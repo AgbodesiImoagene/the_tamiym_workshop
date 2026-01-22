@@ -1,0 +1,58 @@
+\contentsline {section}{\numberline {1}Executive Summary}{4}{section.1}%
+\contentsline {section}{\numberline {2}Project Overview}{4}{section.2}%
+\contentsline {section}{\numberline {3}Scope of Work}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}In-Scope Components}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Out of Scope}{6}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Key Features and Capabilities}{7}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Product Browsing and Discovery}{7}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Design Workshop and Product Customization}{7}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Checkout and Order Management}{8}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Fundraising Campaign Management}{8}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Customer Account and Settings Management}{8}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Admin Dashboard and Operational Management}{9}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}Basic Analytics and Reporting}{9}{subsection.4.7}%
+\contentsline {section}{\numberline {5}User Roles and Access}{9}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Guest Users}{10}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Registered Customers}{10}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Fundraiser Organizers}{10}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Administrative Users}{11}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Access Boundaries and Responsibilities}{11}{subsection.5.5}%
+\contentsline {section}{\numberline {6}Non-Functional Requirements}{11}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Usability and User Experience}{11}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Performance and Responsiveness}{12}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Security and Data Protection}{12}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Reliability and Availability}{13}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Scalability and Growth Considerations}{13}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Browser and Device Support}{13}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}Maintainability and Extensibility}{13}{subsection.6.7}%
+\contentsline {section}{\numberline {7}Assumptions and Dependencies}{14}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Design and Specification Assumptions}{14}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Content and Data Assumptions}{14}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Third-Party Services and Integrations}{14}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Operational and Administrative Assumptions}{15}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Legal and Compliance Assumptions}{15}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Timeline and Collaboration Assumptions}{15}{subsection.7.6}%
+\contentsline {section}{\numberline {8}Risks and Mitigation Strategies}{15}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Design Workshop Complexity}{16}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Fundraising Campaign Misuse or Compliance Issues}{16}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Payment and Checkout Dependencies}{16}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Operational and Administrative Overhead}{16}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Scope Expansion and Feature Creep}{17}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}User Adoption and Usability Challenges}{17}{subsection.8.6}%
+\contentsline {subsection}{\numberline {8.7}Data Growth and Reporting Limitations}{17}{subsection.8.7}%
+\contentsline {section}{\numberline {9}Project Timeline}{17}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Delivery Target}{17}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}High-Level Project Phases}{18}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Timeline Assumptions}{18}{subsection.9.3}%
+\contentsline {section}{\numberline {10}Deliverables}{19}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Primary Deliverables}{19}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Supporting Deliverables}{19}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Exclusions}{19}{subsection.10.3}%
+\contentsline {section}{\numberline {11}Acceptance Criteria}{20}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Functional Acceptance}{20}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Design and Usability Acceptance}{20}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}Quality and Stability Acceptance}{20}{subsection.11.3}%
+\contentsline {subsection}{\numberline {11.4}Review and Sign-Off Process}{20}{subsection.11.4}%
+\contentsline {section}{\numberline {12}Next Steps and Sign-Off}{21}{section.12}%
+\contentsline {subsection}{\numberline {12.1}Next Steps}{21}{subsection.12.1}%
+\contentsline {subsection}{\numberline {12.2}Sign-Off}{21}{subsection.12.2}%

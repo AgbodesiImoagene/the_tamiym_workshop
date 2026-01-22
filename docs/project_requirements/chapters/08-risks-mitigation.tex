@@ -1,0 +1,110 @@
+\section{Risks and Mitigation Strategies}
+
+This section identifies key risks associated with the delivery and operation of
+the platform and outlines mitigation strategies to reduce their potential impact.
+The intent of this section is not to enumerate all possible risks, but to highlight
+areas of complexity and demonstrate proactive planning.
+
+\subsection{Design Workshop Complexity}
+
+\textbf{Risk:}  
+The interactive Design Workshop introduces complexity due to custom artwork
+uploads, text placement, multiple product views (e.g., front/back/sleeve), and
+real-time visual previews. User expectations around design accuracy may exceed
+what is technically or operationally feasible for production.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Clearly communicate that on-screen previews are visual approximations
+    of final printed output
+    \item Constrain design placement to predefined printable areas
+    \item Provide clear feedback and validation within the design workflow
+    \item Align supported customization options strictly with the approved designs
+\end{itemize}
+
+\subsection{Fundraising Campaign Misuse or Compliance Issues}
+
+\textbf{Risk:}  
+Fundraising functionality may be misused or may introduce regulatory and
+compliance concerns depending on jurisdiction.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Provide administrative tools to review, approve, disable, or moderate
+    fundraising campaigns
+    \item Require organizers to supply key campaign information and accept
+    platform terms
+    \item Clearly state that campaign organizers are responsible for compliance
+    with applicable regulations
+\end{itemize}
+
+\subsection{Payment and Checkout Dependencies}
+
+\textbf{Risk:}  
+Reliance on third-party payment providers introduces dependencies related to
+availability, transaction failures, and changes to external services.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Use established and widely adopted payment providers
+    \item Provide clear user messaging in the event of payment failures
+    \item Avoid storing sensitive payment information within the platform
+\end{itemize}
+
+\subsection{Operational and Administrative Overhead}
+
+\textbf{Risk:}  
+Without appropriate tooling, operational tasks such as order management,
+inventory updates, and moderation could become resource-intensive.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Provide a centralized admin dashboard for core operational workflows
+    \item Include search, filtering, and basic reporting to support day-to-day
+    operations
+    \item Ensure administrative interfaces follow the same usability principles
+    as customer-facing views
+\end{itemize}
+
+\subsection{Scope Expansion and Feature Creep}
+
+\textbf{Risk:}  
+Additional feature requests or refinements beyond the agreed scope may arise
+during development or after initial delivery.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Maintain this document as the authoritative reference for scope
+    definition
+    \item Evaluate new requests through a structured change review process
+    \item Prioritize delivery of agreed core functionality before considering
+    enhancements
+\end{itemize}
+
+\subsection{User Adoption and Usability Challenges}
+
+\textbf{Risk:}  
+Users may find certain workflows (e.g., customization or fundraising setup)
+confusing or time-consuming, leading to reduced engagement.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Align implementation closely with the provided designs and interaction
+    patterns
+    \item Provide clear instructional text and contextual guidance where needed
+    \item Use success states and progress indicators to reinforce completion
+\end{itemize}
+
+\subsection{Data Growth and Reporting Limitations}
+
+\textbf{Risk:}  
+As platform usage grows, basic analytics and reporting views may become
+insufficient for deeper business insights.
+
+\textbf{Mitigation:}
+\begin{itemize}[leftmargin=1.5em]
+    \item Limit initial analytics to clearly defined operational metrics
+    \item Design reporting features to be extensible in future phases
+    \item Clearly distinguish between basic out-of-the-box reporting and advanced
+    analytics that may require additional effort
+\end{itemize}

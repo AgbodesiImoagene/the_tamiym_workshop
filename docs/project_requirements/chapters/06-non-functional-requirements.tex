@@ -1,0 +1,127 @@
+\section{Non-Functional Requirements}
+
+This section describes the non-functional requirements of the platform. These
+requirements define the quality attributes, performance expectations, and
+operational characteristics of the system, independent of specific feature
+behavior or technical implementation details.
+
+\subsection{Usability and User Experience}
+
+The platform shall provide a clear, intuitive, and consistent user experience
+across all supported areas of the system.
+
+Key usability requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Consistent visual styling and interaction patterns across public pages,
+    customer dashboards, fundraising views, and administrative interfaces
+    \item Clear navigation and page hierarchy that enables users to locate features
+    and information with minimal effort
+    \item Responsive layouts that adapt to common desktop, tablet, and mobile
+    screen sizes, in alignment with the approved designs
+    \item Clear feedback for user actions such as form submissions, saves,
+    successful purchases, and error conditions
+\end{itemize}
+
+The Design Workshop experience shall prioritize clarity and responsiveness to
+ensure users can confidently preview and adjust designs before purchase.
+
+\subsection{Performance and Responsiveness}
+
+The platform shall be designed to deliver acceptable performance under expected
+usage conditions.
+
+Performance requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Page loads and primary interactions should complete within reasonable
+    timeframes under normal operating conditions
+    \item Interactive features such as product browsing and the Design Workshop
+    should remain responsive during typical user workflows
+    \item Administrative dashboards and reporting views should load efficiently,
+    even as data volumes grow over time
+\end{itemize}
+
+The system is not required to support real-time or sub-second guarantees but
+should provide a smooth and reliable user experience suitable for commercial use.
+
+\subsection{Security and Data Protection}
+
+The platform shall implement appropriate safeguards to protect user data and
+system integrity.
+
+Security-related requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Secure authentication and account access for registered users and
+    administrative users
+    \item Protection of sensitive information such as account credentials and
+    payment-related data
+    \item Logical separation between customer-accessible functionality and
+    administrative capabilities
+    \item Measures to prevent unauthorized access, misuse, or data leakage
+\end{itemize}
+
+Payment processing shall rely on trusted third-party providers where applicable,
+and the platform shall not store sensitive payment details beyond what is
+necessary for operational purposes.
+
+\subsection{Reliability and Availability}
+
+The platform shall be designed to operate reliably under normal usage conditions.
+
+Reliability requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Stable operation during typical user activity, including browsing,
+    customization, checkout, and order management
+    \item Graceful handling of errors, including informative messaging where
+    appropriate
+    \item Preservation of user data such as saved designs, orders, and campaign
+    configurations
+\end{itemize}
+
+The system is expected to be available during standard operating hours, subject
+to planned maintenance and external service dependencies.
+
+\subsection{Scalability and Growth Considerations}
+
+The platform shall be designed with future growth in mind.
+
+Scalability considerations include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Ability to support increasing numbers of users, products, orders, and
+    fundraising campaigns over time
+    \item Ability to extend reporting and analytics capabilities beyond the basic
+    out-of-the-box features defined in this document
+    \item Ability to introduce additional product types, customization options,
+    and administrative workflows in future phases
+\end{itemize}
+
+While advanced scalability solutions are not required as part of the initial
+delivery, the system should avoid design decisions that unnecessarily limit
+future expansion.
+
+\subsection{Browser and Device Support}
+
+The platform shall support modern web browsers and devices.
+
+Support requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Compatibility with current versions of major desktop browsers
+    (e.g., Chrome, Firefox, Safari, Edge)
+    \item Functional support for modern mobile browsers through responsive web
+    design
+    \item No requirement for legacy browser support unless explicitly agreed
+\end{itemize}
+
+\subsection{Maintainability and Extensibility}
+
+The platform shall be structured to support ongoing maintenance and future
+enhancements.
+
+Maintainability requirements include:
+\begin{itemize}[leftmargin=1.5em]
+    \item Clear separation between user-facing functionality and administrative
+    tools
+    \item Ability to update content, products, and campaigns without requiring
+    code changes
+    \item Ability to introduce new features and refinements in a controlled and
+    predictable manner
+\end{itemize}

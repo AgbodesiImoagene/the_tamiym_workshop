@@ -1,0 +1,49 @@
+---
+alwaysApply: true
+---
+
+## Mandatory Rule: Prefer Tools and CLIs Over Manual Generation
+
+The AI agent must **always prefer using existing tools, CLIs, and generators**
+instead of manually producing output that can be reliably created by tools.
+
+This rule is **strict and non-negotiable**.
+
+### Required behavior
+- If a task can be accomplished via a well-known CLI, generator, or automation tool,
+  the tool **must be used**.
+- Manual generation is only acceptable when:
+  1. no suitable tool exists, or
+  2. the task is inherently creative or domain-specific.
+
+### Explicit examples (must follow)
+- Use official CLIs for project scaffolding:
+  - `nest new` for NestJS apps
+  - `create-next-app` for Next.js apps
+- Use Prisma CLI for all schema and database changes:
+  - `prisma init`
+  - `prisma migrate`
+  - `prisma generate`
+- Use Tailwind tooling for design tokens and theme configuration.
+- Use OpenTelemetry SDKs and official instrumentation packages instead of custom tracing code.
+- Use Paystack SDKs or official API clients where available.
+- Use linters, formatters, and code generators rather than hand-formatting.
+- Use color pickers, calculators, and validation tools instead of guessing values.
+- Use Docker, docker-compose, or platform CLIs rather than ad-hoc scripts.
+
+### Explicitly discouraged behavior
+- Hand-writing boilerplate that a CLI would generate.
+- Guessing configuration values instead of deriving them via tools.
+- Manually crafting migrations instead of using Prisma migrations.
+- Writing custom implementations where mature, well-supported libraries exist.
+
+### Enforcement principle
+Using tools improves:
+- correctness
+- consistency
+- maintainability
+- velocity
+- reproducibility
+
+Failure to use appropriate tools is considered a **quality defect**, even if the
+resulting code “works”.

@@ -1,0 +1,204 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User model with roles
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   // CUSTOMER, ORGANIZER, ADMIN (from @tamiym/types)
+  firstName String?
+  lastName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders      Order[]
+  addresses   Address[]
+  campaigns   Campaign[]
+  designs     Design[]
+
+  @@map("users")
+}
+
+// Shipping addresses
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street      String
+  city        String
+  state       String
+  postalCode  String
+  country     String   @default("Nigeria")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orders      Order[]
+
+  @@map("addresses")
+}
+
+// Product categories
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products    Product[]
+
+  @@map("categories")
+}
+
+// Products
+model Product {
+  id          String   @id @default(cuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  name        String
+  slug        String   @unique
+  description String?
+  basePrice   Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  variants         ProductVariant[]
+  orderItems       OrderItem[]
+  campaignProducts CampaignProduct[]
+
+  @@map("products")
+}
+
+// Product variants (size/color combinations)
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String   // e.g., "Small / Red"
+  sku         String   @unique
+  size        String?
+  color       String?
+  price       Decimal  @db.Decimal(10, 2) // Override base price if different
+  stock       Int      @default(0)
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+
+  @@map("product_variants")
+}
+
+// Design model (structured design data)
+model Design {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  name            String
+  designData      Json     // Structured layer model (front/back/sleeve)
+  thumbnailUrl    String?
+  moderationStatus String  @default("PENDING") // PENDING, APPROVED, REJECTED, FLAGGED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  orderItems      OrderItem[]
+  campaignProducts CampaignProduct[]
+
+  @@map("designs")
+}
+
+// Orders
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  shippingAddressId String
+  shippingAddress Address     @relation(fields: [shippingAddressId], references: [id])
+  status          String      @default("PENDING_PAYMENT") // From @tamiym/types OrderStatus
+  paymentStatus   String      @default("PENDING") // From @tamiym/types PaymentStatus
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  paymentReference String?    @unique // Paystack reference
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+// Order line items
+model OrderItem {
+  id                String         @id @default(cuid())
+  orderId           String
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product        @relation(fields: [productId], references: [id])
+  variantId         String
+  variant           ProductVariant @relation(fields: [variantId], references: [id])
+  designId          String?
+  design            Design?        @relation(fields: [designId], references: [id])
+  quantity          Int
+  unitPrice         Decimal        @db.Decimal(10, 2)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@map("order_items")
+}
+
+// Fundraising campaigns
+model Campaign {
+  id          String   @id @default(cuid())
+  organizerId String
+  organizer   User     @relation(fields: [organizerId], references: [id])
+  title       String
+  slug        String   @unique
+  description String?
+  story       String?  // Campaign story/narrative
+  status      String   @default("DRAFT") // From @tamiym/types CampaignStatus
+  goalAmount  Decimal? @db.Decimal(10, 2)
+  currentAmount Decimal @default(0) @db.Decimal(10, 2)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products    CampaignProduct[]
+
+  @@map("campaigns")
+}
+
+// Campaign products (products available in a campaign)
+model CampaignProduct {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  designId    String?
+  design      Design?  @relation(fields: [designId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([campaignId, productId, designId])
+  @@map("campaign_products")
+}

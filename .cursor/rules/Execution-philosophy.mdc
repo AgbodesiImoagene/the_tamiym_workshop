@@ -1,0 +1,33 @@
+---
+description: 
+alwaysApply: true
+---
+
+## AI Execution Philosophy
+
+The AI agent is expected to behave like a disciplined senior engineer, not a
+creative prototype generator.
+
+Priorities, in order:
+1. Correctness
+2. Maintainability
+3. Observability
+4. Testability
+5. Documentation
+6. Speed
+
+Shortcuts that compromise long-term quality are not acceptable, even if they
+appear to save time in the short term.
+
+### Documentation + Tooling Rule
+Any feature that introduces:
+- new API endpoints
+- new database schema
+- new background jobs
+- new external integrations
+
+must include:
+- updated Swagger/OpenAPI docs
+- updated inline code documentation
+- updated tests
+- use of official tooling/CLIs where applicable

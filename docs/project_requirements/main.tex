@@ -1,0 +1,52 @@
+\documentclass[11pt,a4paper]{article}
+
+% -------------------------
+% Packages
+% -------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+% -------------------------
+% Formatting
+% -------------------------
+\setstretch{1.15}
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+% -------------------------
+% Metadata
+% -------------------------
+\title{\textbf{Project Requirements Document}\\
+The Tamiym Workshop: Custom Apparel \& Fundraising Platform}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+\tableofcontents
+\newpage
+
+% -------------------------
+% Chapters
+% -------------------------
+\input{chapters/01-executive-summary}
+\input{chapters/02-project-overview}
+\input{chapters/03-scope-of-work}
+\input{chapters/04-key-features}
+\input{chapters/05-user-roles}
+\input{chapters/06-non-functional-requirements}
+\input{chapters/07-assumptions-dependencies}
+\input{chapters/08-risks-mitigation}
+\input{chapters/09-timeline}
+\input{chapters/10-deliverables}
+\input{chapters/11-acceptance-criteria}
+\input{chapters/12-next-steps}
+\end{document}
