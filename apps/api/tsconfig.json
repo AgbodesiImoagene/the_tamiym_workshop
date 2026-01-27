@@ -1,20 +1,17 @@
 {
-  "extends": "@tamiym/config/tsconfig.json",
+  "extends": "../../packages/config/tsconfig.json",
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "resolvePackageJsonExports": true,
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "ES2023",
+    "target": "ES2022",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
-    "paths": {
-      "@tamiym/types": ["../../packages/types/src"]
-    }
+    "baseUrl": "./"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]

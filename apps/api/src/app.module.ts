@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
+import { UsersModule } from './users/users.module';
+import { AddressesModule } from './addresses/addresses.module';
 
 @Module({
   imports: [
@@ -27,12 +30,12 @@ import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
               }
             : undefined,
         serializers: {
-          req: (req) => ({
+          req: (req: any) => ({
             id: req.id,
             method: req.method,
             url: req.url,
           }),
-          res: (res) => ({
+          res: (res: any) => ({
             statusCode: res.statusCode,
           }),
         },
@@ -40,6 +43,8 @@ import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
     }),
     PrismaModule,
     AuthModule,
+    UsersModule,
+    AddressesModule,
   ],
   controllers: [AppController],
   providers: [
