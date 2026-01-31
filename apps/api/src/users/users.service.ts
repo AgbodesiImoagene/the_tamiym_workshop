@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UserStatus } from '../generated/prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
@@ -12,14 +13,16 @@ export class UsersService {
    * @returns User profile without password
    */
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: { not: UserStatus.DELETED } },
       select: {
         id: true,
         email: true,
         firstName: true,
         lastName: true,
+        phone: true,
         role: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -39,8 +42,8 @@ export class UsersService {
    * @returns Updated user profile
    */
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: { not: UserStatus.DELETED } },
     });
 
     if (!user) {
@@ -49,19 +52,7 @@ export class UsersService {
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        firstName: updateProfileDto.firstName,
-        lastName: updateProfileDto.lastName,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      data: updateProfileDto,
     });
 
     return updatedUser;

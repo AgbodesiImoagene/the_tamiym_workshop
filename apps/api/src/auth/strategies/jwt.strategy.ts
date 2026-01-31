@@ -2,13 +2,25 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import type { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserRole } from '@tamiym/types';
+import { UserRole, UserStatus } from '../../generated/prisma/client';
 
 export interface JwtPayload {
   sub: string; // user id
   email: string;
   role: UserRole;
+}
+
+/** Shape of the user attached to the request by JWT strategy (validate return value). */
+export interface RequestUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
 }
 
 @Injectable()
@@ -20,9 +32,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (request) => {
-          // Also extract from cookies
-          return request?.cookies?.['access_token'];
+        (request: Request): string | null => {
+          const token = request?.cookies?.['access_token'] as
+            | string
+            | undefined;
+          return token ?? null;
         },
       ]),
       ignoreExpiration: false,
@@ -30,28 +44,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload): Promise<RequestUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
         id: true,
         email: true,
         role: true,
+        status: true,
         firstName: true,
         lastName: true,
+        phone: true,
       },
     });
 
-    if (!user) {
+    if (!user || user.status === UserStatus.DELETED) {
       throw new UnauthorizedException('User not found');
     }
 
     return {
       id: user.id,
       email: user.email,
-      role: user.role as UserRole,
+      role: user.role,
+      status: user.status,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
     };
   }
 }

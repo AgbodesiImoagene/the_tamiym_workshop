@@ -32,16 +32,14 @@ export class AddressesService {
     });
 
     const isDefault = createAddressDto.isDefault ?? !existingDefault;
+    const country = createAddressDto.country ?? 'Nigeria';
 
     const address = await this.prisma.address.create({
       data: {
-        userId,
-        street: createAddressDto.street,
-        city: createAddressDto.city,
-        state: createAddressDto.state,
-        postalCode: createAddressDto.postalCode,
-        country: createAddressDto.country || 'Nigeria',
+        ...createAddressDto,
         isDefault,
+        userId,
+        country,
       },
     });
 
@@ -66,7 +64,7 @@ export class AddressesService {
    * @param addressId Address ID
    * @returns Address
    */
-  async findOne(userId: string, addressId: string) {
+  async findUnique(userId: string, addressId: string) {
     const address = await this.prisma.address.findUnique({
       where: { id: addressId },
     });
@@ -94,7 +92,15 @@ export class AddressesService {
     addressId: string,
     updateAddressDto: UpdateAddressDto,
   ) {
-    const address = await this.findOne(userId, addressId);
+    const address = await this.findUnique(userId, addressId);
+
+    if (!address) {
+      throw new NotFoundException('Address not found');
+    }
+
+    if (address.userId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
 
     // If setting as default, unset other default addresses
     if (updateAddressDto.isDefault === true) {
@@ -106,14 +112,7 @@ export class AddressesService {
 
     const updatedAddress = await this.prisma.address.update({
       where: { id: addressId },
-      data: {
-        street: updateAddressDto.street,
-        city: updateAddressDto.city,
-        state: updateAddressDto.state,
-        postalCode: updateAddressDto.postalCode,
-        country: updateAddressDto.country,
-        isDefault: updateAddressDto.isDefault,
-      },
+      data: updateAddressDto,
     });
 
     return updatedAddress;
@@ -125,7 +124,7 @@ export class AddressesService {
    * @param addressId Address ID
    */
   async remove(userId: string, addressId: string) {
-    const address = await this.findOne(userId, addressId);
+    const address = await this.findUnique(userId, addressId);
 
     await this.prisma.address.delete({
       where: { id: addressId },

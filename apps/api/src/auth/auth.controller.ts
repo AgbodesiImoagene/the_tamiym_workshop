@@ -7,9 +7,8 @@ import {
   HttpStatus,
   UseGuards,
   Get,
-  Req,
 } from '@nestjs/common';
-import type { Response, Request } from 'express';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -24,7 +23,8 @@ import { LoginDto } from './dto/login.dto';
 import { Public } from './decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { UserRole } from '@tamiym/types';
+import type { RequestUser } from './strategies/jwt.strategy';
+import { UserRole } from '../generated/prisma/client';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -52,7 +52,9 @@ export class AuthController {
             email: { type: 'string' },
             firstName: { type: 'string', nullable: true },
             lastName: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
             role: { type: 'string', enum: Object.values(UserRole) },
+            status: { type: 'string', example: 'ACTIVE' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -66,7 +68,7 @@ export class AuthController {
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const user = await this.authService.register(registerDto);
+    await this.authService.register(registerDto);
 
     // Auto-login after registration
     const loginResult = await this.authService.login({
@@ -103,7 +105,9 @@ export class AuthController {
             email: { type: 'string' },
             firstName: { type: 'string', nullable: true },
             lastName: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
             role: { type: 'string', enum: Object.values(UserRole) },
+            status: { type: 'string', example: 'ACTIVE' },
           },
         },
       },
@@ -143,7 +147,7 @@ export class AuthController {
       },
     },
   })
-  async logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Res({ passthrough: true }) res: Response) {
     this.clearAuthCookie(res);
     return { message: 'Logged out successfully' };
   }
@@ -166,12 +170,14 @@ export class AuthController {
         email: { type: 'string' },
         firstName: { type: 'string', nullable: true },
         lastName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         role: { type: 'string', enum: Object.values(UserRole) },
+        status: { type: 'string', example: 'ACTIVE' },
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getMe(@CurrentUser() user: any) {
+  getMe(@CurrentUser() user: RequestUser) {
     return user;
   }
 

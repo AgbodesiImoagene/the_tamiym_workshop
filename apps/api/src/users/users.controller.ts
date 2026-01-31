@@ -18,7 +18,8 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '@tamiym/types';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
+import { UserRole } from '../generated/prisma/client';
 
 @ApiTags('Users')
 @Controller('users')
@@ -43,7 +44,9 @@ export class UsersController {
         email: { type: 'string' },
         firstName: { type: 'string', nullable: true },
         lastName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         role: { type: 'string', enum: Object.values(UserRole) },
+        status: { type: 'string', example: 'ACTIVE' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
       },
@@ -51,7 +54,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getProfile(@CurrentUser() user: any) {
+  async getProfile(@CurrentUser() user: RequestUser) {
     return this.usersService.getProfile(user.id);
   }
 
@@ -73,7 +76,9 @@ export class UsersController {
         email: { type: 'string' },
         firstName: { type: 'string', nullable: true },
         lastName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         role: { type: 'string', enum: Object.values(UserRole) },
+        status: { type: 'string', example: 'ACTIVE' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
       },
@@ -83,7 +88,7 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async updateProfile(
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user.id, updateProfileDto);

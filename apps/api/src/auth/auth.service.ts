@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { UserRole } from '@tamiym/types';
+import { UserRole, UserStatus } from '../generated/prisma/client';
 import { JwtPayload } from './strategies/jwt.strategy';
 
 @Injectable()
@@ -41,19 +41,21 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         email: registerDto.email,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
-        role: registerDto.role || UserRole.CUSTOMER,
+        phone: registerDto.phone ?? null,
+        role: registerDto.role ?? UserRole.CUSTOMER,
+        status: UserStatus.ACTIVE,
       },
       select: {
         id: true,
         email: true,
+        role: true,
+        status: true,
         firstName: true,
         lastName: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+        phone: true,
       },
     });
 
@@ -70,13 +72,13 @@ export class AuthService {
       where: { email: loginDto.email },
     });
 
-    if (!user) {
+    if (!user || user.status === UserStatus.DELETED) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
-      user.password,
+      user.passwordHash,
     );
 
     if (!isPasswordValid) {
@@ -86,10 +88,15 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
-      role: user.role as UserRole,
+      role: user.role,
     };
 
     const accessToken = this.jwtService.sign(payload);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     return {
       access_token: accessToken,
@@ -98,28 +105,10 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
         role: user.role,
+        status: user.status,
       },
     };
-  }
-
-  /**
-   * Validate user by ID (used by JWT strategy)
-   * @param userId User ID
-   * @returns User object or null
-   */
-  async validateUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
-
-    return user;
   }
 }

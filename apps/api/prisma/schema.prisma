@@ -4,6 +4,23 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+// NOTE: This schema is designed for:
+// - NestJS + Prisma + Postgres
+// - Nigeria-only v1 (currency default NGN), Paystack-only v1 (via provider interface)
+// - Admin dashboard + moderation + basic analytics support
+// - Structured Design Workshop (Fabric.js) storing layered design JSON + assets
+//
+// Conventions:
+// - Use enums (not strings) for statuses/roles to prevent invalid values.
+// - Orders snapshot shipping details to avoid historical drift if Address changes.
+// - Payments/Refunds/Payouts modeled explicitly for auditability & idempotency.
+// - Discounts + Bulk pricing supported.
+//
+// Missing constraints (not expressible in PSL): enforce in application logic or add via
+// a separate migration. See model-level comments for details (ProductView.isDefault,
+// Address.isDefault, UserPayoutProfile.isDefault, OrganizerPricingPolicy, Discount,
+// BulkPricing).
+
 generator client {
   provider            = "prisma-client"
   output              = "../src/generated/prisma"
@@ -15,47 +32,257 @@ datasource db {
   provider = "postgresql"
 }
 
-// User model with roles
+/**
+ * =========================
+ * Enums
+ * =========================
+ */
+
+/// Role of a user in the system (customer, organizer, or admin).
+enum UserRole {
+  CUSTOMER
+  ORGANIZER
+  ADMIN
+}
+
+/// Lifecycle status of a user account.
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+/// How a product image is used (thumbnail, gallery, or workshop template).
+enum ImageRole {
+  THUMBNAIL
+  GALLERY
+  WORKSHOP_TEMPLATE
+}
+
+/// Order lifecycle from draft/cart through payment, fulfillment, and delivery or refund.
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  FULFILLED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+/// Status of a payment attempt for an order.
+enum PaymentStatus {
+  PENDING
+  INITIATED
+  SUCCEEDED
+  FAILED
+}
+
+/// Lifecycle status of a fundraising campaign.
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  DISABLED
+  ENDED
+}
+
+/// Moderation outcome for a design or asset (e.g. user-uploaded art).
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+/// Payment or payout provider (v1: Paystack only).
+enum PaymentProvider {
+  PAYSTACK
+  // Future: STRIPE, FLUTTERWAVE, PAYPAL
+}
+
+/// How a discount value is applied (percentage, fixed amount, or bulk tier).
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+  BULK
+}
+
+/// Scope of a discount (order, product, variant, or campaign).
+enum DiscountScope {
+  ORDER
+  PRODUCT
+  VARIANT
+  CAMPAIGN
+}
+
+/// Whether a discount is currently active or inactive.
+enum DiscountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Visibility/lifecycle status of a product in the catalog.
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// Supported currency (v1: NGN only).
+enum CurrencyCode {
+  NGN
+  // Future: USD, EUR, GBP, etc.
+}
+
+/// Channel used to send a notification (email, SMS, or Slack).
+enum NotificationChannel {
+  EMAIL
+  SMS
+  SLACK
+}
+
+/// Delivery status of a notification outbox item.
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// Type of admin or system action recorded in the audit log.
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  FLAG
+  DISABLE
+  ENABLE
+  STATUS_CHANGE
+  REFUND
+  PAYOUT
+}
+
+/// Status of a payout to an organizer or recipient.
+enum PayoutStatus {
+  INITIATED
+  SUCCEEDED
+  FAILED
+}
+
+/// Status of a refund against an order.
+enum RefundStatus {
+  INITIATED
+  SUCCEEDED
+  FAILED
+}
+
+/// Type of layer in a workshop template (base, mask, outline, etc.).
+enum TemplateLayerType {
+  BASE
+  SHADOW
+  HIGHLIGHT
+  MASK_OVERLAY
+  OUTLINE
+  DETAIL
+}
+
+/// Effect applied to a template layer when an option value is selected (e.g. TINT, REPLACE_IMAGE).
+enum TemplateEffectType {
+  TINT // apply color to a mask layer
+  SHOW // show a layer (opacity->1)
+  HIDE // hide a layer (opacity->0)
+  REPLACE_IMAGE // swap layer image based on value
+}
+
+/// Blend mode for rendering a template layer over the product image.
+enum BlendMode {
+  NORMAL
+  MULTIPLY
+  SCREEN
+  OVERLAY
+  DARKEN
+  LIGHTEN
+}
+
+/**
+ * =========================
+ * Core Users & Addresses
+ * =========================
+ */
+
+/// Authenticated user (customer, organizer, or admin). Holds auth, profile, and relations.
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  role      String   // CUSTOMER, ORGANIZER, ADMIN (from @tamiym/types)
-  firstName String?
-  lastName  String?
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(CUSTOMER)
+  status       UserStatus @default(ACTIVE)
+
+  firstName       String
+  lastName        String
+  phone           String? // not unique by default; can be unique if you enforce it
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  orders      Order[]
-  addresses   Address[]
-  campaigns   Campaign[]
-  designs     Design[]
+  orders               Order[]
+  addresses            Address[]
+  campaigns            Campaign[]           @relation("OrganizerCampaigns")
+  designs              Design[]
+  designAssets         DesignAsset[]
+  payouts              Payout[]             @relation("RecipientPayouts")
+  auditLogs            AuditLog[]           @relation("ActorAuditLogs")
+  payoutProfiles       UserPayoutProfile[]
+  notificationOutboxes NotificationOutbox[]
 
+  @@index([email])
+  @@index([role])
+  @@index([status])
   @@map("users")
 }
 
-// Shipping addresses
+/// Shipping or billing address for a user. Used at checkout and snapshotted on Order.
+/// Missing constraint: at most one address per user may have isDefault = true. Enforce in app when setting default, or add migration: CREATE UNIQUE INDEX addresses_one_default_per_user ON addresses (user_id) WHERE is_default = true;
 model Address {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  street      String
-  city        String
-  state       String
-  postalCode  String
-  country     String   @default("Nigeria")
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  orders      Order[]
+  recipientName String?
+  phone         String?
 
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String?
+  country      String  @default("Nigeria")
+  landmark     String?
+  instructions String?
+
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([userId])
   @@map("addresses")
 }
 
-// Product categories
+/**
+ * =========================
+ * Catalog: Categories, Products, Variants, Options
+ * =========================
+ */
+
+/// Product category (e.g. T‑shirts, Mugs). Used for catalog grouping and filtering.
 model Category {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -64,147 +291,1066 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  products    Product[]
+  products Product[]
 
   @@map("categories")
 }
 
-// Products
+/// Sellable product in the catalog. Has views, options, prices, and design templates.
 model Product {
-  id          String   @id @default(cuid())
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
   name        String
-  slug        String   @unique
+  slug        String        @unique
   description String?
-  basePrice   Decimal  @db.Decimal(10, 2)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      ProductStatus @default(DRAFT)
 
-  // Relations
-  variants         ProductVariant[]
-  orderItems       OrderItem[]
-  campaignProducts CampaignProduct[]
+  defaultCurrency CurrencyCode @default(NGN)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants                   ProductVariant[]
+  options                    ProductOption[]
+  images                     ProductImage[]
+  views                      ProductView[]
+  printAreas                 PrintArea[]
+  prices                     ProductPrice[]
+  bulkPricingTiers           BulkPricing[]
+  orderItems                 OrderItem[]
+  campaignProducts           CampaignProduct[]
+  designs                    Design[]
+  discountProducts           DiscountProduct[]
+  productImageRoles          ProductImageRole[]
+  productViewPricings        ProductViewPricing[]
+  workshopTemplateLayers     WorkshopTemplateLayer[]
+  optionValueTemplateEffects OptionValueTemplateEffect[]
+  organizerPricingPolicies   OrganizerPricingPolicy[]
+
+  @@index([categoryId])
+  @@index([slug])
   @@map("products")
 }
 
-// Product variants (size/color combinations)
+/// Option definition for a product (e.g. size, color). Contains a set of ProductOptionValues.
+model ProductOption {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  code      String // e.g. "size", "color", "fit", "material"
+  name      String
+  sortOrder Int    @default(0)
+
+  values              ProductOptionValue[]
+  variantOptionValues VariantOptionValue[]
+  templateEffects     OptionValueTemplateEffect[]
+
+  @@unique([productId, code])
+  @@index([productId])
+  @@map("product_options")
+}
+
+/// A single value for an option (e.g. "L", "BLACK"). Linked to variants via VariantOptionValue.
+model ProductOptionValue {
+  id       String        @id @default(cuid())
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  valueCode   String // e.g. "L", "BLACK", "UNISEX"
+  displayName String
+  metadata    Json? // e.g. { "hex": "#000000" }
+  sortOrder   Int    @default(0)
+
+  variantLinks    VariantOptionValue[]
+  templateEffects OptionValueTemplateEffect[]
+
+  @@unique([optionId, valueCode])
+  @@index([optionId])
+  @@map("product_option_values")
+}
+
+/// Concrete variant of a product (e.g. Small/Red). Has SKU, optional price override, inventory, and prices.
 model ProductVariant {
-  id          String   @id @default(cuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name        String   // e.g., "Small / Red"
-  sku         String   @unique
-  size        String?
-  color       String?
-  price       Decimal  @db.Decimal(10, 2) // Override base price if different
-  stock       Int      @default(0)
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  // Relations
-  orderItems  OrderItem[]
+  name String // e.g., "Small / Red / Unisex"
+  sku  String @unique
 
+  // Optional convenience columns (can be derived from options):
+  size  String?
+  color String?
+
+  // Prefer Price table in v1; keep optional override for emergency/manual ops if you want.
+  priceOverride Decimal? @db.Decimal(10, 2)
+
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  optionValues VariantOptionValue[]
+  inventory    InventoryItem?
+  prices       VariantPrice[]
+  bulkPricing  BulkPricing[]
+
+  orderItems       OrderItem[]
+  discountVariants DiscountVariant[]
+
+  images                   ProductImage[]
+  productViewPricings      ProductViewPricing[]
+  organizerPricingPolicies OrganizerPricingPolicy[]
+
+  @@index([productId])
   @@map("product_variants")
 }
 
-// Design model (structured design data)
-model Design {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  name            String
-  designData      Json     // Structured layer model (front/back/sleeve)
-  thumbnailUrl    String?
-  moderationStatus String  @default("PENDING") // PENDING, APPROVED, REJECTED, FLAGGED
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+/// Join table linking a variant to the option values that define it (e.g. size=L, color=BLACK).
+model VariantOptionValue {
+  variantId     String
+  optionId      String
+  optionValueId String
 
-  // Relations
-  orderItems      OrderItem[]
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  option      ProductOption      @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, optionValueId])
+  @@unique([variantId, optionId])
+  @@index([variantId])
+  @@index([optionValueId])
+  @@map("variant_option_values")
+}
+
+/// Stock and reservation for a single variant. One-to-one with ProductVariant.
+model InventoryItem {
+  id        String         @id @default(cuid())
+  variantId String         @unique
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  stockOnHand       Int     @default(0)
+  reserved          Int     @default(0)
+  trackInventory    Boolean @default(true)
+  lowStockThreshold Int     @default(0)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("inventory_items")
+}
+
+/// Base price for a product per currency. One row per (product, currency).
+model ProductPrice {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  currency  CurrencyCode @default(NGN)
+  amount    Decimal      @db.Decimal(10, 2)
+  compareAt Decimal?     @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, currency])
+  @@index([productId])
+  @@index([currency])
+  @@map("product_prices")
+}
+
+/// Price for a variant per currency. Overrides or supplements product base price.
+model VariantPrice {
+  id        String         @id @default(cuid())
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  currency  CurrencyCode @default(NGN)
+  amount    Decimal      @db.Decimal(10, 2)
+  compareAt Decimal?     @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([variantId, currency])
+  @@index([variantId])
+  @@index([currency])
+  @@map("variant_prices")
+}
+
+/// Campaign-specific selling price for a campaign product per currency.
+model CampaignProductPrice {
+  id                String          @id @default(cuid())
+  campaignProductId String
+  campaignProduct   CampaignProduct @relation(fields: [campaignProductId], references: [id], onDelete: Cascade)
+
+  currency  CurrencyCode @default(NGN)
+  amount    Decimal      @db.Decimal(10, 2)
+  compareAt Decimal?     @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignProductId, currency])
+  @@index([campaignProductId])
+  @@index([currency])
+  @@map("campaign_product_prices")
+}
+
+/// Image asset for a product (or optionally a variant). Used in gallery, thumbnails, and workshop templates.
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  url       String
+  sortOrder Int     @default(0)
+  altText   String?
+
+  createdAt DateTime @default(now())
+
+  roles              ProductImageRole[]
+  templateLayers     WorkshopTemplateLayer[]
+  replacementEffects OptionValueTemplateEffect[] @relation("ReplacementImageEffects")
+
+  @@index([productId])
+  @@index([variantId])
+  @@map("product_images")
+}
+
+/// Assigns an image to a role (thumbnail, gallery, or workshop template) for a product or product view.
+model ProductImageRole {
+  id String @id @default(cuid())
+
+  // Include productId to enforce product-scoped uniqueness constraints.
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  imageId String
+  image   ProductImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  role      ImageRole
+  sortOrder Int? // used for GALLERY ordering; optional for others
+
+  // Only applicable for WORKSHOP_TEMPLATE (template per view)
+  productViewId String?
+  productView   ProductView? @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, role, productViewId])
+  @@index([productId])
+  @@index([imageId])
+  @@index([productViewId])
+  @@map("product_image_roles")
+}
+
+/// A designable view of a product (e.g. front, back, sleeve). Has print area, pricing, and template layers.
+/// Missing constraint: at most one view per product may have isDefault = true. Enforce in app when setting default, or add migration: CREATE UNIQUE INDEX product_views_one_default_per_product ON product_views (product_id) WHERE is_default = true;
+model ProductView {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  key         String // e.g. "front", "back", "mug_wrap"
+  displayName String // e.g. "Front", "Back", "Wrap"
+  sortOrder   Int    @default(0)
+
+  isDesignable Boolean @default(true)
+  isDefault    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  printAreas      PrintArea[]
+  imageRoles      ProductImageRole[]
+  designViews     DesignView[]
+  pricingRules    ProductViewPricing[]
+  templateLayers  WorkshopTemplateLayer[]
+  templateEffects OptionValueTemplateEffect[]
+
+  @@unique([productId, key])
+  @@index([productId])
+  @@map("product_views")
+}
+
+/// Surcharge for using an extra product view (e.g. back print). Optional variant override.
+model ProductViewPricing {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Optional variant override (if some blanks cost more for extra placements)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  productViewId String
+  productView   ProductView @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  currency        CurrencyCode @default(NGN)
+  surchargeAmount Decimal      @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, variantId, productViewId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([productViewId])
+  @@map("product_view_pricing")
+}
+
+/**
+ * =========================
+ * Customization constraints (Design Workshop)
+ * =========================
+ */
+
+/// Printable bounding box for a product view. Coordinates can be normalized [0..1] or px.
+model PrintArea {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  productViewId String
+  productView   ProductView @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  // Coordinates can be normalized [0..1] or px relative to a known template.
+  x      Float
+  y      Float
+  width  Float
+  height Float
+
+  rotationAllowed Boolean @default(false)
+  maxLayers       Int? // optional
+  maxColors       Int? // optional
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, productViewId])
+  @@index([productId])
+  @@index([productViewId])
+  @@map("print_areas")
+}
+
+/// A layer in the workshop template for a product view (base, mask, etc.). Drives option-based effects.
+model WorkshopTemplateLayer {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  productViewId String
+  productView   ProductView @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  // Logical identifier like "base", "body_mask", "sleeve_mask"
+  key         String
+  displayName String?
+
+  layerType TemplateLayerType
+
+  // The image asset for this layer (PNG/WebP)
+  imageId String
+  image   ProductImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  // Rendering metadata
+  blendMode BlendMode @default(NORMAL)
+  opacity   Float     @default(1.0)
+  zIndex    Int       @default(0)
+
+  // Optional: extra rendering hints (e.g., transforms: offsets, scaling rules, ...)
+  meta Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  effects OptionValueTemplateEffect[]
+
+  @@unique([productViewId, key])
+  @@index([productId])
+  @@index([productViewId])
+  @@index([imageId])
+  @@map("workshop_template_layers")
+}
+
+/// Effect applied to a template layer when an option value is selected (e.g. TINT for color, REPLACE_IMAGE).
+model OptionValueTemplateEffect {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  productViewId String
+  productView   ProductView @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  templateLayerId String
+  templateLayer   WorkshopTemplateLayer @relation(fields: [templateLayerId], references: [id], onDelete: Cascade)
+
+  effectType TemplateEffectType
+
+  // For TINT: either pull from optionValue.metadata.hex or override here
+  tintHex String?
+
+  // For REPLACE_IMAGE: optional override image
+  replacementImageId String?
+  replacementImage   ProductImage? @relation("ReplacementImageEffects", fields: [replacementImageId], references: [id], onDelete: SetNull)
+
+  // Extra params if needed (e.g. opacity override)
+  meta Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Prevent duplicate effect rules for same combination
+  @@unique([productViewId, optionValueId, templateLayerId, effectType])
+  @@index([productId])
+  @@index([productViewId])
+  @@index([optionId])
+  @@index([optionValueId])
+  @@index([templateLayerId])
+  @@map("option_value_template_effects")
+}
+
+/**
+ * =========================
+ * Designs & Assets
+ * =========================
+ */
+
+/// User-created design for a product. Stores structured designData (layers per view) and moderation status.
+model Design {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  name             String
+  designData       Json // structured layer model per view
+  thumbnailUrl     String?
+  moderationStatus ModerationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  views DesignView[]
+
+  orderItems       OrderItem[]
   campaignProducts CampaignProduct[]
 
+  @@index([userId])
+  @@index([productId])
+  @@index([campaignId])
+  @@index([moderationStatus])
+  @@index([createdAt])
   @@map("designs")
 }
 
-// Orders
+/// Uploaded asset (image/file) owned by a user. Referenced from design layers.
+model DesignAsset {
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  url       String
+  mimeType  String
+  sizeBytes Int
+  checksum  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerUserId])
+  @@map("design_assets")
+}
+
+/// Per-view metadata for a design (which product view, whether used, layer count). Links Design to ProductView.
+model DesignView {
+  id       String @id @default(cuid())
+  designId String
+  design   Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  productViewId String
+  productView   ProductView @relation(fields: [productViewId], references: [id], onDelete: Cascade)
+
+  isUsed     Boolean @default(false)
+  layerCount Int     @default(0)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([designId, productViewId])
+  @@index([designId])
+  @@index([productViewId])
+  @@map("design_views")
+}
+
+/**
+ * =========================
+ * Orders, Payments, Refunds
+ * =========================
+ */
+
+/// Customer order. Snapshot of shipping address; status and payment status; line items and payments.
 model Order {
-  id              String      @id @default(cuid())
-  userId          String
-  user            User        @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Reference to address used, but ALSO store snapshot below.
   shippingAddressId String
-  shippingAddress Address     @relation(fields: [shippingAddressId], references: [id])
-  status          String      @default("PENDING_PAYMENT") // From @tamiym/types OrderStatus
-  paymentStatus   String      @default("PENDING") // From @tamiym/types PaymentStatus
-  totalAmount     Decimal     @db.Decimal(10, 2)
-  paymentReference String?    @unique // Paystack reference
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime   @updatedAt
+  shippingAddress   Address @relation(fields: [shippingAddressId], references: [id])
 
-  // Relations
-  items           OrderItem[]
+  status        OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus PaymentStatus @default(PENDING)
 
+  currency CurrencyCode @default(NGN)
+
+  subtotalAmount Decimal @db.Decimal(10, 2)
+  shippingFee    Decimal @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount    Decimal @db.Decimal(10, 2)
+
+  // Shipping snapshot (prevents drift if Address changes later)
+  shipRecipientName String?
+  shipPhone         String?
+  shipLine1         String
+  shipLine2         String?
+  shipCity          String
+  shipState         String
+  shipPostalCode    String?
+  shipCountry       String  @default("Nigeria")
+  shipLandmark      String?
+  shipInstructions  String?
+
+  // Paystack reference for the order-level payment attempt (still track Payment rows below)
+  paymentReference String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items          OrderItem[]
+  payments       Payment[]
+  refunds        Refund[]
+  orderDiscounts OrderDiscount[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
   @@map("orders")
 }
 
-// Order line items
+/// Single line item on an order (product, variant, optional design/campaign). Stores unit pricing and optional breakdown.
 model OrderItem {
-  id                String         @id @default(cuid())
-  orderId           String
-  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId         String
-  product           Product        @relation(fields: [productId], references: [id])
-  variantId         String
-  variant           ProductVariant @relation(fields: [variantId], references: [id])
-  designId          String?
-  design            Design?        @relation(fields: [designId], references: [id])
-  quantity          Int
-  unitPrice         Decimal        @db.Decimal(10, 2)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  designId String?
+  design   Design? @relation(fields: [designId], references: [id])
+
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  quantity Int
+
+  unitBasePrice      Decimal @db.Decimal(10, 2) // base includes 1 view
+  unitViewSurcharge  Decimal @default(0) @db.Decimal(10, 2)
+  unitDiscountAmount Decimal @default(0) @db.Decimal(10, 2)
+  unitFinalPrice     Decimal @db.Decimal(10, 2) // base + surcharge - discount
+
+  pricingBreakdown         Json?
+  organizerDiscountApplied Decimal? @db.Decimal(10, 2) // y (resolved) for audit, optional
+  organizerCostBasis       Decimal? @db.Decimal(10, 2) // (x - y), optional
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([variantId])
+  @@index([campaignId])
   @@map("order_items")
 }
 
-// Fundraising campaigns
+/// Payment attempt for an order. Tracks provider, amount, idempotency key for webhooks.
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider    PaymentProvider @default(PAYSTACK)
+  providerRef String? // Paystack transaction reference / id
+  status      PaymentStatus   @default(INITIATED)
+
+  currency CurrencyCode @default(NGN)
+  amount   Decimal      @db.Decimal(10, 2)
+
+  // Idempotency: store webhook event ids if Paystack provides, else store signature hash.
+  idempotencyKey String? @unique
+
+  rawEvent Json? // optional: store webhook payload (careful with size)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@index([provider, providerRef])
+  @@map("payments")
+}
+
+/// Refund against an order. Tracks provider, amount, reason, and status.
+model Refund {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider    PaymentProvider @default(PAYSTACK)
+  providerRef String?
+  status      RefundStatus    @default(INITIATED)
+
+  currency CurrencyCode @default(NGN)
+  amount   Decimal      @db.Decimal(10, 2)
+
+  reason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([provider, providerRef])
+  @@map("refunds")
+}
+
+/**
+ * =========================
+ * Campaigns (Fundraising)
+ * =========================
+ */
+
+/// Fundraising campaign. Organizer, goal, dates, optional payout profile or inline bank details.
 model Campaign {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   organizerId String
-  organizer   User     @relation(fields: [organizerId], references: [id])
+  organizer   User   @relation("OrganizerCampaigns", fields: [organizerId], references: [id])
+
   title       String
-  slug        String   @unique
+  slug        String  @unique
   description String?
-  story       String?  // Campaign story/narrative
-  status      String   @default("DRAFT") // From @tamiym/types CampaignStatus
-  goalAmount  Decimal? @db.Decimal(10, 2)
-  currentAmount Decimal @default(0) @db.Decimal(10, 2)
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  story       String?
 
-  // Relations
-  products    CampaignProduct[]
+  status CampaignStatus @default(DRAFT)
 
+  currency      CurrencyCode @default(NGN)
+  goalAmount    Decimal?     @db.Decimal(10, 2)
+  currentAmount Decimal      @default(0) @db.Decimal(10, 2)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Organizer payout details (Nigeria-only v1). You can alternatively normalize this into a separate table.
+  payoutBankName    String?
+  payoutBankCode    String?
+  payoutAccountName String?
+  payoutAccountNo   String?
+  payoutProfileId   String?
+  payoutProfile     UserPayoutProfile? @relation(fields: [payoutProfileId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products          CampaignProduct[]
+  designs           Design[]
+  orderItems        OrderItem[]
+  payouts           Payout[]
+  discountCampaigns DiscountCampaign[]
+
+  @@index([organizerId])
+  @@index([slug])
+  @@index([status])
+  @@index([createdAt])
+  @@index([payoutProfileId])
   @@map("campaigns")
 }
 
-// Campaign products (products available in a campaign)
+/// Product (and optional design) offered in a campaign. Has campaign-specific prices per currency.
 model CampaignProduct {
-  id          String   @id @default(cuid())
-  campaignId  String
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  designId    String?
-  design      Design?  @relation(fields: [designId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  // Optional: restrict to one design or use a default design
+  designId String?
+  design   Design? @relation(fields: [designId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Campaign selling prices z (explicit per currency)
+  prices CampaignProductPrice[]
 
   @@unique([campaignId, productId, designId])
+  @@index([campaignId])
   @@map("campaign_products")
 }
+
+/// Saved bank account for payouts. Organizers can attach to campaigns instead of inline bank fields.
+/// Missing constraint: at most one profile per user may have isDefault = true. Enforce in app when setting default, or add migration: CREATE UNIQUE INDEX user_payout_profiles_one_default_per_user ON user_payout_profiles (user_id) WHERE is_default = true;
+model UserPayoutProfile {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label         String? // "Personal", "Church Account", etc.
+  bankName      String?
+  bankCode      String
+  accountName   String
+  accountNumber String
+
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@index([userId])
+  @@index([bankCode])
+  @@map("user_payout_profiles")
+}
+
+/// Payout from platform to campaign organizer. Tracks provider, amount, and status.
+model Payout {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  recipientUserId String
+  recipient       User   @relation("RecipientPayouts", fields: [recipientUserId], references: [id])
+
+  provider    PaymentProvider @default(PAYSTACK)
+  providerRef String?
+  status      PayoutStatus    @default(INITIATED)
+
+  currency CurrencyCode @default(NGN)
+  amount   Decimal      @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([provider, providerRef])
+  @@map("payouts")
+}
+
+/// Organizer discount/cost policy: percent or fixed discount per currency, scoped to product/variant or site-wide.
+/// Missing constraints (enforce in app): (1) Exactly one of discountPercent or discountAmount must be set. (2) At most one active policy per (currency, productId, variantId) overlapping in time; prevent overlapping active defaults in application logic.
+model OrganizerPricingPolicy {
+  id       String       @id @default(cuid())
+  currency CurrencyCode @default(NGN)
+
+  // The organizer discount y can be defined as percent or fixed amount.
+  // Exactly one should be set (enforce in application logic).
+  discountPercent Float?
+  discountAmount  Decimal? @db.Decimal(10, 2)
+
+  // Scope controls what this policy applies to
+  // If productId/variantId are null => site-wide default
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  isActive Boolean   @default(true)
+  startAt  DateTime?
+  endAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([currency, productId, variantId, startAt], name: "uniq_policy_scope_start")
+  @@index([isActive, currency])
+  @@index([productId])
+  @@index([variantId])
+  // Prevent multiple active defaults that overlap accidentally (enforce in app)
+  @@index([currency, productId, variantId, isActive])
+  @@map("organizer_pricing_policies")
+}
+
+/**
+ * =========================
+ * Discounts & Bulk Pricing
+ * =========================
+ */
+
+/// Promo or discount rule. Type PERCENTAGE/FIXED/BULK; scope ORDER/PRODUCT/VARIANT/CAMPAIGN.
+/// Missing constraints (enforce in app): For type FIXED, currency must be set. For type PERCENTAGE, valuePercent in 0..100. Redeemed count must not exceed maxRedemptions when set.
+model Discount {
+  id     String         @id @default(cuid())
+  code   String?        @unique
+  type   DiscountType
+  status DiscountStatus @default(ACTIVE)
+  scope  DiscountScope
+
+  // For percentage: store 0..100
+  // For fixed: store amount in `valueAmount` with currency
+  valuePercent Float?
+  valueAmount  Decimal?      @db.Decimal(10, 2)
+  currency     CurrencyCode? // required when FIXED
+
+  minOrderAmount Decimal? @db.Decimal(10, 2)
+
+  startAt DateTime?
+  endAt   DateTime?
+
+  maxRedemptions Int?
+  redeemedCount  Int  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products       DiscountProduct[]
+  variants       DiscountVariant[]
+  campaigns      DiscountCampaign[]
+  orderDiscounts OrderDiscount[]
+
+  @@index([status, scope])
+  @@index([status, scope, startAt, endAt])
+  @@map("discounts")
+}
+
+/// Links a discount to a product (when scope includes PRODUCT).
+model DiscountProduct {
+  discountId String
+  productId  String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([discountId, productId])
+  @@map("discount_products")
+}
+
+/// Links a discount to a variant (when scope includes VARIANT).
+model DiscountVariant {
+  discountId String
+  variantId  String
+  discount   Discount       @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@id([discountId, variantId])
+  @@map("discount_variants")
+}
+
+/// Links a discount to a campaign (when scope includes CAMPAIGN).
+model DiscountCampaign {
+  discountId String
+  campaignId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@id([discountId, campaignId])
+  @@map("discount_campaigns")
+}
+
+/// Record of a discount applied to an order (amount and currency). Immutable once created.
+model OrderDiscount {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id])
+
+  currency      CurrencyCode @default(NGN)
+  amountApplied Decimal      @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@map("order_discounts")
+}
+
+/// Quantity-tier pricing for a product or variant (e.g. 10–24 units at X per unit).
+/// Missing constraints (enforce in app): When maxQuantity is set, minQuantity <= maxQuantity. Tiers for same scope should not overlap in quantity range (e.g. 10–24 and 20–49); enforce in application when creating/updating.
+model BulkPricing {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  minQuantity  Int
+  maxQuantity  Int?
+  currency     CurrencyCode @default(NGN)
+  pricePerUnit Decimal      @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Prevent duplicate tiers for same scope:
+  @@unique([productId, variantId, currency, minQuantity])
+  @@index([productId])
+  @@index([variantId])
+  @@index([productId, minQuantity])
+  @@index([variantId, minQuantity])
+  @@map("bulk_pricing")
+}
+
+/**
+ * =========================
+ * Notifications & Audit Logging
+ * =========================
+ */
+
+/// Outbox for notifications (email, SMS, Slack). Processed by a worker; status and attempts tracked.
+model NotificationOutbox {
+  id              String              @id @default(cuid())
+  eventName       String // e.g., "OrderPlaced", "PaymentConfirmed"
+  channel         NotificationChannel
+  recipient       String // email address, phone, slack webhook id/alias
+  recipientUserId String?
+  recipientUser   User?               @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+  payload         Json // template variables
+  status          NotificationStatus  @default(PENDING)
+  attempts        Int                 @default(0)
+  lastError       String?
+  scheduledAt     DateTime            @default(now())
+  sentAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([recipientUserId])
+  @@index([status, scheduledAt])
+  @@map("notification_outbox")
+}
+
+/// Immutable audit record of an action on an entity (e.g. order status change, design approval).
+model AuditLog {
+  id          String  @id @default(cuid())
+  actorUserId String?
+  actor       User?   @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  action     AuditAction
+  entityType String // "Order", "Product", "Campaign", "Design", etc.
+  entityId   String
+  before     Json?
+  after      Json?
+  note       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}
+
+// OrderItem.pricingBreakdown (proposal)
+
+// {
+//   "currency": "NGN",
+//   "base": {
+//     "source": "VARIANT_PRICE|PRODUCT_BASE_PRICE",
+//     "amount": "15000.00",
+//     "includedViews": 1,
+//     "includedViewId": "pv_front_id"
+//   },
+//   "views": {
+//     "usedViewIds": ["pv_front_id", "pv_back_id"],
+//     "billableViewIds": ["pv_back_id"],
+//     "surcharges": [
+//       { "productViewId": "pv_back_id", "amount": "2500.00", "ruleId": "pvp_rule_id" }
+//     ],
+//     "totalSurcharge": "2500.00"
+//   },
+//   "bulkPricing": {
+//     "applied": true,
+//     "tierId": "bulk_tier_id",
+//     "minQty": 10,
+//     "maxQty": 24,
+//     "pricePerUnit": "13500.00",
+//     "savingsPerUnit": "1500.00"
+//   },
+//   "discounts": [
+//     { "discountId": "disc_id", "code": "SAVE10", "type": "PERCENTAGE", "amount": "1500.00" }
+//   ],
+//   "totals": {
+//     "unitBasePrice": "15000.00",
+//     "unitViewSurcharge": "2500.00",
+//     "unitDiscountAmount": "1500.00",
+//     "unitFinalPrice": "16000.00"
+//   }
+// }
+
+// Design.designData (proposal)
+
+// {
+//   "version": 1,
+//   "productId": "prod_id",
+//   "variantId": "variant_id",
+//   "base": {
+//     "baseColorValueCode": "BLACK"
+//   },
+//   "views": {
+//     "pv_front_id": {
+//       "canvas": { "width": 1200, "height": 1600, "dpiHint": 300 },
+//       "printArea": { "x": 0.18, "y": 0.22, "w": 0.64, "h": 0.55 }, 
+//       "layers": [
+//         {
+//           "id": "layer1",
+//           "type": "text",
+//           "text": "TAMIYM",
+//           "fontFamily": "Inter",
+//           "fontWeight": 700,
+//           "fontSize": 80,
+//           "fill": "#FFFFFF",
+//           "transform": { "x": 420, "y": 520, "scaleX": 1, "scaleY": 1, "rotation": 0 },
+//           "opacity": 1
+//         },
+//         {
+//           "id": "layer2",
+//           "type": "image",
+//           "assetId": "asset_id",
+//           "crop": null,
+//           "transform": { "x": 300, "y": 700, "scaleX": 0.6, "scaleY": 0.6, "rotation": 0 },
+//           "opacity": 1
+//         }
+//       ]
+//     },
+//     "pv_back_id": {
+//       "canvas": { "width": 1200, "height": 1600, "dpiHint": 300 },
+//       "printArea": { "x": 0.18, "y": 0.22, "w": 0.64, "h": 0.55 },
+//       "layers": []
+//     }
+//   }
+// }

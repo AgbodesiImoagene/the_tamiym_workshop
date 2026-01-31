@@ -23,6 +23,7 @@ import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
 
 @ApiTags('Users')
 @Controller('users/addresses')
@@ -46,11 +47,16 @@ export class AddressesController {
       properties: {
         id: { type: 'string' },
         userId: { type: 'string' },
-        street: { type: 'string' },
+        addressLine1: { type: 'string' },
+        addressLine2: { type: 'string', nullable: true },
+        recipientName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         city: { type: 'string' },
         state: { type: 'string' },
-        postalCode: { type: 'string' },
+        postalCode: { type: 'string', nullable: true },
         country: { type: 'string' },
+        landmark: { type: 'string', nullable: true },
+        instructions: { type: 'string', nullable: true },
         isDefault: { type: 'boolean' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
@@ -60,7 +66,7 @@ export class AddressesController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
     @Body() createAddressDto: CreateAddressDto,
   ) {
     return this.addressesService.create(user.id, createAddressDto);
@@ -83,11 +89,16 @@ export class AddressesController {
         properties: {
           id: { type: 'string' },
           userId: { type: 'string' },
-          street: { type: 'string' },
+          addressLine1: { type: 'string' },
+          addressLine2: { type: 'string', nullable: true },
+          recipientName: { type: 'string', nullable: true },
+          phone: { type: 'string', nullable: true },
           city: { type: 'string' },
           state: { type: 'string' },
-          postalCode: { type: 'string' },
+          postalCode: { type: 'string', nullable: true },
           country: { type: 'string' },
+          landmark: { type: 'string', nullable: true },
+          instructions: { type: 'string', nullable: true },
           isDefault: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -96,7 +107,7 @@ export class AddressesController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: RequestUser) {
     return this.addressesService.findAll(user.id);
   }
 
@@ -116,11 +127,16 @@ export class AddressesController {
       properties: {
         id: { type: 'string' },
         userId: { type: 'string' },
-        street: { type: 'string' },
+        addressLine1: { type: 'string' },
+        addressLine2: { type: 'string', nullable: true },
+        recipientName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         city: { type: 'string' },
         state: { type: 'string' },
-        postalCode: { type: 'string' },
+        postalCode: { type: 'string', nullable: true },
         country: { type: 'string' },
+        landmark: { type: 'string', nullable: true },
+        instructions: { type: 'string', nullable: true },
         isDefault: { type: 'boolean' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
@@ -130,8 +146,8 @@ export class AddressesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Address not found' })
-  async findOne(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.addressesService.findOne(user.id, id);
+  async findUnique(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.addressesService.findUnique(user.id, id);
   }
 
   /**
@@ -151,11 +167,16 @@ export class AddressesController {
       properties: {
         id: { type: 'string' },
         userId: { type: 'string' },
-        street: { type: 'string' },
+        addressLine1: { type: 'string' },
+        addressLine2: { type: 'string', nullable: true },
+        recipientName: { type: 'string', nullable: true },
+        phone: { type: 'string', nullable: true },
         city: { type: 'string' },
         state: { type: 'string' },
-        postalCode: { type: 'string' },
+        postalCode: { type: 'string', nullable: true },
         country: { type: 'string' },
+        landmark: { type: 'string', nullable: true },
+        instructions: { type: 'string', nullable: true },
         isDefault: { type: 'boolean' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
@@ -167,7 +188,7 @@ export class AddressesController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Address not found' })
   async update(
-    @CurrentUser() user: any,
+    @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Body() updateAddressDto: UpdateAddressDto,
   ) {
@@ -187,7 +208,7 @@ export class AddressesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Address not found' })
-  async remove(@CurrentUser() user: any, @Param('id') id: string) {
+  async remove(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     await this.addressesService.remove(user.id, id);
   }
 }

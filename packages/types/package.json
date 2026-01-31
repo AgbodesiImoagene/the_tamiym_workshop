@@ -5,11 +5,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "generate:enums": "tsx scripts/generate-enums.ts",
+    "prebuild": "pnpm generate:enums",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@tamiym/config": "workspace:*",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }

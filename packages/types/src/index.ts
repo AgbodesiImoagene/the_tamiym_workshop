@@ -1,48 +1,12 @@
 /**
  * Shared TypeScript types and enums for Tamiym Workshop
+ *
+ * Enums are auto-generated from the Prisma schema.
+ * @see enums.generated.ts (generated from apps/api/prisma/schema.prisma)
  */
 
-// User roles
-export enum UserRole {
-  CUSTOMER = 'CUSTOMER',
-  ORGANIZER = 'ORGANIZER',
-  ADMIN = 'ADMIN',
-}
-
-// Order status
-export enum OrderStatus {
-  PENDING_PAYMENT = 'PENDING_PAYMENT',
-  PAID = 'PAID',
-  PROCESSING = 'PROCESSING',
-  SHIPPED = 'SHIPPED',
-  DELIVERED = 'DELIVERED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED',
-}
-
-// Payment status
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  REFUNDED = 'REFUNDED',
-}
-
-// Campaign status
-export enum CampaignStatus {
-  DRAFT = 'DRAFT',
-  ACTIVE = 'ACTIVE',
-  PAUSED = 'PAUSED',
-  COMPLETED = 'COMPLETED',
-  DISABLED = 'DISABLED',
-}
-
-// Design moderation status
-export enum ModerationStatus {
-  PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-}
+// Re-export all generated enums from Prisma schema
+export * from './enums.generated';
 
 // Base types
 export interface BaseEntity {
