@@ -52,6 +52,13 @@ enum UserStatus {
   DELETED
 }
 
+/// Type of one-time or session token stored in AuthToken.
+enum TokenType {
+  REFRESH
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
 /// How a product image is used (thumbnail, gallery, or workshop template).
 enum ImageRole {
   THUMBNAIL
@@ -230,20 +237,39 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders               Order[]
-  addresses            Address[]
-  campaigns            Campaign[]           @relation("OrganizerCampaigns")
-  designs              Design[]
-  designAssets         DesignAsset[]
-  payouts              Payout[]             @relation("RecipientPayouts")
-  auditLogs            AuditLog[]           @relation("ActorAuditLogs")
-  payoutProfiles       UserPayoutProfile[]
+  orders                  Order[]
+  addresses               Address[]
+  campaigns               Campaign[]               @relation("OrganizerCampaigns")
+  designs                 Design[]
+  designAssets            DesignAsset[]
+  payouts                 Payout[]                 @relation("RecipientPayouts")
+  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
+  payoutProfiles   UserPayoutProfile[]
   notificationOutboxes NotificationOutbox[]
+  authTokens       AuthToken[]
 
   @@index([email])
   @@index([role])
   @@index([status])
   @@map("users")
+}
+
+/// Centralised auth tokens: refresh, password reset, email verification. Single cleanup job can delete where expiresAt < now().
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  tokenType TokenType
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([tokenType])
+  @@index([expiresAt])
+  @@map("auth_tokens")
 }
 
 /// Shipping or billing address for a user. Used at checkout and snapshotted on Order.

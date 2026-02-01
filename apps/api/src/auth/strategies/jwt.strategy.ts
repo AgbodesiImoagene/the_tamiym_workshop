@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole, UserStatus } from '../../generated/prisma/client';
+import { ACCESS_TOKEN_COOKIE_NAME } from '../../constants';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -33,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         (request: Request): string | null => {
-          const token = request?.cookies?.['access_token'] as
+          const token = request?.cookies?.[ACCESS_TOKEN_COOKIE_NAME] as
             | string
             | undefined;
           return token ?? null;

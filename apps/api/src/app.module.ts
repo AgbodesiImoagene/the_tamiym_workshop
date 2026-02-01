@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import type { Request, Response } from 'express';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -9,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -16,6 +20,18 @@ import { AddressesModule } from './addresses/addresses.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
+      inject: [ConfigService],
+    }),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL || 'info',
@@ -30,18 +46,19 @@ import { AddressesModule } from './addresses/addresses.module';
               }
             : undefined,
         serializers: {
-          req: (req: any) => ({
+          req: (req: Request) => ({
             id: req.id,
             method: req.method,
             url: req.url,
           }),
-          res: (res: any) => ({
+          res: (res: Response) => ({
             statusCode: res.statusCode,
           }),
         },
       },
     }),
     PrismaModule,
+    MailModule,
     AuthModule,
     UsersModule,
     AddressesModule,
