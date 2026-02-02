@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+---
+
+# Design Tokens & UI Parity
+
+## Source of truth
+
+- **Figma:** [TTW-Site](https://www.figma.com/design/9xmldPK4dDKp72K3oE7tcA/TTW-Site)
+- **Code:** `packages/config/theme.css` — shared Tailwind v4 `@theme` tokens consumed by `web`, `app`, and `admin`.
+
+## Rules
+
+1. **Use tokens only.** Do not hardcode colors, font sizes, or spacing. Use Tailwind classes that map to the shared theme (e.g. `text-primary-600`, `bg-background`, `p-4`, `rounded-lg`, `font-sans`).
+2. **Design parity.** Do not redesign; implement the approved Figma screens. Only small feasibility tweaks (responsive spacing, truncation) are allowed without changing intent.
+3. **Adding tokens.** New colors, radii, or typography must be added to `packages/config/theme.css` and aligned with Figma. Document in `docs/design-rules.md` if you introduce new token names or scales.
+4. **Semantic over raw.** Prefer semantic tokens where defined (e.g. `primary`, `background`, `foreground`, `muted`, `success`, `warning`, `error`) so theme updates propagate.
+
+## References
+
+- `docs/design-rules.md` — full design rules and sync-from-Figma instructions
+- `docs/04-frontend.md` — frontend apps and Tailwind token alignment

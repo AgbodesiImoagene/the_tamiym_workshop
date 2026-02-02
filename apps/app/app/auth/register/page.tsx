@@ -85,7 +85,7 @@ export default function RegisterPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
             </div>
 
@@ -105,7 +105,7 @@ export default function RegisterPage() {
                 minLength={8}
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
             </div>
 
@@ -123,7 +123,7 @@ export default function RegisterPage() {
                 autoComplete="given-name"
                 value={formData.firstName}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
             </div>
 
@@ -141,7 +141,7 @@ export default function RegisterPage() {
                 autoComplete="family-name"
                 value={formData.lastName}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="w-full rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {isLoading ? 'Creating account...' : 'Create account'}
             </button>

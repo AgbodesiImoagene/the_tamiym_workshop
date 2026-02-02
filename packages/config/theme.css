@@ -1,0 +1,163 @@
+/**
+ * TTW design tokens — Tailwind v4 @theme
+ *
+ * Sources:
+ *   - assets/design_rules — Visual Identity Guidelines (primary/secondary colours,
+ *     typography, Tamiym Arch, typeface settings).
+ *   - Figma [TTW-Site](https://www.figma.com/design/9xmldPK4dDKp72K3oE7tcA/TTW-Site)
+ *     and assets/figma_screenshots for UI context.
+ *
+ * Usage: Import in each app's globals.css:
+ *   @import "tailwindcss";
+ *   @import "@tamiym/config/theme.css";
+ *
+ * Semantic usage:
+ *   - primary = Dodger Blue (brand blue; nav, tabs, links).
+ *   - accent = Tamiym Green (CTA buttons: Save, Place Order, Get Started).
+ *   - tamiym-blue = dark blue (footer, “Best Seller” badge, Tamiym Arch).
+ */
+
+@theme {
+  /* ─── 2.1 Primary Colours (design_rules) ───────────────────────────────── */
+  --color-white: #fefefe;        /* Brand White — HEX #FEFEFE */
+  --color-dodger-blue: #1d99ff; /* Dodger Blue — HEX #1D99FF, RGB 29,153,255 */
+
+  /* Primary scale (Dodger Blue #1D99FF as base) */
+  --color-primary-50: #e8f6ff;
+  --color-primary-100: #cceaff;
+  --color-primary-200: #99d4ff;
+  --color-primary-300: #66beff;
+  --color-primary-400: #33a8ff;
+  --color-primary-500: #1d99ff;
+  --color-primary-600: #187acc;
+  --color-primary-700: #135c99;
+  --color-primary-800: #0e3d66;
+  --color-primary-900: #091f33;
+  --color-primary-950: #051019;
+
+  /* ─── 2.2 Secondary Palette (design_rules) ──────────────────────────────── */
+  --color-tamiym-blue: #004385;      /* Secondary 01 — dark blue, footer/arch */
+  --color-tamiym-green: #45ff70;    /* Secondary 02 — CTA green */
+  --color-tamiym-red: #b10813;      /* Secondary 03 — error/alert */
+  --color-tamiym-evening-blue: #aeecef; /* Secondary 04 — light blue/cyan */
+
+  /* Accent scale (Tamiym Green #45FF70 as base) */
+  --color-accent-50: #e8fff0;
+  --color-accent-100: #ccffe0;
+  --color-accent-200: #99ffc2;
+  --color-accent-300: #66ffa3;
+  --color-accent-400: #45ff70;
+  --color-accent-500: #2ee65c;
+  --color-accent-600: #25b84a;
+  --color-accent-700: #1c8a38;
+  --color-accent-800: #135c26;
+  --color-accent-900: #0a2e13;
+  --color-accent-950: #051709;
+
+  /* ─── Neutral / gray ──────────────────────────────────────────────────── */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+
+  /* ─── Semantic ─────────────────────────────────────────────────────────── */
+  --color-background: #fefefe;
+  --color-foreground: #171717;
+  --color-muted: #6b7280;
+  --color-muted-foreground: #4b5563;
+  --color-border: #e5e7eb;
+  --color-input: #e5e7eb;
+  --color-ring: #1d99ff;
+  --color-sidebar: #004385;
+  --color-sidebar-foreground: #fefefe;
+  --color-success: #45ff70;
+  --color-warning: #d97706;
+  --color-error: #b10813;
+}
+
+/* Semantic aliases */
+@theme inline {
+  --color-primary: var(--color-primary-500);
+  --color-accent: var(--color-accent-400);
+}
+
+@theme {
+  /* ─── 3.0 Typography (design_rules) ─────────────────────────────────────── */
+  /* Neuffila Grotesk: headers only, all caps, bold/sturdy. */
+  /* Mundial: body, on-screen headers, social; seven weights (Hair to Black). */
+  --font-heading: "Neuffila Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Mundial", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: Georgia, ui-serif, serif;
+  --font-mono: ui-monospace, "Menlo", "Monaco", monospace;
+
+  /* 3.2 Typeface Setting — headline tracking (design_rules) */
+  --tracking-headline: -0.03em;
+
+  /* Headline sizes (3.2): 80pt/60pt, 60pt/45pt, 30pt/25pt leading (-30 tracking) */
+  --text-headline-xl: 5rem;      /* 80pt */
+  --text-headline-xl--line-height: 3.75rem; /* 60pt */
+  --text-headline-lg: 3.75rem;   /* 60pt */
+  --text-headline-lg--line-height: 2.8125rem; /* 45pt */
+  --text-headline-md: 1.875rem;  /* 30pt */
+  --text-headline-md--line-height: 1.5625rem; /* 25pt */
+
+  /* ─── Radii ────────────────────────────────────────────────────────────── */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  /* 4.1 The Tamiym Arch (design_rules) — top 30pt : bottom 10pt (3:1) */
+  --radius-arch-top: 2.5rem;    /* 30pt */
+  --radius-arch-bottom: 0.833rem; /* 10pt */
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Compatibility: shadcn/ui-style CSS variables (HSL triplets, no hsl() wrapper).
+   Aligned to design_rules: Dodger Blue (primary), Tamiym Green (accent),
+   Tamiym Red (destructive), brand White (#FEFEFE).
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --background: 0 0% 99.6%;   /* #FEFEFE */
+  --foreground: 0 0% 9%;
+  --muted: 220 13% 91%;
+  --muted-foreground: 220 9% 40%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 207 100% 56%;        /* Dodger Blue #1D99FF */
+
+  --primary: 207 100% 56%;     /* Dodger Blue */
+  --primary-foreground: 0 0% 100%;
+  --accent: 134 100% 64%;     /* Tamiym Green #45FF70 */
+  --accent-foreground: 0 0% 9%;
+  --destructive: 356 91% 36%; /* Tamiym Red #B10813 */
+  --destructive-foreground: 0 0% 100%;
+
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 210 100% 13%; /* Tamiym Blue #004385 */
+  --foreground: 0 0% 99.6%;
+  --muted: 210 50% 18%;
+  --muted-foreground: 210 10% 70%;
+  --border: 210 40% 22%;
+  --input: 210 40% 22%;
+  --ring: 207 100% 56%;
+
+  --primary: 207 100% 56%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 134 100% 64%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 356 91% 36%;
+  --destructive-foreground: 0 0% 100%;
+}

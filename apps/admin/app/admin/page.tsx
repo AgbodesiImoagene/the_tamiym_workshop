@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
-        <div className="rounded-lg bg-white p-6 shadow dark:bg-zinc-900">
+        <div className="rounded-lg bg-white p-6 shadow-sm dark:bg-zinc-900">
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Admin Panel</h2>
           <p className="mt-4 text-zinc-600 dark:text-zinc-400">
             Admin dashboard content will be implemented in later milestones.

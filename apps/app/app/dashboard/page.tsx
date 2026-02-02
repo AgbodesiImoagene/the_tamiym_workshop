@@ -75,7 +75,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="rounded-lg bg-white p-6 shadow dark:bg-zinc-900">
+        <div className="rounded-lg bg-white p-6 shadow-sm dark:bg-zinc-900">
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Your Profile</h2>
           <dl className="mt-4 space-y-2">
             <div>
