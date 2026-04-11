@@ -1,0 +1,8 @@
+{{> header}}
+<h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:#004385;">Your order has shipped</h1>
+{{#if firstName}}
+<p style="margin:0 0 16px 0;color:#374151;">Hi {{firstName}},</p>
+{{/if}}
+<p style="margin:0 0 16px 0;">Good news — your order is on its way. Tracking details may be available in your account or in a follow-up message from our team.</p>
+<p style="margin:0;font-family:ui-monospace,monospace;font-size:14px;color:#4b5563;">Order ID: {{orderId}}</p>
+{{> footer}}

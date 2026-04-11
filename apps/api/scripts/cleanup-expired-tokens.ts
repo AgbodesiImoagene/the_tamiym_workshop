@@ -1,5 +1,6 @@
 /**
- * Deletes expired rows from auth_tokens. Run from cron in prod to curtail DB growth.
+ * One-off script: deletes expired rows from auth_tokens.
+ * The API also runs this cleanup daily at 2:00 AM via NestJS Schedule (AuthTokenCleanupService).
  *
  * Usage (from apps/api): pnpm run cleanup:tokens
  * Or: npx ts-node -r dotenv/config scripts/cleanup-expired-tokens.ts

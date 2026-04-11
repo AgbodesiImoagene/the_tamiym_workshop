@@ -19,8 +19,10 @@ import {
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { PaymentsService } from './payments.service';
+import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { QuoteRequestDto } from '../pricing/dto/quote-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../auth/strategies/jwt.strategy';
@@ -32,7 +34,27 @@ export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly paymentsService: PaymentsService,
+    private readonly pricingService: PricingService,
   ) {}
+
+  /**
+   * Get a price quote for a standard order (no campaign). Does not create an order.
+   */
+  @Post('quote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get order quote (standard)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiBody({ type: QuoteRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Quote with line items, shipping, VAT, and total',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input or address' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async quote(@CurrentUser() user: RequestUser, @Body() dto: QuoteRequestDto) {
+    return this.pricingService.quoteStandard(user.id, dto);
+  }
 
   /**
    * Create an order (PENDING_PAYMENT)
@@ -44,7 +66,10 @@ export class OrdersController {
   @ApiCookieAuth('access_token')
   @ApiBody({ type: CreateOrderDto })
   @ApiResponse({ status: 201, description: 'Order created' })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input or insufficient stock',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async create(
@@ -106,7 +131,7 @@ export class OrdersController {
     return this.paymentsService.initiatePayment(
       id,
       user.id,
-      dto.customerEmail ?? '',
+      dto.customerEmail ?? undefined,
     );
   }
 }

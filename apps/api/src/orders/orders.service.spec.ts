@@ -4,10 +4,16 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrdersService } from './orders.service';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
+import { OrderStatus } from '../generated/prisma/enums';
+import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 const mockAddress = {
   id: 'addr-1',
@@ -30,15 +36,90 @@ const mockVariant = {
   name: 'S / Red',
   sku: 'SKU-S-RED',
   isAvailable: true,
-  priceOverride: 5000,
-  prices: [],
+  inventory: { stockOnHand: 10, reserved: 0, trackInventory: true },
+  prices: [{ amount: 5000, currency: 'NGN' }],
+  optionValues: [
+    {
+      option: { name: 'Size', code: 'size' },
+      optionValue: { displayName: 'S', valueCode: 'S' },
+    },
+    {
+      option: { name: 'Color', code: 'color' },
+      optionValue: { displayName: 'Red', valueCode: 'RED' },
+    },
+  ],
+};
+
+const mockQuote = {
+  currency: 'NGN',
+  subtotalAmount: 10000,
+  discountAmount: 0,
+  shippingFee: 2500,
+  vatAmount: 0,
+  totalAmount: 12500,
+  shippingBreakdown: {
+    version: 2,
+    provider: 'INTERNAL',
+    rateSource: 'ZONE_FLAT_RATE',
+    rateId: 'rate-1',
+    zoneId: 'zone-1',
+    zoneName: 'Lagos',
+    appliedFee: 2500,
+    currency: 'NGN',
+    serviceLevel: 'STANDARD',
+    priority: 100,
+    vatAppliedToShipping: true,
+    resolutionMethod: 'RULE_ADMIN1',
+    destination: {
+      countryCode: 'NG',
+      ruleId: 'rule-1',
+      matchType: 'ADMIN1',
+      matchValue: 'LA',
+      matchContext: null,
+      confidence: 'medium',
+    },
+    estimatedDeliveryMinDays: 2,
+    estimatedDeliveryMaxDays: 4,
+    shipmentSummary: {
+      totalQuantity: 2,
+      totalWeightGrams: 600,
+      packageLengthMm: 320,
+      packageWidthMm: 240,
+      packageHeightMm: 80,
+      lineItems: [],
+    },
+  },
+  items: [
+    {
+      productId: 'prod-1',
+      variantId: 'var-1',
+      designId: null,
+      campaignId: null,
+      quantity: 2,
+      unitBasePrice: 5000,
+      unitViewSurcharge: 0,
+      unitDiscountAmount: 0,
+      unitFinalPrice: 5000,
+      lineTotal: 10000,
+      organizerCostBasis: null,
+      pricingBreakdown: {
+        version: 1 as const,
+        unitBasePrice: 5000,
+        optionValueUpcharge: 0,
+        unitViewSurcharge: 0,
+        unitDiscountAmount: 0,
+        unitFinalPrice: 5000,
+      },
+      variantSnapshot: [],
+    },
+  ],
 };
 
 const mockOrder = {
   id: 'order-1',
   userId: 'user-1',
   status: OrderStatus.PENDING_PAYMENT,
-  paymentStatus: PaymentStatus.PENDING,
+  paymentStatus: 'PENDING',
   totalAmount: 10000,
   items: [],
 };
@@ -46,24 +127,85 @@ const mockOrder = {
 describe('OrdersService', () => {
   let service: OrdersService;
   let prisma: jest.Mocked<PrismaService>;
+  let pricingService: jest.Mocked<PricingService>;
 
   beforeEach(async () => {
     const mockPrisma = {
       address: { findUnique: jest.fn() },
+      design: { findUnique: jest.fn() },
       productVariant: { findUnique: jest.fn() },
       productPrice: { findFirst: jest.fn() },
-      order: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+      order: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      inventoryItem: { findUnique: jest.fn(), update: jest.fn() },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      notificationOutbox: {
+        create: jest.fn().mockResolvedValue({ id: 'outbox-test-1' }),
+      },
+      $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          order: { create: jest.fn().mockResolvedValue(mockOrder) },
+          inventoryItem: {
+            findUnique: jest.fn().mockResolvedValue({
+              trackInventory: true,
+              stockOnHand: 10,
+              reserved: 0,
+            }),
+            update: jest.fn(),
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return cb(tx);
+      }),
+    };
+
+    const mockPricingService = {
+      quoteStandard: jest.fn().mockResolvedValue(mockQuote),
+      quoteCampaign: jest.fn().mockResolvedValue(mockQuote),
+    };
+
+    const mockConfigService = {
+      get: jest.fn().mockReturnValue(undefined),
+    };
+
+    const mockNotificationOutboxDelivery = {
+      enqueueDelivery: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const mockAdminNotify = {
+      emit: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const mockInventoryLowStock = {
+      afterInventoryChange: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        { provide: AuditService, useValue: { log: jest.fn() } },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: PricingService, useValue: mockPricingService },
+        { provide: ConfigService, useValue: mockConfigService },
+        {
+          provide: NotificationOutboxDeliveryService,
+          useValue: mockNotificationOutboxDelivery,
+        },
+        { provide: AdminNotifyService, useValue: mockAdminNotify },
+        {
+          provide: InventoryLowStockNotifier,
+          useValue: mockInventoryLowStock,
+        },
       ],
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
     prisma = module.get(PrismaService);
+    pricingService = module.get(PricingService);
   });
 
   it('should be defined', () => {
@@ -73,27 +215,73 @@ describe('OrdersService', () => {
   describe('create', () => {
     it('should create an order', async () => {
       (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
-      (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue(
-        mockVariant,
-      );
-      (prisma.order.create as jest.Mock).mockResolvedValue(mockOrder);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 10,
+        reserved: 0,
+      });
 
       const dto: CreateOrderDto = {
         shippingAddressId: 'addr-1',
-        items: [{ productId: 'prod-1', variantId: 'var-1', quantity: 2 }],
+        items: [{ variantId: 'var-1', quantity: 2 }],
       };
       const result = await service.create('user-1', dto);
 
-      expect(prisma.order.create).toHaveBeenCalled();
+      expect(pricingService.quoteStandard).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: undefined, quantity: 2 }],
+        }),
+      );
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(result).toEqual(mockOrder);
+    });
+
+    it('should throw BadRequestException when stock is insufficient', async () => {
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 1,
+        reserved: 0,
+      });
+
+      const dto: CreateOrderDto = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      };
+
+      await expect(service.create('user-1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should allow order when inventory tracking is disabled', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: false,
+      });
+
+      const dto: CreateOrderDto = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      };
+      const result = await service.create('user-1', dto);
+
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(result).toEqual(mockOrder);
     });
 
     it('should throw NotFoundException when address not found', async () => {
-      (prisma.address.findUnique as jest.Mock).mockResolvedValue(null);
+      (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
+        new NotFoundException('Shipping address not found'),
+      );
 
       const dto: CreateOrderDto = {
         shippingAddressId: 'invalid',
-        items: [{ productId: 'prod-1', variantId: 'var-1', quantity: 1 }],
+        items: [{ variantId: 'var-1', quantity: 1 }],
       };
 
       await expect(service.create('user-1', dto)).rejects.toThrow(
@@ -101,12 +289,30 @@ describe('OrdersService', () => {
       );
     });
 
-    it('should throw ForbiddenException when address belongs to another user', async () => {
-      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+    it('should throw BadRequestException when shipping is unresolved', async () => {
+      (pricingService.quoteStandard as jest.Mock).mockResolvedValue({
+        ...mockQuote,
+        shippingBreakdown: null,
+      });
 
       const dto: CreateOrderDto = {
         shippingAddressId: 'addr-1',
-        items: [{ productId: 'prod-1', variantId: 'var-1', quantity: 1 }],
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      };
+
+      await expect(service.create('user-1', dto)).rejects.toThrow(
+        'Shipping destination could not be resolved for this address',
+      );
+    });
+
+    it('should throw ForbiddenException when address belongs to another user', async () => {
+      (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
+        new ForbiddenException('Access denied to this address'),
+      );
+
+      const dto: CreateOrderDto = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 1 }],
       };
 
       await expect(service.create('other-user', dto)).rejects.toThrow(
@@ -115,7 +321,9 @@ describe('OrdersService', () => {
     });
 
     it('should throw BadRequestException when items empty', async () => {
-      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
+        new BadRequestException('At least one item is required'),
+      );
 
       const dto: CreateOrderDto = {
         shippingAddressId: 'addr-1',

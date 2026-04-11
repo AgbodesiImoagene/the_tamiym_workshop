@@ -1,3 +1,5 @@
+# Local dev: used by docker compose --profile observability
+# App (host): OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 receivers:
   otlp:
     protocols:
@@ -12,25 +14,28 @@ processors:
     send_batch_size: 1024
 
 exporters:
-  logging:
-    loglevel: info
-  # Uncomment to export to other backends
-  # otlp:
-  #   endpoint: your-otel-backend:4317
-  #   tls:
-  #     insecure: true
+  # Span and metric samples in collector logs (useful when UIs are misconfigured)
+  debug:
+    verbosity: basic
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: tamiym
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [prometheus]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [debug]

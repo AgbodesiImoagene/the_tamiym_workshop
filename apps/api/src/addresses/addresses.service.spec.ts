@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { AddressesService } from './addresses.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AddressProvider } from '../generated/prisma/enums';
+import { AddressNormalizationService } from '../shipping/address-normalization.service';
 
 const mockAddress = {
   id: 'addr-1',
@@ -14,8 +16,20 @@ const mockAddress = {
   state: 'Lagos',
   postalCode: null,
   country: 'Nigeria',
+  countryCode: 'NG',
   landmark: null,
   instructions: null,
+  locality: 'Lagos',
+  dependentLocality: null,
+  administrativeAreaLevel1: 'Lagos',
+  administrativeAreaLevel2: null,
+  stateCode: 'LA',
+  lgaId: null,
+  provider: AddressProvider.MANUAL,
+  googlePlaceId: null,
+  formattedAddress: null,
+  latitude: null,
+  longitude: null,
   isDefault: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -37,11 +51,31 @@ describe('AddressesService', () => {
         delete: jest.fn(),
       },
     };
+    const mockAddressNormalization = {
+      normalizeForCreate: jest.fn().mockResolvedValue({
+        addressLine1: '123 Main St',
+        city: 'Lagos',
+        state: 'Lagos',
+        country: 'Nigeria',
+        countryCode: 'NG',
+      }),
+      normalizeForUpdate: jest.fn().mockResolvedValue({
+        addressLine1: '123 Main St',
+        city: 'Lagos',
+        state: 'Lagos',
+        country: 'Nigeria',
+        countryCode: 'NG',
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AddressesService,
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: AddressNormalizationService,
+          useValue: mockAddressNormalization,
+        },
       ],
     }).compile();
 
@@ -155,7 +189,13 @@ describe('AddressesService', () => {
       expect(result).toEqual(updated);
       expect(prisma.address.update).toHaveBeenCalledWith({
         where: { id: 'addr-1' },
-        data: dto,
+        data: expect.objectContaining({
+          addressLine1: '123 Main St',
+          city: 'Lagos',
+          state: 'Lagos',
+          country: 'Nigeria',
+          countryCode: 'NG',
+        }),
       });
     });
 

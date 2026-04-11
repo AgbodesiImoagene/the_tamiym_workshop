@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
+import { OrdersService } from '../orders/orders.service';
+import { PricingService } from '../pricing/pricing.service';
+import { RolesGuard } from '../auth/guards/roles/roles.guard';
 import { CampaignStatus } from '../generated/prisma/enums';
 
 const mockCampaign = {
@@ -23,13 +26,24 @@ describe('CampaignsController', () => {
       update: jest.fn(),
       addProduct: jest.fn(),
     };
+    const mockOrdersService = {
+      findOrdersByCampaignForOrganizer: jest.fn(),
+    };
+    const mockPricingService = {
+      quoteCampaign: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CampaignsController],
       providers: [
         { provide: CampaignsService, useValue: mockCampaignsService },
+        { provide: OrdersService, useValue: mockOrdersService },
+        { provide: PricingService, useValue: mockPricingService },
       ],
-    }).compile();
+    })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<CampaignsController>(CampaignsController);
     campaignsService = module.get(CampaignsService);

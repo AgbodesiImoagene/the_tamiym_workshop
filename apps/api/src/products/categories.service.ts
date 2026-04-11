@@ -105,7 +105,8 @@ export class CategoriesService {
   }
 
   /**
-   * Delete a category (admin)
+   * Delete a category (admin).
+   * Blocks deletion if any products still reference this category.
    */
   async remove(id: string) {
     const category = await this.prisma.category.findUnique({
@@ -113,6 +114,15 @@ export class CategoriesService {
     });
     if (!category) {
       throw new NotFoundException('Category not found');
+    }
+    const productCount = await this.prisma.product.count({
+      where: { categoryId: id },
+    });
+    if (productCount > 0) {
+      throw new ConflictException(
+        `Cannot delete category: ${productCount} product(s) are assigned to it. ` +
+          'Reassign or delete those products first.',
+      );
     }
     return this.prisma.category.delete({
       where: { id },

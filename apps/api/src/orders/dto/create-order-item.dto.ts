@@ -2,12 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNotEmpty, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/**
+ * Line item for order create. Variant is the source of truth; product is derived from the variant.
+ */
 export class CreateOrderItemDto {
-  @ApiProperty({ example: 'prod-1' })
-  @IsString()
-  @IsNotEmpty()
-  productId!: string;
-
   @ApiProperty({ example: 'var-1' })
   @IsString()
   @IsNotEmpty()

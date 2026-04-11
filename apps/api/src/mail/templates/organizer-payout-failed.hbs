@@ -1,0 +1,20 @@
+{{> header}}
+<h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:#b10813;">Payout could not be completed</h1>
+{{#if firstName}}
+<p style="margin:0 0 16px 0;color:#374151;">Hi {{firstName}},</p>
+{{/if}}
+<p style="margin:0 0 16px 0;">We were unable to complete a payout for <strong>{{campaignTitle}}</strong>. Please review your payout profile and bank details in the app, or contact support.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:16px 0;background-color:#fef2f2;border-radius:8px;border:1px solid #fecaca;">
+  <tr>
+    <td style="padding:16px 20px;">
+      <p style="margin:0 0 8px 0;"><strong>Attempted amount</strong></p>
+      <p style="margin:0 0 12px 0;font-size:18px;color:#004385;">{{formatAmount amount currency}}</p>
+      {{#if failureReason}}
+      <p style="margin:0 0 8px 0;font-size:14px;color:#374151;"><strong>Details</strong></p>
+      <p style="margin:0;font-size:14px;color:#6b7280;">{{failureReason}}</p>
+      {{/if}}
+      <p style="margin:12px 0 0 0;font-size:13px;color:#6b7280;font-family:ui-monospace,monospace;">Payout ID: {{payoutId}}</p>
+    </td>
+  </tr>
+</table>
+{{> footer}}

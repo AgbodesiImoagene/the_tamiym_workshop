@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ObservabilityService } from '../observability/observability.service';
 
 describe('AuthTokenCleanupService', () => {
   let service: AuthTokenCleanupService;
@@ -16,6 +17,18 @@ describe('AuthTokenCleanupService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthTokenCleanupService,
+        {
+          provide: ObservabilityService,
+          useValue: {
+            startSpan: jest.fn(
+              async (
+                _name: string,
+                _attributes: Record<string, unknown>,
+                callback: () => Promise<unknown>,
+              ) => callback(),
+            ),
+          },
+        },
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();

@@ -6,10 +6,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { AddressNormalizationService } from '../shipping/address-normalization.service';
+import { Prisma } from '../generated/prisma/client';
 
 @Injectable()
 export class AddressesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly addressNormalization: AddressNormalizationService,
+  ) {}
 
   /**
    * Create a new shipping address for a user
@@ -32,15 +37,22 @@ export class AddressesService {
     });
 
     const isDefault = createAddressDto.isDefault ?? !existingDefault;
-    const country = createAddressDto.country ?? 'Nigeria';
+    const normalizedAddress =
+      await this.addressNormalization.normalizeForCreate(createAddressDto);
+    const data: Prisma.AddressUncheckedCreateInput = {
+      ...normalizedAddress,
+      addressLine1:
+        normalizedAddress.addressLine1 ?? createAddressDto.addressLine1,
+      city: normalizedAddress.city ?? createAddressDto.city,
+      state: normalizedAddress.state ?? createAddressDto.state,
+      country: normalizedAddress.country ?? 'Nigeria',
+      countryCode: normalizedAddress.countryCode ?? 'NG',
+      isDefault,
+      userId,
+    };
 
     const address = await this.prisma.address.create({
-      data: {
-        ...createAddressDto,
-        isDefault,
-        userId,
-        country,
-      },
+      data,
     });
 
     return address;
@@ -94,14 +106,6 @@ export class AddressesService {
   ) {
     const address = await this.findUnique(userId, addressId);
 
-    if (!address) {
-      throw new NotFoundException('Address not found');
-    }
-
-    if (address.userId !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-
     // If setting as default, unset other default addresses
     if (updateAddressDto.isDefault === true) {
       await this.prisma.address.updateMany({
@@ -110,9 +114,21 @@ export class AddressesService {
       });
     }
 
+    const normalizedAddress =
+      await this.addressNormalization.normalizeForUpdate(
+        address,
+        updateAddressDto,
+      );
+    const data: Prisma.AddressUncheckedUpdateInput = {
+      ...normalizedAddress,
+      ...(updateAddressDto.isDefault !== undefined
+        ? { isDefault: updateAddressDto.isDefault }
+        : {}),
+    };
+
     const updatedAddress = await this.prisma.address.update({
       where: { id: addressId },
-      data: updateAddressDto,
+      data,
     });
 
     return updatedAddress;

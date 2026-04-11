@@ -4,9 +4,9 @@ import {
   IsOptional,
   IsNotEmpty,
   IsBoolean,
-  IsNumber,
+  IsInt,
+  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class UpdateVariantDto {
   @ApiProperty({ example: 'Small / Red', required: false })
@@ -21,24 +21,32 @@ export class UpdateVariantDto {
   @IsNotEmpty()
   sku?: string;
 
-  @ApiProperty({ example: 'S', required: false })
-  @IsOptional()
-  @IsString()
-  size?: string;
-
-  @ApiProperty({ example: 'Red', required: false })
-  @IsOptional()
-  @IsString()
-  color?: string;
-
-  @ApiProperty({ example: 5000.5, required: false })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  priceOverride?: number;
-
   @ApiProperty({ example: true, required: false })
   @IsOptional()
   @IsBoolean()
   isAvailable?: boolean;
+
+  @ApiProperty({ example: 320, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  weightGrams?: number;
+
+  @ApiProperty({ example: 320, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageLengthMm?: number;
+
+  @ApiProperty({ example: 240, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageWidthMm?: number;
+
+  @ApiProperty({ example: 40, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageHeightMm?: number;
 }

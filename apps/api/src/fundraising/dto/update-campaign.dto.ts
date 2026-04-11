@@ -5,10 +5,8 @@ import {
   IsNotEmpty,
   IsNumber,
   IsDateString,
-  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CampaignStatus } from '../../generated/prisma/enums';
 
 export class UpdateCampaignDto {
   @ApiProperty({ example: 'School Fundraiser 2025', required: false })
@@ -32,11 +30,6 @@ export class UpdateCampaignDto {
   @IsOptional()
   @IsString()
   story?: string;
-
-  @ApiProperty({ enum: CampaignStatus, required: false })
-  @IsOptional()
-  @IsEnum(CampaignStatus)
-  status?: CampaignStatus;
 
   @ApiProperty({ example: 500000, required: false })
   @IsOptional()

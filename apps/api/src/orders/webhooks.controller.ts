@@ -32,12 +32,18 @@ export class WebhooksController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-paystack-signature') signature: string,
   ) {
-    const rawBody =
-      req.rawBody ??
-      (req.body ? Buffer.from(JSON.stringify(req.body)) : Buffer.from(''));
     if (!signature) {
       throw new UnauthorizedException('Missing x-paystack-signature');
     }
+    if (!req.rawBody) {
+      // Raw body is required for HMAC verification. Re-serialising from the
+      // parsed body is NOT bit-identical to the original payload and can allow
+      // spoofed signatures. Reject immediately.
+      throw new UnauthorizedException(
+        'Raw body unavailable — cannot verify signature',
+      );
+    }
+    const rawBody = req.rawBody;
     await this.paystackWebhookService.handleWebhook(rawBody, signature);
     return { received: true };
   }

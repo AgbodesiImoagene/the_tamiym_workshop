@@ -26,6 +26,7 @@ generator client {
   output              = "../src/generated/prisma"
   moduleFormat        = "cjs"
   importFileExtension = ""
+  previewFeatures     = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -50,6 +51,11 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   DELETED
+}
+
+/// External identity provider linked to a user (e.g. Google OAuth).
+enum OAuthProvider {
+  GOOGLE
 }
 
 /// Type of one-time or session token stored in AuthToken.
@@ -87,8 +93,11 @@ enum PaymentStatus {
 }
 
 /// Lifecycle status of a fundraising campaign.
+/// DRAFT: organiser editing; REVIEW: submitted for admin review; ACTIVE: live and accepting orders;
+/// PAUSED: temporarily stopped by organiser; DISABLED: admin-forced off; ENDED: past end date or closed.
 enum CampaignStatus {
   DRAFT
+  REVIEW
   ACTIVE
   PAUSED
   DISABLED
@@ -101,6 +110,35 @@ enum ModerationStatus {
   APPROVED
   REJECTED
   FLAGGED
+}
+
+/// Lifecycle status for a media asset ingestion job.
+enum MediaAssetStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+/// Where a media asset originated from.
+enum MediaSourceType {
+  UPLOAD
+  IMPORT_URL
+}
+
+/// Derivative type for a media asset.
+enum MediaDerivativeType {
+  ORIGINAL
+  DISPLAY
+  THUMB
+}
+
+/// Virus scan status for media assets.
+enum VirusScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
 }
 
 /// Payment or payout provider (v1: Paystack only).
@@ -143,6 +181,27 @@ enum CurrencyCode {
   // Future: USD, EUR, GBP, etc.
 }
 
+/// Where an address was sourced from before normalization.
+enum AddressProvider {
+  MANUAL
+  GOOGLE_PLACES
+  OTHER
+}
+
+/// Generic strategy used to match an address or destination to a shipping zone.
+enum ShippingRuleMatchType {
+  ADMIN1
+  ADMIN2
+  CITY
+  POSTAL_CODE
+  POSTAL_PREFIX
+}
+
+/// Provider used to quote a shipping rate.
+enum ShippingRateProvider {
+  INTERNAL
+}
+
 /// Channel used to send a notification (email, SMS, or Slack).
 enum NotificationChannel {
   EMAIL
@@ -153,6 +212,7 @@ enum NotificationChannel {
 /// Delivery status of a notification outbox item.
 enum NotificationStatus {
   PENDING
+  PROCESSING
   SENT
   FAILED
 }
@@ -172,11 +232,62 @@ enum AuditAction {
   PAYOUT
 }
 
+/// Result of a security-sensitive or administrative action.
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+/// Origin of an audit event.
+enum AuditSource {
+  PUBLIC_API
+  ADMIN_API
+  WEBHOOK
+  WORKER
+  CRON
+  SYSTEM
+}
+
 /// Status of a payout to an organizer or recipient.
 enum PayoutStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  QUEUED
+  PROCESSING
   INITIATED
   SUCCEEDED
   FAILED
+  REVERSED
+  CANCELLED
+}
+
+/// Type of entry in the campaign balance ledger (source of truth for eligible payout).
+enum LedgerEntryType {
+  PAYMENT_SETTLED
+  REFUND_APPLIED
+  PAYOUT_RESERVED
+  PAYOUT_SUCCEEDED
+  PAYOUT_FAILED
+  MANUAL_ADJUSTMENT
+}
+
+/// Payout automation mode: manual-only, batch with approval, or fully automatic.
+enum PayoutMode {
+  MANUAL
+  AUTO_APPROVAL_REQUIRED
+  AUTO_EXECUTE
+}
+
+/// Status of a payout run (batch).
+enum PayoutRunStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  EXECUTING
+  COMPLETED
+  CANCELLED
 }
 
 /// Status of a refund against an order.
@@ -224,7 +335,8 @@ enum BlendMode {
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
-  passwordHash String
+  /// Null when the user only signs in via OAuth (e.g. Google).
+  passwordHash String?
   role         UserRole   @default(CUSTOMER)
   status       UserStatus @default(ACTIVE)
 
@@ -237,21 +349,39 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders                  Order[]
-  addresses               Address[]
-  campaigns               Campaign[]               @relation("OrganizerCampaigns")
-  designs                 Design[]
-  designAssets            DesignAsset[]
-  payouts                 Payout[]                 @relation("RecipientPayouts")
-  auditLogs               AuditLog[]               @relation("ActorAuditLogs")
-  payoutProfiles   UserPayoutProfile[]
+  orders               Order[]
+  addresses            Address[]
+  campaigns            Campaign[]           @relation("OrganizerCampaigns")
+  designs              Design[]
+  designAssets         DesignAsset[]
+  payouts              Payout[]             @relation("RecipientPayouts")
+  payoutRunsRequested  PayoutRun[]          @relation("PayoutRunRequestedBy")
+  payoutRunsApproved   PayoutRun[]          @relation("PayoutRunApprovedBy")
+  auditLogs            AuditLog[]           @relation("ActorAuditLogs")
+  payoutProfiles       UserPayoutProfile[]
   notificationOutboxes NotificationOutbox[]
-  authTokens       AuthToken[]
+  authTokens           AuthToken[]
+  oauthAccounts        UserOAuthAccount[]
 
   @@index([email])
   @@index([role])
   @@index([status])
   @@map("users")
+}
+
+/// Linked OAuth provider account (one Google account ↔ one user).
+model UserOAuthAccount {
+  id                String        @id @default(cuid())
+  provider          OAuthProvider
+  providerAccountId String /// Provider stable user id (e.g. Google sub)
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("user_oauth_accounts")
 }
 
 /// Centralised auth tokens: refresh, password reset, email verification. Single cleanup job can delete where expiresAt < now().
@@ -282,14 +412,34 @@ model Address {
   recipientName String?
   phone         String?
 
-  addressLine1 String
-  addressLine2 String?
-  city         String
-  state        String
-  postalCode   String?
-  country      String  @default("Nigeria")
-  landmark     String?
-  instructions String?
+  addressLine1             String
+  addressLine2             String?
+  city                     String
+  state                    String
+  postalCode               String?
+  country                  String  @default("Nigeria")
+  countryCode              String  @default("NG")
+  landmark                 String?
+  instructions             String?
+  locality                 String?
+  dependentLocality        String?
+  administrativeAreaLevel1 String?
+  administrativeAreaLevel2 String?
+
+  /// Normalized state code (e.g. LA, AB) for shipping zones. Required for checkout when using zone-based shipping.
+  stateCode String?
+  geoState  GeoState? @relation("AddressStateCode", fields: [stateCode], references: [code], onDelete: SetNull)
+  /// LGA for zone-based shipping (optional in v1).
+  lgaId     String?
+  lga       GeoLga?   @relation(fields: [lgaId], references: [id], onDelete: SetNull)
+
+  /// Optional Google Places fields for autocomplete UX.
+  provider              AddressProvider @default(MANUAL)
+  googlePlaceId         String?
+  formattedAddress      String?
+  latitude              Decimal?        @db.Decimal(10, 7)
+  longitude             Decimal?        @db.Decimal(10, 7)
+  normalizationMetadata Json?
 
   isDefault Boolean @default(false)
 
@@ -299,7 +449,158 @@ model Address {
   orders Order[]
 
   @@index([userId])
+  @@index([stateCode])
+  @@index([lgaId])
   @@map("addresses")
+}
+
+/**
+ * =========================
+ * Site-wide settings (singleton)
+ * =========================
+ */
+
+/// Single-row site config for VAT, default currency, and payout policy. Application must ensure only one row exists.
+model SiteSettings {
+  id String @id @default("default")
+
+  vatRate              Decimal      @db.Decimal(5, 4) // e.g. 0.075 for 7.5%
+  pricesIncludeVat     Boolean      @default(true)
+  vatAppliesToShipping Boolean      @default(true)
+  currency             CurrencyCode @default(NGN)
+
+  /// Payout policy (fundraiser organizer payouts).
+  payoutMode               PayoutMode @default(MANUAL)
+  payoutCadenceDays        Int        @default(7) /// e.g. 7 = weekly.
+  payoutSettlementHoldDays Int        @default(7)
+  minimumPayoutAmount      Decimal?   @db.Decimal(10, 2)
+  autoRetryFailedPayouts   Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+/**
+ * =========================
+ * Shipping: Geo (Nigeria) + Zones + Rates
+ * =========================
+ */
+
+/// Nigerian state (or territory). Used for shipping zones and address normalization.
+model GeoState {
+  code     String  @id // e.g. LA, AB
+  name     String
+  isActive Boolean @default(true)
+
+  lgas                 GeoLga[]
+  shippingAreas        ShippingZoneArea[]
+  addressesByStateCode Address[]          @relation("AddressStateCode")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("geo_states")
+}
+
+/// Local Government Area within a state. Optional for zone-based shipping in v1.
+model GeoLga {
+  id        String   @id @default(cuid())
+  stateCode String
+  state     GeoState @relation(fields: [stateCode], references: [code], onDelete: Cascade)
+  code      String? // optional LGA code
+  name      String
+  isActive  Boolean  @default(true)
+
+  addresses     Address[]
+  shippingAreas ShippingZoneArea[]
+
+  @@unique([stateCode, name])
+  @@index([stateCode])
+  @@map("geo_lgas")
+}
+
+/// Shipping zone (e.g. "Lagos", "Rest of Nigeria"). Areas link states/LGAs to zones.
+model ShippingZone {
+  id       String  @id @default(cuid())
+  name     String
+  isActive Boolean @default(true)
+
+  areas ShippingZoneArea[]
+  rules ShippingZoneRule[]
+  rates ShippingRate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("shipping_zones")
+}
+
+/// Links a zone to a state (and optionally a specific LGA). Used to determine which zone an address belongs to.
+model ShippingZoneArea {
+  id        String       @id @default(cuid())
+  zoneId    String
+  zone      ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  stateCode String
+  state     GeoState     @relation(fields: [stateCode], references: [code], onDelete: Cascade)
+  lgaId     String?
+  lga       GeoLga?      @relation(fields: [lgaId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, stateCode, lgaId])
+  @@index([zoneId])
+  @@index([stateCode])
+  @@map("shipping_zone_areas")
+}
+
+/// Generic destination rule that maps a country-specific match value to a shipping zone.
+model ShippingZoneRule {
+  id String @id @default(cuid())
+
+  zoneId String
+  zone   ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  countryCode  String
+  matchType    ShippingRuleMatchType
+  /// Canonical value for the match type. Example: state code for ADMIN1, LGA id for ADMIN2.
+  matchValue   String
+  /// Optional context that disambiguates the match value. Example: parent ADMIN1 code for ADMIN2.
+  matchContext String?
+  priority     Int                   @default(100)
+  isActive     Boolean               @default(true)
+  metadata     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([zoneId, countryCode, matchType, matchValue, matchContext])
+  @@index([zoneId])
+  @@index([countryCode, matchType, priority, isActive])
+  @@map("shipping_zone_rules")
+}
+
+/// Flat fee (or future: rate table) for a zone. Optional effective dates for v1.
+model ShippingRate {
+  id              String               @id @default(cuid())
+  zoneId          String
+  zone            ShippingZone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  provider        ShippingRateProvider @default(INTERNAL)
+  serviceLevel    String               @default("STANDARD")
+  currency        CurrencyCode         @default(NGN)
+  flatFee         Decimal              @db.Decimal(10, 2)
+  priority        Int                  @default(100)
+  isActive        Boolean              @default(true)
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  minDeliveryDays Int?
+  maxDeliveryDays Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([zoneId])
+  @@index([zoneId, currency, isActive, priority])
+  @@map("shipping_rates")
 }
 
 /**
@@ -328,12 +629,14 @@ model Product {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  name        String
-  slug        String        @unique
-  description String?
-  status      ProductStatus @default(DRAFT)
-
-  defaultCurrency CurrencyCode @default(NGN)
+  name            String
+  slug            String        @unique
+  description     String?
+  status          ProductStatus @default(DRAFT)
+  weightGrams     Int?
+  packageLengthMm Int?
+  packageWidthMm  Int?
+  packageHeightMm Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -392,29 +695,44 @@ model ProductOptionValue {
 
   variantLinks    VariantOptionValue[]
   templateEffects OptionValueTemplateEffect[]
+  upcharges       OptionValueUpcharge[]
 
   @@unique([optionId, valueCode])
   @@index([optionId])
   @@map("product_option_values")
 }
 
-/// Concrete variant of a product (e.g. Small/Red). Has SKU, optional price override, inventory, and prices.
+/// Optional additive upcharge for an option value (e.g. size XL +50). Applied in standard checkout; configurable for campaign buyer pricing.
+model OptionValueUpcharge {
+  id            String             @id @default(cuid())
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+  currency      CurrencyCode       @default(NGN)
+  amount        Decimal            @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([optionValueId, currency])
+  @@index([optionValueId])
+  @@map("option_value_upcharges")
+}
+
+/// Concrete variant of a product (e.g. Small/Red). Has SKU, inventory, and prices (VariantPrice).
+/// Option values (size, color, etc.) are in VariantOptionValue -> ProductOptionValue; name is the display label.
 model ProductVariant {
   id        String  @id @default(cuid())
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  name String // e.g., "Small / Red / Unisex"
+  name String // e.g., "Small / Red / Unisex" (derived from option values at creation)
   sku  String @unique
 
-  // Optional convenience columns (can be derived from options):
-  size  String?
-  color String?
-
-  // Prefer Price table in v1; keep optional override for emergency/manual ops if you want.
-  priceOverride Decimal? @db.Decimal(10, 2)
-
-  isAvailable Boolean @default(true)
+  isAvailable     Boolean @default(true)
+  weightGrams     Int?
+  packageLengthMm Int?
+  packageWidthMm  Int?
+  packageHeightMm Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -535,7 +853,9 @@ model ProductImage {
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  url       String
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
   sortOrder Int     @default(0)
   altText   String?
 
@@ -547,6 +867,7 @@ model ProductImage {
 
   @@index([productId])
   @@index([variantId])
+  @@index([mediaAssetId])
   @@map("product_images")
 }
 
@@ -626,7 +947,7 @@ model ProductViewPricing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([productId, variantId, productViewId])
+  @@unique([productId, variantId, productViewId, currency])
   @@index([productId])
   @@index([variantId])
   @@index([productViewId])
@@ -773,6 +1094,13 @@ model Design {
   designData       Json // structured layer model per view
   thumbnailUrl     String?
   moderationStatus ModerationStatus @default(PENDING)
+  /// AI moderation notes (internal only): category scores and reasoning from the AI pre-screen.
+  moderationNotes  String?
+
+  /// Short token for read-only public share links. Null until the user generates a share link.
+  shareToken          String?   @unique
+  /// Optional expiry for share tokens. Null = non-expiring.
+  shareTokenExpiresAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -796,15 +1124,68 @@ model DesignAsset {
   ownerUserId String
   owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
-  url       String
-  mimeType  String
-  sizeBytes Int
-  checksum  String?
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
 
   @@index([ownerUserId])
+  @@index([mediaAssetId])
   @@map("design_assets")
+}
+
+/// Centralized media asset with derivatives (original, display, thumb).
+model MediaAsset {
+  id               String           @id @default(cuid())
+  sourceType       MediaSourceType
+  sourceUrl        String?
+  status           MediaAssetStatus @default(PENDING)
+  scanStatus       VirusScanStatus  @default(PENDING)
+  moderationStatus ModerationStatus @default(PENDING)
+  /// AI moderation notes (internal only): category scores and reasoning from the AI pre-screen.
+  moderationNotes  String?
+
+  originalKey    String?
+  originalUrl    String?
+  originalMime   String?
+  originalBytes  Int?
+  originalWidth  Int?
+  originalHeight Int?
+  checksum       String?
+  errorMessage   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  derivatives   MediaDerivative[]
+  productImages ProductImage[]
+  designAssets  DesignAsset[]
+
+  @@index([status])
+  @@index([scanStatus])
+  @@index([moderationStatus])
+  @@map("media_assets")
+}
+
+/// Media derivatives for an asset (original, display, thumb).
+model MediaDerivative {
+  id      String     @id @default(cuid())
+  assetId String
+  asset   MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  type      MediaDerivativeType
+  key       String
+  url       String
+  mimeType  String
+  sizeBytes Int
+  width     Int?
+  height    Int?
+
+  createdAt DateTime @default(now())
+
+  @@unique([assetId, type])
+  @@index([assetId])
+  @@map("media_derivatives")
 }
 
 /// Per-view metadata for a design (which product view, whether used, layer count). Links Design to ProductView.
@@ -869,6 +1250,20 @@ model Order {
   // Paystack reference for the order-level payment attempt (still track Payment rows below)
   paymentReference String? @unique
 
+  /// When set, this order is a campaign order (all items from this campaign). Enforces single-campaign-per-order.
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  /// Snapshot of shipping zone/rate applied at order time, e.g. { zoneId, rateId, appliedFee, vatAppliedToShipping }.
+  shippingBreakdown Json?
+
+  /// Unpaid orders expire and release inventory; set when status is PENDING_PAYMENT.
+  expiresAt   DateTime?
+  cancelledAt DateTime?
+
+  /// Idempotency key (per user) to avoid duplicate orders on retries.
+  idempotencyKey String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -877,11 +1272,13 @@ model Order {
   refunds        Refund[]
   orderDiscounts OrderDiscount[]
 
+  @@unique([userId, idempotencyKey])
   @@index([userId])
   @@index([status])
   @@index([createdAt])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([campaignId])
   @@map("orders")
 }
 
@@ -909,6 +1306,10 @@ model OrderItem {
   unitViewSurcharge  Decimal @default(0) @db.Decimal(10, 2)
   unitDiscountAmount Decimal @default(0) @db.Decimal(10, 2)
   unitFinalPrice     Decimal @db.Decimal(10, 2) // base + surcharge - discount
+
+  /// Snapshot of variant option values at time of order, e.g.
+  /// [{ "option": "Size", "optionCode": "size", "value": "Large", "valueCode": "L" }]
+  variantSnapshot Json?
 
   pricingBreakdown         Json?
   organizerDiscountApplied Decimal? @db.Decimal(10, 2) // y (resolved) for audit, optional
@@ -980,6 +1381,7 @@ model Refund {
  */
 
 /// Fundraising campaign. Organizer, goal, dates, optional payout profile or inline bank details.
+/// Lifecycle: DRAFT → REVIEW (submitForReview) → ACTIVE (admin approve) or back to DRAFT (admin reject).
 model Campaign {
   id          String @id @default(cuid())
   organizerId String
@@ -992,20 +1394,32 @@ model Campaign {
 
   status CampaignStatus @default(DRAFT)
 
+  /// Content moderation status for admin review queue (set by AI pre-screen and/or human admin).
+  moderationStatus ModerationStatus @default(PENDING)
+  /// Human-readable reason shown to the organiser when their campaign is rejected.
+  rejectionReason  String?
+  /// AI moderation notes (internal only): category scores and reasoning from the AI pre-screen.
+  moderationNotes  String?
+
   currency      CurrencyCode @default(NGN)
   goalAmount    Decimal?     @db.Decimal(10, 2)
+  /// Denormalised display cache: total payments received minus refunds, maintained by application code.
+  /// Incremented on charge.success (PaystackWebhookService) and decremented on refund (RefundsService).
+  /// Do NOT use for financial calculations or payout eligibility — use the CampaignBalanceLedger instead.
   currentAmount Decimal      @default(0) @db.Decimal(10, 2)
 
   startDate DateTime?
   endDate   DateTime?
 
-  // Organizer payout details (Nigeria-only v1). You can alternatively normalize this into a separate table.
-  payoutBankName    String?
-  payoutBankCode    String?
-  payoutAccountName String?
-  payoutAccountNo   String?
-  payoutProfileId   String?
-  payoutProfile     UserPayoutProfile? @relation(fields: [payoutProfileId], references: [id], onDelete: SetNull)
+  // Organizer payout details (Nigeria-only v1). Prefer payoutProfileId; inline fields deprecated for new flows.
+  payoutBankName     String?
+  payoutBankCode     String?
+  payoutAccountName  String?
+  payoutAccountNo    String?
+  payoutProfileId    String?
+  payoutProfile      UserPayoutProfile? @relation(fields: [payoutProfileId], references: [id], onDelete: SetNull)
+  /// Override site payout mode for this campaign (optional).
+  payoutModeOverride PayoutMode?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1013,15 +1427,45 @@ model Campaign {
   products          CampaignProduct[]
   designs           Design[]
   orderItems        OrderItem[]
+  orders            Order[]
   payouts           Payout[]
   discountCampaigns DiscountCampaign[]
+  ledgerEntries     CampaignBalanceLedgerEntry[]
 
   @@index([organizerId])
   @@index([slug])
   @@index([status])
+  @@index([moderationStatus])
   @@index([createdAt])
   @@index([payoutProfileId])
   @@map("campaigns")
+}
+
+/// Immutable ledger entry for campaign balance (eligible payout = sum of credits minus debits, respecting availableAt).
+model CampaignBalanceLedgerEntry {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  entryType LedgerEntryType
+
+  /// Positive = credit (e.g. payment settled), negative = debit (e.g. refund, payout).
+  amount      Decimal      @db.Decimal(10, 2)
+  currency    CurrencyCode @default(NGN)
+  availableAt DateTime /// When this entry becomes eligible for payout (e.g. payment date + hold days).
+
+  orderId  String?
+  refundId String?
+  payoutId String?
+  metadata Json? /// Optional extra context (e.g. order total, refund reason).
+
+  createdAt DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([campaignId, availableAt])
+  @@index([orderId])
+  @@index([payoutId])
+  @@map("campaign_balance_ledger_entries")
 }
 
 /// Product (and optional design) offered in a campaign. Has campaign-specific prices per currency.
@@ -1060,6 +1504,8 @@ model UserPayoutProfile {
   bankCode      String
   accountName   String
   accountNumber String
+  /// Paystack transfer recipient code (set after first successful resolve/create)
+  recipientCode String? @unique
 
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -1072,27 +1518,75 @@ model UserPayoutProfile {
   @@map("user_payout_profiles")
 }
 
-/// Payout from platform to campaign organizer. Tracks provider, amount, and status.
+/// One batch of payouts (scheduled window). Contains many Payout rows.
+model PayoutRun {
+  id           String          @id @default(cuid())
+  scheduledFor DateTime /// When this run was scheduled to execute.
+  cutoffAt     DateTime /// Settlement cutoff (orders paid before this count).
+  mode         PayoutMode
+  status       PayoutRunStatus @default(DRAFT)
+
+  requestedByUserId String?
+  requestedBy       User?     @relation("PayoutRunRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedByUserId  String?
+  approvedBy        User?     @relation("PayoutRunApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedAt        DateTime?
+  executedAt        DateTime?
+
+  payouts Payout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("payout_runs")
+}
+
+/// Payout from platform to campaign organizer. Tracks provider, amount, status, and snapshot of destination.
 model Payout {
   id         String   @id @default(cuid())
   campaignId String
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
+  payoutRunId String?
+  payoutRun   PayoutRun? @relation(fields: [payoutRunId], references: [id], onDelete: SetNull)
+
   recipientUserId String
   recipient       User   @relation("RecipientPayouts", fields: [recipientUserId], references: [id])
 
-  provider    PaymentProvider @default(PAYSTACK)
-  providerRef String?
-  status      PayoutStatus    @default(INITIATED)
+  provider       PaymentProvider @default(PAYSTACK)
+  /// Paystack transfer reference. Unique per non-null value; multiple payouts may have null
+  /// (pre-initiation). PostgreSQL unique indexes treat each NULL as distinct, so this is safe.
+  providerRef    String?         @unique
+  idempotencyKey String? /// For Paystack transfer idempotency.
+  failureReason  String?
+  rawEvent       Json? /// Webhook payload for reconciliation.
+
+  status PayoutStatus @default(DRAFT)
 
   currency CurrencyCode @default(NGN)
   amount   Decimal      @db.Decimal(10, 2)
+
+  /// Snapshot of destination at time of payout (immutable for audit).
+  snapshotBankCode      String?
+  snapshotAccountName   String?
+  snapshotAccountMask   String? /// e.g. ***6789
+  snapshotRecipientCode String?
+
+  /// For exceptional manual adjustments: two-person approval.
+  requestedByUserId  String?
+  approvedByUserId   String?
+  approvalReason     String?
+  isManualAdjustment Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([campaignId])
-  @@index([provider, providerRef])
+  @@index([payoutRunId])
+  @@index([provider])
+  @@index([status])
   @@map("payouts")
 }
 
@@ -1137,7 +1631,7 @@ model OrganizerPricingPolicy {
  */
 
 /// Promo or discount rule. Type PERCENTAGE/FIXED/BULK; scope ORDER/PRODUCT/VARIANT/CAMPAIGN.
-/// Missing constraints (enforce in app): For type FIXED, currency must be set. For type PERCENTAGE, valuePercent in 0..100. Redeemed count must not exceed maxRedemptions when set.
+/// Enforced in app at creation/update: (1) FIXED requires currency. (2) Only one active discount per subject (sitewide, or per campaign/product/variant). (3) For FIXED, one per (subject, currency). (4) PERCENTAGE and FIXED cannot both be active for the same subject. (5) valuePercent in 0..100 for PERCENTAGE; redeemedCount must not exceed maxRedemptions when set.
 model Discount {
   id     String         @id @default(cuid())
   code   String?        @unique
@@ -1224,7 +1718,7 @@ model OrderDiscount {
 }
 
 /// Quantity-tier pricing for a product or variant (e.g. 10–24 units at X per unit).
-/// Missing constraints (enforce in app): When maxQuantity is set, minQuantity <= maxQuantity. Tiers for same scope should not overlap in quantity range (e.g. 10–24 and 20–49); enforce in application when creating/updating.
+/// Enforced in app when creating/updating: (1) When maxQuantity is set, minQuantity <= maxQuantity. (2) Tiers for same (productId, variantId, currency) must not overlap in quantity range; enforce no overlapping [minQuantity, maxQuantity].
 model BulkPricing {
   id String @id @default(cuid())
 
@@ -1257,6 +1751,38 @@ model BulkPricing {
  * =========================
  */
 
+/// Configurable routing for admin/ops alerts (email, SMS, Slack) per logical event key.
+model AdminNotificationRoute {
+  id       String @id @default(cuid())
+  /// Logical key, e.g. "admin.order.placed" (see AdminNotificationEvents in API).
+  eventKey String
+  /// Multiple named routes per event (e.g. "default", "oncall").
+  name     String @default("default")
+
+  enabled Boolean @default(true)
+
+  notifyEmail     Boolean  @default(false)
+  emailRecipients String[] @default([])
+
+  notifySms     Boolean  @default(false)
+  smsRecipients String[] @default([])
+
+  notifySlack     Boolean @default(false)
+  slackWebhookUrl String?
+
+  /// Optional Handlebars templates; variables depend on event (see docs). Empty uses built-in defaults.
+  subjectTemplate   String? @db.Text
+  emailBodyTemplate String? @db.Text
+  smsBodyTemplate   String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventKey, name])
+  @@index([eventKey, enabled])
+  @@map("admin_notification_routes")
+}
+
 /// Outbox for notifications (email, SMS, Slack). Processed by a worker; status and attempts tracked.
 model NotificationOutbox {
   id              String              @id @default(cuid())
@@ -1283,21 +1809,38 @@ model NotificationOutbox {
 
 /// Immutable audit record of an action on an entity (e.g. order status change, design approval).
 model AuditLog {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   actorUserId String?
-  actor       User?   @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actor       User?     @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorRole   UserRole?
 
+  eventName  String
   action     AuditAction
+  outcome    AuditOutcome @default(SUCCESS)
+  source     AuditSource  @default(SYSTEM)
+  requestId  String?
+  traceId    String?
+  ipAddress  String?
+  userAgent  String?
   entityType String // "Order", "Product", "Campaign", "Design", etc.
   entityId   String
+  targetType String?
+  targetId   String?
   before     Json?
   after      Json?
+  metadata   Json?
   note       String?
+  occurredAt DateTime     @default(now())
 
   createdAt DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([actorUserId])
+  @@index([actorUserId, createdAt])
+  @@index([eventName, createdAt])
+  @@index([requestId])
+  @@index([traceId])
+  @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
 }
 

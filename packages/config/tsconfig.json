@@ -8,6 +8,7 @@
     "resolveJsonModule": true,
     "allowJs": true,
     "strict": true,
+    "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -1,30 +1,46 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/auth';
 import { UserRole } from '@tamiym/types';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@tamiym/ui';
+
+const adminLoginSchema = z.object({
+  email: z.email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+type AdminLoginValues = z.infer<typeof adminLoginSchema>;
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<AdminLoginValues>({
+    resolver: zodResolver(adminLoginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (values: AdminLoginValues) => {
     setError(null);
-    setIsLoading(true);
 
     try {
-      const response = await authApi.login({ email, password });
+      const response = await authApi.login(values);
 
       // Verify user is an admin
       if (response.user.role !== UserRole.ADMIN) {
         await authApi.logout();
         setError('Access denied. Admin privileges required.');
-        setIsLoading(false);
         return;
       }
 
@@ -32,79 +48,72 @@ export default function AdminLoginPage() {
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || 'Login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-lg dark:bg-zinc-900">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Admin Sign In</h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-b from-primary-950 via-primary to-primary-50 px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+            Operations access
+          </p>
+          <CardTitle>Admin sign in</CardTitle>
+          <p className="text-sm text-muted-foreground">
             Sign in to access the admin dashboard
           </p>
-        </div>
+        </CardHeader>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <CardContent>
+        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/20">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Email address
-              </label>
-              <input
+              <Label htmlFor="email">Email address</Label>
+              <Input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-2"
+                {...register('email')}
               />
+              {errors.email ? (
+                <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
+              ) : null}
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-2"
+                {...register('password')}
               />
+              {errors.password ? (
+                <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
+              ) : null}
             </div>
           </div>
 
           <div>
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="w-full rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              disabled={isSubmitting}
+              className="w-full"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
+              {isSubmitting ? 'Signing in...' : 'Sign in'}
+            </Button>
           </div>
         </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

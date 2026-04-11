@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { PaymentsService } from './payments.service';
+import { PricingService } from '../pricing/pricing.service';
 import { OrderStatus } from '../generated/prisma/enums';
 
 const mockOrder = {
@@ -25,12 +26,16 @@ describe('OrdersController', () => {
     const mockPaymentsService = {
       initiatePayment: jest.fn(),
     };
+    const mockPricingService = {
+      quoteStandard: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdersController],
       providers: [
         { provide: OrdersService, useValue: mockOrdersService },
         { provide: PaymentsService, useValue: mockPaymentsService },
+        { provide: PricingService, useValue: mockPricingService },
       ],
     }).compile();
 
@@ -49,7 +54,7 @@ describe('OrdersController', () => {
       const user = { id: 'user-1' } as never;
       const dto = {
         shippingAddressId: 'addr-1',
-        items: [{ productId: 'prod-1', variantId: 'var-1', quantity: 1 }],
+        items: [{ variantId: 'var-1', quantity: 1 }],
       };
 
       const result = await controller.create(user, dto as never);

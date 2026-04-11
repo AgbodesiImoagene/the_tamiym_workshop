@@ -1,185 +1,151 @@
 # Package State Documentation
 
-This document tracks the current state of packages, dependencies, and tooling in the monorepo.
+This document describes the current state of the monorepo as it exists in the repository today.
 
-**Last Updated:** M0 Completion
+## Snapshot
 
-## Monorepo Structure
+- Package manager: `pnpm@9.0.0`
+- Build orchestration: Turborepo
+- Node requirement: `>=18`
+- Primary backend: NestJS 11 + Prisma 7 + PostgreSQL
+- Frontend apps: Next.js 16 app-router scaffolds
 
+## Monorepo layout
+
+```text
+apps/
+  api/     NestJS backend with Prisma, BullMQ, Swagger, JWT auth
+  web/     Public website scaffold
+  app/     Customer application scaffold
+  admin/   Admin frontend scaffold
+packages/
+  config/  Shared TS, ESLint, and theme assets
+  types/   Shared enums and generated types
+  ui/      Shared UI entrypoint scaffold
+docs/      Architecture, backend, deployment, and readiness docs
 ```
-the_tamiym_workshop/
-├── apps/
-│   ├── web/          # Next.js marketing site (port 3000)
-│   ├── app/          # Next.js customer dashboard (port 3002)
-│   ├── admin/        # Next.js admin dashboard (port 3003)
-│   └── api/          # NestJS backend API
-├── packages/
-│   ├── config/       # Shared TypeScript, ESLint, Tailwind configs
-│   ├── types/        # Shared TypeScript types and enums
-│   └── ui/           # Shared UI components (ready for components)
-└── docs/             # Documentation
-```
 
-## Package Manager & Tooling
+## App status
 
-- **Package Manager:** pnpm 9.0.0
-- **Build System:** Turborepo 2.7.5
-- **Node Version:** >=18.0.0
-- **TypeScript:** 5.9.3
+### `apps/api`
 
-## Apps
+- Most mature part of the repo
+- Uses:
+  - NestJS
+  - Prisma
+  - PostgreSQL
+  - BullMQ
+  - `nestjs-pino`
+  - Swagger/OpenAPI
+- Runtime setup includes:
+  - global validation pipe
+  - global `/v1` prefix
+  - cookie parsing
+  - CORS configuration
+  - Swagger at `/docs`
+  - health endpoint at `/v1/health`
+- Domain folders present in `src/`:
+  - `addresses`
+  - `admin`
+  - `analytics`
+  - `auth`
+  - `bulk-pricing`
+  - `designs`
+  - `discounts`
+  - `fundraising`
+  - `inventory`
+  - `mail`
+  - `media`
+  - `orders`
+  - `payouts`
+  - `pricing`
+  - `products`
+  - `storage`
+  - `users`
+- Test coverage exists across many modules plus e2e specs in `apps/api/test`.
+- Important caveat:
+  - `AppModule` currently imports `AddressesModule`, `AdminModule`, `AnalyticsModule`, `AuthModule`, `MailModule`, `PrismaModule`, and `UsersModule` directly.
+  - Other domain modules are reachable through `AdminModule` imports or remain partially wired rather than mounted as first-class top-level modules.
 
-### `apps/web` (Next.js Marketing Site)
+### `apps/web`
 
-- **Framework:** Next.js 16.1.4
-- **Port:** 3000
-- **Features:**
-  - Tailwind CSS v4 (CSS-based config)
-  - TypeScript strict mode
-  - ESLint with Next.js config
-  - Shared packages: `@tamiym/ui`, `@tamiym/types`, `@tamiym/config`
+- Next.js 16 scaffold
+- Current landing page is still the default starter page
+- Not production ready
 
-### `apps/app` (Next.js Customer Dashboard)
+### `apps/app`
 
-- **Framework:** Next.js 16.1.4
-- **Port:** 3002
-- **Features:**
-  - Tailwind CSS v4 (CSS-based config)
-  - TypeScript strict mode
-  - ESLint with Next.js config
-  - Shared packages: `@tamiym/ui`, `@tamiym/types`, `@tamiym/config`
+- Next.js 16 scaffold
+- Contains starter root page plus early auth/dashboard route files
+- Not production ready
 
-### `apps/admin` (Next.js Admin Dashboard)
+### `apps/admin`
 
-- **Framework:** Next.js 16.1.4
-- **Port:** 3003
-- **Features:**
-  - Tailwind CSS v4 (CSS-based config)
-  - TypeScript strict mode
-  - ESLint with Next.js config
-  - Shared packages: `@tamiym/ui`, `@tamiym/types`, `@tamiym/config`
+- Next.js 16 scaffold
+- Contains starter root page plus early auth/admin route files
+- Not production ready
 
-### `apps/api` (NestJS Backend)
-
-- **Framework:** NestJS 11.0.1
-- **Port:** 3001 (to be configured)
-- **Features:**
-  - TypeScript strict mode
-  - ESLint with TypeScript ESLint
-  - Shared packages: `@tamiym/types`, `@tamiym/config`
-- **Status:** Basic scaffold complete, M1 in progress
-
-## Shared Packages
+## Shared package status
 
 ### `packages/config`
 
-- **Purpose:** Shared configuration files
-- **Exports:**
-  - `tsconfig.json` - Base TypeScript configuration
-  - `eslint.config.js` - ESLint configuration
-  - `tailwind.config.js` - Tailwind CSS configuration (v3 format for reference)
-- **Dependencies:**
-  - `@typescript-eslint/eslint-plugin`
-  - `@typescript-eslint/parser`
-  - `eslint`
-  - `eslint-config-next`
-  - `eslint-config-prettier`
+- Active shared config package
+- Contains:
+  - `tsconfig.json`
+  - `eslint.config.js`
+  - `theme.css`
 
 ### `packages/types`
 
-- **Purpose:** Shared TypeScript types and enums
-- **Exports:**
-  - `UserRole` enum (CUSTOMER, ORGANIZER, ADMIN)
-  - `OrderStatus` enum
-  - `PaymentStatus` enum
-  - `CampaignStatus` enum
-  - `ModerationStatus` enum
-  - Base entity interfaces
-  - Paginated response types
-- **Dependencies:** None (pure TypeScript)
+- Active shared types package
+- Contains generated enums in `src/enums.generated.ts`
 
 ### `packages/ui`
 
-- **Purpose:** Shared React UI components
-- **Status:** Scaffold ready, components to be added
-- **Dependencies:**
-  - `react` ^18.2.0
-  - `react-dom` ^18.2.0
-  - `tailwindcss` ^3.4.0
+- Minimal package scaffold
+- Currently exports from `src/index.ts`
 
-## Development Tools
+## Local infrastructure in repo
 
-### Code Quality
+### `docker-compose.yml`
 
-- **Prettier:** 3.8.1 (formatting)
-- **ESLint:** Configured per app/package
-- **Husky:** 9.1.7 (git hooks)
-- **lint-staged:** 15.5.2 (pre-commit linting)
+Defines local services for:
 
-### Pre-commit Hooks
+- PostgreSQL
+- Redis
+- MinIO
+- OpenTelemetry Collector
 
-- **Location:** `.husky/pre-commit`
-- **Action:** Runs `pnpm exec lint-staged`
-- **Lint-staged config:** `.lintstagedrc.json`
-  - Lints and formats `.ts`, `.tsx`, `.js`, `.jsx` files
-  - Formats `.json`, `.md` files
+### `otel-collector-config.yaml`
 
-## CI/CD
+- Collector config exists in repo
+- App-side tracing and metrics instrumentation is not yet wired in `apps/api/src`
 
-### GitHub Actions
+## Script reality check
 
-- **Workflow:** `.github/workflows/ci.yml`
-- **Jobs:**
-  - `typecheck` - TypeScript type checking
-  - `lint` - ESLint + Prettier check
-  - `test` - Unit tests
-- **Triggers:** Push/PR to `main` or `develop` branches
+### Root scripts that are valid today
 
-## Tailwind Configuration
+- `pnpm dev`
+- `pnpm build`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm test:integration`
+- `pnpm test:coverage`
+- `pnpm format`
+- `pnpm format:check`
 
-All Next.js apps use Tailwind CSS v4 with CSS-based configuration:
+### Database workflow today
 
-- Theme tokens defined in `app/globals.css` using `@theme inline`
-- Primary color palette (50-900)
-- Neutral gray scale (50-900)
-- Font families: Inter (sans), system fonts
-- **Note:** Colors are placeholder values; to be updated from Figma design tokens
+The root package declares `db:migrate` and `db:seed`, but `apps/api/package.json` does not currently expose matching scripts. Until that is aligned, the reliable workflow is:
 
-## Scripts
+```bash
+pnpm --dir apps/api prisma migrate dev
+pnpm --dir apps/api prisma db seed
+```
 
-### Root Level (`pnpm`)
+## Documentation status summary
 
-- `dev` - Run all apps in development mode
-- `build` - Build all apps
-- `lint` - Lint all packages
-- `typecheck` - Type check all packages
-- `test` - Run all tests
-- `test:integration` - Run integration tests
-- `test:coverage` - Run tests with coverage
-- `format` - Format all files with Prettier
-- `format:check` - Check formatting
-- `db:migrate` - Run Prisma migrations (api app)
-- `db:seed` - Seed database (api app)
-
-## Environment Setup
-
-### Required
-
-- Node.js >=18.0.0
-- pnpm >=9.0.0
-- Docker + Docker Compose (for local services)
-
-### Local Services (Docker Compose)
-
-- PostgreSQL (required)
-- Redis (optional, recommended)
-- OpenTelemetry Collector (optional, recommended)
-
-## Next Steps (M1)
-
-1. Set up Prisma with PostgreSQL
-2. Configure NestJS with global validation pipe
-3. Create auth module skeleton
-4. Set up Swagger/OpenAPI documentation
-5. Add health endpoint
-6. Configure structured logging and OpenTelemetry baseline
+- Root README now reflects the current repo state
+- Backend docs should be read with `docs/03-backend.md`
+- Production blockers and next steps live in `docs/backend-production-readiness.md`

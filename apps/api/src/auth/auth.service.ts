@@ -11,9 +11,16 @@ import type { Queue } from 'bullmq';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { UserRole, UserStatus, TokenType } from '../generated/prisma/client';
+import {
+  UserRole,
+  UserStatus,
+  TokenType,
+  OAuthProvider,
+} from '../generated/prisma/client';
+import { AuditAction } from '../generated/prisma/enums';
 import { JwtPayload } from './strategies/jwt.strategy';
 import {
   MAIL_QUEUE_NAME,
@@ -23,11 +30,23 @@ import {
   PASSWORD_RESET_TOKEN_TTL_MS,
   REFRESH_TOKEN_TTL_MS,
 } from '../constants';
+import { ObservabilityService } from '../observability/observability.service';
+
+/** Normalized Google userinfo / id_token claims used to sign in or link accounts. */
+export type GoogleOAuthProfile = {
+  providerAccountId: string;
+  email: string;
+  emailVerified: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+};
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
+    private audit: AuditService,
+    private observability: ObservabilityService,
     private jwtService: JwtService,
     private configService: ConfigService,
     @InjectQueue(MAIL_QUEUE_NAME) private mailQueue: Queue,
@@ -40,9 +59,9 @@ export class AuthService {
    * @throws ConflictException if email already exists
    */
   async register(registerDto: RegisterDto) {
-    // Check if user already exists
+    // Normalise email to lower-case to prevent duplicate accounts
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: registerDto.email },
+      where: { email: registerDto.email.toLowerCase().trim() },
     });
 
     if (existingUser) {
@@ -53,12 +72,12 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: registerDto.email,
+        email: registerDto.email.toLowerCase().trim(),
         passwordHash: hashedPassword,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
         phone: registerDto.phone ?? null,
-        role: registerDto.role ?? UserRole.CUSTOMER,
+        role: UserRole.CUSTOMER,
         status: UserStatus.ACTIVE,
       },
       select: {
@@ -83,7 +102,7 @@ export class AuthService {
   async verifyEmail(token: string): Promise<{ message: string }> {
     const record = await this.prisma.authToken.findFirst({
       where: { token, tokenType: TokenType.EMAIL_VERIFICATION },
-      include: { user: true },
+      include: { user: { select: { id: true, role: true } } },
     });
 
     if (!record) {
@@ -94,13 +113,27 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired verification token');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    const verifiedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: record.userId },
-        data: { emailVerifiedAt: new Date() },
-      }),
-      this.prisma.authToken.delete({ where: { id: record.id } }),
-    ]);
+        data: { emailVerifiedAt: verifiedAt },
+      });
+      await tx.authToken.delete({ where: { id: record.id } });
+      await this.audit.log(
+        {
+          eventName: 'auth.email.verified',
+          action: AuditAction.APPROVE,
+          entityType: 'User',
+          entityId: record.userId,
+          actorUserId: record.userId,
+          actorRole: record.user.role,
+          after: { emailVerifiedAt: verifiedAt },
+          note: 'User verified email address',
+        },
+        tx,
+      );
+    });
 
     return { message: 'Email verified successfully' };
   }
@@ -134,6 +167,10 @@ export class AuthService {
     });
 
     if (user) {
+      // Revoke any prior unexpired reset tokens before issuing a new one
+      await this.prisma.authToken.deleteMany({
+        where: { userId: user.id, tokenType: TokenType.PASSWORD_RESET },
+      });
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
       await this.prisma.authToken.create({
@@ -171,7 +208,7 @@ export class AuthService {
   ): Promise<{ message: string }> {
     const record = await this.prisma.authToken.findFirst({
       where: { token, tokenType: TokenType.PASSWORD_RESET },
-      include: { user: true },
+      include: { user: { select: { id: true, role: true } } },
     });
 
     if (!record) {
@@ -183,13 +220,25 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: record.userId },
         data: { passwordHash },
-      }),
-      this.prisma.authToken.delete({ where: { id: record.id } }),
-    ]);
+      });
+      await tx.authToken.delete({ where: { id: record.id } });
+      await this.audit.log(
+        {
+          eventName: 'auth.password.reset',
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: record.userId,
+          actorUserId: record.userId,
+          actorRole: record.user.role,
+          note: 'User reset password via recovery flow',
+        },
+        tx,
+      );
+    });
 
     return { message: 'Password has been reset successfully' };
   }
@@ -212,21 +261,48 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'This account uses Google sign-in. Use password reset to set a password first.',
+      );
+    }
+
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) {
       throw new BadRequestException('Current password is incorrect');
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      });
+      // Invalidate all existing refresh tokens so stolen sessions are closed
+      await tx.authToken.deleteMany({
+        where: { userId, tokenType: TokenType.REFRESH },
+      });
+      await this.audit.log(
+        {
+          eventName: 'auth.password.changed',
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: userId,
+          actorUserId: userId,
+          note: 'Authenticated user changed password — all refresh tokens revoked',
+        },
+        tx,
+      );
     });
 
     return { message: 'Password has been changed successfully' };
   }
 
   private async createVerificationToken(userId: string): Promise<string> {
+    // Revoke any prior unexpired verification tokens before creating a new one
+    await this.prisma.authToken.deleteMany({
+      where: { userId, tokenType: TokenType.EMAIL_VERIFICATION },
+    });
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
     await this.prisma.authToken.create({
@@ -268,6 +344,18 @@ export class AuthService {
     });
 
     if (!user || user.status === UserStatus.DELETED) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Block any non-ACTIVE status (suspended, pending review, etc.)
+    if (user.status !== UserStatus.ACTIVE) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
+      throw new UnauthorizedException('Account is not active');
+    }
+
+    if (!user.passwordHash) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -277,9 +365,133 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    return this.completeLoginSession(user, 'User authenticated successfully');
+  }
+
+  /**
+   * Sign in or register via Google OAuth (account linking by verified email).
+   */
+  async loginWithGoogleProfile(profile: GoogleOAuthProfile) {
+    const email = profile.email.toLowerCase().trim();
+    if (!email || !profile.providerAccountId) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
+      throw new BadRequestException('Invalid Google profile');
+    }
+
+    const linked = await this.prisma.userOAuthAccount.findUnique({
+      where: {
+        provider_providerAccountId: {
+          provider: OAuthProvider.GOOGLE,
+          providerAccountId: profile.providerAccountId,
+        },
+      },
+      include: { user: true },
+    });
+
+    let user = linked?.user;
+
+    if (user?.status === UserStatus.DELETED) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
+      throw new UnauthorizedException('Account is unavailable');
+    }
+
+    if (!user) {
+      const existingByEmail = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingByEmail) {
+        if (existingByEmail.status === UserStatus.DELETED) {
+          this.observability.recordAuthLogin({ outcome: 'failure' });
+          throw new UnauthorizedException('Account is unavailable');
+        }
+        await this.prisma.userOAuthAccount.create({
+          data: {
+            provider: OAuthProvider.GOOGLE,
+            providerAccountId: profile.providerAccountId,
+            userId: existingByEmail.id,
+          },
+        });
+        user = await this.prisma.user.findUniqueOrThrow({
+          where: { id: existingByEmail.id },
+        });
+      } else {
+        const firstName = profile.firstName?.trim() || 'Customer';
+        const lastName = profile.lastName?.trim() || 'User';
+
+        user = await this.prisma.$transaction(async (tx) => {
+          const created = await tx.user.create({
+            data: {
+              email,
+              passwordHash: null,
+              firstName,
+              lastName,
+              phone: null,
+              role: UserRole.CUSTOMER,
+              status: UserStatus.ACTIVE,
+              emailVerifiedAt: profile.emailVerified ? new Date() : null,
+            },
+          });
+          await tx.userOAuthAccount.create({
+            data: {
+              provider: OAuthProvider.GOOGLE,
+              providerAccountId: profile.providerAccountId,
+              userId: created.id,
+            },
+          });
+          return created;
+        });
+      }
+    }
+
+    const updates: {
+      emailVerifiedAt?: Date;
+      firstName?: string;
+      lastName?: string;
+    } = {};
+
+    if (profile.emailVerified && !user.emailVerifiedAt) {
+      updates.emailVerifiedAt = new Date();
+    }
+    if (
+      profile.firstName?.trim() &&
+      (user.firstName === 'Customer' || !user.firstName.trim())
+    ) {
+      updates.firstName = profile.firstName.trim();
+    }
+    if (
+      profile.lastName?.trim() &&
+      (user.lastName === 'User' || !user.lastName.trim())
+    ) {
+      updates.lastName = profile.lastName.trim();
+    }
+
+    if (Object.keys(updates).length > 0) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: updates,
+      });
+    }
+
+    return this.completeLoginSession(user, 'User authenticated via Google');
+  }
+
+  private async completeLoginSession(
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+      role: UserRole;
+      status: UserStatus;
+    },
+    auditNote: string,
+  ) {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -290,20 +502,35 @@ export class AuthService {
     const refreshToken = crypto.randomBytes(32).toString('hex');
     const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    const loggedInAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      }),
-      this.prisma.authToken.create({
+        data: { lastLoginAt: loggedInAt },
+      });
+      await tx.authToken.create({
         data: {
           userId: user.id,
           token: refreshToken,
           tokenType: TokenType.REFRESH,
           expiresAt: refreshExpiresAt,
         },
-      }),
-    ]);
+      });
+      await this.audit.log(
+        {
+          eventName: 'auth.login.succeeded',
+          action: AuditAction.APPROVE,
+          entityType: 'User',
+          entityId: user.id,
+          actorUserId: user.id,
+          actorRole: user.role,
+          after: { lastLoginAt: loggedInAt },
+          note: auditNote,
+        },
+        tx,
+      );
+    });
+    this.observability.recordAuthLogin({ outcome: 'success' });
 
     return {
       access_token: accessToken,
@@ -327,7 +554,19 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const record = await this.prisma.authToken.findFirst({
       where: { token: refreshToken, tokenType: TokenType.REFRESH },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            role: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!record) {
@@ -354,17 +593,29 @@ export class AuthService {
     // Rotate refresh token: delete old, create new
     const newRefreshToken = crypto.randomBytes(32).toString('hex');
     const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    await this.prisma.$transaction([
-      this.prisma.authToken.delete({ where: { id: record.id } }),
-      this.prisma.authToken.create({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.authToken.delete({ where: { id: record.id } });
+      await tx.authToken.create({
         data: {
           userId: user.id,
           token: newRefreshToken,
           tokenType: TokenType.REFRESH,
           expiresAt: refreshExpiresAt,
         },
-      }),
-    ]);
+      });
+      await this.audit.log(
+        {
+          eventName: 'auth.session.refreshed',
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: user.id,
+          actorUserId: user.id,
+          actorRole: user.role,
+          note: 'Refresh token rotated',
+        },
+        tx,
+      );
+    });
 
     return {
       access_token: accessToken,
@@ -386,8 +637,30 @@ export class AuthService {
    */
   async logout(refreshToken: string | undefined): Promise<void> {
     if (!refreshToken) return;
-    await this.prisma.authToken.deleteMany({
+    const record = await this.prisma.authToken.findFirst({
       where: { token: refreshToken, tokenType: TokenType.REFRESH },
+      include: { user: { select: { id: true, role: true } } },
+    });
+    if (!record) {
+      return;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.authToken.deleteMany({
+        where: { token: refreshToken, tokenType: TokenType.REFRESH },
+      });
+      await this.audit.log(
+        {
+          eventName: 'auth.logout',
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: record.userId,
+          actorUserId: record.userId,
+          actorRole: record.user.role,
+          note: 'Refresh token invalidated on logout',
+        },
+        tx,
+      );
     });
   }
 }

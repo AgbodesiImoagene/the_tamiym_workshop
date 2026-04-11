@@ -3,6 +3,7 @@
  */
 
 import { apiClient } from './api';
+export type { ApiError } from './api';
 import { UserRole } from '@tamiym/types';
 
 export interface User {

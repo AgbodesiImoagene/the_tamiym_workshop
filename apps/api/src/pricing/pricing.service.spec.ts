@@ -1,0 +1,228 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { PricingService } from './pricing.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
+import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
+
+describe('PricingService', () => {
+  let service: PricingService;
+  let prisma: jest.Mocked<PrismaService>;
+
+  const mockAddress = {
+    id: 'addr-1',
+    userId: 'user-1',
+    addressLine1: '123 Main',
+    addressLine2: null,
+    city: 'Lagos',
+    state: 'Lagos',
+    postalCode: null,
+    country: 'Nigeria',
+    countryCode: 'NG',
+    locality: 'Lagos',
+    dependentLocality: null,
+    administrativeAreaLevel1: 'Lagos',
+    administrativeAreaLevel2: null,
+    stateCode: 'LA',
+    lgaId: null as string | null,
+  };
+
+  const mockSiteSettings = {
+    id: 'default',
+    vatRate: 0.075,
+    pricesIncludeVat: true,
+    vatAppliesToShipping: true,
+    currency: 'NGN',
+  };
+
+  const mockVariant = {
+    id: 'var-1',
+    productId: 'prod-1',
+    isAvailable: true,
+    name: 'S',
+    sku: 'SKU-S',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    optionValues: [
+      {
+        option: { name: 'Size', code: 'size' },
+        optionValue: {
+          displayName: 'Small',
+          valueCode: 'S',
+          upcharges: [],
+        },
+      },
+    ],
+    prices: [{ amount: 5000 }],
+    product: {
+      prices: [],
+      bulkPricingTiers: [],
+      weightGrams: 300,
+      packageLengthMm: 320,
+      packageWidthMm: 240,
+      packageHeightMm: 40,
+    },
+    bulkPricing: [],
+    productViewPricings: [],
+  };
+
+  beforeEach(async () => {
+    const mockPrisma = {
+      address: {
+        findUnique: jest.fn().mockResolvedValue(mockAddress),
+      },
+      siteSettings: {
+        findUnique: jest.fn().mockResolvedValue(mockSiteSettings),
+      },
+      productVariant: {
+        findUnique: jest.fn().mockResolvedValue(mockVariant),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      shippingZoneArea: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      campaign: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'camp-1' }),
+      },
+      campaignProduct: { findFirst: jest.fn().mockResolvedValue(null) },
+      designView: { findMany: jest.fn().mockResolvedValue([]) },
+      productViewPricing: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const mockResolver = {
+      resolveAddress: jest.fn().mockResolvedValue(null),
+    };
+    const mockRateEngine = {
+      quote: jest.fn().mockResolvedValue(null),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PricingService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: ShippingDestinationResolver, useValue: mockResolver },
+        { provide: ShippingRateEngine, useValue: mockRateEngine },
+      ],
+    }).compile();
+
+    service = module.get<PricingService>(PricingService);
+    prisma = module.get(PrismaService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('quoteStandard', () => {
+    it('should throw when items array is empty', async () => {
+      await expect(
+        service.quoteStandard('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when address not found', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.quoteStandard('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw when address belongs to another user', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        userId: 'other-user',
+      });
+      await expect(
+        service.quoteStandard('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('should return quote shape with currency, items, totals when variant and address valid', async () => {
+      const result = await service.quoteStandard('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      });
+
+      expect(result).toMatchObject({
+        currency: 'NGN',
+        items: [
+          {
+            productId: 'prod-1',
+            variantId: 'var-1',
+            quantity: 2,
+            unitBasePrice: 5000,
+            lineTotal: expect.any(Number),
+          },
+        ],
+        subtotalAmount: expect.any(Number),
+        discountAmount: expect.any(Number),
+        shippingFee: expect.any(Number),
+        vatAmount: expect.any(Number),
+        totalAmount: expect.any(Number),
+      });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].pricingBreakdown).toBeDefined();
+      expect(result.items[0].variantSnapshot).toBeDefined();
+    });
+  });
+
+  describe('quoteCampaign', () => {
+    it('should throw when campaign not found', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getMinCampaignProductPrice', () => {
+    it('should return 0 when product has no variants', async () => {
+      (prisma.productVariant.findMany as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.getMinCampaignProductPrice(
+        'prod-1',
+        null,
+        'NGN',
+      );
+      expect(result).toBe(0);
+    });
+
+    it('should return max of variant base + view surcharge across variants', async () => {
+      const variantA = {
+        id: 'var-a',
+        productId: 'prod-1',
+        prices: [{ amount: 5000 }],
+        product: { prices: [] },
+      };
+      const variantB = {
+        id: 'var-b',
+        productId: 'prod-1',
+        prices: [],
+        product: { prices: [{ amount: 4000 }] },
+      };
+      (prisma.productVariant.findMany as jest.Mock).mockResolvedValue([
+        variantA,
+        variantB,
+      ]);
+      (prisma.designView.findMany as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.getMinCampaignProductPrice(
+        'prod-1',
+        null,
+        'NGN',
+      );
+      expect(result).toBe(5000);
+    });
+  });
+});

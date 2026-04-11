@@ -1,162 +1,198 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { authApi, ApiError } from '@/lib/auth';
+import {
+  authApi,
+  ApiError,
+  getGoogleSignInUrl,
+  GOOGLE_SIGN_IN_ERROR_MESSAGES,
+} from '@/lib/auth';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@tamiym/ui';
+
+const registerSchema = z.object({
+  email: z.email('Enter a valid email address'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Include at least one uppercase letter')
+    .regex(/[a-z]/, 'Include at least one lowercase letter')
+    .regex(/[0-9]/, 'Include at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Include at least one symbol'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+});
+
+type RegisterValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: '',
-  });
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('error');
+    if (code) {
+      setError(
+        GOOGLE_SIGN_IN_ERROR_MESSAGES[code] ??
+          'Sign-in failed. Please try again.',
+      );
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+    },
+  });
+
+  const onSubmit = async (values: RegisterValues) => {
     setError(null);
-    setIsLoading(true);
 
     try {
       await authApi.register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName || undefined,
-        lastName: formData.lastName || undefined,
+        email: values.email,
+        password: values.password,
+        firstName: values.firstName,
+        lastName: values.lastName,
       });
       router.push('/dashboard');
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || 'Registration failed. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-lg dark:bg-zinc-900">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            Create your account
-          </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-b from-primary-50 via-background to-background px-4">
+      <Card className="w-full max-w-lg">
+        <CardHeader className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+            Customer onboarding
+          </p>
+          <CardTitle>Create your account</CardTitle>
+          <p className="text-sm text-muted-foreground">
             Or{' '}
             <Link
               href="/auth/login"
-              className="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-50 dark:hover:text-zinc-300"
+              className="font-medium text-primary hover:text-primary-700"
             >
               sign in to your existing account
             </Link>
           </p>
-        </div>
+        </CardHeader>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <CardContent>
+        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/20">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Email address
-              </label>
-              <input
+          <div className="space-y-3">
+            <a
+              href={getGoogleSignInUrl('/dashboard')}
+              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-border bg-background text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-primary-50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/20"
+            >
+              Continue with Google
+            </a>
+            <div className="relative py-2 text-center text-xs text-muted-foreground">
+              <span className="relative z-10 bg-background px-2">
+                or register with email
+              </span>
+              <span className="bg-border absolute top-1/2 right-0 left-0 z-0 h-px -translate-y-1/2" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Label htmlFor="email">Email address</Label>
+              <Input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-2"
+                {...register('email')}
               />
+              {errors.email ? (
+                <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
+              ) : null}
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={formData.password}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="firstName"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                First name (optional)
-              </label>
-              <input
+              <Label htmlFor="firstName">First name</Label>
+              <Input
                 id="firstName"
-                name="firstName"
                 type="text"
                 autoComplete="given-name"
-                value={formData.firstName}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-2"
+                {...register('firstName')}
               />
+              {errors.firstName ? (
+                <p className="mt-2 text-sm text-red-700">{errors.firstName.message}</p>
+              ) : null}
             </div>
 
             <div>
-              <label
-                htmlFor="lastName"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Last name (optional)
-              </label>
-              <input
+              <Label htmlFor="lastName">Last name</Label>
+              <Input
                 id="lastName"
-                name="lastName"
                 type="text"
                 autoComplete="family-name"
-                value={formData.lastName}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-xs focus:border-zinc-500 focus:outline-hidden focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                className="mt-2"
+                {...register('lastName')}
               />
+              {errors.lastName ? (
+                <p className="mt-2 text-sm text-red-700">{errors.lastName.message}</p>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                className="mt-2"
+                {...register('password')}
+              />
+              {errors.password ? (
+                <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Use at least 8 characters with uppercase, lowercase, number, and symbol.
+                </p>
+              )}
             </div>
           </div>
 
           <div>
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="w-full rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              disabled={isSubmitting}
+              className="w-full"
             >
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </button>
+              {isSubmitting ? 'Creating account...' : 'Create account'}
+            </Button>
           </div>
         </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

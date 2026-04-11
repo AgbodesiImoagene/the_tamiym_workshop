@@ -2,10 +2,24 @@
  * Application-wide constants. Extract env-driven values via ConfigService where needed.
  */
 
+import { CurrencyCode } from './generated/prisma/enums';
+
+/** Default store currency (v1: Nigeria-only). Move to config/customer/session when multi-currency. */
+export const DEFAULT_CURRENCY = CurrencyCode.NGN;
+
+/** Variant generation limits to prevent combinatorial explosions. */
+export const MAX_VARIANTS_PER_PRODUCT = 1000;
+export const MAX_OPTIONS_PER_PRODUCT = 5;
+
 /** Mail queue (BullMQ) name and job types */
 export const MAIL_QUEUE_NAME = 'mail';
 export const JOB_VERIFICATION_EMAIL = 'verification-email';
 export const JOB_PASSWORD_RESET_EMAIL = 'password-reset-email';
+export const JOB_NOTIFICATION_OUTBOX = 'notification-outbox';
+
+/** Payout execution queue (BullMQ) */
+export const PAYOUT_QUEUE_NAME = 'payout-execution';
+export const JOB_EXECUTE_PAYOUT_RUN = 'execute-payout-run';
 
 /** Token TTLs in milliseconds */
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -18,6 +32,18 @@ export const ACCESS_TOKEN_COOKIE_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
 export const REFRESH_TOKEN_COOKIE_NAME = 'refresh_token';
 export const REFRESH_TOKEN_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+/** Google OAuth (CSRF state + post-login path); short-lived */
+export const GOOGLE_OAUTH_STATE_COOKIE_NAME = 'google_oauth_state';
+export const GOOGLE_OAUTH_NEXT_COOKIE_NAME = 'google_oauth_next';
+export const GOOGLE_OAUTH_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
 /** Rate limiting (e.g. resend verification, forgot password) */
 export const THROTTLE_LIMIT = 3;
 export const THROTTLE_TTL_MS = 60_000; // 1 minute
+
+/** Pending order expiry: release reserved inventory after this many minutes if unpaid. */
+export const ORDER_PENDING_EXPIRY_MINUTES = 30;
+
+/** Admin custom email broadcast: throttle per admin (Nest Throttler, default bucket). */
+export const ADMIN_EMAIL_BROADCAST_THROTTLE_LIMIT = 5;
+export const ADMIN_EMAIL_BROADCAST_THROTTLE_TTL_MS = 60 * 60 * 1000; // 1 hour

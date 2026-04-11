@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 const mockVariant = {
   id: 'var-1',
@@ -43,6 +44,12 @@ describe('InventoryService', () => {
       providers: [
         InventoryService,
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: InventoryLowStockNotifier,
+          useValue: {
+            afterInventoryChange: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

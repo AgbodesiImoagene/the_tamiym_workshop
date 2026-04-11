@@ -1,13 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 @Injectable()
 export class InventoryService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly inventoryLowStockNotifier: InventoryLowStockNotifier,
+  ) {}
 
   /**
-   * Get inventory for a variant (public or admin). Creates InventoryItem if not exists (lazy create).
+   * Get inventory for a variant (public or admin).
+   * If no InventoryItem row exists yet, returns a virtual zero-stock object
+   * rather than creating a DB row (the caller treats it as 0 stock).
+   * An InventoryItem row is only written on the first admin update via
+   * updateVariantInventory().
    */
   async getByVariantId(variantId: string) {
     const variant = await this.prisma.productVariant.findUnique({
@@ -52,6 +64,19 @@ export class InventoryService {
       throw new NotFoundException('Variant not found');
     }
 
+    const effectiveStock =
+      dto.stockOnHand ?? variant.inventory?.stockOnHand ?? 0;
+    const effectiveReserved = dto.reserved ?? variant.inventory?.reserved ?? 0;
+    if (effectiveReserved > effectiveStock) {
+      throw new BadRequestException('reserved must not exceed stockOnHand');
+    }
+
+    const previousAvailable =
+      variant.inventory != null
+        ? (variant.inventory.stockOnHand ?? 0) -
+          (variant.inventory.reserved ?? 0)
+        : Number.MAX_SAFE_INTEGER;
+
     const updateData: {
       stockOnHand?: number;
       reserved?: number;
@@ -88,6 +113,11 @@ export class InventoryService {
         data: { isAvailable: dto.isAvailable },
       });
     }
+
+    await this.inventoryLowStockNotifier.afterInventoryChange(
+      variantId,
+      previousAvailable,
+    );
 
     return this.getByVariantId(variantId);
   }

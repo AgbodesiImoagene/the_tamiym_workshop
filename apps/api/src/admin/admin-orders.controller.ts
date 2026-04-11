@@ -2,10 +2,13 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,12 +18,17 @@ import {
   ApiCookieAuth,
   ApiParam,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { OrdersService } from '../orders/orders.service';
+import { RefundsService } from '../orders/refunds.service';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { CreateRefundDto } from './dto/create-refund.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
 import { UserRole } from '../generated/prisma/enums';
 
 @ApiTags('Admin')
@@ -28,7 +36,10 @@ import { UserRole } from '../generated/prisma/enums';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminOrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly refundsService: RefundsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List all orders (admin)' })
@@ -69,9 +80,41 @@ export class AdminOrdersController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async updateStatus(
+    @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateOrderStatus(id, dto.status);
+    return this.ordersService.updateOrderStatus(id, dto.status, user.id);
+  }
+
+  @Post(':id/refund')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Initiate refund for a PAID order (admin)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiBody({ type: CreateRefundDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Refund initiated and order updated',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid amount or order not refundable',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async refund(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: CreateRefundDto,
+  ) {
+    return this.refundsService.initiateRefund(
+      id,
+      dto.amount,
+      dto.reason,
+      user.id,
+    );
   }
 }

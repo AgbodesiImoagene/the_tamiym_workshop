@@ -1,98 +1,135 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Tamiym Workshop API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS backend for the Tamiym Workshop platform.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Current state
 
-## Description
+This app is the most developed part of the monorepo. It already includes:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Swagger/OpenAPI at `/docs`
+- global `/v1` route prefix
+- JWT auth with cookie support
+- Prisma + PostgreSQL
+- request validation
+- structured logging with `nestjs-pino`
+- Redis-backed BullMQ queues (including the `mail` worker in-process with the API)
+- domain modules for orders, products, fundraising, payouts, media, pricing, and admin workflows
 
-## Project setup
+It is not production ready yet. See `../../docs/backend-production-readiness.md` for the detailed backlog.
+
+## Run locally
+
+From the repo root:
 
 ```bash
-$ pnpm install
+pnpm --filter api dev
 ```
 
-## Compile and run the project
+Or from this directory:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm dev
 ```
 
-## Run tests
+Default local URL:
+
+- API: `http://localhost:3001`
+- Swagger: `http://localhost:3001/docs`
+- Health: `http://localhost:3001/v1/health`
+
+## Environment setup
+
+Create a local env file:
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+cp .env.example .env.local
 ```
 
-## Deployment
+Required outside test:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- `DATABASE_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Additional env vars exist for:
+
+- Redis
+- SMTP / transactional email (`MAIL_*`, optional `ORDER_PLACE_NOTIFICATION_EMAIL`, `NOTIFICATION_OUTBOX_*`)
+- Paystack
+- S3-compatible object storage
+- logging
+- OpenTelemetry collector endpoint
+- optional `OTEL_SERVICE_NAME` and `OTEL_METRIC_EXPORT_INTERVAL_MS`
+
+## Database workflow
+
+Reliable current workflow:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm prisma migrate dev
+pnpm prisma db seed
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Useful utility scripts:
 
-## Resources
+```bash
+# Create or promote an admin account in the current DATABASE_URL
+pnpm run admin:create -- --email admin@example.com --password "StrongPassword1!"
 
-Check out a few resources that may come in handy when working with NestJS:
+# Seed deterministic dummy data into the test database from .env.test
+pnpm run seed:e2e
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Notes:
 
-## Support
+- `admin:create` will promote an existing user to `ADMIN` if the email already exists.
+- `seed:e2e` is intentionally guarded and refuses to run against a non-test database unless `ALLOW_NON_TEST_DATABASE_SEED=true` is set.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Tests
 
-## Stay in touch
+```bash
+pnpm test
+pnpm test:e2e
+pnpm test:coverage
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Email (transactional)
 
-## License
+- **Auth:** registration verification and password reset are queued on the `mail` BullMQ queue and sent via `@nestjs-modules/mailer` (Handlebars templates under `src/mail/templates/`).
+- **Orders:** when `ORDER_PLACE_NOTIFICATION_EMAIL` is set, a row is written to `notification_outbox` and a job is queued; a cron every two minutes also requeues any stranded `PENDING` rows.
+- **Payments:** after Paystack `charge.success`, a `PaymentConfirmed` outbox row is created for the customer email and queued the same way.
+- **Order lifecycle (customer):** when an admin updates an order to `PROCESSING`, `FULFILLED`, `DELIVERED`, or `CANCELLED`, the buyer gets the matching transactional email (same outbox + queue).
+- **Refunds (customer):** after a successful admin-initiated refund, the buyer receives `RefundCompleted`.
+- **Design moderation (customer):** when an admin sets moderation to `APPROVED` or `REJECTED`, the design owner is emailed.
+- **Organizer payouts:** when Paystack transfer webhooks mark a payout `SUCCEEDED` or `FAILED`, the recipient organizer is emailed.
+- **Delivery:** the worker loads each row, claims it (`PENDING` → `PROCESSING`), renders the appropriate template (brand logo via CID attachment from `src/mail/assets/`), and marks `SENT` or `FAILED`. Stale `PROCESSING` rows older than `NOTIFICATION_OUTBOX_STALE_PROCESSING_MINUTES` are reset to `PENDING` for retry.
+- **Admin broadcast:** `POST /v1/admin/notifications/email/broadcast` (admin JWT) accepts `audience`, optional `userIds`, `subject`, and `htmlBody`. HTML is sanitized; use `dryRun: true` for a recipient count and sample addresses. Sends are throttled (see `ADMIN_EMAIL_BROADCAST_*` in `src/constants.ts`) and capped by `ADMIN_EMAIL_BROADCAST_MAX_RECIPIENTS`.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Module map
+
+Current source folders under `src/`:
+
+- `addresses`
+- `admin`
+- `analytics`
+- `auth`
+- `bulk-pricing`
+- `designs`
+- `discounts`
+- `fundraising`
+- `inventory`
+- `mail`
+- `media`
+- `orders`
+- `payouts`
+- `pricing`
+- `prisma`
+- `products`
+- `storage`
+- `users`
+
+## Important caveats
+
+- `AppModule` directly imports only a subset of the modules in `src/`.
+- Some business domains are currently exposed through `AdminModule` imports rather than being mounted directly at the application root.
+- OpenTelemetry bootstrap, baseline traces, and baseline metrics are now wired into the API runtime; dashboards, alerts, and environment-specific exporter validation are still pending.

@@ -1,6 +1,6 @@
 # AI Implementation Guide — Tamiym Workshop
 
-This guide translates the Project Requirements Document (PRD) into technical, implementation-ready instructions for an AI coding agent and human developers.
+This guide translates the Project Requirements Document (PRD) into technical, implementation-ready instructions for an AI coding agent and human developers. It now also serves as the entry point for repo-state documentation, so it should reflect what is actually implemented in the repository today.
 
 **Source of truth:** the PRD and the client Figma designs. The implementation must maintain functional and visual parity with the approved designs and the PRD scope.  
 The PRD defines: public website + customer dashboard + design workshop + checkout/orders + fundraising + admin dashboard + basic analytics, with a hard delivery target. (See PRD.)
@@ -30,6 +30,13 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
     - Endpoints without Swagger annotations are considered incomplete.
     - Changes to request/response shapes must update OpenAPI definitions immediately.
 
+## Current repo-state summary
+
+- `apps/api` is the most developed part of the repo and contains real domain modules, controllers, services, DTOs, Prisma models, and tests.
+- `apps/web`, `apps/app`, and `apps/admin` are still mostly scaffold-level Next.js apps.
+- Swagger is enabled in the API, but production hardening work remains.
+- The canonical backend backlog now lives in `backend-production-readiness.md`.
+
 ## What to read first
 
 1. `01-architecture.md` — system architecture & key design decisions
@@ -44,6 +51,17 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 10. `10-deployment-and-environments.md` — environments, secrets, deployment
 11. `11-development-setup.md` — local dev environment setup & workflows
 12. `12-testing-strategy.md` — unit/integration tests + coverage requirements
+    <<<<<<< Updated upstream
+13. `backend-production-readiness.md` — repo-state backend gaps, todos, and production checklist
+
+## Deep Dives
+
+- `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
+- `pricing-strategy.md` — pricing pipeline, money model, discount and bulk-pricing constraints, and rounding policy
+- # `backend-production-readiness.md` — module-by-module backend readiness tracker and next steps
+
+13. `design-rules.md` — Design parity rules and UI tokens (Figma TTW-Site → `packages/config/theme.css`)
+    > > > > > > > Stashed changes
 
 ## Output expectations for the AI agent
 
@@ -121,7 +139,7 @@ resulting code “works”.
 This checklist is the recommended build order to hit the end-of-February delivery target.  
 Each milestone should result in a shippable increment and must include basic tests + telemetry.
 
-### M0 — Repo & Foundations (Day 1–2) ✅ COMPLETE
+### M0 — Repo & Foundations
 
 - [x] Monorepo scaffold (pnpm + turborepo)
 - [x] Apps created: `web`, `app`, `admin`, `api`
@@ -130,14 +148,15 @@ Each milestone should result in a shippable increment and must include basic tes
 - [x] Linting/formatting + pre-commit checks
 - [x] Basic CI pipeline (typecheck + lint + unit tests)
 
-### M1 — Backend Skeleton + OpenAPI (Day 2–3) ✅ COMPLETE
+### M1 — Backend Skeleton + OpenAPI
 
 - [x] NestJS API bootstrapped with Prisma + Postgres
 - [x] Global validation pipe (DTO validation)
-- [x] Auth module skeleton (JWT cookies)
+- [x] Auth module exists and is beyond skeleton stage
 - [x] Role model: CUSTOMER / ORGANIZER / ADMIN
-- [x] **Swagger/OpenAPI auto-generated** and accessible (e.g., `/docs`)
-- [x] Health endpoint + structured logging + OTel baseline
+- [x] **Swagger/OpenAPI auto-generated** and accessible at `/docs`
+- [x] Health endpoint and structured logging
+- [ ] OpenTelemetry runtime instrumentation
 
 ### M2 — Auth + User Accounts (Day 3–5)
 

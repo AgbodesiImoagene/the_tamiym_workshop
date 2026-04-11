@@ -68,19 +68,23 @@ describe('UsersService', () => {
   });
 
   describe('updateProfile', () => {
-    it('should update and return user when found', async () => {
+    it('should update and return public profile only (no password hash)', async () => {
       const updated = { ...mockProfile, firstName: 'Updated' };
-      (prisma.user.findFirst as jest.Mock).mockResolvedValue(mockProfile);
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue({ id: 'user-1' });
       (prisma.user.update as jest.Mock).mockResolvedValue(updated);
 
       const dto = { firstName: 'Updated' };
       const result = await service.updateProfile('user-1', dto as any);
 
       expect(result).toEqual(updated);
+      expect(result).not.toHaveProperty('passwordHash');
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'user-1' },
         data: dto,
+        select: expect.any(Object),
       });
+      const updateArg = (prisma.user.update as jest.Mock).mock.calls[0][0];
+      expect('passwordHash' in updateArg.select).toBe(false);
     });
 
     it('should throw NotFoundException when user not found', async () => {

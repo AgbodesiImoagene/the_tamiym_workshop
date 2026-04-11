@@ -3,6 +3,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserStatus } from '../generated/prisma/client';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
+/** Fields safe to return from profile APIs (never includes passwordHash or tokens). */
+const PUBLIC_PROFILE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  role: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -15,17 +28,7 @@ export class UsersService {
   async getProfile(userId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, status: { not: UserStatus.DELETED } },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: PUBLIC_PROFILE_SELECT,
     });
 
     if (!user) {
@@ -42,19 +45,19 @@ export class UsersService {
    * @returns Updated user profile
    */
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    const user = await this.prisma.user.findFirst({
+    const exists = await this.prisma.user.findFirst({
       where: { id: userId, status: { not: UserStatus.DELETED } },
+      select: { id: true },
     });
 
-    if (!user) {
+    if (!exists) {
       throw new NotFoundException('User not found');
     }
 
-    const updatedUser = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id: userId },
       data: updateProfileDto,
+      select: PUBLIC_PROFILE_SELECT,
     });
-
-    return updatedUser;
   }
 }

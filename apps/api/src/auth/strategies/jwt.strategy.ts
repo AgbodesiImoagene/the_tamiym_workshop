@@ -41,7 +41,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_ACCESS_SECRET') || 'secret',
+      secretOrKey: (() => {
+        const secret = configService.get<string>('JWT_ACCESS_SECRET');
+        if (!secret || secret === 'secret') {
+          throw new Error(
+            'JWT_ACCESS_SECRET must be set and must not be the default placeholder',
+          );
+        }
+        return secret;
+      })(),
     });
   }
 
@@ -63,14 +71,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found');
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-    };
+    return user;
   }
 }

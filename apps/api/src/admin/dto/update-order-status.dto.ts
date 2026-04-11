@@ -2,19 +2,19 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsIn } from 'class-validator';
 import { OrderStatus } from '../../generated/prisma/enums';
 
-const ALLOWED_STATUSES = [
-  OrderStatus.PENDING_PAYMENT,
-  OrderStatus.PAID,
+/**
+ * Statuses that admin may set via PATCH. REFUNDED is set only by the refund flow; CANCELLED only from PENDING_PAYMENT.
+ */
+const ADMIN_SETTABLE_STATUSES = [
   OrderStatus.PROCESSING,
   OrderStatus.FULFILLED,
   OrderStatus.DELIVERED,
   OrderStatus.CANCELLED,
-  OrderStatus.REFUNDED,
 ] as const;
 
 export class UpdateOrderStatusDto {
-  @ApiProperty({ enum: ALLOWED_STATUSES })
+  @ApiProperty({ enum: ADMIN_SETTABLE_STATUSES })
   @IsString()
-  @IsIn(ALLOWED_STATUSES)
-  status!: (typeof ALLOWED_STATUSES)[number];
+  @IsIn(ADMIN_SETTABLE_STATUSES)
+  status!: (typeof ADMIN_SETTABLE_STATUSES)[number];
 }

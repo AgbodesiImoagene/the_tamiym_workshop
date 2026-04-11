@@ -1,65 +1,91 @@
-import Image from 'next/image';
+import Link from 'next/link';
+import { Badge, Card, CardContent, CardHeader, CardTitle, SectionHeading } from '@tamiym/ui';
+
+const surfaces = [
+  {
+    title: 'Product discovery',
+    description: 'Review merchandise options, campaign-ready items, and workshop entry points.',
+  },
+  {
+    title: 'Order visibility',
+    description: 'Track payment state, fulfillment progress, and recent activity from one dashboard.',
+  },
+  {
+    title: 'Fundraising support',
+    description: 'Manage organizer campaigns and monitor their performance from your customer workspace.',
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="min-h-screen bg-linear-to-b from-primary-50 via-background to-background">
+      <section className="mx-auto max-w-6xl px-6 py-16 lg:px-8 lg:py-24">
+        <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+          <div className="space-y-6">
+            <Badge variant="brand">Customer app</Badge>
+            <div className="space-y-4">
+              <h1 className="font-heading text-5xl uppercase tracking-headline text-primary md:text-6xl">
+                Manage products, campaigns, and orders in one place.
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
+                This app now provides the first customer-facing shell for authentication, campaign
+                visibility, and order tracking on top of the live API.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/auth/register"
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-accent px-6 text-sm font-medium text-accent-foreground transition hover:bg-accent-500"
+              >
+                Create account
+              </Link>
+              <Link
+                href="/auth/login"
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-primary px-6 text-sm font-medium text-primary transition hover:bg-primary-50"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-border px-6 text-sm font-medium text-foreground transition hover:bg-gray-50"
+              >
+                View dashboard
+              </Link>
+            </div>
+          </div>
+
+          <Card className="bg-primary text-white">
+            <CardHeader>
+              <CardTitle className="text-white">What is already wired</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-white/85">
+              <p>Cookie-based auth is connected to the API and protected flows redirect on 401s.</p>
+              <p>Dashboard sections now use server-state patterns for orders and campaigns.</p>
+              <p>Shared tokens and UI primitives keep this app aligned with `web` and `admin`.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 pb-16 lg:px-8 lg:pb-24">
+        <SectionHeading
+          eyebrow="Initial slices"
+          title="The first customer workflow surfaces"
+          description="These are the areas now represented in the frontend shell and backed by live API patterns."
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{' '}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{' '}
-            or the{' '}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{' '}
-            center.
-          </p>
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
+          {surfaces.map((surface) => (
+            <Card key={surface.title}>
+              <CardHeader>
+                <CardTitle>{surface.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-7 text-muted-foreground">{surface.description}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

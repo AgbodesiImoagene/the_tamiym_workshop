@@ -35,11 +35,9 @@ import { UserRole } from '../generated/prisma/client';
 import {
   THROTTLE_LIMIT,
   THROTTLE_TTL_MS,
-  ACCESS_TOKEN_COOKIE_NAME,
-  ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
   REFRESH_TOKEN_COOKIE_NAME,
-  REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
 } from '../constants';
+import { setAuthTokenCookies, clearAuthTokenCookies } from './auth-cookies';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -52,6 +50,8 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
@@ -91,8 +91,11 @@ export class AuthController {
       password: registerDto.password,
     });
 
-    this.setAuthCookie(res, loginResult.access_token);
-    this.setRefreshCookie(res, loginResult.refresh_token);
+    setAuthTokenCookies(
+      res,
+      loginResult.access_token,
+      loginResult.refresh_token,
+    );
 
     return {
       user: loginResult.user,
@@ -105,6 +108,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -135,8 +140,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
 
-    this.setAuthCookie(res, result.access_token);
-    this.setRefreshCookie(res, result.refresh_token);
+    setAuthTokenCookies(res, result.access_token, result.refresh_token);
 
     return {
       user: result.user,
@@ -324,8 +328,7 @@ export class AuthController {
         : undefined);
     const result = await this.authService.refresh(refreshToken ?? '');
 
-    this.setAuthCookie(res, result.access_token);
-    this.setRefreshCookie(res, result.refresh_token);
+    setAuthTokenCookies(res, result.access_token, result.refresh_token);
 
     return { user: result.user };
   }
@@ -348,11 +351,13 @@ export class AuthController {
     },
   })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req?.cookies?.[REFRESH_TOKEN_COOKIE_NAME] as
-      | string
-      | undefined;
+    const refreshToken =
+      (req?.cookies?.[REFRESH_TOKEN_COOKIE_NAME] as string | undefined) ??
+      (req?.body && typeof req.body === 'object' && 'refresh_token' in req.body
+        ? (req.body as { refresh_token?: string }).refresh_token
+        : undefined);
     await this.authService.logout(refreshToken);
-    this.clearAllAuthCookies(res);
+    clearAuthTokenCookies(res);
     return { message: 'Logged out successfully' };
   }
 
@@ -383,53 +388,5 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMe(@CurrentUser() user: RequestUser) {
     return user;
-  }
-
-  /**
-   * Helper method to set access token cookie
-   */
-  private setAuthCookie(res: Response, token: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    res.cookie(ACCESS_TOKEN_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
-      path: '/',
-    });
-  }
-
-  /**
-   * Helper method to set refresh token cookie
-   */
-  private setRefreshCookie(res: Response, token: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-      path: '/',
-    });
-  }
-
-  /**
-   * Clear access and refresh token cookies
-   */
-  private clearAllAuthCookies(res: Response) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const sameSite: 'lax' | 'none' = isProduction ? 'none' : 'lax';
-    const clearOpts = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite,
-      maxAge: 0,
-      path: '/',
-    };
-
-    res.cookie(ACCESS_TOKEN_COOKIE_NAME, '', clearOpts);
-    res.cookie(REFRESH_TOKEN_COOKIE_NAME, '', clearOpts);
   }
 }

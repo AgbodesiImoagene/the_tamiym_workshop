@@ -10,7 +10,7 @@ All share:
 
 - `packages/ui` (components)
 - `packages/types` (DTOs/enums)
-- Tailwind config tokens (colors, spacing, typography aligned to Figma)
+- **Design tokens:** `packages/config/theme.css` (Tailwind v4 `@theme`; colors, typography aligned to [TTW-Site Figma](https://www.figma.com/design/9xmldPK4dDKp72K3oE7tcA/TTW-Site)). Each app imports it in `globals.css`. See `docs/design-rules.md` for rules and sync instructions.
 
 ## State & data fetching
 

@@ -21,6 +21,8 @@ import { ModerationActionDto } from '../designs/dto/moderation-action.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
 import { UserRole } from '../generated/prisma/enums';
 import { ModerationStatus } from '../generated/prisma/enums';
 
@@ -58,9 +60,15 @@ export class AdminDesignsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Design not found' })
   async updateModeration(
+    @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
     @Body() dto: ModerationActionDto,
   ) {
-    return this.designsService.updateModeration(id, dto.status);
+    return this.designsService.updateModeration(
+      id,
+      dto.status,
+      dto.notes,
+      actor.id,
+    );
   }
 }

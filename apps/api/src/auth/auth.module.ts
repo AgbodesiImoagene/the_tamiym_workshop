@@ -4,6 +4,9 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { GoogleOAuthController } from './google-oauth.controller';
+import { GoogleOAuthService } from './google-oauth.service';
+import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { RolesGuard } from './guards/roles/roles.guard';
@@ -18,18 +21,33 @@ import { StringValue } from 'ms';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_SECRET') || 'secret',
-        signOptions: {
-          expiresIn:
-            configService.get<StringValue>('JWT_ACCESS_EXPIRES_IN') || '15m',
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_ACCESS_SECRET');
+        if (!secret || secret === 'secret') {
+          throw new Error(
+            'JWT_ACCESS_SECRET must be set and must not be the default placeholder',
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn:
+              configService.get<StringValue>('JWT_ACCESS_EXPIRES_IN') || '15m',
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  controllers: [AuthController, GoogleOAuthController],
+  providers: [
+    AuthService,
+    GoogleOAuthService,
+    AuthTokenCleanupService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+  ],
   exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

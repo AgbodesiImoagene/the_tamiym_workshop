@@ -3,15 +3,36 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
+import express from 'express';
+import type { Request } from 'express';
 import { AppModule } from './app.module';
+import {
+  shutdownOpenTelemetry,
+  startOpenTelemetry,
+} from './observability/otel';
 
 async function bootstrap() {
+  await startOpenTelemetry();
+
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
 
-  // Cookie parser middleware
+  // Raw body capture for webhook signature verification (must run before JSON parser)
+  app.use(
+    express.json({
+      verify: (req: Request & { rawBody?: Buffer }, _res, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
+
+  // Trust the first hop from a reverse proxy so that req.protocol and
+  // req.ip reflect the original client values, not the proxy address.
+  // Adjust to a number or IP list if the deployment topology requires stricter control.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   // Use pino logger
   app.useLogger(app.get(Logger));
@@ -79,9 +100,14 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 3001;
+  app.enableShutdownHooks();
   await app.listen(port);
   const logger = app.get(Logger);
   logger.log(`Application is running on: http://localhost:${port}`);
   logger.log(`Swagger documentation: http://localhost:${port}/docs`);
 }
-bootstrap();
+
+void bootstrap().catch(async (error) => {
+  await shutdownOpenTelemetry();
+  throw error;
+});

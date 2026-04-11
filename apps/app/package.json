@@ -7,24 +7,38 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@tamiym/types": "workspace:*",
     "@tamiym/ui": "workspace:*",
+    "@tanstack/react-query": "^5.97.0",
+    "fabric": "5",
     "next": "16.1.4",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.72.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tamiym/config": "workspace:*",
     "@tailwindcss/postcss": "^4",
+    "@tamiym/config": "workspace:*",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/fabric": "^5.3.11",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.1.4",
+    "jest": "^30.0.0",
+    "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.9.3"
   }
 }

@@ -1,25 +1,106 @@
 # Deployment & Environments
 
-## Environments
+This document reflects the deployment-related artifacts that currently exist in the repo.
 
-- `dev` (local)
-- `staging` (optional but recommended)
-- `prod`
+## Environment tiers
 
-## Secrets
+- `development`
+- `test`
+- `staging` - recommended, not yet formalized in repo config
+- `production`
 
-Use environment variables only.
-Never commit secrets.
+## Backend environment variables in use today
 
-## Services
+### Required outside test
 
-- Postgres
-- Redis (optional)
-- API
-- 3 frontend apps (web/app/admin)
-- OTel Collector (optional)
+- `DATABASE_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
 
-## Deployment target (suggested)
+Startup validation in `apps/api/src/app.module.ts` rejects missing values and known placeholder JWT secrets outside test mode.
 
-Railway for v1 speed.
-Keep infra code portable.
+### Common runtime variables
+
+- `PORT`
+- `NODE_ENV`
+- `LOG_LEVEL`
+- `CORS_ORIGIN`
+- `JWT_ACCESS_EXPIRES_IN`
+- `JWT_REFRESH_EXPIRES_IN`
+
+### Redis and queues
+
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
+
+### Paystack
+
+- `PAYSTACK_SECRET_KEY`
+- `PAYSTACK_PUBLIC_KEY`
+
+### S3-compatible storage
+
+- `S3_ENDPOINT`
+- `S3_PUBLIC_URL`
+- `S3_BUCKET`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_REGION`
+
+### Observability
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+Note: the collector endpoint is configurable, but application tracing and metrics are not fully instrumented yet.
+
+## Local deployment assets that exist in repo
+
+### Docker Compose
+
+`docker-compose.yml` currently provisions:
+
+- `postgres`
+- `redis`
+- `minio`
+- `minio-init`
+- With `docker compose --profile observability up -d`: `jaeger`, `otel-collector` (contrib image), `prometheus`, and `grafana` for local telemetry verification
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` for `apps/api` on the host. UIs: Jaeger `http://localhost:16686`, Prometheus `http://localhost:9090`, Grafana `http://localhost:3333` (anonymous admin enabled for local use).
+
+### OpenTelemetry collector
+
+`otel-collector-config.yaml` defines OTLP receivers and exporters for:
+
+- traces → Jaeger (OTLP gRPC) plus `debug` logging
+- metrics → Prometheus scrape endpoint on the collector (`:8889/metrics`)
+- logs → `debug` logging
+
+## Current deployment reality
+
+- The backend is the only part of the repo that is close to deployable infrastructure-wise.
+- The frontend apps are not production-ready application surfaces yet.
+- The repo contains local-service support, but not a complete production deployment stack or infrastructure-as-code setup.
+
+## Production deployment checklist
+
+Before a production deployment, the repo still needs:
+
+- a formal staging environment
+- production-grade secrets management
+- HTTPS and cookie-domain policy definition
+- database migration release process
+- queue worker deployment topology
+- object storage bucket policy review
+- provider webhook endpoint and retry policy validation
+- metrics, tracing, dashboards, and alerting
+- rollback and incident-response runbooks
+
+## Current recommendation
+
+Treat deployment documentation as backend-first for now. Pair this document with:
+
+- `03-backend.md`
+- `09-observability-otel.md`
+- `release-criteria.md`
+- `backend-production-readiness.md`

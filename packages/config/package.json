@@ -5,6 +5,7 @@
   "main": "./tsconfig.json",
   "files": [
     "tsconfig.json",
+    "theme.css",
     "eslint.config.js",
     "theme.css"
   ],

@@ -1,5 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import { join } from 'node:path';
+
+// Simple RFC-5321 check: at least one character @ at least one character . at least 2 chars
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export interface SendVerificationEmailPayload {
   to: string;
@@ -12,43 +16,68 @@ export interface SendPasswordResetEmailPayload {
   resetUrl: string;
 }
 
+export interface SendTemplatedEmailParams {
+  to: string;
+  subject: string;
+  template: string;
+  context: Record<string, unknown>;
+}
+
 @Injectable()
 export class MailService {
+  private readonly logoPath = join(
+    __dirname,
+    'assets',
+    'logo-lockup-light.png',
+  );
+
   constructor(private readonly mailer: MailerService) {}
 
-  /**
-   * Send email verification message with link containing token.
-   */
+  private logoAttachments() {
+    return [
+      {
+        filename: 'logo.png',
+        path: this.logoPath,
+        cid: 'logo',
+      },
+    ];
+  }
+
+  async sendTemplatedEmail(params: SendTemplatedEmailParams): Promise<void> {
+    const { to, subject, template, context } = params;
+    if (!EMAIL_RE.test(to)) {
+      throw new BadRequestException(`Invalid email address: ${to}`);
+    }
+    await this.mailer.sendMail({
+      to,
+      subject,
+      template,
+      context,
+      attachments: this.logoAttachments(),
+    });
+  }
+
   async sendVerificationEmail(
     payload: SendVerificationEmailPayload,
   ): Promise<void> {
     const { to, verifyUrl } = payload;
-    await this.mailer.sendMail({
+    await this.sendTemplatedEmail({
       to,
       subject: 'Verify your email',
-      html: `
-        <p>Thanks for signing up. Please verify your email by clicking the link below.</p>
-        <p><a href="${verifyUrl}">Verify email</a></p>
-        <p>This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-      `,
+      template: 'verification',
+      context: { verifyUrl },
     });
   }
 
-  /**
-   * Send password reset email with link containing token.
-   */
   async sendPasswordResetEmail(
     payload: SendPasswordResetEmailPayload,
   ): Promise<void> {
     const { to, resetUrl } = payload;
-    await this.mailer.sendMail({
+    await this.sendTemplatedEmail({
       to,
       subject: 'Reset your password',
-      html: `
-        <p>You requested a password reset. Click the link below to set a new password.</p>
-        <p><a href="${resetUrl}">Reset password</a></p>
-        <p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>
-      `,
+      template: 'password-reset',
+      context: { resetUrl },
     });
   }
 }

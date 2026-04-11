@@ -2,9 +2,11 @@ import {
   Controller,
   Get,
   Query,
+  Param,
   Res,
   UseGuards,
   StreamableFile,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,6 +15,7 @@ import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
@@ -45,7 +48,54 @@ export class AnalyticsController {
   async getOverview(@Query() query: AnalyticsQueryDto) {
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : undefined;
     const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
+    if (dateFrom && !isFinite(dateFrom.getTime())) {
+      throw new BadRequestException('dateFrom is not a valid date');
+    }
+    if (dateTo && !isFinite(dateTo.getTime())) {
+      throw new BadRequestException('dateTo is not a valid date');
+    }
     return this.analyticsService.getOverview(dateFrom, dateTo);
+  }
+
+  @Get('payouts')
+  @ApiOperation({
+    summary: 'Get payout overview metrics (admin)',
+    description:
+      'Subset of money-metrics (backward compatible). Prefer GET money-metrics for full snapshot.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiResponse({ status: 200, description: 'Payout run and payout counts' })
+  async getPayoutOverview() {
+    return this.analyticsService.getPayoutOverview();
+  }
+
+  @Get('money-metrics')
+  @ApiOperation({
+    summary: 'Money-truth metrics (admin)',
+    description:
+      'Payout pipeline breakdowns, manual-adjustment backlog, sum of campaign gross cache vs ledger-eligible total.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiResponse({ status: 200, description: 'Money metrics' })
+  async getMoneyMetrics() {
+    return this.analyticsService.getMoneyMetrics();
+  }
+
+  @Get('campaigns/:campaignId/snapshot')
+  @ApiOperation({
+    summary: 'Campaign fundraising snapshot (admin)',
+    description:
+      'Goal, gross currentAmount, ledger eligible balance, paid orders, last payout.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'campaignId' })
+  @ApiResponse({ status: 200, description: 'Campaign snapshot' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async getCampaignSnapshot(@Param('campaignId') campaignId: string) {
+    return this.analyticsService.getCampaignFundraisingSnapshot(campaignId);
   }
 
   @Get('export')
@@ -70,6 +120,12 @@ export class AnalyticsController {
   ) {
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : undefined;
     const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
+    if (dateFrom && !isFinite(dateFrom.getTime())) {
+      throw new BadRequestException('dateFrom is not a valid date');
+    }
+    if (dateTo && !isFinite(dateTo.getTime())) {
+      throw new BadRequestException('dateTo is not a valid date');
+    }
     const entity = query.entity ?? 'orders';
 
     const csv =

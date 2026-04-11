@@ -1,8 +1,25 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
+import { PayoutsService } from '../payouts/payouts.service';
+import { CampaignLedgerService } from '../payouts/campaign-ledger.service';
+import { AuditService } from '../audit/audit.service';
+import {
+  OrderStatus,
+  PaymentStatus,
+  NotificationChannel,
+  PayoutStatus,
+  AuditAction,
+  AuditSource,
+} from '../generated/prisma/enums';
 import * as crypto from 'node:crypto';
+import { ObservabilityService } from '../observability/observability.service';
+import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import {
+  ADMIN_NOTIF_PAYMENT_CONFIRMED,
+  ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+} from '../admin-notifications/admin-notification-events';
 
 export interface PaystackWebhookEvent {
   event: string;
@@ -10,14 +27,24 @@ export interface PaystackWebhookEvent {
     reference?: string;
     id?: number;
     status?: string;
+    amount?: number;
+    currency?: string;
   };
 }
 
 @Injectable()
 export class PaystackWebhookService {
+  private readonly logger = new Logger(PaystackWebhookService.name);
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private payoutsService: PayoutsService,
+    private campaignLedger: CampaignLedgerService,
+    private audit: AuditService,
+    private observability: ObservabilityService,
+    private notificationOutboxDelivery: NotificationOutboxDeliveryService,
+    private adminNotify: AdminNotifyService,
   ) {}
 
   /**
@@ -37,51 +64,272 @@ export class PaystackWebhookService {
 
   /**
    * Process charge.success event: idempotent update of Payment and Order.
+   * Keys off Payment.providerRef (not mutable Order.paymentReference). Rejects expired/cancelled orders.
    */
   async processChargeSuccess(event: PaystackWebhookEvent): Promise<void> {
-    const reference = event.data?.reference;
-    if (!reference) {
-      return;
-    }
-    const idempotencyKey = reference;
+    await this.observability.startSpan(
+      'webhooks.paystack.charge_success',
+      { 'paystack.reference': event.data?.reference },
+      async () => {
+        const reference = event.data?.reference;
+        if (!reference) {
+          return;
+        }
 
-    const existingPayment = await this.prisma.payment.findUnique({
-      where: { idempotencyKey },
-    });
-    if (existingPayment?.status === PaymentStatus.SUCCEEDED) {
-      return;
-    }
+        const payment = await this.prisma.payment.findFirst({
+          where: { providerRef: reference },
+          include: {
+            order: { include: { user: { select: { id: true, email: true } } } },
+          },
+        });
+        if (!payment) {
+          return;
+        }
+        if (payment.status === PaymentStatus.SUCCEEDED) {
+          return;
+        }
 
-    const order = await this.prisma.order.findFirst({
-      where: { paymentReference: reference },
-    });
-    if (!order) {
-      return;
-    }
-    if (order.status === OrderStatus.PAID) {
-      return;
-    }
+        const order = payment.order;
+        if (order.status === OrderStatus.PAID) {
+          return;
+        }
+        if (order.status === OrderStatus.CANCELLED) {
+          // Money was captured for an already-cancelled order — alert admins so
+          // they can issue a manual refund. Do NOT auto-refund here to avoid
+          // double-refund if a refund was already processed out-of-band.
+          this.logger.error(
+            `charge.success received for CANCELLED order ${order.id} (ref: ${reference}). Manual refund required.`,
+          );
+          this.observability.recordWebhook(
+            'charge.success.cancelled_order',
+            'denied',
+          );
+          await this.adminNotify.emit(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            {
+              orderId: order.id,
+              reference,
+              amount: event.data?.amount,
+              currency: event.data?.currency ?? order.currency,
+              reason: 'Order was already CANCELLED',
+            },
+          );
+          return;
+        }
+        if (order.expiresAt && order.expiresAt < new Date()) {
+          // Same situation for an expired (not yet explicitly cancelled) order.
+          this.logger.error(
+            `charge.success received for expired order ${order.id} (ref: ${reference}). Manual refund required.`,
+          );
+          this.observability.recordWebhook(
+            'charge.success.expired_order',
+            'denied',
+          );
+          await this.adminNotify.emit(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            {
+              orderId: order.id,
+              reference,
+              amount: event.data?.amount,
+              currency: event.data?.currency ?? order.currency,
+              reason: 'Order was already expired',
+            },
+          );
+          return;
+        }
+        if (order.status !== OrderStatus.PENDING_PAYMENT) {
+          return;
+        }
 
-    const paymentToUpdate = await this.prisma.payment.findFirst({
-      where: { orderId: order.id, idempotencyKey },
-    });
-    if (paymentToUpdate) {
-      await this.prisma.payment.update({
-        where: { id: paymentToUpdate.id },
-        data: {
-          status: PaymentStatus.SUCCEEDED,
-          rawEvent: event as unknown as object,
-        },
-      });
-    }
+        if (event.data?.amount != null) {
+          const expectedKobo = Math.round(Number(order.totalAmount) * 100);
+          if (event.data.amount !== expectedKobo) {
+            this.logger.error(
+              `charge.success amount mismatch for order ${order.id}: ` +
+                `expected ${expectedKobo} kobo, got ${event.data.amount} (ref: ${reference})`,
+            );
+            this.observability.recordWebhook(
+              'charge.success.amount_mismatch',
+              'denied',
+            );
+            await this.adminNotify.emit(
+              ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+              {
+                orderId: order.id,
+                reference,
+                amount: event.data.amount,
+                currency: event.data?.currency ?? order.currency,
+                reason: `Amount mismatch: expected ${expectedKobo} kobo, received ${event.data.amount} kobo`,
+              },
+            );
+            return;
+          }
+        }
+        if (
+          event.data?.currency != null &&
+          event.data.currency !== order.currency
+        ) {
+          this.logger.error(
+            `charge.success currency mismatch for order ${order.id}: ` +
+              `expected ${order.currency}, got ${event.data.currency} (ref: ${reference})`,
+          );
+          this.observability.recordWebhook(
+            'charge.success.currency_mismatch',
+            'denied',
+          );
+          await this.adminNotify.emit(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            {
+              orderId: order.id,
+              reference,
+              amount: event.data?.amount,
+              currency: event.data.currency,
+              reason: `Currency mismatch: expected ${order.currency}, received ${event.data.currency}`,
+            },
+          );
+          return;
+        }
+        if (event.data?.status != null && event.data.status !== 'success') {
+          return;
+        }
 
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: OrderStatus.PAID,
-        paymentStatus: PaymentStatus.SUCCEEDED,
+        const settledAt = new Date();
+        let availableAt: Date | undefined;
+        if (order.campaignId) {
+          const holdDays = await this.campaignLedger.getSettlementHoldDays();
+          availableAt = new Date(settledAt);
+          availableAt.setDate(availableAt.getDate() + holdDays);
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: PaymentStatus.SUCCEEDED,
+              rawEvent: event as unknown as object,
+            },
+          });
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.PAID,
+              paymentStatus: PaymentStatus.SUCCEEDED,
+            },
+          });
+          if (order.campaignId) {
+            await tx.campaign.update({
+              where: { id: order.campaignId },
+              data: {
+                currentAmount: { increment: order.totalAmount },
+              },
+            });
+            await this.campaignLedger.createPaymentSettled(
+              order.campaignId,
+              order.id,
+              Number(order.totalAmount),
+              order.currency,
+              settledAt,
+              {
+                availableAt,
+                metadata: { orderTotal: Number(order.totalAmount) },
+              },
+              tx,
+            );
+          }
+          await this.audit.log(
+            {
+              eventName: 'webhook.payment.charge_success',
+              action: AuditAction.STATUS_CHANGE,
+              entityType: 'Order',
+              entityId: order.id,
+              before: { status: order.status, paymentStatus: payment.status },
+              after: {
+                status: OrderStatus.PAID,
+                paymentStatus: PaymentStatus.SUCCEEDED,
+                providerRef: reference,
+              },
+              metadata: event as unknown as object,
+              note: 'Paystack charge.success settled payment',
+              source: AuditSource.WEBHOOK,
+            },
+            tx,
+          );
+        });
+
+        const orderUser = (
+          payment.order as { user?: { id: string; email: string } }
+        )?.user;
+        if (orderUser?.email) {
+          const notification = await this.prisma.notificationOutbox.create({
+            data: {
+              eventName: 'PaymentConfirmed',
+              channel: NotificationChannel.EMAIL,
+              recipient: orderUser.email,
+              recipientUserId: orderUser.id,
+              payload: {
+                orderId: order.id,
+                reference,
+                amount: Number(order.totalAmount),
+                currency: order.currency,
+              },
+            },
+          });
+          await this.notificationOutboxDelivery.enqueueDelivery(
+            notification.id,
+          );
+        }
+
+        await this.adminNotify.emit(ADMIN_NOTIF_PAYMENT_CONFIRMED, {
+          orderId: order.id,
+          reference,
+          amount: Number(order.totalAmount),
+          currency: order.currency,
+          userId: orderUser?.id ?? '',
+        });
       },
-    });
+    );
+  }
+
+  /**
+   * Process transfer webhook events: update Payout status by reference, store raw payload, and reconcile ledger.
+   */
+  async processTransferEvent(
+    event: string,
+    reference: string | undefined,
+    rawPayload?: object,
+  ): Promise<boolean> {
+    if (!reference) return false;
+    this.observability.recordWebhook(event, 'success');
+    const status =
+      event === 'transfer.success'
+        ? PayoutStatus.SUCCEEDED
+        : event === 'transfer.reversed'
+          ? PayoutStatus.REVERSED
+          : PayoutStatus.FAILED;
+    const payouts = await this.payoutsService.updatePayoutStatusByReference(
+      reference,
+      status,
+      rawPayload,
+    );
+    for (const p of payouts) {
+      if (status === PayoutStatus.SUCCEEDED) {
+        await this.campaignLedger.createPayoutSucceeded(
+          p.campaignId,
+          p.id,
+          p.amount,
+          p.currency,
+        );
+      } else {
+        // Both FAILED and REVERSED release the reserved balance back to eligible.
+        await this.campaignLedger.createPayoutFailed(
+          p.campaignId,
+          p.id,
+          p.amount,
+          p.currency,
+        );
+      }
+    }
+    return payouts.length > 0;
   }
 
   /**
@@ -92,6 +340,7 @@ export class PaystackWebhookService {
     signature: string,
   ): Promise<boolean> {
     if (!this.verifySignature(rawBody, signature)) {
+      this.observability.recordWebhook('paystack.invalid_signature', 'denied');
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
@@ -100,8 +349,20 @@ export class PaystackWebhookService {
     ) as PaystackWebhookEvent;
 
     if (payload.event === 'charge.success') {
+      this.observability.recordWebhook(payload.event, 'success');
       await this.processChargeSuccess(payload);
       return true;
+    }
+
+    const ref =
+      payload.data?.reference ??
+      (payload.data as { transfer_code?: string })?.transfer_code;
+    if (
+      payload.event === 'transfer.success' ||
+      payload.event === 'transfer.failed' ||
+      payload.event === 'transfer.reversed'
+    ) {
+      return this.processTransferEvent(payload.event, ref, payload as object);
     }
 
     return false;

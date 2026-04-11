@@ -1,24 +1,82 @@
-import { Module } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { trace } from '@opentelemetry/api';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { DesignsModule } from './designs/designs.module';
+import { DesignAssetsModule } from './design-assets/design-assets.module';
 import { MailModule } from './mail/mail.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { AuditModule } from './audit/audit.module';
+import { ObservabilityModule } from './observability/observability.module';
+import { HttpMetricsInterceptor } from './observability/http-metrics.interceptor';
+import { RequestContextInterceptor } from './request-context/request-context.interceptor';
+import { RequestContextMiddleware } from './request-context/request-context.middleware';
+import { getRequestContext } from './request-context/request-context.store';
+
+const requiredEnvVars = [
+  'DATABASE_URL',
+  'JWT_ACCESS_SECRET',
+  'JWT_REFRESH_SECRET',
+] as const;
+const forbiddenPlaceholders = new Set([
+  'secret',
+  'your-access-secret-key-change-in-production',
+  'your-refresh-secret-key-change-in-production',
+]);
+
+function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
+  if (process.env.NODE_ENV === 'test') {
+    return config;
+  }
+  for (const key of requiredEnvVars) {
+    const value = config[key];
+    if (
+      value === undefined ||
+      value === null ||
+      (typeof value !== 'string' &&
+        typeof value !== 'number' &&
+        typeof value !== 'boolean') ||
+      String(value).trim() === ''
+    ) {
+      throw new Error(`Missing required environment variable: ${key}`);
+    }
+    const normalized = `${value}`.trim().toLowerCase();
+    if (forbiddenPlaceholders.has(normalized)) {
+      throw new Error(
+        `Environment variable ${key} must be set to a secure value, not a placeholder`,
+      );
+    }
+  }
+  return config;
+}
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
+      validate: validateEnv,
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -35,6 +93,20 @@ import { MailModule } from './mail/mail.module';
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL || 'info',
+        genReqId: (
+          req: { headers: Record<string, unknown>; id?: string | number },
+          res: { setHeader: (name: string, value: string) => void },
+        ) => {
+          const requestIdHeader = req.headers['x-request-id'];
+          const requestId =
+            (typeof requestIdHeader === 'string' && requestIdHeader.trim()) ||
+            (req.id != null ? String(req.id) : undefined) ||
+            randomUUID();
+
+          req.id = requestId;
+          res.setHeader('x-request-id', requestId);
+          return requestId;
+        },
         transport:
           process.env.NODE_ENV === 'development'
             ? {
@@ -45,6 +117,27 @@ import { MailModule } from './mail/mail.module';
                 },
               }
             : undefined,
+        redact: {
+          paths: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'req.body.password',
+            'req.body.currentPassword',
+            'req.body.newPassword',
+            'req.body.token',
+            'req.body.refresh_token',
+          ],
+          censor: '[REDACTED]',
+        },
+        customProps: () => {
+          const context = getRequestContext();
+          return {
+            requestId: context?.requestId,
+            traceId: trace.getActiveSpan()?.spanContext().traceId,
+            actorUserId: context?.actorUserId,
+            actorRole: context?.actorRole,
+          };
+        },
         serializers: {
           req: (req: Request) => ({
             id: req.id,
@@ -55,13 +148,19 @@ import { MailModule } from './mail/mail.module';
             statusCode: res.statusCode,
           }),
         },
-      },
+      } as never,
     }),
-    PrismaModule,
-    MailModule,
-    AuthModule,
-    UsersModule,
     AddressesModule,
+    AdminModule,
+    AnalyticsModule,
+    AuditModule,
+    AuthModule,
+    DesignAssetsModule,
+    DesignsModule,
+    MailModule,
+    ObservabilityModule,
+    PrismaModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
@@ -70,6 +169,21 @@ import { MailModule } from './mail/mail.module';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpMetricsInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes({
+      path: '*',
+      method: RequestMethod.ALL,
+    });
+  }
+}

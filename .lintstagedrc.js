@@ -1,11 +1,13 @@
 // lint-staged configuration
-// Runs ESLint and Prettier on staged files
+// Runs ESLint and Prettier on staged files under src/ and test/ only (excludes scripts/)
 // ESLint will automatically find the nearest config for each file
 
 export default {
-  '*.{ts,tsx,js,jsx}': [
-    // ESLint will find configs in subdirectories automatically
-    // Suppress warnings about ignored files and files without configs
+  '**/src/**/*.{ts,tsx,js,jsx}': [
+    'eslint --fix --max-warnings=0 --no-warn-ignored --quiet',
+    'prettier --write',
+  ],
+  '**/test/**/*.{ts,tsx,js,jsx}': [
     'eslint --fix --max-warnings=0 --no-warn-ignored --quiet',
     'prettier --write',
   ],

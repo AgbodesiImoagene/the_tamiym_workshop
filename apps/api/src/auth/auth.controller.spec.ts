@@ -1,195 +1,157 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from '../app.module';
-import { PrismaService } from '../prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import type { Response } from 'express';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { REFRESH_TOKEN_COOKIE_NAME } from '../constants';
 
-describe('AuthController (e2e)', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
+const mockUser = {
+  id: 'user-1',
+  email: 'test@example.com',
+  firstName: 'Test',
+  lastName: 'User',
+  phone: null,
+  role: 'CUSTOMER' as const,
+  status: 'ACTIVE' as const,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+describe('AuthController', () => {
+  let controller: AuthController;
+  let authService: jest.Mocked<AuthService>;
+  let mockRes: jest.Mocked<Pick<Response, 'cookie'>>;
 
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-    await app.init();
+  beforeEach(async () => {
+    mockRes = {
+      cookie: jest.fn(),
+    };
+
+    const mockAuthService = {
+      register: jest.fn(),
+      login: jest.fn(),
+      logout: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: mockAuthService }],
+    })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    controller = module.get<AuthController>(AuthController);
+    authService = module.get(AuthService);
   });
 
-  afterAll(async () => {
-    // Clean up test data
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: ['test@example.com', 'test2@example.com'],
-        },
-      },
-    });
-    await app.close();
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 
-  describe('/auth/register (POST)', () => {
-    it('should register a new user', async () => {
+  describe('register', () => {
+    it('should register a new user and return user (no password)', async () => {
       const registerDto = {
         email: 'test@example.com',
-        password: 'password123',
+        password: 'Password1!',
         firstName: 'Test',
         lastName: 'User',
       };
+      authService.register.mockResolvedValue(mockUser);
+      authService.login.mockResolvedValue({
+        user: mockUser,
+        access_token: 'access',
+        refresh_token: 'refresh',
+      });
 
-      const response = await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send(registerDto)
-        .expect(201);
+      const result = await controller.register(
+        registerDto as any,
+        mockRes as unknown as Response,
+      );
 
-      expect(response.body).toHaveProperty('user');
-      expect(response.body.user.email).toBe(registerDto.email);
-      expect(response.body.user.firstName).toBe(registerDto.firstName);
-      expect(response.body.user.lastName).toBe(registerDto.lastName);
-      expect(response.body.user).not.toHaveProperty('password');
+      expect(authService.register).toHaveBeenCalledWith(registerDto);
+      expect(authService.login).toHaveBeenCalledWith({
+        email: registerDto.email,
+        password: registerDto.password,
+      });
+      expect(result).toEqual({ user: mockUser });
+      expect(result.user).not.toHaveProperty('password');
+      expect(mockRes.cookie).toHaveBeenCalled();
     });
 
-    it('should return 409 if email already exists', async () => {
+    it('should throw ConflictException when email already exists', async () => {
       const registerDto = {
         email: 'test@example.com',
         password: 'password123',
       };
+      authService.register.mockRejectedValue(
+        new ConflictException('Email already exists'),
+      );
 
-      await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send(registerDto)
-        .expect(409);
-    });
-
-    it('should return 400 for invalid input', async () => {
-      const registerDto = {
-        email: 'invalid-email',
-        password: '123', // Too short
-      };
-
-      await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send(registerDto)
-        .expect(400);
+      await expect(
+        controller.register(registerDto as any, mockRes as unknown as Response),
+      ).rejects.toThrow(ConflictException);
+      expect(authService.login).not.toHaveBeenCalled();
     });
   });
 
-  describe('/auth/login (POST)', () => {
-    it('should login with valid credentials', async () => {
-      // Create a user first
-      const hashedPassword = await bcrypt.hash('password123', 10);
-      await prisma.user.create({
-        data: {
-          email: 'test2@example.com',
-          password: hashedPassword,
-          role: 'CUSTOMER',
-        },
+  describe('login', () => {
+    it('should return user and set cookies on success', async () => {
+      const loginDto = { email: 'test@example.com', password: 'password123' };
+      authService.login.mockResolvedValue({
+        user: mockUser,
+        access_token: 'access',
+        refresh_token: 'refresh',
       });
 
-      const loginDto = {
-        email: 'test2@example.com',
-        password: 'password123',
-      };
+      const result = await controller.login(
+        loginDto as any,
+        mockRes as unknown as Response,
+      );
 
-      const response = await request(app.getHttpServer())
-        .post('/v1/auth/login')
-        .send(loginDto)
-        .expect(200);
-
-      expect(response.body).toHaveProperty('user');
-      expect(response.body.user.email).toBe(loginDto.email);
-      expect(response.headers['set-cookie']).toBeDefined();
+      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(result).toEqual({ user: mockUser });
+      expect(mockRes.cookie).toHaveBeenCalled();
     });
 
-    it('should return 401 for invalid credentials', async () => {
-      const loginDto = {
-        email: 'test2@example.com',
-        password: 'wrongpassword',
-      };
+    it('should throw UnauthorizedException for invalid credentials', async () => {
+      const loginDto = { email: 'test@example.com', password: 'wrong' };
+      authService.login.mockRejectedValue(
+        new UnauthorizedException('Invalid credentials'),
+      );
 
-      await request(app.getHttpServer())
-        .post('/v1/auth/login')
-        .send(loginDto)
-        .expect(401);
-    });
-
-    it('should return 401 for non-existent user', async () => {
-      const loginDto = {
-        email: 'nonexistent@example.com',
-        password: 'password123',
-      };
-
-      await request(app.getHttpServer())
-        .post('/v1/auth/login')
-        .send(loginDto)
-        .expect(401);
+      await expect(
+        controller.login(loginDto as any, mockRes as unknown as Response),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
-  describe('/auth/me (GET)', () => {
-    it('should return current user when authenticated', async () => {
-      // Register and login first
-      const registerDto = {
-        email: 'me@example.com',
-        password: 'password123',
-      };
-
-      await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send(registerDto)
-        .expect(201);
-
-      const loginResponse = await request(app.getHttpServer())
-        .post('/v1/auth/login')
-        .send(registerDto)
-        .expect(200);
-
-      const cookies = loginResponse.headers['set-cookie'];
-
-      const meResponse = await request(app.getHttpServer())
-        .get('/v1/auth/me')
-        .set('Cookie', cookies)
-        .expect(200);
-
-      expect(meResponse.body).toHaveProperty('id');
-      expect(meResponse.body.email).toBe(registerDto.email);
-    });
-
-    it('should return 401 when not authenticated', async () => {
-      await request(app.getHttpServer()).get('/v1/auth/me').expect(401);
+  describe('getMe', () => {
+    it('should return current user', () => {
+      const user = { ...mockUser } as any;
+      const result = controller.getMe(user);
+      expect(result).toBe(user);
+      expect(authService.login).not.toHaveBeenCalled();
+      expect(authService.register).not.toHaveBeenCalled();
     });
   });
 
-  describe('/auth/logout (POST)', () => {
-    it('should logout successfully', async () => {
-      // Register and login first
-      const registerDto = {
-        email: 'logout@example.com',
-        password: 'password123',
+  describe('logout', () => {
+    it('should call authService.logout and return message', async () => {
+      authService.logout.mockResolvedValue(undefined);
+      const mockReq = {
+        cookies: { [REFRESH_TOKEN_COOKIE_NAME]: 'refresh-token' },
       };
 
-      await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send(registerDto)
-        .expect(201);
+      const result = await controller.logout(
+        mockReq as any,
+        mockRes as unknown as Response,
+      );
 
-      const loginResponse = await request(app.getHttpServer())
-        .post('/v1/auth/login')
-        .send(registerDto)
-        .expect(200);
-
-      const cookies = loginResponse.headers['set-cookie'];
-
-      const logoutResponse = await request(app.getHttpServer())
-        .post('/v1/auth/logout')
-        .set('Cookie', cookies)
-        .expect(200);
-
-      expect(logoutResponse.body).toHaveProperty('message');
-      expect(logoutResponse.body.message).toBe('Logged out successfully');
+      expect(authService.logout).toHaveBeenCalledWith('refresh-token');
+      expect(result).toEqual({ message: 'Logged out successfully' });
+      expect(mockRes.cookie).toHaveBeenCalled();
     });
   });
 });

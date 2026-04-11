@@ -2,7 +2,8 @@
  * Auth API functions
  */
 
-import { apiClient } from './api';
+import { apiClient, API_BASE_URL } from './api';
+export type { ApiError } from './api';
 import { UserRole } from '@tamiym/types';
 
 export interface User {
@@ -29,6 +30,19 @@ export interface RegisterRequest {
 export interface AuthResponse {
   user: User;
 }
+
+/** Full-page redirect to API Google OAuth start (sets auth cookies on callback). */
+export function getGoogleSignInUrl(next = '/dashboard'): string {
+  const q = new URLSearchParams({ next });
+  return `${API_BASE_URL}/auth/google?${q.toString()}`;
+}
+
+export const GOOGLE_SIGN_IN_ERROR_MESSAGES: Record<string, string> = {
+  google_denied: 'Google sign-in was cancelled.',
+  google_state: 'Sign-in session expired. Please try again.',
+  google_failed: 'Google sign-in failed. Please try again.',
+  google_unavailable: 'Google sign-in is not available right now.',
+};
 
 export const authApi = {
   /**

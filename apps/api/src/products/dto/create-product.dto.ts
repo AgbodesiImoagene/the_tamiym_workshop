@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNotEmpty, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNotEmpty,
+  IsEnum,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { ProductStatus } from '../../generated/prisma/enums';
 
 export class CreateProductDto {
@@ -32,4 +39,28 @@ export class CreateProductDto {
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus = ProductStatus.DRAFT;
+
+  @ApiProperty({ example: 300, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  weightGrams?: number;
+
+  @ApiProperty({ example: 320, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageLengthMm?: number;
+
+  @ApiProperty({ example: 240, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageWidthMm?: number;
+
+  @ApiProperty({ example: 40, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  packageHeightMm?: number;
 }
