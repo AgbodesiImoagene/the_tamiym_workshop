@@ -7,6 +7,7 @@ import type {
   ResolveAccountResult,
   TransferResult,
 } from './paystack-provider.interface';
+import { toPaystackTransferReference } from './paystack-transfer-reference';
 
 const PAYSTACK_BASE = 'https://api.paystack.co';
 
@@ -124,8 +125,11 @@ export class PaystackTransferProviderService implements PaystackTransferProvider
           Authorization: `Bearer ${this.getSecret()}`,
           'Content-Type': 'application/json',
         };
-        if (params.idempotencyKey) {
-          headers['Idempotency-Key'] = params.idempotencyKey;
+        const reference = params.idempotencyKey
+          ? toPaystackTransferReference(params.idempotencyKey)
+          : undefined;
+        if (reference) {
+          headers['Idempotency-Key'] = reference;
         }
         const res = await fetch(`${PAYSTACK_BASE}/transfer`, {
           method: 'POST',
@@ -135,6 +139,7 @@ export class PaystackTransferProviderService implements PaystackTransferProvider
             amount: params.amountKobo,
             recipient: params.recipientCode,
             reason: params.reason,
+            ...(reference ? { reference } : {}),
           }),
         });
         const data = (await res.json()) as {
@@ -150,7 +155,11 @@ export class PaystackTransferProviderService implements PaystackTransferProvider
           };
         }
         return {
-          reference: data.data?.reference ?? data.data?.transfer_code ?? null,
+          reference:
+            data.data?.reference ??
+            data.data?.transfer_code ??
+            reference ??
+            null,
           success: true,
         };
       },

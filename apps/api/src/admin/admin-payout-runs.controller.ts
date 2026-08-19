@@ -150,11 +150,17 @@ export class AdminPayoutRunsController {
   }
 
   @Post('payouts/:payoutId/retry')
-  @ApiOperation({ summary: 'Retry a failed payout in a run' })
+  @ApiOperation({
+    summary:
+      'Retry a failed payout in a run (creates a new payout row; TTW-011)',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'payoutId' })
-  @ApiResponse({ status: 200, description: 'Payout retried' })
+  @ApiResponse({
+    status: 200,
+    description: 'New payout created and executed; returns the new payout id',
+  })
   @ApiResponse({
     status: 400,
     description: 'Payout not failed or not in a run',

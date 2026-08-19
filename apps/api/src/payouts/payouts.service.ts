@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,7 @@ import {
   NotificationChannel,
   PayoutRunStatus,
 } from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
 import { DEFAULT_CURRENCY } from '../constants';
 import { AuditAction } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
@@ -29,9 +31,29 @@ import {
   OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED,
   OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED,
 } from '../mail/mail-outbox-templates';
+import {
+  TransferWebhookEventName,
+  allowedFromStatuses,
+  classifySkippedTransition,
+  isTerminalPayoutStatus,
+  payoutTransferBusinessKey,
+  shouldRecordSuccessLedger,
+  shouldReleaseReserve,
+  transferEventToStatus,
+} from './payout-transfer-transitions';
+import { toPaystackTransferReference } from './paystack-transfer-reference';
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
+}
 
 @Injectable()
 export class PayoutsService {
+  private readonly logger = new Logger(PayoutsService.name);
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
@@ -118,8 +140,13 @@ export class PayoutsService {
           Authorization: `Bearer ${secretKey}`,
           'Content-Type': 'application/json',
         };
-        if (idempotencyKey) {
-          headers['Idempotency-Key'] = idempotencyKey;
+        // Paystack transfer idempotency is the body `reference` (reuse on
+        // inconclusive retries). Also send Idempotency-Key when present.
+        const reference = idempotencyKey
+          ? toPaystackTransferReference(idempotencyKey)
+          : undefined;
+        if (reference) {
+          headers['Idempotency-Key'] = reference;
         }
         const res = await fetch('https://api.paystack.co/transfer', {
           method: 'POST',
@@ -129,6 +156,7 @@ export class PayoutsService {
             amount: amountKobo,
             recipient: recipientCode,
             reason,
+            ...(reference ? { reference } : {}),
           }),
         });
         const data = (await res.json()) as {
@@ -141,9 +169,9 @@ export class PayoutsService {
             data.message ?? 'Paystack transfer failed',
           );
         }
-        const reference =
-          data.data?.reference ?? data.data?.transfer_code ?? null;
-        return { reference };
+        const providerReference =
+          data.data?.reference ?? data.data?.transfer_code ?? reference ?? null;
+        return { reference: providerReference };
       },
     );
   }
@@ -277,9 +305,244 @@ export class PayoutsService {
   }
 
   /**
-   * Update payout status by Paystack reference (called from webhook).
-   * Optionally store raw webhook payload for reconciliation.
-   * Returns updated payout(s) for ledger reconciliation.
+   * Apply a Paystack transfer webhook exactly once per (event, providerRef).
+   * Conditional status transition + ledger effect + claim + run completion are atomic.
+   * Returns true when at least one matching payout row exists.
+   */
+  async applyTransferWebhookEvent(
+    event: TransferWebhookEventName,
+    reference: string,
+    rawEvent?: object,
+  ): Promise<boolean> {
+    const payouts = await this.prisma.payout.findMany({
+      where: { providerRef: reference },
+      include: {
+        recipient: { select: { id: true, email: true, firstName: true } },
+        campaign: { select: { id: true, title: true } },
+      },
+    });
+    if (payouts.length === 0) return false;
+
+    const toStatus = transferEventToStatus(event);
+    const businessKey = payoutTransferBusinessKey(event, reference);
+
+    for (const payout of payouts) {
+      const amount = Number(payout.amount);
+      const currency = payout.currency;
+      type ApplyResult =
+        | { kind: 'applied'; fromStatus: PayoutStatus }
+        | { kind: 'skip'; status: PayoutStatus };
+
+      let result: ApplyResult;
+      try {
+        result = await this.prisma.$transaction(async (tx) => {
+          const fromStatuses = allowedFromStatuses(toStatus);
+          // Retry CAS when a concurrent transition wins: re-read and apply if
+          // the new status is still an allowed source (e.g. success then reverse).
+          for (let attempt = 0; attempt < 8; attempt++) {
+            const current = await tx.payout.findUniqueOrThrow({
+              where: { id: payout.id },
+              select: { status: true },
+            });
+            if (!fromStatuses.includes(current.status)) {
+              return { kind: 'skip' as const, status: current.status };
+            }
+
+            const updated = await tx.payout.updateMany({
+              where: {
+                id: payout.id,
+                status: current.status,
+              },
+              data: {
+                status: toStatus,
+                ...(rawEvent ? { rawEvent } : {}),
+              },
+            });
+
+            if (updated.count !== 1) {
+              continue;
+            }
+
+            const fromStatus = current.status;
+
+            if (shouldRecordSuccessLedger(toStatus)) {
+              await this.campaignLedger.createPayoutSucceeded(
+                payout.campaignId,
+                payout.id,
+                amount,
+                currency,
+                tx,
+              );
+            }
+            if (shouldReleaseReserve(fromStatus, toStatus)) {
+              await this.campaignLedger.createPayoutFailed(
+                payout.campaignId,
+                payout.id,
+                amount,
+                currency,
+                { transferEvent: event, fromStatus },
+                tx,
+              );
+            }
+
+            await tx.payoutProviderEventClaim.create({
+              data: {
+                provider: payout.provider ?? PaymentProvider.PAYSTACK,
+                businessKey,
+                payoutId: payout.id,
+                fromStatus,
+                toStatus,
+              },
+            });
+
+            await this.audit.log(
+              {
+                eventName: 'webhook.payout.status_updated',
+                action: AuditAction.PAYOUT,
+                entityType: 'Payout',
+                entityId: payout.id,
+                outcome:
+                  toStatus === PayoutStatus.FAILED ||
+                  toStatus === PayoutStatus.REVERSED
+                    ? AuditOutcome.FAILURE
+                    : AuditOutcome.SUCCESS,
+                before: { status: fromStatus },
+                after: {
+                  status: toStatus,
+                  providerRef: reference,
+                  businessKey,
+                },
+                metadata: rawEvent,
+                note: 'Paystack transfer webhook applied payout transition',
+                source: AuditSource.WEBHOOK,
+              },
+              tx,
+            );
+
+            if (payout.payoutRunId && isTerminalPayoutStatus(toStatus)) {
+              // Serialize run completion checks so concurrent sibling terminals
+              // cannot both miss COMPLETED under Read Committed.
+              await tx.$executeRaw`
+                SELECT id FROM "payout_runs" WHERE id = ${payout.payoutRunId} FOR UPDATE
+              `;
+              const allInRun = await tx.payout.findMany({
+                where: { payoutRunId: payout.payoutRunId },
+                select: { status: true },
+              });
+              const allTerminal = allInRun.every((p) =>
+                isTerminalPayoutStatus(p.status),
+              );
+              if (allTerminal) {
+                await tx.payoutRun.update({
+                  where: { id: payout.payoutRunId },
+                  data: {
+                    status: PayoutRunStatus.COMPLETED,
+                    executedAt: new Date(),
+                  },
+                });
+              }
+            }
+
+            return { kind: 'applied' as const, fromStatus };
+          }
+
+          const finalStatus = await tx.payout.findUniqueOrThrow({
+            where: { id: payout.id },
+            select: { status: true },
+          });
+          return { kind: 'skip' as const, status: finalStatus.status };
+        });
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          this.observability.recordPayoutTransferEvent('duplicate');
+          this.logger.log(
+            `Duplicate transfer webhook ignored for ${businessKey} (claim or ledger unique)`,
+          );
+          continue;
+        }
+        throw error;
+      }
+
+      if (result.kind !== 'applied') {
+        const skip = classifySkippedTransition(result.status, toStatus);
+        this.observability.recordPayoutTransferEvent(skip);
+        continue;
+      }
+
+      this.observability.recordPayoutTransferEvent('applied');
+      this.observability.recordPayout({
+        outcome:
+          toStatus === PayoutStatus.FAILED || toStatus === PayoutStatus.REVERSED
+            ? 'failure'
+            : 'success',
+      });
+
+      if (
+        toStatus === PayoutStatus.SUCCEEDED ||
+        toStatus === PayoutStatus.FAILED
+      ) {
+        const email = payout.recipient?.email;
+        if (email) {
+          const eventName =
+            toStatus === PayoutStatus.SUCCEEDED
+              ? OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED
+              : OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED;
+          const dedupeKey = `${eventName}:${payout.id}`;
+          try {
+            const notification = await this.prisma.notificationOutbox.create({
+              data: {
+                eventName,
+                channel: NotificationChannel.EMAIL,
+                recipient: email,
+                recipientUserId: payout.recipient.id,
+                dedupeKey,
+                payload: {
+                  payoutId: payout.id,
+                  amount,
+                  currency,
+                  campaignTitle: payout.campaign?.title ?? 'Your campaign',
+                  firstName: payout.recipient.firstName,
+                  failureReason:
+                    toStatus === PayoutStatus.FAILED
+                      ? (payout.failureReason ??
+                        'The transfer did not complete. Check your payout profile in the app.')
+                      : '',
+                },
+              },
+            });
+            await this.notificationOutboxDelivery.enqueueDelivery(
+              notification.id,
+            );
+          } catch (error) {
+            if (!isUniqueConstraintError(error)) throw error;
+          }
+
+          await this.adminNotify.emit(
+            toStatus === PayoutStatus.SUCCEEDED
+              ? ADMIN_NOTIF_PAYOUT_SUCCEEDED
+              : ADMIN_NOTIF_PAYOUT_FAILED,
+            {
+              payoutId: payout.id,
+              amount,
+              currency,
+              campaignTitle: payout.campaign?.title ?? '',
+              recipientEmail: email,
+              failureReason:
+                toStatus === PayoutStatus.FAILED
+                  ? (payout.failureReason ??
+                    'The transfer did not complete. Check your payout profile in the app.')
+                  : '',
+            },
+          );
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @deprecated Prefer applyTransferWebhookEvent. Kept for callers that only know a status.
    */
   async updatePayoutStatusByReference(
     reference: string,
@@ -288,123 +551,16 @@ export class PayoutsService {
   ): Promise<
     { campaignId: string; id: string; amount: number; currency: string }[]
   > {
+    const event: TransferWebhookEventName =
+      status === PayoutStatus.SUCCEEDED
+        ? 'transfer.success'
+        : status === PayoutStatus.REVERSED
+          ? 'transfer.reversed'
+          : 'transfer.failed';
+    await this.applyTransferWebhookEvent(event, reference, rawEvent);
     const payouts = await this.prisma.payout.findMany({
       where: { providerRef: reference },
-      include: {
-        recipient: { select: { id: true, email: true, firstName: true } },
-        campaign: { select: { id: true, title: true } },
-      },
     });
-    if (payouts.length === 0) return [];
-    await this.prisma.payout.updateMany({
-      where: { providerRef: reference },
-      data: { status, ...(rawEvent && { rawEvent }) },
-    });
-    await Promise.all(
-      payouts.map((payout) =>
-        this.audit.log({
-          eventName: 'webhook.payout.status_updated',
-          action: AuditAction.PAYOUT,
-          entityType: 'Payout',
-          entityId: payout.id,
-          outcome:
-            status === PayoutStatus.FAILED
-              ? AuditOutcome.FAILURE
-              : AuditOutcome.SUCCESS,
-          before: { status: payout.status },
-          after: { status, providerRef: reference },
-          metadata: rawEvent,
-          note: 'Paystack transfer webhook updated payout status',
-          source: AuditSource.WEBHOOK,
-        }),
-      ),
-    );
-    this.observability.recordPayout({
-      outcome: status === PayoutStatus.FAILED ? 'failure' : 'success',
-    });
-
-    if (status === PayoutStatus.SUCCEEDED || status === PayoutStatus.FAILED) {
-      for (const p of payouts) {
-        const email = p.recipient?.email;
-        if (!email) continue;
-        const eventName =
-          status === PayoutStatus.SUCCEEDED
-            ? OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED
-            : OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED;
-        const notification = await this.prisma.notificationOutbox.create({
-          data: {
-            eventName,
-            channel: NotificationChannel.EMAIL,
-            recipient: email,
-            recipientUserId: p.recipient.id,
-            payload: {
-              payoutId: p.id,
-              amount: Number(p.amount),
-              currency: p.currency,
-              campaignTitle: p.campaign?.title ?? 'Your campaign',
-              firstName: p.recipient.firstName,
-              failureReason:
-                status === PayoutStatus.FAILED
-                  ? (p.failureReason ??
-                    'The transfer did not complete. Check your payout profile in the app.')
-                  : '',
-            },
-          },
-        });
-        await this.notificationOutboxDelivery.enqueueDelivery(notification.id);
-
-        await this.adminNotify.emit(
-          status === PayoutStatus.SUCCEEDED
-            ? ADMIN_NOTIF_PAYOUT_SUCCEEDED
-            : ADMIN_NOTIF_PAYOUT_FAILED,
-          {
-            payoutId: p.id,
-            amount: Number(p.amount),
-            currency: p.currency,
-            campaignTitle: p.campaign?.title ?? '',
-            recipientEmail: email,
-            failureReason:
-              status === PayoutStatus.FAILED
-                ? (p.failureReason ??
-                  'The transfer did not complete. Check your payout profile in the app.')
-                : '',
-          },
-        );
-      }
-    }
-
-    // After updating a terminal state, check whether the owning payout run
-    // (if any) has all its payouts in terminal states and can be closed.
-    const terminalStatuses: PayoutStatus[] = [
-      PayoutStatus.SUCCEEDED,
-      PayoutStatus.FAILED,
-      PayoutStatus.REVERSED,
-      PayoutStatus.CANCELLED,
-    ];
-    if (terminalStatuses.includes(status)) {
-      const runIds = [
-        ...new Set(payouts.map((p) => p.payoutRunId).filter(Boolean)),
-      ] as string[];
-      for (const runId of runIds) {
-        const allInRun = await this.prisma.payout.findMany({
-          where: { payoutRunId: runId },
-          select: { status: true },
-        });
-        const allTerminal = allInRun.every((p) =>
-          terminalStatuses.includes(p.status),
-        );
-        if (allTerminal) {
-          await this.prisma.payoutRun.update({
-            where: { id: runId },
-            data: {
-              status: PayoutRunStatus.COMPLETED,
-              executedAt: new Date(),
-            },
-          });
-        }
-      }
-    }
-
     return payouts.map((p) => ({
       campaignId: p.campaignId,
       id: p.id,
