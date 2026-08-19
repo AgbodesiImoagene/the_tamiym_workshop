@@ -4,14 +4,23 @@ This document defines the required local development environment for the monorep
 
 ## Prerequisites
 
-- Node.js LTS (recommend using `nvm`)
-- pnpm
+- Node.js 24 (Active LTS). Install with `nvm` (or equivalent); the repo pins this line in `.nvmrc`.
+- pnpm 9, activated through Corepack so it matches `packageManager` in the root `package.json`:
+
+  ```bash
+  nvm install
+  nvm use
+  corepack enable
+  ```
+
+  `pnpm install` fails on any other Node or pnpm major because `.npmrc` sets `engine-strict=true`.
+
 - Docker + Docker Compose
 - PostgreSQL client tools (optional but helpful)
 
 ## Monorepo tooling
 
-- Package manager: pnpm
+- Package manager: pnpm 9 (Corepack)
 - Task runner/build cache: turborepo
 - Formatting: prettier
 - Linting: eslint
@@ -73,6 +82,7 @@ The repo should provide these root-level scripts:
 - `pnpm test:coverage` — full coverage run
 - `pnpm db:migrate`
 - `pnpm db:seed`
+- `pnpm db:generate` — required before `pnpm typecheck` and `pnpm build` (Prisma Client is gitignored)
 
 ## Running apps locally
 

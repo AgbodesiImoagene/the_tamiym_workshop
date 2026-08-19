@@ -16,7 +16,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "pnpm exec husky || true",
     "db:migrate": "pnpm --filter api db:migrate",
-    "db:seed": "pnpm --filter api db:seed"
+    "db:seed": "pnpm --filter api db:seed",
+    "db:generate": "pnpm --filter api exec prisma generate"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -39,7 +40,7 @@
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=9.0.0"
+    "node": "^24.0.0",
+    "pnpm": "^9.0.0"
   }
 }

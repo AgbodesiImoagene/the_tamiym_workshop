@@ -33,8 +33,8 @@ the_tamiym_workshop/
 
 ### Prerequisites
 
-- Node.js `>=18`
-- pnpm `>=9`
+- Node.js 24 (Active LTS). `nvm use` reads `.nvmrc`.
+- pnpm 9 via Corepack (`corepack enable`), matching `packageManager` in the root `package.json`.
 - Docker and Docker Compose
 
 ### Install

@@ -1,13 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
+import { SharedWorkshopCanvas } from '@/components/workshop/SharedWorkshopCanvas';
 import { getSharedDesign, getProductWorkshop, type WorkshopView, type DesignData } from '@/lib/designs';
-
-// Load canvas client-side only
-const WorkshopCanvas = dynamic(
-  () => import('@/components/workshop/WorkshopCanvas'),
-  { ssr: false },
-);
 
 interface SharedDesignPageProps {
   params: Promise<{ shareToken: string }>;
@@ -83,7 +77,7 @@ export default async function SharedDesignPage({
                   <p className="mb-2 text-sm font-medium text-zinc-700">
                     {view.displayName}
                   </p>
-                  <WorkshopCanvas
+                  <SharedWorkshopCanvas
                     viewKey={view.key}
                     printArea={view.printArea}
                     templateLayers={view.templateLayers}

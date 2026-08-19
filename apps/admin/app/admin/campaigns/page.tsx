@@ -7,12 +7,12 @@ import { CampaignStatus } from '@tamiym/types';
 import { Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label } from '@tamiym/ui';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-const statusOptions = ['ALL', 'REVIEW', ...Object.values(CampaignStatus)];
+const statusOptions = ['ALL', ...Object.values(CampaignStatus)];
 
-export default function AdminCampaignsPage() {
+function AdminCampaignsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -169,5 +169,23 @@ export default function AdminCampaignsPage() {
         </Card>
       </div>
     </AdminShell>
+  );
+}
+
+export default function AdminCampaignsPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell
+          activeNav="campaigns"
+          title="Campaigns workspace"
+          description="Review fundraising campaigns, moderate their readiness, and adjust payout policy with enough context before a live status change."
+        >
+          <p className="text-sm text-black/55">Loading campaigns...</p>
+        </AdminShell>
+      }
+    >
+      <AdminCampaignsPageContent />
+    </Suspense>
   );
 }

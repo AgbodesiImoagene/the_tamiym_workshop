@@ -9,11 +9,11 @@
     "assets": [
       {
         "include": "mail/templates/**/*.hbs",
-        "watchAssets": true
+        "watchAssets": false
       },
       {
         "include": "mail/assets/**/*",
-        "watchAssets": true
+        "watchAssets": false
       }
     ]
   }

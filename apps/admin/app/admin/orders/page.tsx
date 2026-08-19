@@ -7,7 +7,7 @@ import { OrderStatus, PaymentStatus } from '@tamiym/types';
 import { Card, CardContent, CardHeader, CardTitle, EmptyState, Input, Label } from '@tamiym/ui';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 const orderStatusOptions = ['ALL', ...Object.values(OrderStatus)];
@@ -17,7 +17,7 @@ const paymentOptions = [
   ...Object.values(PaymentStatus),
 ];
 
-export default function AdminOrdersPage() {
+function AdminOrdersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -189,5 +189,23 @@ export default function AdminOrdersPage() {
         </Card>
       </div>
     </AdminShell>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell
+          activeNav="orders"
+          title="Orders workspace"
+          description="Filter the order queue by status and payment state, then open each detail view for higher-context actions like status transitions and refunds."
+        >
+          <p className="text-sm text-black/55">Loading orders...</p>
+        </AdminShell>
+      }
+    >
+      <AdminOrdersPageContent />
+    </Suspense>
   );
 }
