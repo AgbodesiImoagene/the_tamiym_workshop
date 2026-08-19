@@ -57,7 +57,15 @@ Given time constraints, prioritize:
 
 Avoid:
 
-- Heavy end-to-end browser automation unless time permits.
+- Replacing the Playwright smoke foundation with ad-hoc browser scripts.
+
+Browser acceptance (Playwright):
+
+- Root `playwright.config.ts` + `tests/e2e/**` cover `web` / `app` / `admin` (see `docs/16-playwright-regression-strategy.md`).
+- `pnpm test:e2e:smoke` — Chromium `@smoke` on PR CI (**Playwright Smoke** job); HTML report + traces uploaded on failure.
+- `pnpm test:e2e:matrix` — full-matrix script (Firefox/WebKit web projects scaffolded; not required every PR).
+- Role fixtures: customer, organiser, admin (storage under `tests/e2e/.auth/`, gitignored). Paystack is simulated locally — never live.
+- Cookie _name_ isolation for admin vs customer remains TTW-020; smoke still proves customer→admin UI/API denial via separate users/contexts.
 
 ## Coverage targets (required)
 
