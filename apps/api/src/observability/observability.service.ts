@@ -62,6 +62,14 @@ export class ObservabilityService {
     },
   );
 
+  private readonly chargeSettlements = this.meter.createCounter(
+    'charge_settlement_total',
+    {
+      description:
+        'Paystack charge settlement outcomes (settled, duplicate no-op, rejected).',
+    },
+  );
+
   private readonly queueJobs = this.meter.createCounter('queue_jobs_total', {
     description: 'Queue jobs grouped by queue, job, and outcome.',
   });
@@ -141,6 +149,10 @@ export class ObservabilityService {
     outcome: 'success' | 'failure' | 'denied',
   ): void {
     this.webhookEvents.add(1, { event: eventName, outcome });
+  }
+
+  recordChargeSettlement(outcome: 'settled' | 'duplicate' | 'rejected'): void {
+    this.chargeSettlements.add(1, { outcome });
   }
 
   recordQueueJob(params: {

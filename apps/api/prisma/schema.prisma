@@ -1338,9 +1338,13 @@ model Payment {
   amount   Decimal      @db.Decimal(10, 2)
 
   // Idempotency: store webhook event ids if Paystack provides, else store signature hash.
+  // Initiation sets this to the provider reference; settlement uses ChargeSettlementClaim.
   idempotencyKey String? @unique
 
   rawEvent Json? // optional: store webhook payload (careful with size)
+
+  /// Exactly-once settlement claim for charge.success (TTW-010).
+  settlementClaim ChargeSettlementClaim?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1349,6 +1353,24 @@ model Payment {
   @@index([createdAt])
   @@index([provider, providerRef])
   @@map("payments")
+}
+
+/// Exactly-once claim that a provider charge reference has settled a payment (TTW-010).
+/// Inserting this row is the settlement lock; duplicates become successful no-ops.
+model ChargeSettlementClaim {
+  id          String          @id @default(cuid())
+  provider    PaymentProvider @default(PAYSTACK)
+  /// Business key, e.g. `charge.success:{providerRef}`.
+  businessKey String
+  paymentId   String          @unique
+  payment     Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  orderId     String
+
+  createdAt DateTime @default(now())
+
+  @@unique([provider, businessKey])
+  @@index([orderId])
+  @@map("charge_settlement_claims")
 }
 
 /// Refund against an order. Tracks provider, amount, reason, and status.
@@ -1461,6 +1483,7 @@ model CampaignBalanceLedgerEntry {
 
   createdAt DateTime @default(now())
 
+  /// Exactly one PAYMENT_SETTLED row per order is enforced by a partial unique index in migrations (TTW-010).
   @@index([campaignId])
   @@index([campaignId, availableAt])
   @@index([orderId])
@@ -1792,6 +1815,8 @@ model NotificationOutbox {
   recipientUserId String?
   recipientUser   User?               @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
   payload         Json // template variables
+  /// Optional exactly-once key (e.g. PaymentConfirmed:{orderId}). Nulls allowed for multi-recipient admin fan-out.
+  dedupeKey       String?             @unique
   status          NotificationStatus  @default(PENDING)
   attempts        Int                 @default(0)
   lastError       String?

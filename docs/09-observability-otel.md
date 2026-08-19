@@ -16,6 +16,7 @@ Implemented in `apps/api`:
   - refund outcomes
   - payout and payout-run outcomes
   - webhook events
+  - charge settlement outcomes (`charge_settlement_total`: settled / duplicate / rejected)
   - queue-job outcomes and duration
 
 ## Logging requirements

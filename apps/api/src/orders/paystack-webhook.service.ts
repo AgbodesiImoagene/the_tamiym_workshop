@@ -11,7 +11,9 @@ import {
   PayoutStatus,
   AuditAction,
   AuditSource,
+  PaymentProvider,
 } from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
 import * as crypto from 'node:crypto';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
@@ -30,6 +32,13 @@ export interface PaystackWebhookEvent {
     amount?: number;
     currency?: string;
   };
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }
 
 @Injectable()
@@ -63,8 +72,8 @@ export class PaystackWebhookService {
   }
 
   /**
-   * Process charge.success event: idempotent update of Payment and Order.
-   * Keys off Payment.providerRef (not mutable Order.paymentReference). Rejects expired/cancelled orders.
+   * Process charge.success: settle payment/order exactly once under duplicate/concurrent delivery.
+   * Keys off Payment.providerRef. Settlement lock is ChargeSettlementClaim (provider, businessKey).
    */
   async processChargeSuccess(event: PaystackWebhookEvent): Promise<void> {
     await this.observability.startSpan(
@@ -80,23 +89,26 @@ export class PaystackWebhookService {
           where: { providerRef: reference },
           include: {
             order: { include: { user: { select: { id: true, email: true } } } },
+            settlementClaim: true,
           },
         });
         if (!payment) {
           return;
         }
-        if (payment.status === PaymentStatus.SUCCEEDED) {
+        if (
+          payment.settlementClaim ||
+          payment.status === PaymentStatus.SUCCEEDED
+        ) {
+          this.observability.recordChargeSettlement('duplicate');
           return;
         }
 
         const order = payment.order;
         if (order.status === OrderStatus.PAID) {
+          this.observability.recordChargeSettlement('duplicate');
           return;
         }
         if (order.status === OrderStatus.CANCELLED) {
-          // Money was captured for an already-cancelled order — alert admins so
-          // they can issue a manual refund. Do NOT auto-refund here to avoid
-          // double-refund if a refund was already processed out-of-band.
           this.logger.error(
             `charge.success received for CANCELLED order ${order.id} (ref: ${reference}). Manual refund required.`,
           );
@@ -104,6 +116,7 @@ export class PaystackWebhookService {
             'charge.success.cancelled_order',
             'denied',
           );
+          this.observability.recordChargeSettlement('rejected');
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -117,7 +130,6 @@ export class PaystackWebhookService {
           return;
         }
         if (order.expiresAt && order.expiresAt < new Date()) {
-          // Same situation for an expired (not yet explicitly cancelled) order.
           this.logger.error(
             `charge.success received for expired order ${order.id} (ref: ${reference}). Manual refund required.`,
           );
@@ -125,6 +137,7 @@ export class PaystackWebhookService {
             'charge.success.expired_order',
             'denied',
           );
+          this.observability.recordChargeSettlement('rejected');
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -152,6 +165,7 @@ export class PaystackWebhookService {
               'charge.success.amount_mismatch',
               'denied',
             );
+            this.observability.recordChargeSettlement('rejected');
             await this.adminNotify.emit(
               ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
               {
@@ -177,6 +191,7 @@ export class PaystackWebhookService {
             'charge.success.currency_mismatch',
             'denied',
           );
+          this.observability.recordChargeSettlement('rejected');
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -201,84 +216,128 @@ export class PaystackWebhookService {
           availableAt.setDate(availableAt.getDate() + holdDays);
         }
 
-        await this.prisma.$transaction(async (tx) => {
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: {
-              status: PaymentStatus.SUCCEEDED,
-              rawEvent: event as unknown as object,
-            },
-          });
-          await tx.order.update({
-            where: { id: order.id },
-            data: {
-              status: OrderStatus.PAID,
-              paymentStatus: PaymentStatus.SUCCEEDED,
-            },
-          });
-          if (order.campaignId) {
-            await tx.campaign.update({
-              where: { id: order.campaignId },
+        const businessKey = `charge.success:${reference}`;
+        const paymentConfirmedDedupeKey = `PaymentConfirmed:${order.id}`;
+        let notificationId: string | undefined;
+
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.chargeSettlementClaim.create({
               data: {
-                currentAmount: { increment: order.totalAmount },
+                provider: payment.provider ?? PaymentProvider.PAYSTACK,
+                businessKey,
+                paymentId: payment.id,
+                orderId: order.id,
               },
             });
-            await this.campaignLedger.createPaymentSettled(
-              order.campaignId,
-              order.id,
-              Number(order.totalAmount),
-              order.currency,
-              settledAt,
+
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: PaymentStatus.SUCCEEDED,
+                rawEvent: event as unknown as object,
+              },
+            });
+
+            const orderUpdate = await tx.order.updateMany({
+              where: {
+                id: order.id,
+                status: OrderStatus.PENDING_PAYMENT,
+              },
+              data: {
+                status: OrderStatus.PAID,
+                paymentStatus: PaymentStatus.SUCCEEDED,
+              },
+            });
+            if (orderUpdate.count !== 1) {
+              throw new Error(
+                `charge.success claim won but order ${order.id} was not PENDING_PAYMENT`,
+              );
+            }
+
+            if (order.campaignId) {
+              await tx.campaign.update({
+                where: { id: order.campaignId },
+                data: {
+                  currentAmount: { increment: order.totalAmount },
+                },
+              });
+              await this.campaignLedger.createPaymentSettled(
+                order.campaignId,
+                order.id,
+                Number(order.totalAmount),
+                order.currency,
+                settledAt,
+                {
+                  availableAt,
+                  metadata: { orderTotal: Number(order.totalAmount) },
+                },
+                tx,
+              );
+            }
+
+            await this.audit.log(
               {
-                availableAt,
-                metadata: { orderTotal: Number(order.totalAmount) },
+                eventName: 'webhook.payment.charge_success',
+                action: AuditAction.STATUS_CHANGE,
+                entityType: 'Order',
+                entityId: order.id,
+                before: { status: order.status, paymentStatus: payment.status },
+                after: {
+                  status: OrderStatus.PAID,
+                  paymentStatus: PaymentStatus.SUCCEEDED,
+                  providerRef: reference,
+                  settlementBusinessKey: businessKey,
+                },
+                metadata: event as unknown as object,
+                note: 'Paystack charge.success settled payment',
+                source: AuditSource.WEBHOOK,
               },
               tx,
             );
+
+            const orderUser = (
+              payment.order as { user?: { id: string; email: string } }
+            )?.user;
+            if (orderUser?.email) {
+              const notification = await tx.notificationOutbox.create({
+                data: {
+                  eventName: 'PaymentConfirmed',
+                  channel: NotificationChannel.EMAIL,
+                  recipient: orderUser.email,
+                  recipientUserId: orderUser.id,
+                  dedupeKey: paymentConfirmedDedupeKey,
+                  payload: {
+                    orderId: order.id,
+                    reference,
+                    amount: Number(order.totalAmount),
+                    currency: order.currency,
+                  },
+                },
+              });
+              notificationId = notification.id;
+            }
+          });
+        } catch (error) {
+          if (isUniqueConstraintError(error)) {
+            this.observability.recordChargeSettlement('duplicate');
+            this.logger.log(
+              `Duplicate charge.success ignored for ref ${reference} (settlement claim already exists)`,
+            );
+            return;
           }
-          await this.audit.log(
-            {
-              eventName: 'webhook.payment.charge_success',
-              action: AuditAction.STATUS_CHANGE,
-              entityType: 'Order',
-              entityId: order.id,
-              before: { status: order.status, paymentStatus: payment.status },
-              after: {
-                status: OrderStatus.PAID,
-                paymentStatus: PaymentStatus.SUCCEEDED,
-                providerRef: reference,
-              },
-              metadata: event as unknown as object,
-              note: 'Paystack charge.success settled payment',
-              source: AuditSource.WEBHOOK,
-            },
-            tx,
-          );
-        });
+          throw error;
+        }
+
+        this.observability.recordChargeSettlement('settled');
+
+        if (notificationId) {
+          await this.notificationOutboxDelivery.enqueueDelivery(notificationId);
+        }
 
         const orderUser = (
           payment.order as { user?: { id: string; email: string } }
         )?.user;
-        if (orderUser?.email) {
-          const notification = await this.prisma.notificationOutbox.create({
-            data: {
-              eventName: 'PaymentConfirmed',
-              channel: NotificationChannel.EMAIL,
-              recipient: orderUser.email,
-              recipientUserId: orderUser.id,
-              payload: {
-                orderId: order.id,
-                reference,
-                amount: Number(order.totalAmount),
-                currency: order.currency,
-              },
-            },
-          });
-          await this.notificationOutboxDelivery.enqueueDelivery(
-            notification.id,
-          );
-        }
-
         await this.adminNotify.emit(ADMIN_NOTIF_PAYMENT_CONFIRMED, {
           orderId: order.id,
           reference,

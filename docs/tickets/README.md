@@ -20,14 +20,14 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 1 — Financial and inventory integrity
 
-| Ticket                                                  | Priority | Risk     | State  | Outcome                                                                      |
-| ------------------------------------------------------- | -------- | -------- | ------ | ---------------------------------------------------------------------------- |
-| [TTW-010](ttw-010-make-charge-settlement-idempotent.md) | P0       | Critical | Scoped | Settle each Paystack charge exactly once under duplicate/concurrent delivery |
-| [TTW-011](ttw-011-make-payout-events-idempotent.md)     | P0       | Critical | Scoped | Apply each payout transition and ledger effect exactly once                  |
-| [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Scoped | Permit at most one active payment attempt per order                          |
-| [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Scoped | Track provider-confirmed partial/full refunds and reconcile them once        |
-| [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Scoped | Convert paid reservations to consumed stock or release them exactly once     |
-| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Scoped | Add scheduled financial/inventory reconciliation reports and repair runbooks |
+| Ticket                                                  | Priority | Risk     | State    | Outcome                                                                      |
+| ------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- |
+| [TTW-010](ttw-010-make-charge-settlement-idempotent.md) | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery |
+| [TTW-011](ttw-011-make-payout-events-idempotent.md)     | P0       | Critical | Scoped   | Apply each payout transition and ledger effect exactly once                  |
+| [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Scoped   | Permit at most one active payment attempt per order                          |
+| [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Scoped   | Track provider-confirmed partial/full refunds and reconcile them once        |
+| [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Scoped   | Convert paid reservations to consumed stock or release them exactly once     |
+| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Scoped   | Add scheduled financial/inventory reconciliation reports and repair runbooks |
 
 ## Epic 2 — Security and trust boundaries
 
