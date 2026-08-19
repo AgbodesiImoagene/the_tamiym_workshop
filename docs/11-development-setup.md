@@ -88,6 +88,8 @@ The repo should provide these root-level scripts:
 - `pnpm dev` — run all apps/services in dev mode
 - `pnpm lint` — read-only ESLint across workspaces
 - `pnpm lint:fix` — intentional ESLint autofix (not a CI verify command)
+- `pnpm test:e2e:smoke` — Chromium Playwright smoke across `web` / `app` / `admin` (requires build + test DB seed; see `tests/e2e/README.md`)
+- `pnpm test:e2e:matrix` — Playwright full-matrix script (Chromium + Firefox/WebKit web projects)
 - `pnpm format:check` / `pnpm format`
 - `pnpm typecheck`
 - `pnpm test` — unit tests

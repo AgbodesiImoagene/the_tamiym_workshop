@@ -16,7 +16,7 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | [TTW-001](ttw-001-align-supported-node-runtime.md)    | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
 | [TTW-002](ttw-002-restore-quality-gates.md)           | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
 | [TTW-003](ttw-003-repair-api-integration-harness.md)  | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
-| [TTW-004](ttw-004-establish-playwright-foundation.md) | P0       | High     | Scoped   | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
+| [TTW-004](ttw-004-establish-playwright-foundation.md) | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
 
 ## Epic 1 — Financial and inventory integrity
 
