@@ -5,12 +5,13 @@ import { PAYOUT_QUEUE_NAME, JOB_EXECUTE_PAYOUT_RUN } from '../constants';
 import { PayoutRunsService } from './payout-runs.service';
 import { ObservabilityService } from '../observability/observability.service';
 import { runWithRequestContext } from '../request-context/request-context.store';
+import { bullProcessorOptions } from '../queues/bull-processor.options';
 
 export interface ExecutePayoutRunPayload {
   runId: string;
 }
 
-@Processor(PAYOUT_QUEUE_NAME)
+@Processor(PAYOUT_QUEUE_NAME, bullProcessorOptions)
 export class PayoutExecutionProcessor extends WorkerHost {
   private readonly logger = new Logger(PayoutExecutionProcessor.name);
 

@@ -15,12 +15,13 @@ import {
 import { ObservabilityService } from '../../observability/observability.service';
 import { runWithRequestContext } from '../../request-context/request-context.store';
 import { NotificationOutboxDeliveryService } from '../notification-outbox-delivery.service';
+import { bullProcessorOptions } from '../../queues/bull-processor.options';
 
 export interface NotificationOutboxJobData {
   outboxId: string;
 }
 
-@Processor(MAIL_QUEUE_NAME)
+@Processor(MAIL_QUEUE_NAME, bullProcessorOptions)
 export class MailProcessor extends WorkerHost {
   private readonly logger = new Logger(MailProcessor.name);
 

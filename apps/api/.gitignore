@@ -16,13 +16,13 @@ build/
 # Testing
 coverage/
 *.log
+e2e-*.log
 test-results/
 *.spec.js
 *.spec.js.map
 
 # Prisma
-prisma/migrations/
-!prisma/migrations/.gitkeep
+# Authored migrations are versioned; do not ignore prisma/migrations/
 *.db
 *.db-journal
 

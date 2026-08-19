@@ -139,9 +139,11 @@ Coverage exemptions:
 
 ### Integration test pattern
 
-- Start Nest app in test mode
-- Use a dedicated test database schema
-- Transaction rollback or DB reset strategy per test suite
+- Start Nest app in test mode via `apps/api/test/utils/create-e2e-app.ts` (production `AppModule`, `v1` prefix, cookies, validation).
+- Use a dedicated test database (`*test*` / `*e2e*` in `DATABASE_URL`) and Redis logical DB (`REDIS_DB`).
+- Jest e2e config loads `.env.test`, runs `prisma migrate deploy` in globalSetup, flushes the Redis test DB in globalTeardown.
+- BullMQ workers use `autorun: false` under `NODE_ENV=test`; mail templates avoid `@css-inline` in test to keep Jest handle-free.
+- Prove clean exit with `node scripts/quality/prove-e2e-open-handles.mjs` (no `--forceExit`).
 
 ## CI pipeline (required)
 
@@ -150,9 +152,9 @@ On every PR:
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
-- `pnpm test:integration`
-- `pnpm test:coverage` (enforce thresholds)
-- Build apps (optional but recommended): `pnpm build`
+- `pnpm --filter api test:e2e` (GitHub Actions **API Integration** job with Postgres 16 + Redis 7 services; two passes + open-handle proof)
+- `pnpm test:coverage` + coverage ratchet / diff-coverage
+- `pnpm build`
 
 ## Development workflow rules
 

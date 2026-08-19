@@ -119,6 +119,92 @@ jobs:
             apps/api/coverage/lcov-report
           if-no-files-found: error
 
+  integration:
+    name: API Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tamiym_workshop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_test?schema=public
+      JWT_ACCESS_SECRET: test-access-secret-ttw003-not-for-prod
+      JWT_REFRESH_SECRET: test-refresh-secret-ttw003-not-for-prod
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PAYSTACK_SECRET_KEY: sk_test_mock
+      PAYSTACK_PUBLIC_KEY: pk_test_mock
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_DB: 15
+      MAIL_HOST: localhost
+      MAIL_PORT: 1025
+      LOG_LEVEL: error
+      S3_ENDPOINT: http://localhost:9000
+      S3_PUBLIC_URL: http://localhost:9000/tamiym-assets
+      S3_BUCKET: tamiym-assets
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Apply migrations
+        run: pnpm --filter api exec prisma migrate deploy
+      - name: Run API e2e (pass 1)
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter api test:e2e 2>&1 | tee apps/api/e2e-pass-1.log
+      - name: Run API e2e (pass 2)
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter api test:e2e 2>&1 | tee apps/api/e2e-pass-2.log
+      - name: Prove no open handles
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/quality/prove-e2e-open-handles.mjs 2>&1 | tee apps/api/e2e-open-handles.log
+      - name: Upload e2e logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-e2e-logs
+          path: |
+            apps/api/e2e-pass-1.log
+            apps/api/e2e-pass-2.log
+            apps/api/e2e-open-handles.log
+          if-no-files-found: error
+
   build:
     name: Production Build
     runs-on: ubuntu-latest

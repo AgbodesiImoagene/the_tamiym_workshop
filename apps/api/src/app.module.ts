@@ -72,10 +72,12 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath:
+        process.env.NODE_ENV === 'test'
+          ? ['.env.test', '.env.local', '.env']
+          : ['.env.local', '.env'],
       validate: validateEnv,
     }),
     BullModule.forRootAsync({
@@ -83,8 +85,9 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
       useFactory: (config: ConfigService) => ({
         connection: {
           host: config.get<string>('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
+          port: Number(config.get<string | number>('REDIS_PORT', 6379)),
           password: config.get<string>('REDIS_PASSWORD') || undefined,
+          db: Number(config.get<string | number>('REDIS_DB', 0)),
         },
       }),
       inject: [ConfigService],

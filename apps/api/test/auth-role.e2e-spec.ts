@@ -1,8 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
+import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 
 /**
  * Integration tests: customers cannot access organizer-only or admin-only routes.
@@ -12,25 +11,11 @@ describe('Auth and role boundaries (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    );
-    app.setGlobalPrefix('v1');
-    await app.init();
+    app = await createE2eApp();
   });
 
   afterAll(async () => {
-    await app.close();
+    await closeE2eApp(app);
   });
 
   it('register creates CUSTOMER only (no role in body)', async () => {
