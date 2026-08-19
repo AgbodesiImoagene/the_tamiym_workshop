@@ -41,3 +41,6 @@
 - Verify Paystack webhook signatures.
 - Never trust client-side payment success.
 - Idempotency: webhook handlers must be idempotent (safe to re-run).
+  - `charge.success` takes an exactly-once `ChargeSettlementClaim` (`provider` + `businessKey = charge.success:{providerRef}`) inside one DB transaction with payment/order/campaign/ledger/audit/outbox mutations (TTW-010). Losing duplicates are successful no-ops; metrics use `charge_settlement_total{outcome}`.
+  - Customer `PaymentConfirmed` outbox rows use `dedupeKey = PaymentConfirmed:{orderId}`.
+  - At most one `PAYMENT_SETTLED` ledger credit per order (partial unique index).

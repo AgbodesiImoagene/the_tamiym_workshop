@@ -7,6 +7,7 @@ import { PayoutsService } from '../payouts/payouts.service';
 import { CampaignLedgerService } from '../payouts/campaign-ledger.service';
 import { AuditService } from '../audit/audit.service';
 import { PaymentStatus, OrderStatus } from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
 import * as crypto from 'node:crypto';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
@@ -16,6 +17,11 @@ describe('PaystackWebhookService', () => {
   let service: PaystackWebhookService;
   let prisma: jest.Mocked<PrismaService>;
   let config: ConfigService;
+  let observability: {
+    recordChargeSettlement: jest.Mock;
+    recordWebhook: jest.Mock;
+    startSpan: jest.Mock;
+  };
 
   const secret = 'sk_test_secret';
   const rawBody = JSON.stringify({
@@ -24,13 +30,24 @@ describe('PaystackWebhookService', () => {
   });
 
   const mockTx = {
+    chargeSettlementClaim: { create: jest.fn().mockResolvedValue({}) },
     payment: { update: jest.fn().mockResolvedValue({}) },
-    order: { update: jest.fn().mockResolvedValue({}) },
+    order: {
+      update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     campaign: { update: jest.fn().mockResolvedValue({}) },
     campaignBalanceLedgerEntry: { create: jest.fn().mockResolvedValue({}) },
+    notificationOutbox: {
+      create: jest.fn().mockResolvedValue({ id: 'outbox-pay-1' }),
+    },
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockTx.chargeSettlementClaim.create.mockResolvedValue({});
+    mockTx.order.updateMany.mockResolvedValue({ count: 1 });
+
     const mockPrisma = {
       payment: { findFirst: jest.fn(), update: jest.fn() },
       order: { findFirst: jest.fn(), update: jest.fn() },
@@ -59,7 +76,7 @@ describe('PaystackWebhookService', () => {
     const mockAudit = {
       log: jest.fn().mockResolvedValue(undefined),
     };
-    const mockObservability = {
+    observability = {
       startSpan: jest.fn(
         async (
           _name: string,
@@ -68,6 +85,7 @@ describe('PaystackWebhookService', () => {
         ) => callback(),
       ),
       recordWebhook: jest.fn(),
+      recordChargeSettlement: jest.fn(),
     };
 
     const mockNotificationOutboxDelivery = {
@@ -86,7 +104,7 @@ describe('PaystackWebhookService', () => {
         { provide: PayoutsService, useValue: mockPayoutsService },
         { provide: CampaignLedgerService, useValue: mockCampaignLedger },
         { provide: AuditService, useValue: mockAudit },
-        { provide: ObservabilityService, useValue: mockObservability },
+        { provide: ObservabilityService, useValue: observability },
         {
           provide: NotificationOutboxDeliveryService,
           useValue: mockNotificationOutboxDelivery,
@@ -138,6 +156,7 @@ describe('PaystackWebhookService', () => {
           ) => callback(),
         ),
         recordWebhook: jest.fn(),
+        recordChargeSettlement: jest.fn(),
       };
       const mockDelivery = {
         enqueueDelivery: jest.fn(),
@@ -163,6 +182,7 @@ describe('PaystackWebhookService', () => {
         id: 'pay-1',
         providerRef: 'ref-123',
         status: PaymentStatus.SUCCEEDED,
+        settlementClaim: { id: 'claim-1' },
         order: { id: 'order-1', status: OrderStatus.PENDING_PAYMENT },
       });
 
@@ -172,6 +192,9 @@ describe('PaystackWebhookService', () => {
       });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'duplicate',
+      );
     });
 
     it('should skip when payment not found for reference', async () => {
@@ -190,6 +213,7 @@ describe('PaystackWebhookService', () => {
         id: 'pay-1',
         providerRef: 'ref-123',
         status: PaymentStatus.INITIATED,
+        settlementClaim: null,
         order: { id: 'order-1', status: OrderStatus.PAID },
       });
 
@@ -199,6 +223,9 @@ describe('PaystackWebhookService', () => {
       });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'duplicate',
+      );
     });
 
     it('should skip when order is CANCELLED', async () => {
@@ -206,6 +233,7 @@ describe('PaystackWebhookService', () => {
         id: 'pay-1',
         providerRef: 'ref-123',
         status: PaymentStatus.INITIATED,
+        settlementClaim: null,
         order: { id: 'order-1', status: OrderStatus.CANCELLED },
       });
 
@@ -215,6 +243,117 @@ describe('PaystackWebhookService', () => {
       });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'rejected',
+      );
+    });
+
+    it('should reject expired orders', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() - 1000),
+        },
+      });
+
+      await service.processChargeSuccess({
+        event: 'charge.success',
+        data: { reference: 'ref-123' },
+      });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'rejected',
+      );
+    });
+
+    it('should reject amount mismatches', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 100,
+        },
+      });
+
+      await service.processChargeSuccess({
+        event: 'charge.success',
+        data: { reference: 'ref-123', amount: 999 },
+      });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'rejected',
+      );
+    });
+
+    it('should reject currency mismatches', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 100,
+        },
+      });
+
+      await service.processChargeSuccess({
+        event: 'charge.success',
+        data: { reference: 'ref-123', currency: 'USD' },
+      });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'rejected',
+      );
+    });
+
+    it('should treat unique claim conflict as duplicate no-op', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        provider: 'PAYSTACK',
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 100,
+        },
+      });
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await service.processChargeSuccess({
+        event: 'charge.success',
+        data: { reference: 'ref-123' },
+      });
+
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'duplicate',
+      );
     });
 
     it('should update payment and order when not yet processed', async () => {
@@ -222,6 +361,8 @@ describe('PaystackWebhookService', () => {
         id: 'pay-1',
         providerRef: 'ref-123',
         status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        provider: 'PAYSTACK',
         order: {
           id: 'order-1',
           status: OrderStatus.PENDING_PAYMENT,
@@ -237,19 +378,143 @@ describe('PaystackWebhookService', () => {
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.chargeSettlementClaim.create).toHaveBeenCalled();
       expect(mockTx.payment.update).toHaveBeenCalledWith({
         where: { id: 'pay-1' },
         data: expect.objectContaining({
           status: PaymentStatus.SUCCEEDED,
         }),
       });
-      expect(mockTx.order.update).toHaveBeenCalledWith({
-        where: { id: 'order-1' },
+      expect(mockTx.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+        },
         data: {
           status: OrderStatus.PAID,
           paymentStatus: PaymentStatus.SUCCEEDED,
         },
       });
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'settled',
+      );
+    });
+
+    it('should settle campaign orders with ledger credit and customer email', async () => {
+      const mockCampaignLedger = {
+        getSettlementHoldDays: jest.fn().mockResolvedValue(7),
+        createPaymentSettled: jest.fn().mockResolvedValue(undefined),
+      };
+      const mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
+      const mockDelivery = {
+        enqueueDelivery: jest.fn().mockResolvedValue(undefined),
+      };
+      const mockAdminNotify = { emit: jest.fn().mockResolvedValue(undefined) };
+      const svc = new PaystackWebhookService(
+        prisma,
+        config,
+        { updatePayoutStatusByReference: jest.fn() } as never,
+        mockCampaignLedger as never,
+        mockAudit as never,
+        observability as never,
+        mockDelivery as never,
+        mockAdminNotify as never,
+      );
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-camp',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        provider: 'PAYSTACK',
+        order: {
+          id: 'order-camp',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 250,
+          campaignId: 'camp-1',
+          user: { id: 'user-1', email: 'buyer@example.com' },
+        },
+      });
+
+      await svc.processChargeSuccess({
+        event: 'charge.success',
+        data: {
+          reference: 'ref-camp',
+          amount: 25000,
+          currency: 'NGN',
+          status: 'success',
+        },
+      });
+
+      expect(mockTx.campaign.update).toHaveBeenCalled();
+      expect(mockCampaignLedger.createPaymentSettled).toHaveBeenCalled();
+      expect(mockTx.notificationOutbox.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            dedupeKey: 'PaymentConfirmed:order-camp',
+            recipient: 'buyer@example.com',
+          }),
+        }),
+      );
+      expect(mockDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-pay-1');
+      expect(mockAdminNotify.emit).toHaveBeenCalled();
+      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+        'settled',
+      );
+    });
+
+    it('should rethrow non-unique transaction failures', async () => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        provider: 'PAYSTACK',
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 100,
+        },
+      });
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
+        new Error('db down'),
+      );
+
+      await expect(
+        service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123' },
+        }),
+      ).rejects.toThrow('db down');
+    });
+
+    it('should fail the transaction when order is no longer PENDING_PAYMENT', async () => {
+      mockTx.order.updateMany.mockResolvedValue({ count: 0 });
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-1',
+        providerRef: 'ref-123',
+        status: PaymentStatus.INITIATED,
+        settlementClaim: null,
+        provider: 'PAYSTACK',
+        order: {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date(Date.now() + 3600000),
+          currency: 'NGN',
+          totalAmount: 100,
+        },
+      });
+
+      await expect(
+        service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123' },
+        }),
+      ).rejects.toThrow(/was not PENDING_PAYMENT/);
     });
   });
 
@@ -269,6 +534,8 @@ describe('PaystackWebhookService', () => {
         id: 'pay-1',
         providerRef: 'ref-123',
         status: 'INITIATED',
+        settlementClaim: null,
+        provider: 'PAYSTACK',
         order: {
           id: 'order-1',
           status: OrderStatus.PENDING_PAYMENT,
