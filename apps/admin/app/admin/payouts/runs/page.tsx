@@ -11,7 +11,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 
 const runStatuses = ['ALL', 'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'COMPLETED', 'CANCELLED'];
 const payoutModes = ['MANUAL', 'AUTO_APPROVAL_REQUIRED', 'AUTO_EXECUTE'];
@@ -25,7 +25,7 @@ function toDateTimeLocal(value: Date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-export default function AdminPayoutRunsPage() {
+function AdminPayoutRunsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -267,5 +267,23 @@ export default function AdminPayoutRunsPage() {
         </div>
       </div>
     </AdminShell>
+  );
+}
+
+export default function AdminPayoutRunsPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell
+          activeNav="payouts"
+          title="Payout runs"
+          description="Review eligible balances, create runs, and move approved batches into execution from one queue-oriented financial workspace."
+        >
+          <p className="text-sm text-black/55">Loading payout runs...</p>
+        </AdminShell>
+      }
+    >
+      <AdminPayoutRunsPageContent />
+    </Suspense>
   );
 }

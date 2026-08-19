@@ -76,6 +76,15 @@ Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` for `apps/api` on the ho
 - metrics → Prometheus scrape endpoint on the collector (`:8889/metrics`)
 - logs → `debug` logging
 
+## Supported Node and pnpm runtime
+
+Local development, CI, tests, and production builds use the same contract:
+
+- Node.js 24 (Active LTS), pinned in `.nvmrc` and `package.json` `engines.node`
+- pnpm 9, pinned as `packageManager: pnpm@9.0.0` and `engines.pnpm`
+
+There is no application Dockerfile yet. When one is added, it must use a Node 24 image (for example `node:24-bookworm`) and Corepack/`pnpm@9`. `docker-compose.yml` only provisions datastore and observability sidecars, not the Node apps.
+
 ## Current deployment reality
 
 - The backend is the only part of the repo that is close to deployable infrastructure-wise.
