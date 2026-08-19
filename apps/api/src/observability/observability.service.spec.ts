@@ -14,4 +14,23 @@ describe('ObservabilityService', () => {
     expect(() => service.recordPayoutTransferEvent('duplicate')).not.toThrow();
     expect(() => service.recordPayoutTransferEvent('stale')).not.toThrow();
   });
+
+  it('records payment initiation outcomes', () => {
+    const service = new ObservabilityService();
+    expect(() =>
+      service.recordPaymentInitiation({ outcome: 'created' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordPaymentInitiation({ outcome: 'reused' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordPaymentInitiation({ outcome: 'reconciled' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordPaymentInitiation({ outcome: 'blocked' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordPaymentInitiation({ outcome: 'failure' }),
+    ).not.toThrow();
+  });
 });

@@ -2,6 +2,9 @@
  * Local Paystack simulator for deterministic webhook delivery controls.
  * Ordinary CI must never call live Paystack; later tickets emit signed
  * charge.success / transfer events through this in-process stub.
+ *
+ * TTW-012: `initializeTransaction` is idempotent per reference so payment-retry
+ * journeys can assert a single provider session.
  */
 export type SimulatedWebhookEvent = {
   id: string;
@@ -11,10 +14,43 @@ export type SimulatedWebhookEvent = {
   deliveredAt?: number;
 };
 
+export type SimulatedInitializeResult = {
+  authorizationUrl: string;
+  reference: string;
+  accessCode: string;
+  outcome: 'created' | 'reused';
+};
+
 export class PaystackSimulator {
   private readonly queue: SimulatedWebhookEvent[] = [];
   private readonly delivered: SimulatedWebhookEvent[] = [];
+  private readonly sessions = new Map<string, SimulatedInitializeResult>();
   private seq = 0;
+  initializeCalls = 0;
+
+  /**
+   * Simulate transaction/initialize. Same reference returns the same session
+   * (mirrors server-side attempt reuse / Idempotency-Key).
+   */
+  initializeTransaction(reference: string): SimulatedInitializeResult {
+    this.initializeCalls += 1;
+    const existing = this.sessions.get(reference);
+    if (existing) {
+      return { ...existing, outcome: 'reused' };
+    }
+    const created: SimulatedInitializeResult = {
+      authorizationUrl: `https://checkout.paystack.test/${reference}`,
+      reference,
+      accessCode: `ac_${reference.slice(-8)}`,
+      outcome: 'created',
+    };
+    this.sessions.set(reference, created);
+    return created;
+  }
+
+  sessionCount(): number {
+    return this.sessions.size;
+  }
 
   enqueue(
     event: string,
@@ -71,7 +107,9 @@ export class PaystackSimulator {
   reset(): void {
     this.queue.length = 0;
     this.delivered.length = 0;
+    this.sessions.clear();
     this.seq = 0;
+    this.initializeCalls = 0;
   }
 }
 

@@ -1325,6 +1325,7 @@ model OrderItem {
 }
 
 /// Payment attempt for an order. Tracks provider, amount, idempotency key for webhooks.
+/// TTW-012: at most one active (PENDING|INITIATED) attempt per order (partial unique index).
 model Payment {
   id      String @id @default(cuid())
   orderId String
@@ -1332,7 +1333,7 @@ model Payment {
 
   provider    PaymentProvider @default(PAYSTACK)
   providerRef String? // Paystack transaction reference / id
-  status      PaymentStatus   @default(INITIATED)
+  status      PaymentStatus   @default(PENDING)
 
   currency CurrencyCode @default(NGN)
   amount   Decimal      @db.Decimal(10, 2)
@@ -1340,6 +1341,13 @@ model Payment {
   // Idempotency: store webhook event ids if Paystack provides, else store signature hash.
   // Initiation sets this to the provider reference; settlement uses ChargeSettlementClaim.
   idempotencyKey String? @unique
+
+  /// Paystack checkout URL returned by transaction/initialize (TTW-012 reuse).
+  authorizationUrl String?
+  /// Paystack access_code for the same session (TTW-012 reuse).
+  accessCode       String?
+  /// When this active attempt stops being reusable and may be failed (TTW-012).
+  expiresAt        DateTime?
 
   rawEvent Json? // optional: store webhook payload (careful with size)
 
@@ -1352,6 +1360,7 @@ model Payment {
   @@index([orderId])
   @@index([createdAt])
   @@index([provider, providerRef])
+  @@index([expiresAt])
   @@map("payments")
 }
 

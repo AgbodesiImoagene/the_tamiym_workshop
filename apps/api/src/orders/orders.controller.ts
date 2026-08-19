@@ -22,6 +22,7 @@ import { PaymentsService } from './payments.service';
 import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { InitiatePaymentResponseDto } from './dto/initiate-payment-response.dto';
 import { QuoteRequestDto } from '../pricing/dto/quote-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -118,8 +119,18 @@ export class OrdersController {
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiBody({ type: InitiatePaymentDto })
-  @ApiResponse({ status: 200, description: 'Authorization URL and reference' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Authorization URL and reference. Retries of an active attempt return the same session.',
+    type: InitiatePaymentResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Invalid order or payment config' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Active attempt is reserved but not yet ready; retry to attach to the same attempt',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Order not found' })

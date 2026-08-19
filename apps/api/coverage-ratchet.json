@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-19",
-  "notes": "Raised after TTW-011 payout transfer idempotency.",
+  "notes": "Raised after TTW-012 payment initiation serialization.",
   "floors": {
-    "statements": 46.54,
-    "branches": 41.48,
-    "functions": 44.03,
-    "lines": 46.55
+    "statements": 47.6,
+    "branches": 42.22,
+    "functions": 45.39,
+    "lines": 47.64
   }
 }

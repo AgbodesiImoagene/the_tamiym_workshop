@@ -7,6 +7,7 @@ import { OrderExpiryService } from './order-expiry.service';
 import { PaymentsService } from './payments.service';
 import { PaystackWebhookService } from './paystack-webhook.service';
 import { RefundsService } from './refunds.service';
+import { PaystackTransactionClient } from './paystack-transaction.client';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { PayoutsModule } from '../payouts/payouts.module';
@@ -27,6 +28,7 @@ import { AdminNotificationsModule } from '../admin-notifications/admin-notificat
     OrdersService,
     OrderExpiryService,
     PaymentsService,
+    PaystackTransactionClient,
     PaystackWebhookService,
     RefundsService,
   ],
