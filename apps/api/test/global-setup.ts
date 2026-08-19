@@ -1,6 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { config as loadEnv } from 'dotenv';
+
+const execFileAsync = promisify(execFile);
 
 function databaseNameFromUrl(databaseUrl: string): string {
   try {
@@ -41,9 +44,8 @@ export default async function globalSetup(): Promise<void> {
   assertTestDatabaseUrl(databaseUrl);
 
   const apiRoot = resolve(__dirname, '..');
-  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+  await execFileAsync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
     cwd: apiRoot,
     env: process.env,
-    stdio: 'inherit',
   });
 }

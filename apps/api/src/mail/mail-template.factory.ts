@@ -1,16 +1,22 @@
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type { MailerOptions } from '@nestjs-modules/mailer';
 import type { ConfigService } from '@nestjs/config';
 
+const requireFromHere = createRequire(__filename);
+
 /** Minimal adapter used in NODE_ENV=test to avoid importing @css-inline (CustomGC). */
 class TestMailTemplateAdapter {
   compile() {
-    return async () =>
-      '<html><body><!-- e2e test template stub --></body></html>';
+    return () =>
+      Promise.resolve(
+        '<html><body><!-- e2e test template stub --></body></html>',
+      );
   }
 }
 
-function formatAmountHelper(amount: unknown, currency: unknown): string {
+/** Exported for unit coverage of currency formatting edge cases. */
+export function formatAmountHelper(amount: unknown, currency: unknown): string {
   const cur =
     typeof currency === 'string' && currency.length > 0 ? currency : 'NGN';
   const n = typeof amount === 'number' ? amount : Number(amount);
@@ -28,9 +34,9 @@ function formatAmountHelper(amount: unknown, currency: unknown): string {
  * Build Mailer template options. Production uses Handlebars + CSS inlining;
  * tests avoid loading @css-inline so Jest can exit without open handles.
  */
-export async function buildMailTemplateOptions(
+export function buildMailTemplateOptions(
   templatesDir = join(__dirname, 'templates'),
-): Promise<NonNullable<MailerOptions['template']>> {
+): NonNullable<MailerOptions['template']> {
   if (process.env.NODE_ENV === 'test') {
     return {
       dir: templatesDir,
@@ -43,16 +49,15 @@ export async function buildMailTemplateOptions(
     };
   }
 
-  // CommonJS require keeps unit Jest (without --experimental-vm-modules) working;
-  // e2e uses NODE_OPTIONS=--experimental-vm-modules for Prisma WASM separately.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { HandlebarsAdapter } =
-    require('@nestjs-modules/mailer/dist/adapters/handlebars.adapter') as {
-      HandlebarsAdapter: new (
-        helpers?: Record<string, unknown>,
-        options?: { inlineCssEnabled?: boolean },
-      ) => NonNullable<MailerOptions['template']>['adapter'];
-    };
+  // Lazy CJS load: keeps unit/e2e Jest from importing @css-inline at module eval time.
+  const { HandlebarsAdapter } = requireFromHere(
+    '@nestjs-modules/mailer/dist/adapters/handlebars.adapter',
+  ) as {
+    HandlebarsAdapter: new (
+      helpers?: Record<string, unknown>,
+      options?: { inlineCssEnabled?: boolean },
+    ) => NonNullable<MailerOptions['template']>['adapter'];
+  };
 
   return {
     dir: templatesDir,
@@ -69,7 +74,7 @@ export async function buildMailTemplateOptions(
 }
 
 /** Nest MailerModule.forRootAsync factory — unit-tested outside the module class. */
-export async function buildMailerModuleOptions(config: ConfigService) {
+export function buildMailerModuleOptions(config: ConfigService) {
   return {
     transport: {
       host: config.get<string>('MAIL_HOST', 'localhost'),
@@ -86,6 +91,6 @@ export async function buildMailerModuleOptions(config: ConfigService) {
     defaults: {
       from: config.get<string>('MAIL_FROM', '"Tamiym" <noreply@tamiym.com>'),
     },
-    template: await buildMailTemplateOptions(),
+    template: buildMailTemplateOptions(),
   };
 }
