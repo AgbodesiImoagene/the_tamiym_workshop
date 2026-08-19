@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-19",
-  "notes": "Raised after TTW-003 CI lint/diff-coverage fixes for mail-template helpers.",
+  "notes": "Raised after TTW-011 payout transfer idempotency.",
   "floors": {
-    "statements": 44.13,
-    "branches": 39.62,
-    "functions": 41.72,
-    "lines": 44.05
+    "statements": 46.54,
+    "branches": 41.48,
+    "functions": 44.03,
+    "lines": 46.55
   }
 }

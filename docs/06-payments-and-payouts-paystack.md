@@ -44,3 +44,4 @@
   - `charge.success` takes an exactly-once `ChargeSettlementClaim` (`provider` + `businessKey = charge.success:{providerRef}`) inside one DB transaction with payment/order/campaign/ledger/audit/outbox mutations (TTW-010). Losing duplicates are successful no-ops; metrics use `charge_settlement_total{outcome}`.
   - Customer `PaymentConfirmed` outbox rows use `dedupeKey = PaymentConfirmed:{orderId}`.
   - At most one `PAYMENT_SETTLED` ledger credit per order (partial unique index).
+  - Transfer webhooks (`transfer.success|failed|reversed`) apply conditional payout transitions atomically with at most one reserve, one success marker, and one release per payout (TTW-011); stale/out-of-order events are acknowledged without changing balances. Admin retry of a failed run payout creates a **new** payout row (same uniqueness constraints cannot re-reserve the failed id). The original is `CANCELLED` under a row lock so duplicate retries cannot double-initiate.

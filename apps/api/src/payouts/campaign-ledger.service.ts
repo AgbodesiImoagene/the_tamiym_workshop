@@ -94,14 +94,17 @@ export class CampaignLedgerService {
 
   /**
    * Create PAYOUT_RESERVED (negative) when a payout is queued; reduces eligible balance.
+   * At most one reserve per payoutId (DB unique index, TTW-011).
    */
   async createPayoutReserved(
     campaignId: string,
     payoutId: string,
     amount: number,
     currency: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.campaignBalanceLedgerEntry.create({
+    const client = tx ?? this.prisma;
+    await client.campaignBalanceLedgerEntry.create({
       data: {
         campaignId,
         payoutId,
@@ -115,15 +118,17 @@ export class CampaignLedgerService {
 
   /**
    * Create PAYOUT_SUCCEEDED (0 amount, audit only) when transfer succeeds.
-   * Balance was already reduced by PAYOUT_RESERVED.
+   * Balance was already reduced by PAYOUT_RESERVED. At most one per payoutId (TTW-011).
    */
   async createPayoutSucceeded(
     campaignId: string,
     payoutId: string,
     amount: number,
     currency: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.campaignBalanceLedgerEntry.create({
+    const client = tx ?? this.prisma;
+    await client.campaignBalanceLedgerEntry.create({
       data: {
         campaignId,
         payoutId,
@@ -162,7 +167,8 @@ export class CampaignLedgerService {
   }
 
   /**
-   * Create PAYOUT_FAILED (positive amount) to release the reserved balance when transfer fails.
+   * Create PAYOUT_FAILED (positive amount) to release the reserved balance when transfer fails/reverses.
+   * At most one release per payoutId (TTW-011).
    */
   async createPayoutFailed(
     campaignId: string,
@@ -170,8 +176,10 @@ export class CampaignLedgerService {
     amount: number,
     currency: string,
     metadata?: Record<string, unknown>,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.campaignBalanceLedgerEntry.create({
+    const client = tx ?? this.prisma;
+    await client.campaignBalanceLedgerEntry.create({
       data: {
         campaignId,
         payoutId,
@@ -225,8 +233,12 @@ export class CampaignLedgerService {
    * i.e. the process crashed before PAYOUT_FAILED was written.
    * Used by retryPayout to detect and repair stale reservations.
    */
-  async getNetLedgerAmountForPayout(payoutId: string): Promise<number> {
-    const result = await this.prisma.campaignBalanceLedgerEntry.aggregate({
+  async getNetLedgerAmountForPayout(
+    payoutId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    const client = tx ?? this.prisma;
+    const result = await client.campaignBalanceLedgerEntry.aggregate({
       where: { payoutId },
       _sum: { amount: true },
     });

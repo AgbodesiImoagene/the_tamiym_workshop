@@ -8,7 +8,6 @@ import {
   OrderStatus,
   PaymentStatus,
   NotificationChannel,
-  PayoutStatus,
   AuditAction,
   AuditSource,
   PaymentProvider,
@@ -350,7 +349,7 @@ export class PaystackWebhookService {
   }
 
   /**
-   * Process transfer webhook events: update Payout status by reference, store raw payload, and reconcile ledger.
+   * Process transfer webhook events: exactly-once status + ledger + run completion (TTW-011).
    */
   async processTransferEvent(
     event: string,
@@ -358,37 +357,19 @@ export class PaystackWebhookService {
     rawPayload?: object,
   ): Promise<boolean> {
     if (!reference) return false;
+    if (
+      event !== 'transfer.success' &&
+      event !== 'transfer.failed' &&
+      event !== 'transfer.reversed'
+    ) {
+      return false;
+    }
     this.observability.recordWebhook(event, 'success');
-    const status =
-      event === 'transfer.success'
-        ? PayoutStatus.SUCCEEDED
-        : event === 'transfer.reversed'
-          ? PayoutStatus.REVERSED
-          : PayoutStatus.FAILED;
-    const payouts = await this.payoutsService.updatePayoutStatusByReference(
+    return this.payoutsService.applyTransferWebhookEvent(
+      event,
       reference,
-      status,
       rawPayload,
     );
-    for (const p of payouts) {
-      if (status === PayoutStatus.SUCCEEDED) {
-        await this.campaignLedger.createPayoutSucceeded(
-          p.campaignId,
-          p.id,
-          p.amount,
-          p.currency,
-        );
-      } else {
-        // Both FAILED and REVERSED release the reserved balance back to eligible.
-        await this.campaignLedger.createPayoutFailed(
-          p.campaignId,
-          p.id,
-          p.amount,
-          p.currency,
-        );
-      }
-    }
-    return payouts.length > 0;
   }
 
   /**

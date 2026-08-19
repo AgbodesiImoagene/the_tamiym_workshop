@@ -70,6 +70,14 @@ export class ObservabilityService {
     },
   );
 
+  private readonly payoutTransferEvents = this.meter.createCounter(
+    'payout_transfer_event_total',
+    {
+      description:
+        'Paystack transfer webhook outcomes (applied, duplicate, stale).',
+    },
+  );
+
   private readonly queueJobs = this.meter.createCounter('queue_jobs_total', {
     description: 'Queue jobs grouped by queue, job, and outcome.',
   });
@@ -153,6 +161,10 @@ export class ObservabilityService {
 
   recordChargeSettlement(outcome: 'settled' | 'duplicate' | 'rejected'): void {
     this.chargeSettlements.add(1, { outcome });
+  }
+
+  recordPayoutTransferEvent(outcome: 'applied' | 'duplicate' | 'stale'): void {
+    this.payoutTransferEvents.add(1, { outcome });
   }
 
   recordQueueJob(params: {

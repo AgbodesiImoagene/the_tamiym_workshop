@@ -15,6 +15,7 @@ import {
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
 import { ObservabilityService } from '../observability/observability.service';
+import { isTerminalPayoutStatus } from './payout-transfer-transitions';
 
 export interface PayoutRunPreviewItem {
   campaignId: string;
@@ -415,7 +416,7 @@ export class PayoutRunsService {
       const recipientCode = await this.payoutsService.resolveRecipient(
         profile.id,
       );
-      const idempotencyKey = `payout-${payoutId}`;
+      const idempotencyKey = payout.idempotencyKey ?? `payout-${payoutId}`;
 
       const result = await this.payoutsService.initiateTransfer(
         recipientCode,
@@ -454,51 +455,127 @@ export class PayoutRunsService {
   }
 
   /**
-   * Retry a failed payout in a run (re-queue and execute again).
-   * If the previous attempt crashed after PAYOUT_RESERVED was written but
-   * before PAYOUT_FAILED, the ledger carries a dangling debit.  We detect
-   * this via the net ledger sum for the payoutId and create a PAYOUT_FAILED
-   * entry to zero it out before re-queuing.
+   * Retry a failed payout in a run by creating a **new** payout row and executing it.
+   *
+   * TTW-011 enforces at most one PAYOUT_RESERVED / PAYOUT_FAILED / PAYOUT_SUCCEEDED
+   * per payoutId. Re-using the failed row would violate those uniqueness constraints,
+   * so each retry attempt is a distinct payout with its own ledger lifecycle.
+   *
+   * The original row is moved to CANCELLED under a row lock so a second click
+   * (or concurrent retry) cannot start another Paystack transfer. If the run
+   * was already COMPLETED, it is reopened to EXECUTING until the retry is terminal.
+   *
+   * If the previous attempt crashed after PAYOUT_RESERVED but before PAYOUT_FAILED,
+   * we release the dangling debit on the **failed** payout before starting the retry.
    */
   async retryPayout(payoutId: string): Promise<{ id: string; status: string }> {
-    const payout = await this.prisma.payout.findUnique({
-      where: { id: payoutId },
-    });
-    if (!payout) throw new NotFoundException('Payout not found');
-    if (payout.status !== PayoutStatus.FAILED) {
-      throw new BadRequestException('Only failed payouts can be retried');
-    }
-    if (!payout.payoutRunId) {
-      throw new BadRequestException(
-        'Only run payouts can be retried via this endpoint',
-      );
-    }
+    const retry = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT id FROM "payouts" WHERE id = ${payoutId} FOR UPDATE
+      `;
+      const payout = await tx.payout.findUnique({
+        where: { id: payoutId },
+      });
+      if (!payout) throw new NotFoundException('Payout not found');
+      if (payout.status !== PayoutStatus.FAILED) {
+        throw new BadRequestException('Only failed payouts can be retried');
+      }
+      if (!payout.payoutRunId) {
+        throw new BadRequestException(
+          'Only run payouts can be retried via this endpoint',
+        );
+      }
 
-    // Repair any stale PAYOUT_RESERVED entry left by a mid-flight crash.
-    const netLedger =
-      await this.campaignLedger.getNetLedgerAmountForPayout(payoutId);
-    if (netLedger < 0) {
-      // Net negative = unreconciled reservation — cancel it so the retry
-      // starts with a clean ledger position.
-      await this.campaignLedger.createPayoutFailed(
-        payout.campaignId,
+      const netLedger = await this.campaignLedger.getNetLedgerAmountForPayout(
         payoutId,
-        Math.abs(netLedger),
-        payout.currency,
-        { reason: 'Clearing stale reservation before retry' },
+        tx,
       );
+      if (netLedger < 0) {
+        await this.campaignLedger.createPayoutFailed(
+          payout.campaignId,
+          payoutId,
+          Math.abs(netLedger),
+          payout.currency,
+          { reason: 'Clearing stale reservation before retry' },
+          tx,
+        );
+      }
+
+      const created = await tx.payout.create({
+        data: {
+          campaignId: payout.campaignId,
+          recipientUserId: payout.recipientUserId,
+          payoutRunId: payout.payoutRunId,
+          provider: payout.provider,
+          status: PayoutStatus.QUEUED,
+          currency: payout.currency,
+          amount: payout.amount,
+          // Ambiguous local failures leave providerRef null — reuse the original
+          // Paystack Idempotency-Key so we recover the same transfer instead of
+          // minting a second one. Webhook-failed rows keep providerRef and get a
+          // fresh key via executeSinglePayout (`payout-${newId}`).
+          idempotencyKey:
+            payout.providerRef == null
+              ? (payout.idempotencyKey ?? `payout-${payout.id}`)
+              : undefined,
+        },
+      });
+
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: {
+          status: PayoutStatus.CANCELLED,
+          failureReason: `Superseded by retry payout ${created.id}`,
+        },
+      });
+
+      await tx.$executeRaw`
+        SELECT id FROM "payout_runs" WHERE id = ${payout.payoutRunId} FOR UPDATE
+      `;
+      await tx.payoutRun.update({
+        where: { id: payout.payoutRunId },
+        data: { status: PayoutRunStatus.EXECUTING, executedAt: null },
+      });
+
+      return created;
+    });
+
+    try {
+      await this.executeSinglePayout(retry.id);
+    } finally {
+      if (retry.payoutRunId) {
+        await this.markRunCompletedIfAllTerminal(retry.payoutRunId);
+      }
     }
-
-    await this.prisma.payout.update({
-      where: { id: payoutId },
-      data: { status: PayoutStatus.QUEUED, failureReason: null },
-    });
-
-    await this.executeSinglePayout(payoutId);
     const updated = await this.prisma.payout.findUnique({
-      where: { id: payoutId },
+      where: { id: retry.id },
     });
-    return { id: payoutId, status: updated?.status ?? PayoutStatus.QUEUED };
+    return { id: retry.id, status: updated?.status ?? PayoutStatus.QUEUED };
+  }
+
+  /** Serialize with webhook completion: COMPLETED iff every member is terminal. */
+  private async markRunCompletedIfAllTerminal(runId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT id FROM "payout_runs" WHERE id = ${runId} FOR UPDATE
+      `;
+      const allInRun = await tx.payout.findMany({
+        where: { payoutRunId: runId },
+        select: { status: true },
+      });
+      if (
+        allInRun.length > 0 &&
+        allInRun.every((p) => isTerminalPayoutStatus(p.status))
+      ) {
+        await tx.payoutRun.update({
+          where: { id: runId },
+          data: {
+            status: PayoutRunStatus.COMPLETED,
+            executedAt: new Date(),
+          },
+        });
+      }
+    });
   }
 
   async listPayoutRuns(params: {

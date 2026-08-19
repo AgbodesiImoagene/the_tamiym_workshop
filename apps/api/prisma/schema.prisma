@@ -1484,6 +1484,7 @@ model CampaignBalanceLedgerEntry {
   createdAt DateTime @default(now())
 
   /// Exactly one PAYMENT_SETTLED row per order is enforced by a partial unique index in migrations (TTW-010).
+  /// Exactly one PAYOUT_RESERVED / PAYOUT_SUCCEEDED / PAYOUT_FAILED (release) per payoutId (TTW-011).
   @@index([campaignId])
   @@index([campaignId, availableAt])
   @@index([orderId])
@@ -1606,11 +1607,31 @@ model Payout {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Exactly-once transfer webhook claims (TTW-011).
+  providerEventClaims PayoutProviderEventClaim[]
+
   @@index([campaignId])
   @@index([payoutRunId])
   @@index([provider])
   @@index([status])
   @@map("payouts")
+}
+
+/// Exactly-once record that a Paystack transfer webhook event was applied to a payout (TTW-011).
+model PayoutProviderEventClaim {
+  id          String          @id @default(cuid())
+  provider    PaymentProvider @default(PAYSTACK)
+  /// e.g. `transfer.success:{providerRef}`
+  businessKey String
+  payoutId    String
+  payout      Payout          @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  fromStatus  PayoutStatus?
+  toStatus    PayoutStatus
+  createdAt   DateTime        @default(now())
+
+  @@unique([provider, businessKey])
+  @@index([payoutId])
+  @@map("payout_provider_event_claims")
 }
 
 /// Organizer discount/cost policy: percent or fixed discount per currency, scoped to product/variant or site-wide.

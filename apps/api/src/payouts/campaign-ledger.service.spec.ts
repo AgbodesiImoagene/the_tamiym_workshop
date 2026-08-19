@@ -28,6 +28,37 @@ describe('CampaignLedgerService', () => {
     expect(service).toBeDefined();
   });
 
+  it('createPayoutReserved uses transaction client when provided', async () => {
+    const tx = {
+      campaignBalanceLedgerEntry: { create: jest.fn().mockResolvedValue({}) },
+    };
+    await service.createPayoutReserved('c1', 'p1', 10, 'NGN', tx as never);
+    expect(tx.campaignBalanceLedgerEntry.create).toHaveBeenCalled();
+  });
+
+  it('createPayoutSucceeded uses transaction client when provided', async () => {
+    const tx = {
+      campaignBalanceLedgerEntry: { create: jest.fn().mockResolvedValue({}) },
+    };
+    await service.createPayoutSucceeded('c1', 'p1', 10, 'NGN', tx as never);
+    expect(tx.campaignBalanceLedgerEntry.create).toHaveBeenCalled();
+  });
+
+  it('createPayoutFailed uses transaction client when provided', async () => {
+    const tx = {
+      campaignBalanceLedgerEntry: { create: jest.fn().mockResolvedValue({}) },
+    };
+    await service.createPayoutFailed(
+      'c1',
+      'p1',
+      10,
+      'NGN',
+      { reason: 'x' },
+      tx as never,
+    );
+    expect(tx.campaignBalanceLedgerEntry.create).toHaveBeenCalled();
+  });
+
   describe('getSettlementHoldDays', () => {
     it('should return 7 when site settings has payoutSettlementHoldDays', async () => {
       (prisma.siteSettings.findUnique as jest.Mock).mockResolvedValue({
