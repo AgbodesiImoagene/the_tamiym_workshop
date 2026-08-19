@@ -22,8 +22,9 @@ import {
   MEDIA_SUPPORTED_MIME_TYPES,
   MEDIA_THUMB_MAX,
 } from './media.constants';
+import { bullProcessorOptions } from '../queues/bull-processor.options';
 
-@Processor(MEDIA_QUEUE)
+@Processor(MEDIA_QUEUE, bullProcessorOptions)
 export class MediaProcessor extends WorkerHost {
   private readonly logger = new Logger(MediaProcessor.name);
 

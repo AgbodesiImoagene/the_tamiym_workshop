@@ -91,14 +91,22 @@ The repo should provide these root-level scripts:
 - `pnpm format:check` / `pnpm format`
 - `pnpm typecheck`
 - `pnpm test` — unit tests
-- `pnpm test:integration` — integration tests
+- `pnpm test:integration` — API integration/e2e (`pnpm --filter api test:e2e`); requires Postgres test DB + Redis and `apps/api/.env.test` (see `.env.test.example`)
 - `pnpm test:coverage` — full coverage run
 - `pnpm coverage:ratchet` — fail if API aggregate coverage drops below committed floors
 - `pnpm coverage:diff` — fail if changed API executable lines are under the diff-coverage floor
-- `pnpm verify` — local composite of the release-facing gates
+- `pnpm verify` — local composite of the release-facing unit/format/coverage/build gates (integration runs in CI’s API Integration job)
 - `pnpm db:migrate`
 - `pnpm db:seed`
 - `pnpm db:generate` — required before `pnpm typecheck` and `pnpm build` (Prisma Client is gitignored)
+
+### API integration harness (TTW-003)
+
+1. Copy `apps/api/.env.test.example` → `apps/api/.env.test` and point `DATABASE_URL` at a dedicated DB whose name matches `/test|e2e/i` (e.g. `tamiym_workshop_test`).
+2. Set `REDIS_DB=15` (or another unused logical DB) so teardown can `FLUSHDB` safely.
+3. Apply schema: `pnpm --filter api exec prisma migrate deploy` (globalSetup also does this).
+4. Existing non-empty developer DBs that predate the baseline migration need a one-time `prisma migrate resolve --applied 20260819100000_baseline` before `migrate deploy`.
+5. Run `pnpm --filter api test:e2e` (sets `NODE_OPTIONS=--experimental-vm-modules` for Prisma 7). Open-handle proof: `node scripts/quality/prove-e2e-open-handles.mjs`.
 
 ## Running apps locally
 

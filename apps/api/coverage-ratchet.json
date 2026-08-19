@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-19",
-  "notes": "TTW-002 initial authored-code floors after restoring green unit suites and lint-driven helper coverage. Raise only; never lower without a new ticket.",
+  "notes": "Raised after TTW-003 CI lint/diff-coverage fixes for mail-template helpers.",
   "floors": {
-    "statements": 42.93,
-    "branches": 38.46,
-    "functions": 41.26,
-    "lines": 42.95
+    "statements": 44.13,
+    "branches": 39.62,
+    "functions": 41.72,
+    "lines": 44.05
   }
 }
