@@ -169,4 +169,4 @@ Deviations from the original implementation plan:
 
 ## Completion summary
 
-Shipped a single Node **24** / pnpm **9** contract for local, CI, and production builds. Unsupported majors fail at install via `engine-strict`. Incidental build/typecheck blockers required for verification are included; lint/format/coverage remain TTW-002. No PR opened yet (awaiting user request). Unrelated prior WIP remains in `stash@{0}` (`Preserve unrelated worktree WIP before TTW-001`).
+Shipped a single Node **24** / pnpm **9** contract for local, CI, and production builds. Unsupported majors fail at install via `engine-strict`. Incidental build/typecheck blockers required for verification are included; lint/format/coverage remain TTW-002. PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/1. Unrelated prior WIP remains in `stash@{0}` (`Preserve unrelated worktree WIP before TTW-001`).
