@@ -190,11 +190,7 @@ export async function updateAdminOrderStatus(id: string, status: string) {
   return apiClient.patch<AdminOrderDetail>(`/admin/orders/${id}`, { status });
 }
 
-export async function createAdminRefund(
-  id: string,
-  amount: number,
-  reason?: string,
-) {
+export async function createAdminRefund(id: string, amount: number, reason?: string) {
   return apiClient.post(`/admin/orders/${id}/refund`, { amount, reason });
 }
 
@@ -211,11 +207,7 @@ export async function activateAdminCampaign(id: string) {
   return apiClient.post<AdminCampaign>(`/admin/campaigns/${id}/activate`);
 }
 
-export async function rejectAdminCampaign(
-  id: string,
-  rejectionReason: string,
-  notes?: string,
-) {
+export async function rejectAdminCampaign(id: string, rejectionReason: string, notes?: string) {
   return apiClient.post<AdminCampaign>(`/admin/campaigns/${id}/reject`, {
     rejectionReason,
     notes,
@@ -230,7 +222,7 @@ export async function updateAdminCampaignStatus(id: string, status: string) {
 
 export async function updateAdminCampaignPayoutPolicy(
   id: string,
-  payoutModeOverride: string | null,
+  payoutModeOverride: string | null
 ) {
   return apiClient.patch<AdminCampaign>(`/admin/campaigns/${id}/payout-policy`, {
     payoutModeOverride,
@@ -330,7 +322,7 @@ export async function retryAdminPayout(payoutId: string) {
 export async function initiateAdminCampaignPayout(
   campaignId: string,
   amount: number,
-  reason?: string,
+  reason?: string
 ) {
   return apiClient.post(`/admin/campaigns/${campaignId}/payouts`, {
     amount,
@@ -341,21 +333,15 @@ export async function initiateAdminCampaignPayout(
 export async function requestAdminManualAdjustment(
   campaignId: string,
   amount: number,
-  reason: string,
+  reason: string
 ) {
-  return apiClient.post(
-    `/admin/campaigns/${campaignId}/payouts/manual-adjustment`,
-    {
-      amount,
-      reason,
-    },
-  );
+  return apiClient.post(`/admin/campaigns/${campaignId}/payouts/manual-adjustment`, {
+    amount,
+    reason,
+  });
 }
 
-export async function approveAdminManualAdjustment(
-  payoutId: string,
-  approvalReason?: string,
-) {
+export async function approveAdminManualAdjustment(payoutId: string, approvalReason?: string) {
   return apiClient.post(`/admin/payouts/${payoutId}/approve-manual`, {
     approvalReason,
   });

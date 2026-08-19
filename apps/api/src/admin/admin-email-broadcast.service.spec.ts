@@ -16,6 +16,7 @@ describe('AdminEmailBroadcastService', () => {
   let prisma: {
     user: { findMany: jest.Mock };
     notificationOutbox: { create: jest.Mock };
+    $transaction: jest.Mock;
   };
   let delivery: { enqueueDelivery: jest.Mock };
   let audit: { log: jest.Mock };
@@ -26,6 +27,12 @@ describe('AdminEmailBroadcastService', () => {
       notificationOutbox: {
         create: jest.fn().mockResolvedValue({ id: 'out-1' }),
       },
+      $transaction: jest.fn(async (callbackOrSteps: unknown) => {
+        if (Array.isArray(callbackOrSteps)) {
+          return Promise.all(callbackOrSteps);
+        }
+        return (callbackOrSteps as (tx: unknown) => Promise<unknown>)(prisma);
+      }),
     };
     delivery = { enqueueDelivery: jest.fn().mockResolvedValue(undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };

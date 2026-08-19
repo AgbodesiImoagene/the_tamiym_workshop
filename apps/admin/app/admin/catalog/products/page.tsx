@@ -16,8 +16,10 @@ const STATUS_BADGE: Record<
 };
 
 function ProductRow({ product }: { product: AdminProductSummary }) {
-  const badge =
-    STATUS_BADGE[product.status] ?? { variant: 'neutral' as const, label: product.status };
+  const badge = STATUS_BADGE[product.status] ?? {
+    variant: 'neutral' as const,
+    label: product.status,
+  };
   const thumbUrl =
     product.thumbnailUrl ??
     `https://placehold.co/56x56/f3f4f6/9ca3af?text=${encodeURIComponent(product.name[0] ?? '?')}`;
@@ -78,14 +80,9 @@ export default function AdminCatalogProductsPage() {
             </CardContent>
           </Card>
         ) : productsQuery.data && productsQuery.data.length > 0 ? (
-          productsQuery.data.map((product) => (
-            <ProductRow key={product.id} product={product} />
-          ))
+          productsQuery.data.map((product) => <ProductRow key={product.id} product={product} />)
         ) : (
-          <EmptyState
-            title="No products yet"
-            description="Products you create will appear here."
-          />
+          <EmptyState title="No products yet" description="Products you create will appear here." />
         )}
       </div>
     </AdminShell>

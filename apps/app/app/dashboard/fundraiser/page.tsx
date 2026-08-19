@@ -3,11 +3,7 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { authApi, ApiError, User } from '@/lib/auth';
 import { getCustomerCampaigns } from '@/lib/dashboard';
-import {
-  createPayoutProfile,
-  getBanks,
-  getPayoutProfiles,
-} from '@/lib/fundraising';
+import { createPayoutProfile, getBanks, getPayoutProfiles } from '@/lib/fundraising';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -89,11 +85,8 @@ export default function DashboardFundraiserPage() {
 
   const totalRaised = useMemo(
     () =>
-      (campaignsQuery.data ?? []).reduce(
-        (sum, campaign) => sum + (campaign.currentAmount ?? 0),
-        0,
-      ),
-    [campaignsQuery.data],
+      (campaignsQuery.data ?? []).reduce((sum, campaign) => sum + (campaign.currentAmount ?? 0), 0),
+    [campaignsQuery.data]
   );
 
   const organizerLocked =
@@ -117,14 +110,17 @@ export default function DashboardFundraiserPage() {
         <div className="space-y-3">
           <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">Fundraiser</h1>
           <p className="max-w-2xl text-base text-black/75">
-            Monitor campaign performance and keep your payout destination ready for future disbursements.
+            Monitor campaign performance and keep your payout destination ready for future
+            disbursements.
           </p>
         </div>
 
         <section className="grid gap-6 md:grid-cols-3">
           <div className="rounded-[28px] border border-black/15 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.12)]">
             <p className="text-sm text-black/60">Active campaigns</p>
-            <p className="mt-3 text-[30px] font-bold text-black">{campaignsQuery.data?.length ?? 0}</p>
+            <p className="mt-3 text-[30px] font-bold text-black">
+              {campaignsQuery.data?.length ?? 0}
+            </p>
           </div>
           <div className="rounded-[28px] border border-black/15 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.12)]">
             <p className="text-sm text-black/60">Funds raised</p>
@@ -134,7 +130,9 @@ export default function DashboardFundraiserPage() {
           </div>
           <div className="rounded-[28px] border border-black/15 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.12)]">
             <p className="text-sm text-black/60">Payout profiles</p>
-            <p className="mt-3 text-[30px] font-bold text-black">{payoutProfilesQuery.data?.length ?? 0}</p>
+            <p className="mt-3 text-[30px] font-bold text-black">
+              {payoutProfilesQuery.data?.length ?? 0}
+            </p>
           </div>
         </section>
 
@@ -262,10 +260,7 @@ export default function DashboardFundraiserPage() {
                   <p className="text-sm text-muted-foreground">Loading payout profiles...</p>
                 ) : payoutProfilesQuery.data?.length ? (
                   payoutProfilesQuery.data.map((profile) => (
-                    <div
-                      key={profile.id}
-                      className="rounded-2xl border border-black/10 px-4 py-4"
-                    >
+                    <div key={profile.id} className="rounded-2xl border border-black/10 px-4 py-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-black">
@@ -284,9 +279,7 @@ export default function DashboardFundraiserPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No payout profiles saved yet.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No payout profiles saved yet.</p>
                 )}
               </div>
             </section>

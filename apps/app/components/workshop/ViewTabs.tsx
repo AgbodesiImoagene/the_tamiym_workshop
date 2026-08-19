@@ -28,9 +28,7 @@ export default function ViewTabs({
     <div className="flex gap-1 border-b border-zinc-200 bg-white px-4">
       {designableViews.map((view) => {
         const viewData = designData.views[view.key];
-        const hasLayers = viewData
-          ? (viewData.fabricJson?.objects?.length ?? 0) > 0
-          : false;
+        const hasLayers = viewData ? (viewData.fabricJson?.objects?.length ?? 0) > 0 : false;
         const isActive = view.key === activeViewKey;
 
         return (
@@ -42,16 +40,13 @@ export default function ViewTabs({
               'relative flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
               isActive
                 ? 'border-zinc-900 text-zinc-900'
-                : 'border-transparent text-zinc-500 hover:text-zinc-700',
+                : 'border-transparent text-zinc-500 hover:text-zinc-700'
             )}
           >
             {view.displayName}
             {hasLayers && (
               <span
-                className={cn(
-                  'h-2 w-2 rounded-full',
-                  isActive ? 'bg-zinc-900' : 'bg-zinc-400',
-                )}
+                className={cn('h-2 w-2 rounded-full', isActive ? 'bg-zinc-900' : 'bg-zinc-400')}
                 aria-label="has layers"
               />
             )}

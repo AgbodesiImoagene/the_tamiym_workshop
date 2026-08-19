@@ -9,7 +9,7 @@
  * the module at the module system level and test the component rendering synchronously.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import type { TemplateLayer, PrintArea } from '@/lib/designs';
 
 // Mock next/dynamic to return a simple div (WorkshopCanvas is loaded via next/dynamic in pages,
@@ -30,13 +30,13 @@ jest.mock('fabric', () => ({
       dispose: jest.fn(),
     })),
     Image: {
-      fromURL: jest.fn(
-        (_url: string, cb: (img: unknown) => void) => cb({
+      fromURL: jest.fn((_url: string, cb: (img: unknown) => void) =>
+        cb({
           set: jest.fn(),
           filters: [],
           applyFilters: jest.fn(),
           toJSON: jest.fn().mockReturnValue({}),
-        }),
+        })
       ),
       filters: {
         BlendColor: jest.fn().mockImplementation(() => ({})),
@@ -67,20 +67,20 @@ jest.mock(
         dispose: jest.fn(),
       })),
       Image: {
-        fromURL: jest.fn(
-          (_url: string, cb: (img: unknown) => void) => cb({
+        fromURL: jest.fn((_url: string, cb: (img: unknown) => void) =>
+          cb({
             set: jest.fn(),
             filters: [],
             applyFilters: jest.fn(),
             toJSON: jest.fn().mockReturnValue({}),
-          }),
+          })
         ),
         filters: { BlendColor: jest.fn() },
       },
       Rect: jest.fn().mockImplementation(() => ({})),
     },
   }),
-  { virtual: true },
+  { virtual: true }
 );
 
 import WorkshopCanvas from '@/components/workshop/WorkshopCanvas';
@@ -119,7 +119,7 @@ describe('WorkshopCanvas', () => {
         templateLayers={mockTemplateLayers}
         activeEffects={[]}
         fabricJson={null}
-      />,
+      />
     );
 
     expect(container.querySelector('canvas')).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe('WorkshopCanvas', () => {
         activeEffects={[]}
         fabricJson={{ objects: [] }}
         readOnly
-      />,
+      />
     );
 
     expect(container.querySelector('canvas')).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('WorkshopCanvas', () => {
         fabricJson={null}
         width={400}
         height={400}
-      />,
+      />
     );
 
     const canvas = container.querySelector('canvas');

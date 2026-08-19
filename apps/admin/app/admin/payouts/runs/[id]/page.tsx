@@ -29,7 +29,7 @@ export default function AdminPayoutRunDetailPage() {
 
   const run = useMemo(
     () => runsQuery.data?.runs.find((entry) => entry.id === runId),
-    [runId, runsQuery.data],
+    [runId, runsQuery.data]
   );
 
   async function refreshRun() {
@@ -75,8 +75,7 @@ export default function AdminPayoutRunDetailPage() {
     },
   });
 
-  const totalAmount =
-    run?.payouts.reduce((sum, payout) => sum + Number(payout.amount), 0) ?? 0;
+  const totalAmount = run?.payouts.reduce((sum, payout) => sum + Number(payout.amount), 0) ?? 0;
 
   return (
     <AdminShell

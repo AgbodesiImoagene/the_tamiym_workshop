@@ -1,5 +1,7 @@
 /** Maps NotificationOutbox.eventName to template id, subject, and Handlebars context. */
 
+import { asScalarString } from './notification-outbox-delivery.helpers';
+
 export const OUTBOX_EVENT_ORDER_PLACED = 'OrderPlaced';
 export const OUTBOX_EVENT_PAYMENT_CONFIRMED = 'PaymentConfirmed';
 export const OUTBOX_EVENT_ADMIN_BROADCAST = 'AdminBroadcast';
@@ -41,9 +43,9 @@ export function resolveOutboxMail(
   const p = asRecord(payload);
   switch (eventName) {
     case OUTBOX_EVENT_ORDER_PLACED: {
-      const orderId = String(p.orderId ?? '');
+      const orderId = asScalarString(p.orderId);
       const totalAmount = Number(p.totalAmount ?? 0);
-      const currency = String(p.currency ?? 'NGN');
+      const currency = asScalarString(p.currency, 'NGN');
       return {
         template: 'order-placed',
         subject: 'New order placed',
@@ -51,10 +53,10 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_PAYMENT_CONFIRMED: {
-      const orderId = String(p.orderId ?? '');
+      const orderId = asScalarString(p.orderId);
       const amount = Number(p.amount ?? p.totalAmount ?? 0);
-      const currency = String(p.currency ?? 'NGN');
-      const reference = p.reference != null ? String(p.reference) : '';
+      const currency = asScalarString(p.currency, 'NGN');
+      const reference = asScalarString(p.reference);
       return {
         template: 'payment-confirmed',
         subject: 'Payment confirmed — thank you',
@@ -62,9 +64,12 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ADMIN_BROADCAST: {
-      const subject = String(p.subject ?? 'Message from Tamiym').slice(0, 200);
-      const bodyHtml = String(p.bodyHtml ?? '');
-      const firstName = String(p.firstName ?? '');
+      const subject = asScalarString(p.subject, 'Message from Tamiym').slice(
+        0,
+        200,
+      );
+      const bodyHtml = asScalarString(p.bodyHtml);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'admin-broadcast',
         subject,
@@ -72,8 +77,8 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORDER_PROCESSING: {
-      const orderId = String(p.orderId ?? '');
-      const firstName = String(p.firstName ?? '');
+      const orderId = asScalarString(p.orderId);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'order-processing',
         subject: 'Your order is being prepared',
@@ -81,8 +86,8 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORDER_FULFILLED: {
-      const orderId = String(p.orderId ?? '');
-      const firstName = String(p.firstName ?? '');
+      const orderId = asScalarString(p.orderId);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'order-fulfilled',
         subject: 'Your order has shipped',
@@ -90,8 +95,8 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORDER_DELIVERED: {
-      const orderId = String(p.orderId ?? '');
-      const firstName = String(p.firstName ?? '');
+      const orderId = asScalarString(p.orderId);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'order-delivered',
         subject: 'Your order was delivered',
@@ -99,8 +104,8 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORDER_CANCELLED_CUSTOMER: {
-      const orderId = String(p.orderId ?? '');
-      const firstName = String(p.firstName ?? '');
+      const orderId = asScalarString(p.orderId);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'order-cancelled-customer',
         subject: 'Your order was cancelled',
@@ -108,11 +113,11 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_REFUND_COMPLETED: {
-      const orderId = String(p.orderId ?? '');
+      const orderId = asScalarString(p.orderId);
       const amount = Number(p.amount ?? 0);
-      const currency = String(p.currency ?? 'NGN');
-      const reason = p.reason != null ? String(p.reason) : '';
-      const firstName = String(p.firstName ?? '');
+      const currency = asScalarString(p.currency, 'NGN');
+      const reason = asScalarString(p.reason);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'refund-completed',
         subject: 'Your refund has been processed',
@@ -120,10 +125,10 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_DESIGN_MODERATION_APPROVED: {
-      const designId = String(p.designId ?? '');
-      const designName = String(p.designName ?? '');
-      const productName = String(p.productName ?? '');
-      const firstName = String(p.firstName ?? '');
+      const designId = asScalarString(p.designId);
+      const designName = asScalarString(p.designName);
+      const productName = asScalarString(p.productName);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'design-moderation-approved',
         subject: 'Your design was approved',
@@ -131,10 +136,10 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_DESIGN_MODERATION_REJECTED: {
-      const designId = String(p.designId ?? '');
-      const designName = String(p.designName ?? '');
-      const productName = String(p.productName ?? '');
-      const firstName = String(p.firstName ?? '');
+      const designId = asScalarString(p.designId);
+      const designName = asScalarString(p.designName);
+      const productName = asScalarString(p.productName);
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'design-moderation-rejected',
         subject: 'Update on your design',
@@ -142,11 +147,11 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED: {
-      const payoutId = String(p.payoutId ?? '');
+      const payoutId = asScalarString(p.payoutId);
       const amount = Number(p.amount ?? 0);
-      const currency = String(p.currency ?? 'NGN');
-      const campaignTitle = String(p.campaignTitle ?? 'Your campaign');
-      const firstName = String(p.firstName ?? '');
+      const currency = asScalarString(p.currency, 'NGN');
+      const campaignTitle = asScalarString(p.campaignTitle, 'Your campaign');
+      const firstName = asScalarString(p.firstName);
       return {
         template: 'organizer-payout-succeeded',
         subject: 'Payout sent for your campaign',
@@ -154,12 +159,12 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED: {
-      const payoutId = String(p.payoutId ?? '');
+      const payoutId = asScalarString(p.payoutId);
       const amount = Number(p.amount ?? 0);
-      const currency = String(p.currency ?? 'NGN');
-      const campaignTitle = String(p.campaignTitle ?? 'Your campaign');
-      const firstName = String(p.firstName ?? '');
-      const failureReason = String(p.failureReason ?? '');
+      const currency = asScalarString(p.currency, 'NGN');
+      const campaignTitle = asScalarString(p.campaignTitle, 'Your campaign');
+      const firstName = asScalarString(p.firstName);
+      const failureReason = asScalarString(p.failureReason);
       return {
         template: 'organizer-payout-failed',
         subject: 'Payout could not be completed',
@@ -174,8 +179,8 @@ export function resolveOutboxMail(
       };
     }
     case OUTBOX_EVENT_ADMIN_OPERATIONAL: {
-      const subject = String(p.subject ?? 'Operational alert');
-      const bodyHtml = String(p.html ?? '');
+      const subject = asScalarString(p.subject, 'Operational alert');
+      const bodyHtml = asScalarString(p.html);
       return {
         template: 'admin-operational',
         subject,

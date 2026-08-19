@@ -28,7 +28,7 @@ export function MarketingSplitSection({
       id={id}
       className={cn(
         'grid items-center gap-10 lg:grid-cols-[minmax(0,360px)_minmax(0,503px)] lg:gap-14',
-        reverse && 'lg:grid-cols-[minmax(0,503px)_minmax(0,360px)]',
+        reverse && 'lg:grid-cols-[minmax(0,503px)_minmax(0,360px)]'
       )}
     >
       <div className={cn('space-y-4', reverse && 'lg:order-2')}>
@@ -49,7 +49,7 @@ export function MarketingSplitSection({
       <div
         className={cn(
           'relative mx-auto h-[360px] w-full max-w-[503px] overflow-hidden border border-black/20 bg-white shadow-sm sm:h-[520px] lg:h-[750px]',
-          reverse ? 'rounded-l-[8rem] rounded-r-2xl' : 'rounded-r-[8rem] rounded-l-2xl',
+          reverse ? 'rounded-l-[8rem] rounded-r-2xl' : 'rounded-r-[8rem] rounded-l-2xl'
         )}
       >
         <Image
@@ -85,7 +85,7 @@ export function EditorialSection({
     <section
       className={cn(
         'grid items-start gap-8 border-t border-black/10 py-10 lg:grid-cols-[minmax(0,528px)_minmax(0,1fr)] lg:gap-10',
-        reverse && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,528px)]',
+        reverse && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,528px)]'
       )}
     >
       <div className={cn(reverse && 'lg:order-2')}>

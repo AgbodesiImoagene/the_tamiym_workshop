@@ -150,12 +150,7 @@ export default function TextTool({ onAddText }: TextToolProps) {
         </label>
       </div>
 
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleAdd}
-        disabled={!text.trim()}
-      >
+      <Button variant="secondary" size="sm" onClick={handleAdd} disabled={!text.trim()}>
         Add to canvas
       </Button>
     </div>

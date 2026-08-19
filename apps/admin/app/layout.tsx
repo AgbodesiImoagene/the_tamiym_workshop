@@ -4,8 +4,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Tamiym Admin',
-  description:
-    'Admin dashboard for orders, products, fundraising operations, and analytics.',
+  description: 'Admin dashboard for orders, products, fundraising operations, and analytics.',
 };
 
 export default function RootLayout({

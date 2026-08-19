@@ -129,14 +129,16 @@ function AdminCampaignsPageContent() {
                               .filter(Boolean)
                               .join(' ') || 'Unknown organizer'}
                           </p>
-                          <p className="text-xs text-black/55">{campaign.organizer?.email ?? 'No email'}</p>
+                          <p className="text-xs text-black/55">
+                            {campaign.organizer?.email ?? 'No email'}
+                          </p>
                         </td>
                         <td className="border-y border-black/8 px-4 py-4 text-sm text-black/68">
                           <p>
                             Raised{' '}
                             {formatAdminCurrency(
                               Number(campaign.currentAmount ?? 0),
-                              campaign.currency,
+                              campaign.currency
                             )}
                           </p>
                           <p className="text-xs text-black/55">

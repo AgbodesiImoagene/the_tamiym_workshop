@@ -42,11 +42,31 @@ const primaryNavItems: AdminNavItem[] = [
 ];
 
 const secondaryNavItems: AdminNavItem[] = [
-  { key: 'catalog', label: 'Catalog', href: '/admin/catalog/products', hint: 'Products and categories' },
-  { key: 'pricing', label: 'Pricing', href: '/admin/pricing/discounts', hint: 'Discounts and bulk rules' },
+  {
+    key: 'catalog',
+    label: 'Catalog',
+    href: '/admin/catalog/products',
+    hint: 'Products and categories',
+  },
+  {
+    key: 'pricing',
+    label: 'Pricing',
+    href: '/admin/pricing/discounts',
+    hint: 'Discounts and bulk rules',
+  },
   { key: 'shipping', label: 'Shipping', href: '/admin/shipping/zones', hint: 'Zones and rates' },
-  { key: 'moderation', label: 'Moderation', href: '/admin/moderation/designs', hint: 'Design review' },
-  { key: 'notifications', label: 'Notifications', href: '/admin/notifications', hint: 'Operational alerts' },
+  {
+    key: 'moderation',
+    label: 'Moderation',
+    href: '/admin/moderation/designs',
+    hint: 'Design review',
+  },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    href: '/admin/notifications',
+    hint: 'Operational alerts',
+  },
   { key: 'settings', label: 'Settings', href: '/admin/settings/site', hint: 'Site policies' },
 ];
 
@@ -98,7 +118,7 @@ function SidebarSection({
                 'block rounded-2xl border px-4 py-3 transition',
                 active
                   ? 'border-accent bg-white text-tamiym-blue shadow-sm'
-                  : 'border-white/10 bg-white/5 text-white/78 hover:border-white/20 hover:bg-white/8',
+                  : 'border-white/10 bg-white/5 text-white/78 hover:border-white/20 hover:bg-white/8'
               )}
             >
               <div className="flex items-center justify-between gap-3">
@@ -106,7 +126,7 @@ function SidebarSection({
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]',
-                    active ? 'bg-accent text-tamiym-blue' : 'bg-white/10 text-white/65',
+                    active ? 'bg-accent text-tamiym-blue' : 'bg-white/10 text-white/65'
                   )}
                 >
                   {item.hint}
@@ -120,13 +140,7 @@ function SidebarSection({
   );
 }
 
-export function AdminShell({
-  activeNav,
-  title,
-  description,
-  actions,
-  children,
-}: AdminShellProps) {
+export function AdminShell({ activeNav, title, description, actions, children }: AdminShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
@@ -199,9 +213,7 @@ export function AdminShell({
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
                 Admin access
               </p>
-              <h1 className="text-2xl font-semibold text-tamiym-blue">
-                Session check failed
-              </h1>
+              <h1 className="text-2xl font-semibold text-tamiym-blue">Session check failed</h1>
             </div>
             <p className="text-sm text-black/70">{authError}</p>
             <div className="flex gap-3">
@@ -237,11 +249,7 @@ export function AdminShell({
             </Link>
 
             <SidebarSection label="Core work" items={primaryNavItems} activeNav={activeNav} />
-            <SidebarSection
-              label="Later domains"
-              items={secondaryNavItems}
-              activeNav={activeNav}
-            />
+            <SidebarSection label="Later domains" items={secondaryNavItems} activeNav={activeNav} />
           </div>
         </aside>
 
@@ -268,9 +276,7 @@ export function AdminShell({
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
                     Signed in as
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-tamiym-blue">
-                    {formatName(user)}
-                  </p>
+                  <p className="mt-1 text-sm font-semibold text-tamiym-blue">{formatName(user)}</p>
                   <div className="mt-3 flex items-center gap-3">
                     <span className="rounded-full bg-tamiym-blue px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
                       {user?.role}

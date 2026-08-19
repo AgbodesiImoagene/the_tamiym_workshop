@@ -54,7 +54,7 @@ describe('ViewTabs', () => {
         activeViewKey="front"
         designData={emptyDesignData}
         onViewChange={jest.fn()}
-      />,
+      />
     );
 
     expect(screen.getByText('Front')).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('ViewTabs', () => {
         activeViewKey="front"
         designData={emptyDesignData}
         onViewChange={onViewChange}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByText('Back'));
@@ -83,7 +83,7 @@ describe('ViewTabs', () => {
         activeViewKey="front"
         designData={emptyDesignData}
         onViewChange={jest.fn()}
-      />,
+      />
     );
 
     // The back view has 1 layer, so it should show the badge
@@ -98,7 +98,7 @@ describe('ViewTabs', () => {
         activeViewKey="front"
         designData={emptyDesignData}
         onViewChange={jest.fn()}
-      />,
+      />
     );
     expect(container.firstChild).toBeNull();
   });

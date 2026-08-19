@@ -100,6 +100,7 @@ describe('ProductsService', () => {
       },
       productImage: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -149,6 +150,10 @@ describe('ProductsService', () => {
       },
       orderItem: {
         findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      design: {
+        count: jest.fn().mockResolvedValue(0),
       },
       mediaAsset: {
         findUnique: jest.fn(),
@@ -320,7 +325,7 @@ describe('ProductsService', () => {
       const result = await service.findOne('prod-1');
 
       expect(prisma.product.findUnique).toHaveBeenCalledWith({
-        where: { id: 'prod-1' },
+        where: { id: 'prod-1', status: ProductStatus.ACTIVE },
         include: expect.any(Object),
       });
       expect(result.id).toBe('prod-1');
@@ -931,6 +936,9 @@ describe('ProductsService', () => {
       (prisma.productImage.findUnique as jest.Mock).mockResolvedValue({
         id: 'img-1',
         productId: 'prod-1',
+      });
+      (prisma.productImage.findFirst as jest.Mock).mockResolvedValue({
+        id: 'img-1',
       });
       (prisma.productImage.update as jest.Mock).mockResolvedValue({
         id: 'img-1',

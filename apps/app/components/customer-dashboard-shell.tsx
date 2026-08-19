@@ -52,7 +52,13 @@ export function CustomerDashboardShell({
         <aside className="hidden min-h-screen w-[300px] flex-col justify-between bg-black px-[15px] py-12 text-white lg:flex">
           <div className="space-y-10">
             <div className="flex items-center gap-3 px-1">
-              <Image src={customerAssets.profileIcon} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full" />
+              <Image
+                src={customerAssets.profileIcon}
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-full"
+              />
               <p className="text-base font-medium">{displayName}</p>
             </div>
 
@@ -65,7 +71,7 @@ export function CustomerDashboardShell({
                       'flex h-10 w-full items-center gap-2 rounded-b-[10px] border-b px-4 text-left text-base font-medium transition',
                       isActive
                         ? 'border-white bg-white text-[#004385]'
-                        : 'border-white text-white hover:bg-white/10',
+                        : 'border-white text-white hover:bg-white/10'
                     )}
                   >
                     <Icon />
@@ -105,7 +111,13 @@ export function CustomerDashboardShell({
                 className="h-10 w-10 rounded-full border border-white/20 p-0 text-white hover:bg-white/10"
               >
                 <span className="sr-only">Logout</span>
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M10 17 15 12 10 7" />
                   <path d="M15 12H3" />
                   <path d="M20 4v16" />

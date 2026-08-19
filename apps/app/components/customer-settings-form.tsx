@@ -41,13 +41,7 @@ interface AddressFormValues {
   addressLine1: string;
 }
 
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)] lg:p-8">
       <div className="border-b border-black/10 pb-4">
@@ -126,7 +120,8 @@ export function CustomerSettingsForm({
   }, [profileForm, profileQuery.data]);
 
   useEffect(() => {
-    const primary = addressesQuery.data?.find((address) => address.isDefault) ?? addressesQuery.data?.[0];
+    const primary =
+      addressesQuery.data?.find((address) => address.isDefault) ?? addressesQuery.data?.[0];
     if (primary) {
       addressForm.reset({
         country: primary.country ?? 'Nigeria',
@@ -162,7 +157,13 @@ export function CustomerSettingsForm({
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
         <button type="button" className="rounded-full p-1 text-black">
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
@@ -181,7 +182,13 @@ export function CustomerSettingsForm({
           })}
         >
           <div className="flex flex-col items-center gap-4">
-            <Image src={customerAssets.settingsProfilePhoto} alt="Profile" width={220} height={220} className="h-[220px] w-[220px] rounded-full object-cover" />
+            <Image
+              src={customerAssets.settingsProfilePhoto}
+              alt="Profile"
+              width={220}
+              height={220}
+              className="h-[220px] w-[220px] rounded-full object-cover"
+            />
             <button
               type="button"
               className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
@@ -195,7 +202,11 @@ export function CustomerSettingsForm({
               <Label htmlFor="firstName" className="text-[20px] font-bold text-black">
                 First Name
               </Label>
-              <Input id="firstName" placeholder="Enter name" {...profileForm.register('firstName')} />
+              <Input
+                id="firstName"
+                placeholder="Enter name"
+                {...profileForm.register('firstName')}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName" className="text-[20px] font-bold text-black">
@@ -300,7 +311,11 @@ export function CustomerSettingsForm({
               <Label htmlFor="country" className="text-[20px] font-bold text-black">
                 Select Country
               </Label>
-              <Input id="country" placeholder="Enter country" {...addressForm.register('country')} />
+              <Input
+                id="country"
+                placeholder="Enter country"
+                {...addressForm.register('country')}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="state" className="text-[20px] font-bold text-black">
@@ -321,7 +336,11 @@ export function CustomerSettingsForm({
             <Label htmlFor="addressLine1" className="text-[20px] font-bold text-black">
               Street Address
             </Label>
-            <Textarea id="addressLine1" placeholder="Enter address" {...addressForm.register('addressLine1')} />
+            <Textarea
+              id="addressLine1"
+              placeholder="Enter address"
+              {...addressForm.register('addressLine1')}
+            />
           </div>
 
           <SaveButton label="Save" loading={addressMutation.isPending} />

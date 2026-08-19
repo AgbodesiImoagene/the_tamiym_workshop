@@ -63,19 +63,20 @@ Avoid:
 
 Set enforceable thresholds in CI.
 
-Backend (apps/api):
+Backend (`apps/api`):
 
-- Lines: **>= 85%**
-- Branches: **>= 75%**
-- Functions: **>= 85%**
+- Aggregate floors are versioned in `apps/api/coverage-ratchet.json` and enforced by `pnpm coverage:ratchet`.
+- Floors are **non-decreasing**: feature tickets that touch executable API code must raise them when measured coverage improves; never lower without an explicit ticket.
+- Changed executable lines under `apps/api/src` (excluding specs/generated) must meet `pnpm coverage:diff` (default **80%** vs `origin/main`).
+- Long-term aspiration remains high (see historical 85/75/85 targets), but aggregate coverage is a ratchet, not a waiver for ticket-required failure/retry/concurrency tests.
 
-Frontend (apps/\*):
+Frontend (`apps/*`):
 
-- Lines: **>= 60%** (raise later; focus on critical logic first)
+- Lines: **>= 60%** on critical logic once frontend coverage collection is wired (follow-up); not yet a CI fail gate in TTW-002.
 
 Coverage exemptions:
 
-- Generated files
+- Generated files (`apps/api/src/generated/**`, `enums.generated.ts`)
 - Simple DTO definitions (only if purely declarative)
   Exemptions must be explicit (no blanket ignores).
 

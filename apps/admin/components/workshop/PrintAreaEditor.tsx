@@ -37,9 +37,7 @@ export function PrintAreaEditor({
 }: PrintAreaEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [rect, setRect] = useState<Rect>(
-    printArea ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
-  );
+  const [rect, setRect] = useState<Rect>(printArea ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
 
   // Numeric inputs state (string so we can type freely)
   const [xInput, setXInput] = useState(String(Math.round(rect.x * 100)));
@@ -48,14 +46,12 @@ export function PrintAreaEditor({
   const [hInput, setHInput] = useState(String(Math.round(rect.height * 100)));
 
   const [maxLayers, setMaxLayers] = useState<string>(
-    printArea?.maxLayers != null ? String(printArea.maxLayers) : '',
+    printArea?.maxLayers != null ? String(printArea.maxLayers) : ''
   );
   const [maxColors, setMaxColors] = useState<string>(
-    printArea?.maxColors != null ? String(printArea.maxColors) : '',
+    printArea?.maxColors != null ? String(printArea.maxColors) : ''
   );
-  const [rotationAllowed, setRotationAllowed] = useState(
-    printArea?.rotationAllowed ?? false,
-  );
+  const [rotationAllowed, setRotationAllowed] = useState(printArea?.rotationAllowed ?? false);
 
   const syncInputs = (r: Rect) => {
     setXInput(String(Math.round(r.x * 100)));
@@ -116,7 +112,7 @@ export function PrintAreaEditor({
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [rect],
+    [rect]
   );
 
   const applyInputs = () => {
@@ -220,9 +216,7 @@ export function PrintAreaEditor({
           ] as const
         ).map(({ label, value, set }) => (
           <label key={label} className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              {label}
-            </span>
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
             <input
               type="number"
               min={1}
@@ -240,9 +234,7 @@ export function PrintAreaEditor({
       {/* Constraints */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            Max layers
-          </span>
+          <span className="text-xs font-medium text-muted-foreground">Max layers</span>
           <input
             type="number"
             min={1}
@@ -253,9 +245,7 @@ export function PrintAreaEditor({
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            Max colors
-          </span>
+          <span className="text-xs font-medium text-muted-foreground">Max colors</span>
           <input
             type="number"
             min={1}

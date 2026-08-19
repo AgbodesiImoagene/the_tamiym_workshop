@@ -7,11 +7,7 @@ interface OptionPickerProps {
   options: ProductOption[];
   allEffects: TemplateEffect[];
   selectedOptions: Record<string, string>; // optionId → optionValueId
-  onChange: (
-    optionId: string,
-    optionValueId: string,
-    activeEffects: TemplateEffect[],
-  ) => void;
+  onChange: (optionId: string, optionValueId: string, activeEffects: TemplateEffect[]) => void;
 }
 
 /**
@@ -26,9 +22,7 @@ export default function OptionPicker({
 }: OptionPickerProps) {
   if (options.length === 0) return null;
 
-  const resolveEffects = (
-    newSelections: Record<string, string>,
-  ): TemplateEffect[] => {
+  const resolveEffects = (newSelections: Record<string, string>): TemplateEffect[] => {
     const selectedValueIds = new Set(Object.values(newSelections));
     return allEffects.filter((e) => selectedValueIds.has(e.optionValueId));
   };
@@ -72,7 +66,7 @@ export default function OptionPicker({
                         'h-8 w-8 rounded-full border-2 transition-all',
                         isSelected
                           ? 'border-zinc-900 ring-2 ring-zinc-900 ring-offset-1'
-                          : 'border-white shadow',
+                          : 'border-white shadow'
                       )}
                       style={hex ? { backgroundColor: hex } : { backgroundColor: '#e5e7eb' }}
                       aria-pressed={isSelected}
@@ -93,7 +87,7 @@ export default function OptionPicker({
                         'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
                         isSelected
                           ? 'border-zinc-900 bg-zinc-900 text-white'
-                          : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400',
+                          : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400'
                       )}
                       aria-pressed={isSelected}
                     >

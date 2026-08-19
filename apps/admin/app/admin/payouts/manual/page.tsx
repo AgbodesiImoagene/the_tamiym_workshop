@@ -8,7 +8,16 @@ import {
   requestAdminManualAdjustment,
 } from '@/lib/dashboard';
 import { CampaignStatus } from '@tamiym/types';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Textarea } from '@tamiym/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Textarea,
+} from '@tamiym/ui';
 import { useMutation } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -34,8 +43,7 @@ export default function AdminManualPayoutsPage() {
   const campaignOptions = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
 
   const directPayoutMutation = useMutation({
-    mutationFn: () =>
-      initiateAdminCampaignPayout(campaignId, Number(amount), reason || undefined),
+    mutationFn: () => initiateAdminCampaignPayout(campaignId, Number(amount), reason || undefined),
     onSuccess: () => {
       setMessage('Direct campaign payout initiated.');
       setError(null);
@@ -64,8 +72,7 @@ export default function AdminManualPayoutsPage() {
   });
 
   const approveManualMutation = useMutation({
-    mutationFn: () =>
-      approveAdminManualAdjustment(manualPayoutId, approvalReason || undefined),
+    mutationFn: () => approveAdminManualAdjustment(manualPayoutId, approvalReason || undefined),
     onSuccess: () => {
       setMessage('Manual adjustment approved.');
       setError(null);

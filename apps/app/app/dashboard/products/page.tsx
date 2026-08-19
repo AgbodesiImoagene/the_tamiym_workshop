@@ -4,10 +4,7 @@ import { CustomerDashboardShell, formatCurrency } from '@/components/customer-da
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
 import { addCartItem } from '@/lib/cart-store';
-import {
-  getDashboardProductDetail,
-  getDashboardProducts,
-} from '@/lib/products';
+import { getDashboardProductDetail, getDashboardProducts } from '@/lib/products';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -32,7 +29,16 @@ const previewCards = [
   { name: 'Workshop Hoodie', subtitle: 'Preview while catalog is being published' },
 ];
 
-const colorDots = ['#1497c6', '#c25c88', '#ef2557', '#fefefe', '#54b96a', '#4a2aa0', '#c48a28', '#3d3d3d'];
+const colorDots = [
+  '#1497c6',
+  '#c25c88',
+  '#ef2557',
+  '#fefefe',
+  '#54b96a',
+  '#4a2aa0',
+  '#c48a28',
+  '#3d3d3d',
+];
 
 function getCategoryLabel(name?: string | null) {
   if (!name) {
@@ -41,7 +47,7 @@ function getCategoryLabel(name?: string | null) {
 
   const normalized = name.toLowerCase();
   const matched = categoryTabs.find((tab) =>
-    tab === 'All' ? false : normalized.includes(tab.toLowerCase().replace(/s$/, '')),
+    tab === 'All' ? false : normalized.includes(tab.toLowerCase().replace(/s$/, ''))
   );
 
   return matched ?? 'All';
@@ -84,7 +90,9 @@ export default function DashboardProductsPage() {
       return products;
     }
 
-    return products.filter((product) => getCategoryLabel(product.category?.name) === activeCategory);
+    return products.filter(
+      (product) => getCategoryLabel(product.category?.name) === activeCategory
+    );
   }, [activeCategory, productsQuery.data]);
 
   if (error) {
@@ -103,7 +111,9 @@ export default function DashboardProductsPage() {
       <div className="mt-10 space-y-8 lg:mt-0">
         <div className="space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <h1 className="text-[32px] font-bold tracking-[-0.02em] text-[rgba(0,0,0,0.86)]">Product List</h1>
+            <h1 className="text-[32px] font-bold tracking-[-0.02em] text-[rgba(0,0,0,0.86)]">
+              Product List
+            </h1>
             <Link
               href="/dashboard/cart"
               className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-black"
@@ -141,7 +151,9 @@ export default function DashboardProductsPage() {
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product, index) => {
               const price = product.prices[0];
-              const imageUrl = product.productImageRoles[0]?.image?.url ?? fallbackImages[index % fallbackImages.length];
+              const imageUrl =
+                product.productImageRoles[0]?.image?.url ??
+                fallbackImages[index % fallbackImages.length];
 
               return (
                 <article
@@ -176,7 +188,9 @@ export default function DashboardProductsPage() {
                     <div className="space-y-1">
                       <p className="text-base font-bold">{product.name}</p>
                       <p className="text-sm text-black/80">
-                        {price ? `${formatCurrency(price.amount, price.currency)} each` : 'Quote on request'}{' '}
+                        {price
+                          ? `${formatCurrency(price.amount, price.currency)} each`
+                          : 'Quote on request'}{' '}
                         {product.category?.name ? `for ${product.category.name}` : ''}
                       </p>
                       <p className="text-sm text-black/70">{product.description || 'No Minimum'}</p>
@@ -190,11 +204,13 @@ export default function DashboardProductsPage() {
                           try {
                             const detail = await getDashboardProductDetail(product.id);
                             const variant = detail.variants.find(
-                              (entry) => entry.isAvailable && entry.inStock,
+                              (entry) => entry.isAvailable && entry.inStock
                             );
 
                             if (!variant) {
-                              setCartMessage('This product does not have an available variant yet.');
+                              setCartMessage(
+                                'This product does not have an available variant yet.'
+                              );
                               return;
                             }
 
@@ -207,7 +223,7 @@ export default function DashboardProductsPage() {
                                 variant.optionValues
                                   .map(
                                     (entry) =>
-                                      `${entry.option.name}: ${entry.optionValue.displayName}`,
+                                      `${entry.option.name}: ${entry.optionValue.displayName}`
                                   )
                                   .join(' • ') || 'Default option',
                               quantity: 1,
@@ -227,7 +243,7 @@ export default function DashboardProductsPage() {
                           } catch (err) {
                             const apiError = err as ApiError;
                             setCartMessage(
-                              apiError.message || 'We could not add this product to your cart.',
+                              apiError.message || 'We could not add this product to your cart.'
                             );
                           } finally {
                             setAddingProductId(null);
@@ -238,10 +254,7 @@ export default function DashboardProductsPage() {
                       >
                         {addingProductId === product.id ? 'Adding...' : 'Add to cart'}
                       </button>
-                      <Link
-                        href="/dashboard/cart"
-                        className="text-xs font-semibold text-[#004385]"
-                      >
+                      <Link href="/dashboard/cart" className="text-xs font-semibold text-[#004385]">
                         Go to cart
                       </Link>
                     </div>

@@ -19,7 +19,13 @@ import { useEffect, useMemo, useState } from 'react';
 
 function SettingsIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <path d="M12 3v2.2" />
       <path d="M12 18.8V21" />
       <path d="m4.9 4.9 1.5 1.5" />
@@ -35,7 +41,13 @@ function SettingsIcon() {
 
 function OrdersGlyph() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+    >
       <path d="M10 16H5V7h9v9h-1.5" />
       <path d="M14 10h3l2 2.3V16h-2" />
       <circle cx="7.5" cy="17.5" r="1.5" />
@@ -63,13 +75,19 @@ function TimelineIcon({
     <div
       className={cn(
         'flex h-9 w-9 items-center justify-center rounded-full border border-border',
-        completed ? 'bg-accent text-white' : 'bg-white text-black',
+        completed ? 'bg-accent text-white' : 'bg-white text-black'
       )}
     >
       {kind === 'box' ? <GridIcon /> : null}
       {kind === 'truck' ? <TruckIcon /> : null}
       {kind === 'check' ? (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="m5 12 4 4L19 6" />
         </svg>
       ) : null}
@@ -130,7 +148,7 @@ export default function DashboardPage() {
     const deliveredCount = orders.filter((order) => order.status === OrderStatus.DELIVERED).length;
     const pendingCount = orders.filter(
       (order) =>
-        ![OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status),
+        ![OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status)
     ).length;
 
     return {
@@ -165,7 +183,8 @@ export default function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_134px] lg:items-start">
           <div className="space-y-3">
             <h1 className="max-w-[614px] text-[32px] font-semibold leading-[0.95] tracking-[-0.02em] sm:text-[40px] lg:text-[48px]">
-              Welcome To Your Workshop <span className="text-[#1e39d2]">{dashboardData.displayName}!</span>
+              Welcome To Your Workshop{' '}
+              <span className="text-[#1e39d2]">{dashboardData.displayName}!</span>
             </h1>
             <p className="max-w-[614px] text-sm leading-normal sm:text-base">
               Here is everything you need to stay up to date with:
@@ -174,7 +193,9 @@ export default function DashboardPage() {
 
           <div className="w-full max-w-[160px] rounded-[32px] bg-[#1e39d2] px-6 py-5 text-white">
             <TruckIcon />
-            <p className="mt-2 text-[54px] leading-none">{String(dashboardData.orderCount).padStart(2, '0')}</p>
+            <p className="mt-2 text-[54px] leading-none">
+              {String(dashboardData.orderCount).padStart(2, '0')}
+            </p>
             <p className="mt-1 text-sm">Orders Placed</p>
           </div>
         </div>
@@ -210,7 +231,7 @@ export default function DashboardPage() {
                     Latest order value:{' '}
                     {formatCurrency(
                       Number(dashboardData.latestOrder.totalAmount),
-                      dashboardData.latestOrder.currency,
+                      dashboardData.latestOrder.currency
                     )}
                   </p>
                 ) : (
@@ -250,7 +271,9 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-base font-bold">Delivering</p>
                   <p className="text-sm font-medium">
-                    {dashboardData.latestStatusStep >= 2 ? 'Order is on the move' : 'Awaiting dispatch update'}
+                    {dashboardData.latestStatusStep >= 2
+                      ? 'Order is on the move'
+                      : 'Awaiting dispatch update'}
                   </p>
                 </div>
               </div>
@@ -260,7 +283,9 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-base font-bold">Delivered</p>
                   <p className="text-sm font-medium">
-                    {dashboardData.latestStatusStep >= 3 ? 'Latest order delivered' : 'Pending completion'}
+                    {dashboardData.latestStatusStep >= 3
+                      ? 'Latest order delivered'
+                      : 'Pending completion'}
                   </p>
                 </div>
               </div>
@@ -272,7 +297,13 @@ export default function DashboardPage() {
           <Card className="rounded-[24px] border border-black/25 shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:rounded-[32px]">
             <CardContent className="space-y-8 px-6 py-8 lg:py-10">
               <div className="flex items-center justify-between">
-                <Image src={customerAssets.profileIcon} alt="" width={40} height={40} className="h-10 w-10 rounded-full" />
+                <Image
+                  src={customerAssets.profileIcon}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-full"
+                />
                 <Link href="/dashboard/profile" className="text-sm font-medium">
                   edit
                 </Link>
@@ -295,7 +326,9 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-base font-bold">Settings</p>
-                <p className="text-sm font-medium">Update your password and set your delivery location</p>
+                <p className="text-sm font-medium">
+                  Update your password and set your delivery location
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
                     Password

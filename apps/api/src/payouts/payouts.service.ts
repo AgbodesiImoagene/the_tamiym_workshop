@@ -391,7 +391,7 @@ export class PayoutsService {
           select: { status: true },
         });
         const allTerminal = allInRun.every((p) =>
-          terminalStatuses.includes(p.status as PayoutStatus),
+          terminalStatuses.includes(p.status),
         );
         if (allTerminal) {
           await this.prisma.payoutRun.update({

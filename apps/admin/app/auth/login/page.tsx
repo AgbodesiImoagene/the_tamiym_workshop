@@ -59,59 +59,53 @@ export default function AdminLoginPage() {
             Operations access
           </p>
           <CardTitle>Admin sign in</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Sign in to access the admin dashboard
-          </p>
+          <p className="text-sm text-muted-foreground">Sign in to access the admin dashboard</p>
         </CardHeader>
 
         <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
-          <div className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  className="mt-2"
+                  {...register('email')}
+                />
+                {errors.email ? (
+                  <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  className="mt-2"
+                  {...register('password')}
+                />
+                {errors.password ? (
+                  <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
+                ) : null}
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="mt-2"
-                {...register('email')}
-              />
-              {errors.email ? (
-                <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
-              ) : null}
+              <Button type="submit" disabled={isSubmitting} className="w-full">
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className="mt-2"
-                {...register('password')}
-              />
-              {errors.password ? (
-                <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full"
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </div>
-        </form>
+          </form>
         </CardContent>
       </Card>
     </div>

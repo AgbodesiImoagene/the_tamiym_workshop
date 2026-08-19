@@ -4,11 +4,7 @@ import { apiClient } from './api';
 // Types
 // ---------------------------------------------------------------------------
 
-export type ModerationStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'FLAGGED'
-  | 'REJECTED';
+export type ModerationStatus = 'PENDING' | 'APPROVED' | 'FLAGGED' | 'REJECTED';
 
 export interface DesignView {
   id: string;
@@ -160,10 +156,7 @@ export async function createDesign(dto: CreateDesignDto): Promise<Design> {
 }
 
 /** Update an existing design (own only). */
-export async function updateDesign(
-  id: string,
-  dto: UpdateDesignDto,
-): Promise<Design> {
+export async function updateDesign(id: string, dto: UpdateDesignDto): Promise<Design> {
   return apiClient.patch<Design>(`/designs/${id}`, dto);
 }
 
@@ -178,18 +171,14 @@ export async function duplicateDesign(id: string): Promise<Design> {
 }
 
 /** Generate or regenerate a share link for a design. */
-export async function shareDesign(
-  id: string,
-): Promise<{ shareToken: string; shareUrl: string }> {
-  return apiClient.post<{ shareToken: string; shareUrl: string }>(
-    `/designs/${id}/share`,
-  );
+export async function shareDesign(id: string): Promise<{ shareToken: string; shareUrl: string }> {
+  return apiClient.post<{ shareToken: string; shareUrl: string }>(`/designs/${id}/share`);
 }
 
 /** Upload a thumbnail for a design (PNG/WebP, ≤ 2 MB). */
 export async function uploadThumbnail(
   designId: string,
-  blob: Blob,
+  blob: Blob
 ): Promise<{ thumbnailUrl: string }> {
   const formData = new FormData();
   formData.append('thumbnail', blob, 'thumb.webp');
@@ -210,7 +199,7 @@ export async function uploadThumbnail(
 
 /** Upload a user image asset for use in the workshop canvas (PNG/JPEG/WebP, ≤ 10 MB). */
 export async function uploadDesignAsset(
-  file: File,
+  file: File
 ): Promise<{ designAssetId: string; originalUrl: string | null; status: string }> {
   const formData = new FormData();
   formData.append('file', file);

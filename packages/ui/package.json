@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -16,13 +17,18 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@tamiym/config": "workspace:*",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.24",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.3.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.20.0"
   },
   "peerDependencies": {
     "react": "^19.2.4",

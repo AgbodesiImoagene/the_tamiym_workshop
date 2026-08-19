@@ -3,11 +3,7 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
-import {
-  removeCartItem,
-  updateCartItemQuantity,
-  useCart,
-} from '@/lib/cart-store';
+import { removeCartItem, updateCartItemQuantity, useCart } from '@/lib/cart-store';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -68,7 +64,13 @@ export default function DashboardCartPage() {
         {items.length === 0 ? (
           <div className="grid gap-8 rounded-[32px] border border-black/10 bg-white p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] lg:grid-cols-[260px_minmax(0,1fr)] lg:items-center">
             <div className="relative mx-auto h-[220px] w-full max-w-[220px]">
-              <Image src={customerAssets.emptyCartIllustration} alt="" fill className="object-contain" sizes="220px" />
+              <Image
+                src={customerAssets.emptyCartIllustration}
+                alt=""
+                fill
+                className="object-contain"
+                sizes="220px"
+              />
             </div>
             <div className="space-y-4">
               <h2 className="text-2xl font-bold text-black/90">Your cart is empty</h2>
@@ -131,7 +133,9 @@ export default function DashboardCartPage() {
                         >
                           -
                         </button>
-                        <div className="min-w-10 text-center text-sm font-semibold">{item.quantity}</div>
+                        <div className="min-w-10 text-center text-sm font-semibold">
+                          {item.quantity}
+                        </div>
                         <button
                           type="button"
                           onClick={() => updateCartItemQuantity(item.variantId, item.quantity + 1)}
@@ -154,7 +158,9 @@ export default function DashboardCartPage() {
               <div className="space-y-5">
                 <div>
                   <h2 className="text-xl font-bold text-black/90">Order Summary</h2>
-                  <p className="mt-1 text-sm text-black/65">{itemCount} item(s) ready for checkout</p>
+                  <p className="mt-1 text-sm text-black/65">
+                    {itemCount} item(s) ready for checkout
+                  </p>
                 </div>
 
                 <div className="space-y-3 text-sm">

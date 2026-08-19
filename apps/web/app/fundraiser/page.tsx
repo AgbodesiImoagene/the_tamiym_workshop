@@ -62,9 +62,9 @@ export default function FundraiserPage() {
             <p className="mx-auto max-w-5xl text-lg leading-[1.45] text-tamiym-blue">
               Create and sell custom apparel while collecting donations with no upfront costs, no
               inventory, no stress. Simply design your merch, share your story, and launch your
-              campaign. We handle production and fulfillment, so you can focus on making an
-              impact. Perfect for organizations, events, and communities looking to fundraise in a
-              seamless and risk-free way.
+              campaign. We handle production and fulfillment, so you can focus on making an impact.
+              Perfect for organizations, events, and communities looking to fundraise in a seamless
+              and risk-free way.
             </p>
             <a
               href={customerAppPath('/auth/register')}

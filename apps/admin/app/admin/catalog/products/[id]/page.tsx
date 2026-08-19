@@ -36,9 +36,7 @@ function ViewTab({
       onClick={onClick}
       className={[
         'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
-        active
-          ? 'bg-primary text-white shadow-xs'
-          : 'bg-white text-gray-600 hover:bg-gray-100',
+        active ? 'bg-primary text-white shadow-xs' : 'bg-white text-gray-600 hover:bg-gray-100',
       ].join(' ')}
     >
       {view.displayName}
@@ -86,12 +84,12 @@ function ViewWorkshopPanel({
         opacity?: number;
         zIndex?: number;
         displayName?: string;
-      },
+      }
     ) => {
       await updateAdminTemplateLayer(productId, view.id, layerId, dto);
       onRefresh();
     },
-    [productId, view.id, onRefresh],
+    [productId, view.id, onRefresh]
   );
 
   const handleDeleteLayer = useCallback(
@@ -99,7 +97,7 @@ function ViewWorkshopPanel({
       await deleteAdminTemplateLayer(productId, view.id, layerId);
       onRefresh();
     },
-    [productId, view.id, onRefresh],
+    [productId, view.id, onRefresh]
   );
 
   const handleNewLayer = useCallback(
@@ -112,7 +110,7 @@ function ViewWorkshopPanel({
         blendMode: BlendMode;
         opacity: number;
         zIndex: number;
-      },
+      }
     ) => {
       const productImage = await uploadAdminProductImage(productId, file, {
         altText: dto.displayName ?? dto.key,
@@ -124,7 +122,7 @@ function ViewWorkshopPanel({
       });
       onRefresh();
     },
-    [productId, view.id, onRefresh],
+    [productId, view.id, onRefresh]
   );
 
   const handleSavePrintArea = useCallback(
@@ -148,7 +146,7 @@ function ViewWorkshopPanel({
         setSavingPrintArea(false);
       }
     },
-    [productId, view.id, onRefresh],
+    [productId, view.id, onRefresh]
   );
 
   return (
@@ -172,9 +170,7 @@ function ViewWorkshopPanel({
           <CardHeader>
             <CardTitle>
               Template layers{' '}
-              <span className="text-sm font-normal text-muted-foreground">
-                sorted by z-index
-              </span>
+              <span className="text-sm font-normal text-muted-foreground">sorted by z-index</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -210,18 +206,15 @@ function ViewWorkshopPanel({
             <div className="flex items-center justify-between">
               <CardTitle>Print area</CardTitle>
               {printAreaSuccess && (
-                <span className="text-xs font-medium text-green-600">
-                  Saved ✓
-                </span>
+                <span className="text-xs font-medium text-green-600">Saved ✓</span>
               )}
             </div>
           </CardHeader>
           <CardContent>
             {!view.isDesignable ? (
               <p className="text-sm text-muted-foreground">
-                This view is not designable. Set{' '}
-                <strong>isDesignable: true</strong> on the view to configure a
-                print area.
+                This view is not designable. Set <strong>isDesignable: true</strong> on the view to
+                configure a print area.
               </p>
             ) : (
               <PrintAreaEditor
@@ -334,9 +327,7 @@ export default function AdminCatalogProductDetailPage({
       }
     >
       {isLoading ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">
-          Loading product…
-        </p>
+        <p className="py-16 text-center text-sm text-muted-foreground">Loading product…</p>
       ) : isError || !product ? (
         <div className="py-16 text-center">
           <p className="text-sm text-red-600">Failed to load product.</p>
@@ -345,8 +336,8 @@ export default function AdminCatalogProductDetailPage({
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-sm text-muted-foreground">
-              This product has no views configured. Create views via the API
-              before setting up workshop layers.
+              This product has no views configured. Create views via the API before setting up
+              workshop layers.
             </p>
           </CardContent>
         </Card>

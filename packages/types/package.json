@@ -8,11 +8,17 @@
     "generate:enums": "tsx scripts/generate-enums.ts",
     "prebuild": "pnpm generate:enums",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@tamiym/config": "workspace:*",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.20.0"
   }
 }

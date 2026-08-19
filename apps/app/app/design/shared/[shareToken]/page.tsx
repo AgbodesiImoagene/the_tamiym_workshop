@@ -1,15 +1,18 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { SharedWorkshopCanvas } from '@/components/workshop/SharedWorkshopCanvas';
-import { getSharedDesign, getProductWorkshop, type WorkshopView, type DesignData } from '@/lib/designs';
+import {
+  getSharedDesign,
+  getProductWorkshop,
+  type WorkshopView,
+  type DesignData,
+} from '@/lib/designs';
 
 interface SharedDesignPageProps {
   params: Promise<{ shareToken: string }>;
 }
 
-export default async function SharedDesignPage({
-  params,
-}: SharedDesignPageProps) {
+export default async function SharedDesignPage({ params }: SharedDesignPageProps) {
   const { shareToken } = await params;
 
   let design;
@@ -52,9 +55,7 @@ export default async function SharedDesignPage({
 
       {/* Canvas per view */}
       <main className="mx-auto max-w-5xl space-y-10 px-6 py-10">
-        <p className="text-sm text-zinc-500">
-          This is a read-only view of a shared design.
-        </p>
+        <p className="text-sm text-zinc-500">This is a read-only view of a shared design.</p>
 
         <div className="flex flex-wrap gap-8">
           {designableViews.length === 0 ? (
@@ -74,9 +75,7 @@ export default async function SharedDesignPage({
               const viewData = designData?.views?.[view.key];
               return (
                 <div key={view.key}>
-                  <p className="mb-2 text-sm font-medium text-zinc-700">
-                    {view.displayName}
-                  </p>
+                  <p className="mb-2 text-sm font-medium text-zinc-700">{view.displayName}</p>
                   <SharedWorkshopCanvas
                     viewKey={view.key}
                     printArea={view.printArea}

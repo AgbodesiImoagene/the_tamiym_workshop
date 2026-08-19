@@ -7,12 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CustomerDashboardShell } from '@/components/customer-dashboard-shell';
 import { authApi, type ApiError, type User } from '@/lib/auth';
-import {
-  getMyDesigns,
-  deleteDesign,
-  duplicateDesign,
-  type Design,
-} from '@/lib/designs';
+import { getMyDesigns, deleteDesign, duplicateDesign, type Design } from '@/lib/designs';
 import { getDashboardProducts } from '@/lib/products';
 import { Badge, Button } from '@tamiym/ui';
 
@@ -55,14 +50,12 @@ export default function DashboardDesignPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDesign(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['my-designs'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-designs'] }),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (id: string) => duplicateDesign(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['my-designs'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-designs'] }),
   });
 
   if (error) {
@@ -84,12 +77,8 @@ export default function DashboardDesignPage() {
       <div className="space-y-10">
         {/* Hero */}
         <div className="rounded-3xl border border-black/10 bg-gradient-to-br from-blue-50 to-white p-8 shadow-sm">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-            Design Workshop
-          </h1>
-          <p className="mt-2 text-zinc-600">
-            Create, customise, and manage your product designs.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Design Workshop</h1>
+          <p className="mt-2 text-zinc-600">Create, customise, and manage your product designs.</p>
         </div>
 
         {/* My Designs */}
@@ -110,8 +99,7 @@ export default function DashboardDesignPage() {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {designs.map((design) => {
                 const moderation =
-                  MODERATION_BADGE[design.moderationStatus] ??
-                  MODERATION_BADGE.PENDING;
+                  MODERATION_BADGE[design.moderationStatus] ?? MODERATION_BADGE.PENDING;
 
                 return (
                   <article
@@ -137,16 +125,10 @@ export default function DashboardDesignPage() {
                     {/* Meta */}
                     <div className="space-y-2 p-4">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-zinc-900 line-clamp-1">
-                          {design.name}
-                        </p>
-                        <Badge variant={moderation.variant}>
-                          {moderation.label}
-                        </Badge>
+                        <p className="font-semibold text-zinc-900 line-clamp-1">{design.name}</p>
+                        <Badge variant={moderation.variant}>{moderation.label}</Badge>
                       </div>
-                      <p className="text-xs text-zinc-500">
-                        {design.product.name}
-                      </p>
+                      <p className="text-xs text-zinc-500">{design.product.name}</p>
 
                       {/* Actions */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -167,11 +149,7 @@ export default function DashboardDesignPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (
-                              confirm(
-                                `Delete "${design.name}"? This cannot be undone.`,
-                              )
-                            ) {
+                            if (confirm(`Delete "${design.name}"? This cannot be undone.`)) {
                               deleteMutation.mutate(design.id);
                             }
                           }}
@@ -191,9 +169,7 @@ export default function DashboardDesignPage() {
 
         {/* Start from a product */}
         <section>
-          <h2 className="mb-4 text-xl font-bold text-zinc-900">
-            Start from a product
-          </h2>
+          <h2 className="mb-4 text-xl font-bold text-zinc-900">Start from a product</h2>
 
           {productsQuery.isLoading ? (
             <p className="text-sm text-zinc-500">Loading products…</p>
@@ -202,8 +178,7 @@ export default function DashboardDesignPage() {
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {products.slice(0, 6).map((product) => {
-                const imageUrl =
-                  product.productImageRoles[0]?.image?.url ?? null;
+                const imageUrl = product.productImageRoles[0]?.image?.url ?? null;
                 const price = product.prices[0];
 
                 return (
@@ -213,12 +188,7 @@ export default function DashboardDesignPage() {
                   >
                     <div className="relative h-48 bg-zinc-100">
                       {imageUrl ? (
-                        <Image
-                          src={imageUrl}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                        />
+                        <Image src={imageUrl} alt={product.name} fill className="object-cover" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-zinc-400 text-sm">
                           No image
@@ -226,9 +196,7 @@ export default function DashboardDesignPage() {
                       )}
                     </div>
                     <div className="space-y-2 p-4">
-                      <p className="font-semibold text-zinc-900">
-                        {product.name}
-                      </p>
+                      <p className="font-semibold text-zinc-900">{product.name}</p>
                       {price && (
                         <p className="text-xs text-zinc-500">
                           From{' '}
@@ -241,11 +209,7 @@ export default function DashboardDesignPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/design/new/${product.id}`,
-                          )
-                        }
+                        onClick={() => router.push(`/dashboard/design/new/${product.id}`)}
                       >
                         Design this product
                       </Button>

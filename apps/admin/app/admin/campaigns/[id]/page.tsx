@@ -24,7 +24,12 @@ const payoutPolicyOptions = [
   { value: 'AUTO_EXECUTE', label: 'Auto execute' },
 ];
 
-const statusOptions = [CampaignStatus.PAUSED, CampaignStatus.DISABLED, CampaignStatus.ENDED, CampaignStatus.DRAFT];
+const statusOptions = [
+  CampaignStatus.PAUSED,
+  CampaignStatus.DISABLED,
+  CampaignStatus.ENDED,
+  CampaignStatus.DRAFT,
+];
 
 export default function AdminCampaignDetailPage() {
   const params = useParams<{ id: string }>();
@@ -43,7 +48,7 @@ export default function AdminCampaignDetailPage() {
   });
   const campaign = useMemo(
     () => campaignsQuery.data?.find((entry) => entry.id === campaignId),
-    [campaignId, campaignsQuery.data],
+    [campaignId, campaignsQuery.data]
   );
   const snapshotQuery = useQuery({
     queryKey: ['admin-campaign-snapshot', campaignId],
@@ -101,7 +106,7 @@ export default function AdminCampaignDetailPage() {
     mutationFn: () =>
       updateAdminCampaignPayoutPolicy(
         campaignId,
-        selectedPayoutPolicy === 'keep' ? null : selectedPayoutPolicy,
+        selectedPayoutPolicy === 'keep' ? null : selectedPayoutPolicy
       ),
     onSuccess: async () => {
       setMessage('Payout policy updated.');
@@ -167,9 +172,12 @@ export default function AdminCampaignDetailPage() {
                       .filter(Boolean)
                       .join(' ') || 'Unknown organizer'}
                   </p>
-                  <p className="mt-1 text-sm text-black/65">{campaign.organizer?.email ?? 'No email'}</p>
+                  <p className="mt-1 text-sm text-black/65">
+                    {campaign.organizer?.email ?? 'No email'}
+                  </p>
                   <p className="mt-3 text-xs text-black/55">
-                    Last updated context comes from the list endpoint and fundraising analytics snapshot.
+                    Last updated context comes from the list endpoint and fundraising analytics
+                    snapshot.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#f7f9fc] p-4">
@@ -214,7 +222,7 @@ export default function AdminCampaignDetailPage() {
                   <p className="mt-2 text-xl font-semibold text-tamiym-blue">
                     {formatAdminCurrency(
                       Number(snapshotQuery.data?.eligibleBalance ?? 0),
-                      campaign.currency,
+                      campaign.currency
                     )}
                   </p>
                 </div>
