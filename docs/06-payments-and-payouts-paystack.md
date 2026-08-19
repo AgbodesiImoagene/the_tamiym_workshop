@@ -13,6 +13,7 @@
 
 - Checkout creates an `Order` in `PENDING_PAYMENT`.
 - Create Paystack transaction (initiate payment).
+  - TTW-012: reserve a `PENDING` payment row **before** calling Paystack (`providerRef` = attempt reference + `Idempotency-Key`). A partial unique index allows at most one `PENDING`/`INITIATED` attempt per order. **Only the DB-reserve winner** calls Paystack initialize (single-flight). Concurrent losers poll until `INITIATED` and reuse the same `authorizationUrl`, or receive `409` while the winner is still in flight. Expired or stale-`PENDING` attempts become `FAILED` so a new attempt can start. Metrics: `payment_initiation_total{outcome=created|reused|blocked|failure}`.
 - Redirect customer to Paystack or embedded checkout (based on design).
 - Webhook confirms:
   - Mark payment `SUCCEEDED`

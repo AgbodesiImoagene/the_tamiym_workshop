@@ -12,6 +12,15 @@ interface OutcomeMetric {
   outcome: 'success' | 'failure' | 'denied';
 }
 
+export type PaymentInitiationMetricOutcome =
+  | 'success'
+  | 'failure'
+  | 'denied'
+  | 'created'
+  | 'reused'
+  | 'reconciled'
+  | 'blocked';
+
 @Injectable()
 export class ObservabilityService {
   private readonly tracer = trace.getTracer('tamiym-api');
@@ -37,9 +46,10 @@ export class ObservabilityService {
   });
 
   private readonly paymentInitiations = this.meter.createCounter(
-    'payments_initiated_total',
+    'payment_initiation_total',
     {
-      description: 'Payment initiation attempts grouped by outcome.',
+      description:
+        'Payment initiation outcomes (created, reused, reconciled, blocked, failure).',
     },
   );
 
@@ -136,7 +146,9 @@ export class ObservabilityService {
     this.authLogins.add(1, { outcome: metric.outcome });
   }
 
-  recordPaymentInitiation(metric: OutcomeMetric): void {
+  recordPaymentInitiation(metric: {
+    outcome: PaymentInitiationMetricOutcome;
+  }): void {
     this.paymentInitiations.add(1, { outcome: metric.outcome });
   }
 

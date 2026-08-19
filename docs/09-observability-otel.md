@@ -12,7 +12,7 @@ Implemented in `apps/api`:
 - baseline counters and histograms for:
   - HTTP request volume and latency
   - auth login outcomes
-  - payment initiation outcomes
+  - payment initiation outcomes (`payment_initiation_total`: created / reused / reconciled / blocked / failure)
   - refund outcomes
   - payout and payout-run outcomes
   - webhook events

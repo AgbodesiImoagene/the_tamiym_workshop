@@ -1,12 +1,12 @@
 {
   "version": 1,
   "source": "apps/api",
-  "measuredAt": "2026-08-19",
-  "notes": "Raised after TTW-011 payout transfer idempotency.",
+  "measuredAt": "2026-08-20",
+  "notes": "Raised after TTW-012 diff-coverage fix.",
   "floors": {
-    "statements": 46.54,
-    "branches": 41.48,
-    "functions": 44.03,
-    "lines": 46.55
+    "statements": 48.17,
+    "branches": 42.89,
+    "functions": 45.85,
+    "lines": 48.2
   }
 }
