@@ -9,7 +9,7 @@ describe('SavePanel', () => {
         isSaving={false}
         onNameChange={jest.fn()}
         onSave={jest.fn()}
-      />,
+      />
     );
 
     expect(screen.getByDisplayValue('My Design')).toBeInTheDocument();
@@ -18,12 +18,7 @@ describe('SavePanel', () => {
 
   it('shows "Saving…" text and disables the button while saving', () => {
     render(
-      <SavePanel
-        designName="My Design"
-        isSaving
-        onNameChange={jest.fn()}
-        onSave={jest.fn()}
-      />,
+      <SavePanel designName="My Design" isSaving onNameChange={jest.fn()} onSave={jest.fn()} />
     );
 
     expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
@@ -32,12 +27,7 @@ describe('SavePanel', () => {
   it('calls onSave when the save button is clicked', () => {
     const onSave = jest.fn();
     render(
-      <SavePanel
-        designName="My Design"
-        isSaving={false}
-        onNameChange={jest.fn()}
-        onSave={onSave}
-      />,
+      <SavePanel designName="My Design" isSaving={false} onNameChange={jest.fn()} onSave={onSave} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
@@ -52,7 +42,7 @@ describe('SavePanel', () => {
         isSaving={false}
         onNameChange={onNameChange}
         onSave={jest.fn()}
-      />,
+      />
     );
 
     fireEvent.change(screen.getByDisplayValue('My Design'), {
@@ -63,12 +53,7 @@ describe('SavePanel', () => {
 
   it('disables save button when design name is empty', () => {
     render(
-      <SavePanel
-        designName=""
-        isSaving={false}
-        onNameChange={jest.fn()}
-        onSave={jest.fn()}
-      />,
+      <SavePanel designName="" isSaving={false} onNameChange={jest.fn()} onSave={jest.fn()} />
     );
 
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();

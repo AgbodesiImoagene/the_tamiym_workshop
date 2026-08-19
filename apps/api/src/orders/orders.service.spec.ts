@@ -30,26 +30,6 @@ const mockAddress = {
   instructions: null,
 };
 
-const mockVariant = {
-  id: 'var-1',
-  productId: 'prod-1',
-  name: 'S / Red',
-  sku: 'SKU-S-RED',
-  isAvailable: true,
-  inventory: { stockOnHand: 10, reserved: 0, trackInventory: true },
-  prices: [{ amount: 5000, currency: 'NGN' }],
-  optionValues: [
-    {
-      option: { name: 'Size', code: 'size' },
-      optionValue: { displayName: 'S', valueCode: 'S' },
-    },
-    {
-      option: { name: 'Color', code: 'color' },
-      optionValue: { displayName: 'Red', valueCode: 'RED' },
-    },
-  ],
-};
-
 const mockQuote = {
   currency: 'NGN',
   subtotalAmount: 10000,

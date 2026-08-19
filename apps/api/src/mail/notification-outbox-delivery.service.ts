@@ -11,7 +11,10 @@ import { JOB_NOTIFICATION_OUTBOX, MAIL_QUEUE_NAME } from '../constants';
 import { MailService } from './mail.service';
 import { resolveOutboxMail } from './mail-outbox-templates';
 import { SmsService } from './sms.service';
-import { payloadAsRecord } from './notification-outbox-delivery.helpers';
+import {
+  asScalarString,
+  payloadAsRecord,
+} from './notification-outbox-delivery.helpers';
 
 @Injectable()
 export class NotificationOutboxDeliveryService {
@@ -137,13 +140,13 @@ export class NotificationOutboxDeliveryService {
         const p = payloadAsRecord(row.payload);
         await this.smsService.send(
           row.recipient,
-          String(p.text ?? '').slice(0, 480),
+          asScalarString(p.text).slice(0, 480),
         );
         return;
       }
       case NotificationChannel.SLACK: {
         const p = payloadAsRecord(row.payload);
-        const text = String(p.text ?? '');
+        const text = asScalarString(p.text);
 
         // SSRF guard: only call real Slack webhook endpoints
         let slackUrl: URL;
@@ -173,8 +176,10 @@ export class NotificationOutboxDeliveryService {
         }
         return;
       }
-      default:
-        throw new Error(`Unsupported notification channel: ${row.channel}`);
+      default: {
+        const channel = String(row.channel);
+        throw new Error(`Unsupported notification channel: ${channel}`);
+      }
     }
   }
 }

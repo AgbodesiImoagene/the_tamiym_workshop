@@ -22,9 +22,20 @@ This document defines the required local development environment for the monorep
 
 - Package manager: pnpm 9 (Corepack)
 - Task runner/build cache: turborepo
-- Formatting: prettier
-- Linting: eslint
+- Formatting: prettier (read-only check via `pnpm format:check`; mutate with `pnpm format`)
+- Linting: eslint via `pnpm lint` (read-only). Intentional autofixes use `pnpm lint:fix`.
 - Type checking: TypeScript strict mode
+- Coverage: API coverage floors live in `apps/api/coverage-ratchet.json` and are enforced by `pnpm coverage:ratchet`. Changed executable lines under `apps/api/src` must meet `pnpm coverage:diff` (default 80% vs `origin/main`).
+
+### Generated / excluded artefacts
+
+Do not hand-format or lint generated output. Root `.prettierignore` and package ESLint ignores exclude:
+
+- `apps/api/src/generated/**` (Prisma Client)
+- `packages/types/src/enums.generated.ts`
+- `**/next-env.d.ts`, `dist`, `.next`, `coverage`, `.turbo`, lockfiles
+
+Regenerate Prisma Client with `pnpm db:generate` and enums via `pnpm --filter @tamiym/types generate:enums` rather than editing generated files.
 
 ## Local services (Docker Compose)
 
@@ -75,11 +86,16 @@ Minimum API env vars (example names):
 The repo should provide these root-level scripts:
 
 - `pnpm dev` — run all apps/services in dev mode
-- `pnpm lint`
+- `pnpm lint` — read-only ESLint across workspaces
+- `pnpm lint:fix` — intentional ESLint autofix (not a CI verify command)
+- `pnpm format:check` / `pnpm format`
 - `pnpm typecheck`
 - `pnpm test` — unit tests
 - `pnpm test:integration` — integration tests
 - `pnpm test:coverage` — full coverage run
+- `pnpm coverage:ratchet` — fail if API aggregate coverage drops below committed floors
+- `pnpm coverage:diff` — fail if changed API executable lines are under the diff-coverage floor
+- `pnpm verify` — local composite of the release-facing gates
 - `pnpm db:migrate`
 - `pnpm db:seed`
 - `pnpm db:generate` — required before `pnpm typecheck` and `pnpm build` (Prisma Client is gitignored)

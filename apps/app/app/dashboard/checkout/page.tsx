@@ -3,17 +3,8 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { ApiError, User, authApi } from '@/lib/auth';
 import { clearCart, useCart } from '@/lib/cart-store';
-import {
-  createOrder,
-  initiateOrderPayment,
-  quoteOrder,
-  type OrderQuote,
-} from '@/lib/checkout';
-import {
-  getUserAddresses,
-  type ShippingAddress,
-  upsertPrimaryAddress,
-} from '@/lib/profile';
+import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
+import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -79,7 +70,8 @@ export default function DashboardCheckoutPage() {
   });
 
   useEffect(() => {
-    const address = (addressesQuery.data ?? []).find((item) => item.isDefault) ?? addressesQuery.data?.[0];
+    const address =
+      (addressesQuery.data ?? []).find((item) => item.isDefault) ?? addressesQuery.data?.[0];
     if (address) {
       setSavedAddressId(address.id);
       setForm(addressToForm(address));
@@ -92,7 +84,7 @@ export default function DashboardCheckoutPage() {
         variantId: item.variantId,
         quantity: item.quantity,
       })),
-    [items],
+    [items]
   );
 
   async function ensureAddress() {
@@ -199,7 +191,9 @@ export default function DashboardCheckoutPage() {
                   <span>Recipient Name</span>
                   <input
                     value={form.recipientName}
-                    onChange={(event) => setForm((current) => ({ ...current, recipientName: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, recipientName: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter recipient name"
                   />
@@ -209,7 +203,9 @@ export default function DashboardCheckoutPage() {
                   <span>Phone</span>
                   <input
                     value={form.phone}
-                    onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, phone: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="+234..."
                   />
@@ -219,7 +215,9 @@ export default function DashboardCheckoutPage() {
                   <span>Street Address</span>
                   <input
                     value={form.addressLine1}
-                    onChange={(event) => setForm((current) => ({ ...current, addressLine1: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, addressLine1: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter address"
                   />
@@ -229,7 +227,9 @@ export default function DashboardCheckoutPage() {
                   <span>Address Line 2</span>
                   <input
                     value={form.addressLine2}
-                    onChange={(event) => setForm((current) => ({ ...current, addressLine2: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, addressLine2: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Apartment, landmark, or suite"
                   />
@@ -239,7 +239,9 @@ export default function DashboardCheckoutPage() {
                   <span>City</span>
                   <input
                     value={form.city}
-                    onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, city: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter city"
                   />
@@ -249,7 +251,9 @@ export default function DashboardCheckoutPage() {
                   <span>State</span>
                   <input
                     value={form.state}
-                    onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, state: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter state"
                   />
@@ -259,7 +263,9 @@ export default function DashboardCheckoutPage() {
                   <span>Postal Code</span>
                   <input
                     value={form.postalCode}
-                    onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, postalCode: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Optional postal code"
                   />
@@ -269,7 +275,9 @@ export default function DashboardCheckoutPage() {
                   <span>Country</span>
                   <input
                     value={form.country}
-                    onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, country: event.target.value }))
+                    }
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Nigeria"
                   />
@@ -287,7 +295,8 @@ export default function DashboardCheckoutPage() {
                 </button>
                 {addressesQuery.data?.length ? (
                   <p className="text-xs text-black/55">
-                    {addressesQuery.data.length} saved address(es) found. The default address has been loaded.
+                    {addressesQuery.data.length} saved address(es) found. The default address has
+                    been loaded.
                   </p>
                 ) : null}
               </div>
@@ -301,7 +310,10 @@ export default function DashboardCheckoutPage() {
 
               <div className="space-y-4">
                 {items.map((item) => (
-                  <div key={item.variantId} className="flex items-start justify-between gap-4 text-sm">
+                  <div
+                    key={item.variantId}
+                    className="flex items-start justify-between gap-4 text-sm"
+                  >
                     <div>
                       <p className="font-semibold text-black">{item.productName}</p>
                       <p className="text-black/60">
@@ -318,7 +330,9 @@ export default function DashboardCheckoutPage() {
               <div className="space-y-3 border-t border-black/10 pt-4 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-black/70">Items subtotal</span>
-                  <span className="font-semibold text-black">{formatCurrency(subtotal, currency)}</span>
+                  <span className="font-semibold text-black">
+                    {formatCurrency(subtotal, currency)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-black/70">Shipping</span>
@@ -335,7 +349,9 @@ export default function DashboardCheckoutPage() {
                 <div className="flex items-center justify-between border-t border-black/10 pt-3">
                   <span className="font-semibold text-black">Total</span>
                   <span className="text-lg font-bold text-black">
-                    {quote ? formatCurrency(quote.totalAmount, quote.currency) : formatCurrency(subtotal, currency)}
+                    {quote
+                      ? formatCurrency(quote.totalAmount, quote.currency)
+                      : formatCurrency(subtotal, currency)}
                   </span>
                 </div>
               </div>
@@ -353,8 +369,8 @@ export default function DashboardCheckoutPage() {
               </button>
 
               <p className="text-xs leading-5 text-black/55">
-                After you place the order we will redirect you to Paystack to complete payment.
-                You will return to your order confirmation page afterwards.
+                After you place the order we will redirect you to Paystack to complete payment. You
+                will return to your order confirmation page afterwards.
               </p>
             </aside>
           </div>

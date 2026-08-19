@@ -28,9 +28,7 @@ export function LayerCompositePreview({
         className="flex items-center justify-center rounded-xl border-2 border-dashed border-border bg-gray-50"
         style={{ height }}
       >
-        <p className="text-sm text-muted-foreground">
-          No layers uploaded yet
-        </p>
+        <p className="text-sm text-muted-foreground">No layers uploaded yet</p>
       </div>
     );
   }
@@ -48,8 +46,7 @@ export function LayerCompositePreview({
 
         if (!url) return null;
 
-        const blendCss =
-          BLEND_MODE_CSS[layer.blendMode as BlendMode] ?? 'normal';
+        const blendCss = BLEND_MODE_CSS[layer.blendMode as BlendMode] ?? 'normal';
 
         return (
           <img

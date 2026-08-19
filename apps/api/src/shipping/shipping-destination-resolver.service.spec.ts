@@ -15,6 +15,9 @@ describe('ShippingDestinationResolver', () => {
       shippingZoneArea: {
         findFirst: jest.fn(),
       },
+      geoLga: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({

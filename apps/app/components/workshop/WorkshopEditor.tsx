@@ -39,33 +39,21 @@ const AUTOSAVE_DELAY_MS = 3000;
  * - Save (create / update) with thumbnail capture
  * - Auto-save on inactivity
  */
-export default function WorkshopEditor({
-  workshopContext,
-  existingDesign,
-}: WorkshopEditorProps) {
+export default function WorkshopEditor({ workshopContext, existingDesign }: WorkshopEditorProps) {
   const router = useRouter();
   const { product, views } = workshopContext;
   const designableViews = views.filter((v) => v.isDesignable);
 
   // Use the first designable view as the default active view
-  const defaultView =
-    designableViews.find((v) => v.isDefault) ?? designableViews[0];
+  const defaultView = designableViews.find((v) => v.isDefault) ?? designableViews[0];
 
-  const [activeViewKey, setActiveViewKey] = useState(
-    defaultView?.key ?? '',
-  );
-  const [designId, setDesignId] = useState<string | undefined>(
-    existingDesign?.id,
-  );
-  const [designName, setDesignName] = useState(
-    existingDesign?.name ?? 'My Design',
-  );
+  const [activeViewKey, setActiveViewKey] = useState(defaultView?.key ?? '');
+  const [designId, setDesignId] = useState<string | undefined>(existingDesign?.id);
+  const [designName, setDesignName] = useState(existingDesign?.name ?? 'My Design');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activeEffects, setActiveEffects] = useState<TemplateEffect[]>([]);
-  const [selectedOptions, setSelectedOptions] = useState<
-    Record<string, string>
-  >({});
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
   // Initialise designData from existing design or empty
   const [designData, setDesignData] = useState<DesignData>(() => {
@@ -122,19 +110,15 @@ export default function WorkshopEditor({
       }));
       scheduleAutoSave();
     },
-    [scheduleAutoSave],
+    [scheduleAutoSave]
   );
 
   const handleOptionChange = useCallback(
-    (
-      optionId: string,
-      optionValueId: string,
-      newEffects: TemplateEffect[],
-    ) => {
+    (optionId: string, optionValueId: string, newEffects: TemplateEffect[]) => {
       setSelectedOptions((prev) => ({ ...prev, [optionId]: optionValueId }));
       setActiveEffects(newEffects);
     },
-    [],
+    []
   );
 
   const captureThumbnail = useCallback(async (): Promise<Blob | null> => {
@@ -151,7 +135,6 @@ export default function WorkshopEditor({
     }
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSave = useCallback(
     async (withThumbnail = true) => {
       if (isSaving) return;
@@ -196,45 +179,36 @@ export default function WorkshopEditor({
         setIsSaving(false);
       }
     },
-    [isSaving, designId, designName, designData, product.id, router, captureThumbnail],
+    [isSaving, designId, designName, designData, product.id, router, captureThumbnail]
   );
 
-  const handleAddText = useCallback(
-    (textObject: Record<string, unknown>) => {
-      if (!canvasRef.current) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAddText = useCallback((textObject: Record<string, unknown>) => {
+    if (!canvasRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import('fabric').then(({ fabric }: any) => {
-        const itext = new fabric.IText(
-          String(textObject.text ?? 'Text'),
-          textObject,
-        );
-        canvasRef.current.add(itext);
-        canvasRef.current.setActiveObject(itext);
-        canvasRef.current.renderAll();
-      });
-    },
-    [],
-  );
+      const itext = new fabric.IText(String(textObject.text ?? 'Text'), textObject);
+      canvasRef.current.add(itext);
+      canvasRef.current.setActiveObject(itext);
+      canvasRef.current.renderAll();
+    });
+  }, []);
 
-  const handleAddImage = useCallback(
-    (imageObject: Record<string, unknown>) => {
-      if (!canvasRef.current) return;
-      import('fabric').then(({ fabric }) => {
-        fabric.Image.fromURL(
-          String(imageObject.src ?? ''),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (img: any) => {
-            img.set(imageObject);
-            canvasRef.current.add(img);
-            canvasRef.current.setActiveObject(img);
-            canvasRef.current.renderAll();
-          },
-          { crossOrigin: 'anonymous' },
-        );
-      });
-    },
-    [],
-  );
+  const handleAddImage = useCallback((imageObject: Record<string, unknown>) => {
+    if (!canvasRef.current) return;
+    import('fabric').then(({ fabric }) => {
+      fabric.Image.fromURL(
+        String(imageObject.src ?? ''),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (img: any) => {
+          img.set(imageObject);
+          canvasRef.current.add(img);
+          canvasRef.current.setActiveObject(img);
+          canvasRef.current.renderAll();
+        },
+        { crossOrigin: 'anonymous' }
+      );
+    });
+  }, []);
 
   const activeView = designableViews.find((v) => v.key === activeViewKey);
 
@@ -248,9 +222,7 @@ export default function WorkshopEditor({
           </h1>
           <p className="text-xs text-zinc-500">{product.name}</p>
         </div>
-        {saveError && (
-          <p className="text-xs font-medium text-red-600">{saveError}</p>
-        )}
+        {saveError && <p className="text-xs font-medium text-red-600">{saveError}</p>}
       </div>
 
       {/* View tabs */}
@@ -271,14 +243,10 @@ export default function WorkshopEditor({
               printArea={activeView.printArea}
               templateLayers={activeView.templateLayers}
               activeEffects={activeView.effects.filter((e) =>
-                activeEffects.some((ae) => ae.id === e.id),
+                activeEffects.some((ae) => ae.id === e.id)
               )}
-              fabricJson={
-                designData.views[activeViewKey]?.fabricJson ?? null
-              }
-              onLayersChange={(json) =>
-                handleLayersChange(activeViewKey, json)
-              }
+              fabricJson={designData.views[activeViewKey]?.fabricJson ?? null}
+              onLayersChange={(json) => handleLayersChange(activeViewKey, json)}
             />
           )}
         </div>

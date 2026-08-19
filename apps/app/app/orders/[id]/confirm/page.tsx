@@ -2,10 +2,7 @@
 
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { ApiError, User, authApi } from '@/lib/auth';
-import {
-  getCustomerOrderDetail,
-  initiateOrderPayment,
-} from '@/lib/checkout';
+import { getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
 import { OrderStatus, PaymentStatus } from '@tamiym/types';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -72,8 +69,7 @@ export default function OrderConfirmPage() {
     enabled: !!user && typeof params.id === 'string',
     refetchInterval: (query) => {
       const paymentStatus = query.state.data?.paymentStatus;
-      return paymentStatus === PaymentStatus.PENDING ||
-        paymentStatus === PaymentStatus.INITIATED
+      return paymentStatus === PaymentStatus.PENDING || paymentStatus === PaymentStatus.INITIATED
         ? 3000
         : false;
     },
@@ -81,7 +77,7 @@ export default function OrderConfirmPage() {
 
   const statusCopy = useMemo(
     () => getStatusCopy(orderQuery.data?.paymentStatus, orderQuery.data?.status),
-    [orderQuery.data?.paymentStatus, orderQuery.data?.status],
+    [orderQuery.data?.paymentStatus, orderQuery.data?.status]
   );
 
   async function handleRetryPayment() {
@@ -140,19 +136,29 @@ export default function OrderConfirmPage() {
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Order ID</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+                    Order ID
+                  </p>
                   <p className="mt-2 text-sm font-semibold text-black">{orderQuery.data.id}</p>
                 </div>
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Payment</p>
-                  <p className="mt-2 text-sm font-semibold text-black">{orderQuery.data.paymentStatus}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+                    Payment
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-black">
+                    {orderQuery.data.paymentStatus}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Order status</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+                    Order status
+                  </p>
                   <p className="mt-2 text-sm font-semibold text-black">{orderQuery.data.status}</p>
                 </div>
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">Total</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
+                    Total
+                  </p>
                   <p className="mt-2 text-sm font-semibold text-black">
                     {formatCurrency(orderQuery.data.totalAmount, orderQuery.data.currency)}
                   </p>

@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  authApi,
-  ApiError,
-  getGoogleSignInUrl,
-  GOOGLE_SIGN_IN_ERROR_MESSAGES,
-} from '@/lib/auth';
+import { authApi, ApiError, getGoogleSignInUrl, GOOGLE_SIGN_IN_ERROR_MESSAGES } from '@/lib/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -21,21 +16,21 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+function readGoogleSignInErrorFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const code = new URLSearchParams(window.location.search).get('error');
+  if (!code) return null;
+  return GOOGLE_SIGN_IN_ERROR_MESSAGES[code] ?? 'Sign-in failed. Please try again.';
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(readGoogleSignInErrorFromUrl);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('error');
-    if (code) {
-      setError(
-        GOOGLE_SIGN_IN_ERROR_MESSAGES[code] ??
-          'Sign-in failed. Please try again.',
-      );
-      window.history.replaceState(null, '', window.location.pathname);
-    }
+    if (!new URLSearchParams(window.location.search).get('error')) return;
+    window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
   const {
@@ -72,76 +67,69 @@ export default function LoginPage() {
           <CardTitle>Sign in to your account</CardTitle>
           <p className="text-sm text-muted-foreground">
             Or{' '}
-            <Link
-              href="/auth/register"
-              className="font-medium text-primary hover:text-primary-700"
-            >
+            <Link href="/auth/register" className="font-medium text-primary hover:text-primary-700">
               create a new account
             </Link>
           </p>
         </CardHeader>
 
         <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
-          <div className="space-y-3">
-            <a
-              href={getGoogleSignInUrl('/dashboard')}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-border bg-background text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-primary-50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/20"
-            >
-              Continue with Google
-            </a>
-            <div className="relative py-2 text-center text-xs text-muted-foreground">
-              <span className="relative z-10 bg-background px-2">or use email</span>
-              <span className="bg-border absolute top-1/2 right-0 left-0 z-0 h-px -translate-y-1/2" />
+            <div className="space-y-3">
+              <a
+                href={getGoogleSignInUrl('/dashboard')}
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-border bg-background text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-primary-50 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/20"
+              >
+                Continue with Google
+              </a>
+              <div className="relative py-2 text-center text-xs text-muted-foreground">
+                <span className="relative z-10 bg-background px-2">or use email</span>
+                <span className="bg-border absolute top-1/2 right-0 left-0 z-0 h-px -translate-y-1/2" />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  className="mt-2"
+                  {...register('email')}
+                />
+                {errors.email ? (
+                  <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  className="mt-2"
+                  {...register('password')}
+                />
+                {errors.password ? (
+                  <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
+                ) : null}
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="mt-2"
-                {...register('email')}
-              />
-              {errors.email ? (
-                <p className="mt-2 text-sm text-red-700">{errors.email.message}</p>
-              ) : null}
+              <Button type="submit" disabled={isSubmitting} className="w-full">
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className="mt-2"
-                {...register('password')}
-              />
-              {errors.password ? (
-                <p className="mt-2 text-sm text-red-700">{errors.password.message}</p>
-              ) : null}
-            </div>
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full"
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </div>
-        </form>
+          </form>
         </CardContent>
       </Card>
     </div>

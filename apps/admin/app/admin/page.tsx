@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
       (order) =>
         order.paymentStatus !== PaymentStatus.SUCCEEDED ||
         order.status === OrderStatus.PENDING_PAYMENT ||
-        order.status === OrderStatus.CANCELLED,
+        order.status === OrderStatus.CANCELLED
     ) ?? [];
   const campaignsForReview =
     campaignsQuery.data?.filter((campaign) => campaign.status === 'REVIEW') ?? [];
@@ -79,7 +79,7 @@ export default function AdminDashboardPage() {
       (campaign) =>
         campaign.status === 'REVIEW' ||
         campaign.status === CampaignStatus.PAUSED ||
-        campaign.status === CampaignStatus.DISABLED,
+        campaign.status === CampaignStatus.DISABLED
     ) ?? [];
 
   return (
@@ -162,7 +162,7 @@ export default function AdminDashboardPage() {
                 <p className="mt-2 text-2xl font-semibold text-tamiym-blue">
                   {formatAdminCurrency(
                     Number(overviewQuery.data?.totalRevenue ?? 0),
-                    overviewQuery.data?.currency ?? 'NGN',
+                    overviewQuery.data?.currency ?? 'NGN'
                   )}
                 </p>
                 <p className="mt-2 text-sm text-black/60">
@@ -176,7 +176,7 @@ export default function AdminDashboardPage() {
                 <p className="mt-2 text-2xl font-semibold text-tamiym-blue">
                   {formatAdminCurrency(
                     Number(moneyMetricsQuery.data?.eligibleLedgerBalance ?? 0),
-                    moneyMetricsQuery.data?.currency ?? 'NGN',
+                    moneyMetricsQuery.data?.currency ?? 'NGN'
                   )}
                 </p>
                 <p className="mt-2 text-sm text-black/60">
@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
                 <p className="mt-2 text-2xl font-semibold text-tamiym-blue">
                   {formatAdminCurrency(
                     Number(moneyMetricsQuery.data?.totalPaidOut ?? 0),
-                    moneyMetricsQuery.data?.currency ?? 'NGN',
+                    moneyMetricsQuery.data?.currency ?? 'NGN'
                   )}
                 </p>
                 <p className="mt-2 text-sm text-black/60">
@@ -217,7 +217,9 @@ export default function AdminDashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm leading-6 text-white/75">
               <p>The left sidebar is job-oriented, not controller-oriented.</p>
-              <p>Each queue uses list and detail routes so high-risk actions happen with context.</p>
+              <p>
+                Each queue uses list and detail routes so high-risk actions happen with context.
+              </p>
               <p>
                 Catalog, pricing, shipping, moderation, notifications, and settings already exist in
                 the IA, but only first-slice workflows are fully built now.

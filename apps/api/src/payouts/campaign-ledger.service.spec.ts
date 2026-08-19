@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CampaignLedgerService } from './campaign-ledger.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { LedgerEntryType } from '../generated/prisma/enums';
 
 describe('CampaignLedgerService', () => {
   let service: CampaignLedgerService;

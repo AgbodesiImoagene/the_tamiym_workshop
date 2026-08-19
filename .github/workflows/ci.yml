@@ -38,13 +38,30 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Lint
         run: pnpm lint
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Check formatting
         run: pnpm format:check
 
-  test:
-    name: Test
+  unit:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,8 +78,46 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Run unit tests
         run: pnpm test
-      - name: Run API tests with coverage
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
+      - name: Run API coverage
         run: pnpm --filter api test:coverage
+      - name: Enforce coverage ratchet
+        run: pnpm coverage:ratchet
+      - name: Enforce diff coverage
+        run: pnpm coverage:diff
+        env:
+          COVERAGE_DIFF_BASE: origin/${{ github.base_ref || 'main' }}
+      - name: Prove gate fail-closed behaviour
+        run: node scripts/quality/prove-gate-failures.mjs
+      - name: Upload coverage artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: |
+            apps/api/coverage/coverage-final.json
+            apps/api/coverage/lcov.info
+            apps/api/coverage/coverage-summary.json
+            apps/api/coverage/lcov-report
+          if-no-files-found: error
 
   build:
     name: Production Build

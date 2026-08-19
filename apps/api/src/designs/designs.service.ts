@@ -411,6 +411,7 @@ export class DesignsService {
     notes?: string,
     actorUserId?: string,
   ) {
+    void actorUserId;
     const design = await this.prisma.design.findUnique({ where: { id } });
     if (!design) {
       throw new NotFoundException('Design not found');

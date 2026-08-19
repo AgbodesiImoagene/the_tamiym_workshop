@@ -15,12 +15,7 @@ interface SavePanelProps {
  * Panel with a design name input and Save / Auto-save indicator.
  * The parent component owns saving state; this is a pure UI shell.
  */
-export default function SavePanel({
-  designName,
-  isSaving,
-  onNameChange,
-  onSave,
-}: SavePanelProps) {
+export default function SavePanel({ designName, isSaving, onNameChange, onSave }: SavePanelProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-zinc-900">Save Design</h3>
@@ -49,9 +44,7 @@ export default function SavePanel({
         {isSaving ? 'Saving…' : 'Save'}
       </Button>
 
-      {isSaving && (
-        <p className="text-xs text-zinc-400">Auto-saving…</p>
-      )}
+      {isSaving && <p className="text-xs text-zinc-400">Auto-saving…</p>}
     </div>
   );
 }

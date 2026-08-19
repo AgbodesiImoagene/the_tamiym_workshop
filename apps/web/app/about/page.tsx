@@ -31,9 +31,9 @@ export default function AboutPage() {
                 eliminate the barriers to personalized event branding.
               </p>
               <p>
-                Our mission is to empower individuals, organizations, and businesses to bring
-                their events to life with ease, fostering creativity and connection while enabling
-                them to celebrate their passions and milestones in style.
+                Our mission is to empower individuals, organizations, and businesses to bring their
+                events to life with ease, fostering creativity and connection while enabling them to
+                celebrate their passions and milestones in style.
               </p>
             </div>
           </div>

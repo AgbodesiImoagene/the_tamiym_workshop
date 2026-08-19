@@ -47,8 +47,7 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
     return [first, last].filter(Boolean).join(' ') || 'Organizer Name';
   }, [fundraiser.organizer?.firstName, fundraiser.organizer?.lastName]);
 
-  const imageUrl =
-    primaryProduct?.design?.thumbnailUrl || marketingAssets.fundraiserDetailFallback;
+  const imageUrl = primaryProduct?.design?.thumbnailUrl || marketingAssets.fundraiserDetailFallback;
 
   return (
     <div className="space-y-8">
@@ -90,9 +89,13 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
           <div className="space-y-7">
             <div className="space-y-3">
               <p className="text-xs text-black">CampaignProduct</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.02em] text-black">About Campaign</h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.02em] text-black">
+                About Campaign
+              </h2>
               <p className="text-sm leading-[1.5] text-black">
-                {fundraiser.story || fundraiser.description || 'Support this fundraiser by choosing a product and donating toward the campaign goal.'}
+                {fundraiser.story ||
+                  fundraiser.description ||
+                  'Support this fundraiser by choosing a product and donating toward the campaign goal.'}
               </p>
               <span className="inline-flex rounded-lg bg-accent-600 px-3 py-1 text-[10px] font-bold text-white">
                 Tag
@@ -152,7 +155,9 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
                   >
                     -
                   </button>
-                  <div className="flex h-10 min-w-8 items-center justify-center text-sm">{quantity}</div>
+                  <div className="flex h-10 min-w-8 items-center justify-center text-sm">
+                    {quantity}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setQuantity((value) => value + 1)}
@@ -168,7 +173,11 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
                   {fundraiser.performance.currentAmount
                     ? `${Math.max(1, Math.round(fundraiser.performance.currentAmount / 5000))} items sold`
                     : '0 items sold'}{' '}
-                  of {fundraiser.performance.goalAmount ? Math.max(1, Math.round(fundraiser.performance.goalAmount / 5000)) : 50} goal
+                  of{' '}
+                  {fundraiser.performance.goalAmount
+                    ? Math.max(1, Math.round(fundraiser.performance.goalAmount / 5000))
+                    : 50}{' '}
+                  goal
                 </p>
                 <div className="rounded-xl border border-black/15 px-4 py-3 text-sm text-gray-500">
                   Value

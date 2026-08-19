@@ -1,7 +1,7 @@
 # TTW-001 — Align the supported Node runtime
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** In review  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** TTW-002, TTW-003, TTW-004

@@ -5,7 +5,6 @@ import { PrismaService } from './prisma/prisma.service';
 
 describe('AppController', () => {
   let appController: AppController;
-  let prisma: jest.Mocked<PrismaService>;
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -18,7 +17,6 @@ describe('AppController', () => {
     }).compile();
 
     appController = app.get<AppController>(AppController);
-    prisma = app.get(PrismaService);
   });
 
   describe('getHealth', () => {

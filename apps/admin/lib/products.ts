@@ -1,7 +1,6 @@
 import { apiClient } from './api';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
 // ─── Enums (mirror backend) ───────────────────────────────────────────────────
 
@@ -151,7 +150,7 @@ export async function getAdminProductDetail(id: string) {
 
 export async function updateAdminProduct(
   id: string,
-  dto: { name?: string; slug?: string; description?: string; status?: ProductStatus },
+  dto: { name?: string; slug?: string; description?: string; status?: ProductStatus }
 ) {
   return apiClient.patch<AdminProductDetail>(`/admin/products/${id}`, dto);
 }
@@ -162,13 +161,12 @@ export async function updateAdminProduct(
 export async function uploadAdminProductImage(
   productId: string,
   file: File,
-  opts: { altText?: string; sortOrder?: number } = {},
+  opts: { altText?: string; sortOrder?: number } = {}
 ): Promise<ProductImage & { id: string }> {
   const form = new FormData();
   form.append('file', file);
   if (opts.altText) form.append('altText', opts.altText);
-  if (opts.sortOrder !== undefined)
-    form.append('sortOrder', String(opts.sortOrder));
+  if (opts.sortOrder !== undefined) form.append('sortOrder', String(opts.sortOrder));
 
   const url = `${API_BASE_URL}/admin/products/${productId}/images/upload`;
   const res = await fetch(url, {
@@ -184,10 +182,7 @@ export async function uploadAdminProductImage(
   return res.json();
 }
 
-export async function deleteAdminProductImage(
-  productId: string,
-  imageId: string,
-) {
+export async function deleteAdminProductImage(productId: string, imageId: string) {
   return apiClient.delete(`/admin/products/${productId}/images/${imageId}`);
 }
 
@@ -201,29 +196,20 @@ export async function createAdminProductView(
     sortOrder?: number;
     isDesignable?: boolean;
     isDefault?: boolean;
-  },
+  }
 ) {
-  return apiClient.post<ProductView>(
-    `/admin/products/${productId}/views`,
-    dto,
-  );
+  return apiClient.post<ProductView>(`/admin/products/${productId}/views`, dto);
 }
 
 export async function updateAdminProductView(
   productId: string,
   viewId: string,
-  dto: { displayName?: string; sortOrder?: number; isDesignable?: boolean; isDefault?: boolean },
+  dto: { displayName?: string; sortOrder?: number; isDesignable?: boolean; isDefault?: boolean }
 ) {
-  return apiClient.patch<ProductView>(
-    `/admin/products/${productId}/views/${viewId}`,
-    dto,
-  );
+  return apiClient.patch<ProductView>(`/admin/products/${productId}/views/${viewId}`, dto);
 }
 
-export async function deleteAdminProductView(
-  productId: string,
-  viewId: string,
-) {
+export async function deleteAdminProductView(productId: string, viewId: string) {
   return apiClient.delete(`/admin/products/${productId}/views/${viewId}`);
 }
 
@@ -240,12 +226,9 @@ export async function upsertAdminPrintArea(
     rotationAllowed?: boolean;
     maxLayers?: number;
     maxColors?: number;
-  },
+  }
 ) {
-  return apiClient.post<PrintArea>(
-    `/admin/products/${productId}/views/${viewId}/print-area`,
-    dto,
-  );
+  return apiClient.post<PrintArea>(`/admin/products/${productId}/views/${viewId}/print-area`, dto);
 }
 
 // ─── Template Layers ──────────────────────────────────────────────────────────
@@ -262,12 +245,9 @@ export async function createAdminTemplateLayer(
     opacity?: number;
     zIndex?: number;
     meta?: Record<string, unknown>;
-  },
+  }
 ) {
-  return apiClient.post<TemplateLayer>(
-    `/admin/products/${productId}/views/${viewId}/layers`,
-    dto,
-  );
+  return apiClient.post<TemplateLayer>(`/admin/products/${productId}/views/${viewId}/layers`, dto);
 }
 
 export async function updateAdminTemplateLayer(
@@ -281,22 +261,16 @@ export async function updateAdminTemplateLayer(
     blendMode?: BlendMode;
     opacity?: number;
     zIndex?: number;
-  },
+  }
 ) {
   return apiClient.patch<TemplateLayer>(
     `/admin/products/${productId}/views/${viewId}/layers/${layerId}`,
-    dto,
+    dto
   );
 }
 
-export async function deleteAdminTemplateLayer(
-  productId: string,
-  viewId: string,
-  layerId: string,
-) {
-  return apiClient.delete(
-    `/admin/products/${productId}/views/${viewId}/layers/${layerId}`,
-  );
+export async function deleteAdminTemplateLayer(productId: string, viewId: string, layerId: string) {
+  return apiClient.delete(`/admin/products/${productId}/views/${viewId}/layers/${layerId}`);
 }
 
 // ─── CSS blend mode map ───────────────────────────────────────────────────────

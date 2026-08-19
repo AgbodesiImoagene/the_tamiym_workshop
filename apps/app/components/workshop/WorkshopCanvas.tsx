@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import type {
-  FabricJson,
-  PrintArea,
-  TemplateLayer,
-  TemplateEffect,
-} from '@/lib/designs';
+import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricModule = any;
@@ -56,15 +51,13 @@ export default function WorkshopCanvas({
   const buildLayerKey = (layerId: string) => `__template_${layerId}`;
 
   const clearTemplateLayers = useCallback((canvas: FabricCanvas) => {
-    const toRemove = canvas
-      .getObjects()
-      .filter((o: FabricCanvas) => o.data?.isTemplateLayer);
+    const toRemove = canvas.getObjects().filter((o: FabricCanvas) => o.data?.isTemplateLayer);
     toRemove.forEach((o: FabricCanvas) => canvas.remove(o));
   }, []);
 
   const getEffectForLayer = useCallback(
     (layerId: string) => activeEffects.find((e) => e.templateLayerId === layerId) ?? null,
-    [activeEffects],
+    [activeEffects]
   );
 
   const loadTemplateLayers = useCallback(
@@ -110,13 +103,13 @@ export default function WorkshopCanvas({
               canvas.sendToBack(img);
               resolve();
             },
-            { crossOrigin: 'anonymous' },
+            { crossOrigin: 'anonymous' }
           );
         });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [templateLayers, activeEffects, width, height],
+    [templateLayers, activeEffects, width, height]
   );
 
   const loadUserLayers = useCallback(
@@ -124,21 +117,18 @@ export default function WorkshopCanvas({
       if (!json || json.objects.length === 0) return;
 
       await new Promise<void>((resolve) => {
-        canvas.loadFromJSON(
-          { ...json },
-          () => {
-            canvas.getObjects().forEach((o: FabricCanvas) => {
-              if (!o.data?.isTemplateLayer) {
-                o.set({ selectable: !readOnly, evented: !readOnly });
-              }
-            });
-            canvas.renderAll();
-            resolve();
-          },
-        );
+        canvas.loadFromJSON({ ...json }, () => {
+          canvas.getObjects().forEach((o: FabricCanvas) => {
+            if (!o.data?.isTemplateLayer) {
+              o.set({ selectable: !readOnly, evented: !readOnly });
+            }
+          });
+          canvas.renderAll();
+          resolve();
+        });
       });
     },
-    [readOnly],
+    [readOnly]
   );
 
   const buildClipPath = useCallback(
@@ -153,20 +143,18 @@ export default function WorkshopCanvas({
       });
       canvas.clipPath = rect;
     },
-    [printArea, width, height],
+    [printArea, width, height]
   );
 
   const emitChange = useCallback(
     (canvas: FabricCanvas) => {
       if (!onLayersChange) return;
-      const userObjects = canvas
-        .getObjects()
-        .filter((o: FabricCanvas) => !o.data?.isTemplateLayer);
+      const userObjects = canvas.getObjects().filter((o: FabricCanvas) => !o.data?.isTemplateLayer);
 
       const json: FabricJson = {
         ...canvas.toJSON(['designAssetId', 'data']),
-        objects: userObjects.map((o: FabricCanvas) =>
-          o.toJSON(['designAssetId', 'data']) as Record<string, unknown>,
+        objects: userObjects.map(
+          (o: FabricCanvas) => o.toJSON(['designAssetId', 'data']) as Record<string, unknown>
         ),
       };
       const serialised = JSON.stringify(json);
@@ -174,7 +162,7 @@ export default function WorkshopCanvas({
       lastJsonRef.current = serialised;
       onLayersChange(json);
     },
-    [onLayersChange],
+    [onLayersChange]
   );
 
   // Initialise and tear down Fabric canvas
@@ -235,11 +223,7 @@ export default function WorkshopCanvas({
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-      <canvas
-        ref={canvasRef}
-        key={viewKey}
-        style={{ width, height, display: 'block' }}
-      />
+      <canvas ref={canvasRef} key={viewKey} style={{ width, height, display: 'block' }} />
     </div>
   );
 }

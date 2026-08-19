@@ -3,10 +3,9 @@
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
 
-const WorkshopCanvas = dynamic(
-  () => import('@/components/workshop/WorkshopCanvas'),
-  { ssr: false },
-);
+const WorkshopCanvas = dynamic(() => import('@/components/workshop/WorkshopCanvas'), {
+  ssr: false,
+});
 
 export type SharedWorkshopCanvasProps = ComponentProps<typeof WorkshopCanvas>;
 

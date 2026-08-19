@@ -46,16 +46,9 @@ export default function SharePanel({ designId }: SharePanelProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-zinc-900">Share Design</h3>
-      <p className="text-xs text-zinc-500">
-        Generate a read-only link to share this design.
-      </p>
+      <p className="text-xs text-zinc-500">Generate a read-only link to share this design.</p>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleShare}
-        disabled={loading || !designId}
-      >
+      <Button variant="ghost" size="sm" onClick={handleShare} disabled={loading || !designId}>
         {loading ? 'Generating…' : copied ? 'Copied!' : 'Get share link'}
       </Button>
 

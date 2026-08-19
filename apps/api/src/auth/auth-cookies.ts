@@ -6,12 +6,17 @@ import {
   REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
 } from '../constants';
 
-export function authCookieBaseOptions() {
+export function authCookieBaseOptions(): {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'none' | 'lax';
+  path: string;
+} {
   const isProduction = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
   };
 }

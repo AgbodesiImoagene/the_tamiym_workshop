@@ -38,18 +38,12 @@ interface LayerCardProps {
   viewId: string;
   onUpdate: (
     layerId: string,
-    dto: { blendMode?: BlendMode; opacity?: number; zIndex?: number; displayName?: string },
+    dto: { blendMode?: BlendMode; opacity?: number; zIndex?: number; displayName?: string }
   ) => Promise<void>;
   onDelete: (layerId: string) => Promise<void>;
 }
 
-export function LayerCard({
-  layer,
-  productId,
-  viewId,
-  onUpdate,
-  onDelete,
-}: LayerCardProps) {
+export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: LayerCardProps) {
   const [blendMode, setBlendMode] = useState<BlendMode>(layer.blendMode);
   const [opacity, setOpacity] = useState(layer.opacity);
   const [displayName, setDisplayName] = useState(layer.displayName ?? '');
@@ -71,7 +65,12 @@ export function LayerCard({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onUpdate(layer.id, { blendMode, opacity, zIndex, displayName: displayName || undefined });
+      await onUpdate(layer.id, {
+        blendMode,
+        opacity,
+        zIndex,
+        displayName: displayName || undefined,
+      });
     } finally {
       setSaving(false);
     }
@@ -116,17 +115,13 @@ export function LayerCard({
         {/* Controls */}
         <div className="flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColorClass}`}
-            >
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColorClass}`}>
               {LAYER_TYPE_LABELS[layer.layerType]}
             </span>
             <span className="text-xs text-muted-foreground">
               key: <code className="font-mono">{layer.key}</code>
             </span>
-            <span className="ml-auto text-xs text-muted-foreground">
-              z-index:
-            </span>
+            <span className="ml-auto text-xs text-muted-foreground">z-index:</span>
             <input
               type="number"
               value={zIndex}
@@ -147,9 +142,7 @@ export function LayerCard({
           {/* Blend mode + opacity row */}
           <div className="flex flex-wrap gap-3">
             <label className="flex-1 space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                Blend mode
-              </span>
+              <span className="text-xs font-medium text-muted-foreground">Blend mode</span>
               <select
                 value={blendMode}
                 onChange={(e) => setBlendMode(e.target.value as BlendMode)}
@@ -219,16 +212,11 @@ interface NewLayerCardProps {
       blendMode: BlendMode;
       opacity: number;
       zIndex: number;
-    },
+    }
   ) => Promise<void>;
 }
 
-export function NewLayerCard({
-  productId,
-  viewId,
-  existingCount,
-  onUpload,
-}: NewLayerCardProps) {
+export function NewLayerCard({ productId, viewId, existingCount, onUpload }: NewLayerCardProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -246,7 +234,12 @@ export function NewLayerCard({
     setFile(f);
     setPreview(URL.createObjectURL(f));
     if (!key) {
-      setKey(f.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').toLowerCase());
+      setKey(
+        f.name
+          .replace(/\.[^.]+$/, '')
+          .replace(/[^a-z0-9_-]/gi, '_')
+          .toLowerCase()
+      );
     }
   };
 
@@ -285,9 +278,7 @@ export function NewLayerCard({
 
   return (
     <div className="rounded-xl border-2 border-dashed border-border bg-gray-50 p-4">
-      <p className="mb-3 text-sm font-semibold text-foreground">
-        Add layer
-      </p>
+      <p className="mb-3 text-sm font-semibold text-foreground">Add layer</p>
 
       {/* File drop zone */}
       <div
@@ -295,11 +286,7 @@ export function NewLayerCard({
         onClick={() => fileRef.current?.click()}
       >
         {preview ? (
-          <img
-            src={preview}
-            alt="Layer preview"
-            className="h-28 w-auto object-contain"
-          />
+          <img src={preview} alt="Layer preview" className="h-28 w-auto object-contain" />
         ) : (
           <>
             <svg
@@ -315,9 +302,7 @@ export function NewLayerCard({
                 d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
               />
             </svg>
-            <p className="text-sm text-muted-foreground">
-              Click to upload PNG / WebP
-            </p>
+            <p className="text-sm text-muted-foreground">Click to upload PNG / WebP</p>
           </>
         )}
       </div>
@@ -388,9 +373,7 @@ export function NewLayerCard({
         </label>
       </div>
 
-      {error && (
-        <p className="mt-2 text-xs text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
 
       <Button
         className="mt-3 w-full"

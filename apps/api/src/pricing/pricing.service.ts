@@ -312,7 +312,7 @@ export class PricingService {
       }
       unitBasePrice = Number(cpPrice.amount);
       // Organizer cost: base from product/variant + view surcharges (for payout math)
-      const orgBase = await this.resolveBaseUnitPrice(variant, currency);
+      const orgBase = this.resolveBaseUnitPrice(variant);
       const viewSurchargeForOrg = await this.computeViewSurchargeForDesign(
         variant.id,
         variant.productId,
@@ -324,7 +324,7 @@ export class PricingService {
         currency,
       );
     } else {
-      unitBasePrice = await this.resolveBaseUnitPrice(variant, currency);
+      unitBasePrice = this.resolveBaseUnitPrice(variant);
     }
 
     if (unitBasePrice <= 0) {
@@ -336,7 +336,7 @@ export class PricingService {
     const optionUpcharge = this.sumOptionValueUpcharges(variant, currency);
     let bulkAdjustment = 0;
     if (mode === 'standard') {
-      const bulkTier = this.getBulkTier(variant, item.quantity, currency);
+      const bulkTier = this.getBulkTier(variant, item.quantity);
       if (bulkTier) {
         const tierPrice = Number(bulkTier.pricePerUnit);
         bulkAdjustment = roundToMinor(tierPrice - unitBasePrice, currency);
@@ -428,13 +428,10 @@ export class PricingService {
     };
   }
 
-  private async resolveBaseUnitPrice(
-    variant: {
-      prices: { amount: unknown }[];
-      product: { prices: { amount: unknown }[] };
-    },
-    currency: string,
-  ): Promise<number> {
+  private resolveBaseUnitPrice(variant: {
+    prices: { amount: unknown }[];
+    product: { prices: { amount: unknown }[] };
+  }): number {
     const vp = variant.prices[0];
     if (vp) return Number(vp.amount);
     const pp = variant.product.prices[0];
@@ -472,7 +469,6 @@ export class PricingService {
       }[];
     },
     quantity: number,
-    _currency: string,
   ): { pricePerUnit: unknown } | null {
     const tiers = variant.bulkPricing.length
       ? variant.bulkPricing
@@ -551,7 +547,7 @@ export class PricingService {
     if (variants.length === 0) return 0;
     let maxBasis = 0;
     for (const variant of variants) {
-      const base = await this.resolveBaseUnitPrice(variant, currency);
+      const base = this.resolveBaseUnitPrice(variant);
       const surcharge = await this.computeViewSurchargeForDesign(
         variant.id,
         productId,

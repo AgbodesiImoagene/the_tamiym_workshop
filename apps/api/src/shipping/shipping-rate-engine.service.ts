@@ -17,7 +17,8 @@ export class ShippingRateEngine {
     const providers = [this.internalZoneRateProvider];
 
     for (const provider of providers) {
-      if (!(await provider.supports(request))) {
+      const supported = await Promise.resolve(provider.supports(request));
+      if (!supported) {
         continue;
       }
       const quote = await provider.quote(request);

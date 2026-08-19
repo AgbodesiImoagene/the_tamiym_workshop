@@ -11,11 +11,7 @@ import { useMemo, Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 const orderStatusOptions = ['ALL', ...Object.values(OrderStatus)];
-const paymentOptions = [
-  'ALL',
-  'attention',
-  ...Object.values(PaymentStatus),
-];
+const paymentOptions = ['ALL', 'attention', ...Object.values(PaymentStatus)];
 
 function AdminOrdersPageContent() {
   const router = useRouter();
@@ -41,12 +37,7 @@ function AdminOrdersPageContent() {
             ? order.paymentStatus !== PaymentStatus.SUCCEEDED
             : order.paymentStatus === payment;
       const matchesQuery = normalizedQuery
-        ? [
-            order.id,
-            order.user.email,
-            order.user.firstName ?? '',
-            order.user.lastName ?? '',
-          ]
+        ? [order.id, order.user.email, order.user.firstName ?? '', order.user.lastName ?? '']
             .join(' ')
             .toLowerCase()
             .includes(normalizedQuery)

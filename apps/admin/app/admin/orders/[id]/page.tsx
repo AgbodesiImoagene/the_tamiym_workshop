@@ -2,13 +2,18 @@
 
 import { AdminShell, formatAdminCurrency, formatAdminDate } from '@/components/admin-shell';
 import { AdminStatusBadge } from '@/components/admin-status-badge';
-import {
-  createAdminRefund,
-  getAdminOrder,
-  updateAdminOrderStatus,
-} from '@/lib/dashboard';
+import { createAdminRefund, getAdminOrder, updateAdminOrderStatus } from '@/lib/dashboard';
 import { OrderStatus } from '@tamiym/types';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Textarea } from '@tamiym/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Textarea,
+} from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -140,7 +145,9 @@ export default function AdminOrderDetailPage() {
                         {order.shippingAddress.recipientName || 'No recipient name'}
                       </p>
                       <p>{order.shippingAddress.addressLine1}</p>
-                      {order.shippingAddress.addressLine2 ? <p>{order.shippingAddress.addressLine2}</p> : null}
+                      {order.shippingAddress.addressLine2 ? (
+                        <p>{order.shippingAddress.addressLine2}</p>
+                      ) : null}
                       <p>
                         {order.shippingAddress.city}, {order.shippingAddress.state}
                       </p>
@@ -159,10 +166,7 @@ export default function AdminOrderDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-black/8 bg-[#f7f9fc] p-4"
-                  >
+                  <div key={item.id} className="rounded-2xl border border-black/8 bg-[#f7f9fc] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-tamiym-blue">

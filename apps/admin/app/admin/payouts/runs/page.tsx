@@ -2,18 +2,22 @@
 
 import { AdminShell, formatAdminCurrency, formatAdminDate } from '@/components/admin-shell';
 import { AdminStatusBadge } from '@/components/admin-status-badge';
-import {
-  createAdminPayoutRun,
-  getAdminPayoutRuns,
-  previewAdminPayoutRun,
-} from '@/lib/dashboard';
+import { createAdminPayoutRun, getAdminPayoutRuns, previewAdminPayoutRun } from '@/lib/dashboard';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
 
-const runStatuses = ['ALL', 'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXECUTING', 'COMPLETED', 'CANCELLED'];
+const runStatuses = [
+  'ALL',
+  'DRAFT',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'EXECUTING',
+  'COMPLETED',
+  'CANCELLED',
+];
 const payoutModes = ['MANUAL', 'AUTO_APPROVAL_REQUIRED', 'AUTO_EXECUTE'];
 
 function toDateTimeLocal(value: Date) {
@@ -222,7 +226,9 @@ function AdminPayoutRunsPageContent() {
               {previewQuery.isLoading ? (
                 <p className="text-sm text-black/55">Loading payout preview...</p>
               ) : previewQuery.isError ? (
-                <p className="text-sm text-red-700">We could not load the payout preview right now.</p>
+                <p className="text-sm text-red-700">
+                  We could not load the payout preview right now.
+                </p>
               ) : previewQuery.data ? (
                 <>
                   <div className="rounded-2xl bg-[#f7f9fc] p-4">
@@ -232,7 +238,7 @@ function AdminPayoutRunsPageContent() {
                     <p className="mt-2 text-2xl font-semibold text-tamiym-blue">
                       {formatAdminCurrency(
                         Number(previewQuery.data.totalAmount ?? 0),
-                        previewQuery.data.items[0]?.currency ?? 'NGN',
+                        previewQuery.data.items[0]?.currency ?? 'NGN'
                       )}
                     </p>
                     <p className="mt-2 text-xs text-black/55">

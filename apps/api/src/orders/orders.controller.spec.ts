@@ -105,7 +105,7 @@ describe('OrdersController', () => {
       expect(paymentsService.initiatePayment).toHaveBeenCalledWith(
         'order-1',
         'user-1',
-        '',
+        undefined,
       );
       expect(result.authorizationUrl).toBe('https://checkout.paystack.com/xxx');
     });

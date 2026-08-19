@@ -11,6 +11,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MAIL_QUEUE_NAME } from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
 
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+  hash: jest.fn(),
+}));
+
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: {
@@ -91,10 +96,13 @@ describe('AuthService', () => {
     prisma = module.get(PrismaService);
 
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
   });
 
   afterEach(() => {
+    jest.clearAllMocks();
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
   });
 
   it('should be defined', () => {

@@ -76,14 +76,21 @@ export default function DashboardOrdersPage() {
     >
       <div className="mt-10 space-y-8 lg:mt-0">
         <div className="space-y-5">
-          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-[rgba(0,0,0,0.86)]">Orders</h1>
+          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-[rgba(0,0,0,0.86)]">
+            Orders
+          </h1>
 
           <div className="border-b border-black/10">
             <div className="grid grid-cols-2 text-center text-base font-medium">
-              <Link href="/dashboard/design" className="border-b-[4px] border-transparent pb-3 pt-1 text-black">
+              <Link
+                href="/dashboard/design"
+                className="border-b-[4px] border-transparent pb-3 pt-1 text-black"
+              >
                 My Designs
               </Link>
-              <span className="border-b-[4px] border-[#1e39d2] pb-3 pt-1 text-[#1e39d2]">Order History</span>
+              <span className="border-b-[4px] border-[#1e39d2] pb-3 pt-1 text-[#1e39d2]">
+                Order History
+              </span>
             </div>
           </div>
         </div>

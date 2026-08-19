@@ -41,7 +41,7 @@ export function AdminStatusBadge({ value }: AdminStatusBadgeProps) {
     <Badge
       className={cn(
         'border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]',
-        toneMap[normalized] || 'border-slate-200 bg-slate-100 text-slate-700',
+        toneMap[normalized] || 'border-slate-200 bg-slate-100 text-slate-700'
       )}
     >
       {normalized.replaceAll('_', ' ')}

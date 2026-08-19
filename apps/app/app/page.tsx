@@ -8,11 +8,13 @@ const surfaces = [
   },
   {
     title: 'Order visibility',
-    description: 'Track payment state, fulfillment progress, and recent activity from one dashboard.',
+    description:
+      'Track payment state, fulfillment progress, and recent activity from one dashboard.',
   },
   {
     title: 'Fundraising support',
-    description: 'Manage organizer campaigns and monitor their performance from your customer workspace.',
+    description:
+      'Manage organizer campaigns and monitor their performance from your customer workspace.',
   },
 ];
 

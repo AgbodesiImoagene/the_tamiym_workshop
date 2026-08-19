@@ -35,10 +35,7 @@ export interface CustomerOrderDetail extends CustomerOrder {
   } | null;
 }
 
-export async function quoteOrder(input: {
-  shippingAddressId: string;
-  items: QuoteLineItem[];
-}) {
+export async function quoteOrder(input: { shippingAddressId: string; items: QuoteLineItem[] }) {
   return apiClient.post<OrderQuote>('/orders/quote', input);
 }
 
@@ -50,10 +47,7 @@ export async function createOrder(input: {
   return apiClient.post<CustomerOrderDetail>('/orders', input);
 }
 
-export async function initiateOrderPayment(
-  orderId: string,
-  customerEmail?: string,
-) {
+export async function initiateOrderPayment(orderId: string, customerEmail?: string) {
   return apiClient.post<{
     authorizationUrl: string;
     reference: string;

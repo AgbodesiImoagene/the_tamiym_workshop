@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DesignsService } from './designs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
@@ -63,6 +64,9 @@ describe('DesignsService', () => {
       product: {
         findUnique: jest.fn(),
       },
+      productView: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const mockModeration = {
@@ -88,6 +92,16 @@ describe('DesignsService', () => {
           provide: AdminNotifyService,
           useValue: { emit: jest.fn().mockResolvedValue(undefined) },
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === 'S3_PUBLIC_URL') return 'https://cdn.example.com';
+              if (key === 'S3_BUCKET') return 'test-bucket';
+              return undefined;
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -109,8 +123,12 @@ describe('DesignsService', () => {
     it('creates a design, runs AI moderation when thumbnail provided, stores result', async () => {
       (prisma.product.findUnique as jest.Mock).mockResolvedValue({
         id: 'prod-1',
+        status: 'ACTIVE',
       });
       (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
 
       const dto: CreateDesignDto = {
         name: 'My Design',
@@ -140,8 +158,12 @@ describe('DesignsService', () => {
     it('falls back to PENDING when no text layers and no thumbnail', async () => {
       (prisma.product.findUnique as jest.Mock).mockResolvedValue({
         id: 'prod-1',
+        status: 'ACTIVE',
       });
       (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
 
       await service.create('user-1', {
         name: 'My Design',
@@ -183,8 +205,15 @@ describe('DesignsService', () => {
     it('stores text extracted from design layers for moderation', async () => {
       (prisma.product.findUnique as jest.Mock).mockResolvedValue({
         id: 'prod-1',
+        status: 'ACTIVE',
       });
       (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+      (prisma.productView.findMany as jest.Mock).mockResolvedValue([
+        { id: 'pv-1' },
+      ]);
 
       const designData = {
         version: 1,
@@ -276,8 +305,14 @@ describe('DesignsService', () => {
     });
 
     it('re-runs moderation when designData with text layers changes', async () => {
-      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        productId: 'prod-1',
+      });
       (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.productView.findMany as jest.Mock).mockResolvedValue([
+        { id: 'pv-1' },
+      ]);
 
       const dto: UpdateDesignDto = {
         designData: {
@@ -383,6 +418,14 @@ describe('DesignsService', () => {
 
   describe('upsertDesignViews', () => {
     it('upserts a DesignView row for each view with a productViewId', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+      (prisma.productView.findMany as jest.Mock).mockResolvedValue([
+        { id: 'pv-1' },
+        { id: 'pv-2' },
+      ]);
+
       const designData = {
         version: 1,
         views: {

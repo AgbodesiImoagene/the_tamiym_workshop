@@ -28,6 +28,9 @@ describe('CategoriesService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      product: {
+        count: jest.fn().mockResolvedValue(0),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
