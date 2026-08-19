@@ -1,12 +1,12 @@
 {
   "version": 1,
   "source": "apps/api",
-  "measuredAt": "2026-08-19",
-  "notes": "Raised after TTW-012 payment initiation serialization.",
+  "measuredAt": "2026-08-20",
+  "notes": "Raised after TTW-012 diff-coverage fix.",
   "floors": {
-    "statements": 47.6,
-    "branches": 42.22,
-    "functions": 45.39,
-    "lines": 47.64
+    "statements": 48.17,
+    "branches": 42.89,
+    "functions": 45.85,
+    "lines": 48.2
   }
 }

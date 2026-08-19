@@ -93,10 +93,132 @@ describe('PaymentsService (TTW-012)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('rejects non-owner', async () => {
+  it('rejects non-PENDING_PAYMENT orders', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      status: OrderStatus.PAID,
+    });
     await expect(
-      service.initiatePayment('ord_1', 'other', undefined),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects zero-amount orders', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      totalAmount: 0,
+    });
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects when no customer email is available', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      user: { email: null },
+    });
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns 409 when persistInitiated matches zero rows', async () => {
+    prisma.payment.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.recordPaymentInitiation).toHaveBeenCalledWith({
+      outcome: 'blocked',
+    });
+  });
+
+  it('rethrows unexpected create errors', async () => {
+    prisma.payment.create.mockRejectedValue(new Error('db down'));
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toThrow('db down');
+  });
+
+  it('expires an active attempt discovered during the PENDING poll', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'pay_pending',
+        status: PaymentStatus.PENDING,
+        providerRef: 'ref_pending',
+        authorizationUrl: null,
+        accessCode: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        id: 'pay_pending',
+        status: PaymentStatus.PENDING,
+        providerRef: 'ref_pending',
+        authorizationUrl: null,
+        accessCode: null,
+        expiresAt: new Date(Date.now() - 1_000),
+        createdAt: new Date(Date.now() - 120_000),
+      })
+      .mockResolvedValueOnce(null);
+
+    const result = await service.initiatePayment('ord_1', 'user_1', undefined);
+    expect(result.attemptOutcome).toBe('created');
+  });
+
+  it('fails a PENDING attempt that goes stale during the poll', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'pay_pending',
+        status: PaymentStatus.PENDING,
+        providerRef: 'ref_pending',
+        authorizationUrl: null,
+        accessCode: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        id: 'pay_pending',
+        status: PaymentStatus.PENDING,
+        providerRef: 'ref_pending',
+        authorizationUrl: null,
+        accessCode: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        createdAt: new Date(Date.now() - 50_000),
+      })
+      .mockResolvedValueOnce(null);
+
+    const result = await service.initiatePayment('ord_1', 'user_1', undefined);
+    expect(result.attemptOutcome).toBe('created');
+  });
+
+  it('returns 409 when the active PENDING disappears during poll', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'pay_pending',
+        status: PaymentStatus.PENDING,
+        providerRef: 'ref_pending',
+        authorizationUrl: null,
+        accessCode: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    // After poll sees null, resolve returns null and create path runs.
+    const result = await service.initiatePayment('ord_1', 'user_1', undefined);
+    expect(result.attemptOutcome).toBe('created');
+  });
+
+  it('maps unexpected initialize errors to 409 without failing the attempt', async () => {
+    paystack.initialize.mockRejectedValue('weird');
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(observability.recordPaymentInitiation).toHaveBeenCalledWith({
+      outcome: 'blocked',
+    });
   });
 
   it('creates a new attempt and calls the provider once', async () => {
