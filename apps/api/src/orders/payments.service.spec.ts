@@ -93,6 +93,12 @@ describe('PaymentsService (TTW-012)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('rejects non-owner', async () => {
+    await expect(
+      service.initiatePayment('ord_1', 'other', undefined),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rejects non-PENDING_PAYMENT orders', async () => {
     prisma.order.findUnique.mockResolvedValue({
       ...order,

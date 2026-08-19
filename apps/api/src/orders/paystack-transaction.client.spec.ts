@@ -37,14 +37,15 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({
-        status: true,
-        data: {
-          authorization_url: 'https://checkout.paystack.com/x',
-          reference: 'ord_ref_1',
-          access_code: 'ac_1',
-        },
-      }),
+      json: () =>
+        Promise.resolve({
+          status: true,
+          data: {
+            authorization_url: 'https://checkout.paystack.com/x',
+            reference: 'ord_ref_1',
+            access_code: 'ac_1',
+          },
+        }),
     } as Response);
 
     await expect(client.initialize(params)).resolves.toEqual({
@@ -85,7 +86,7 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,
       status: 503,
-      json: async () => ({ message: 'upstream down' }),
+      json: () => Promise.resolve({ message: 'upstream down' }),
     } as Response);
 
     await expect(client.initialize(params)).rejects.toMatchObject({
@@ -99,9 +100,7 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,
       status: 502,
-      json: async () => {
-        throw new Error('not json');
-      },
+      json: () => Promise.reject(new Error('not json')),
     } as unknown as Response);
 
     await expect(client.initialize(params)).rejects.toMatchObject({
@@ -114,7 +113,7 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => ({ message: 'Invalid email' }),
+      json: () => Promise.resolve({ message: 'Invalid email' }),
     } as Response);
 
     await expect(client.initialize(params)).rejects.toBeInstanceOf(
@@ -127,9 +126,7 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => {
-        throw new Error('not json');
-      },
+      json: () => Promise.reject(new Error('not json')),
     } as unknown as Response);
 
     await expect(client.initialize(params)).rejects.toMatchObject({
@@ -142,10 +139,11 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({
-        status: false,
-        message: 'Invalid response from payment provider',
-      }),
+      json: () =>
+        Promise.resolve({
+          status: false,
+          message: 'Invalid response from payment provider',
+        }),
     } as Response);
 
     await expect(client.initialize(params)).rejects.toBeInstanceOf(
@@ -158,7 +156,7 @@ describe('PaystackTransactionClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ status: true, data: {} }),
+      json: () => Promise.resolve({ status: true, data: {} }),
     } as Response);
 
     await expect(client.initialize(params)).rejects.toMatchObject({
