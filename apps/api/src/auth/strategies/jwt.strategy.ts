@@ -11,6 +11,7 @@ import {
   resolveSurfaceFromOrigin,
 } from '../auth-surface';
 import { surfaceCookieNames } from '../auth-cookies';
+import { AccountPolicyService } from '../account-policy.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -67,6 +68,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    private accountPolicy: AccountPolicyService,
   ) {
     super({
       passReqToCallback: true,
@@ -98,10 +100,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         firstName: true,
         lastName: true,
         phone: true,
+        emailVerifiedAt: true,
       },
     });
 
-    if (!user || user.status === UserStatus.DELETED) {
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
       throw new UnauthorizedException('User not found');
     }
 
@@ -133,6 +140,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    return { ...user, surface: payload.surface };
+    const { emailVerifiedAt: _verified, ...safeUser } = user;
+    void _verified;
+    return { ...safeUser, surface: payload.surface };
   }
 }

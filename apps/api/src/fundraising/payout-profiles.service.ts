@@ -7,10 +7,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePayoutProfileDto } from './dto/create-payout-profile.dto';
 import { UpdatePayoutProfileDto } from './dto/update-payout-profile.dto';
+import { AccountPolicyService } from '../auth/account-policy.service';
 
 @Injectable()
 export class PayoutProfilesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private accountPolicy: AccountPolicyService,
+  ) {}
 
   async findAllForUser(userId: string) {
     return this.prisma.userPayoutProfile.findMany({
@@ -29,7 +33,19 @@ export class PayoutProfilesService {
     return profile;
   }
 
+  private async assertVerifiedForMutate(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerifiedAt: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('Access denied');
+    }
+    this.accountPolicy.assertVerifiedForAction(user, 'MUTATE_PAYOUT_PROFILE');
+  }
+
   async create(userId: string, dto: CreatePayoutProfileDto) {
+    await this.assertVerifiedForMutate(userId);
     const isFirst = await this.prisma.userPayoutProfile.count({
       where: { userId },
     });
@@ -47,6 +63,7 @@ export class PayoutProfilesService {
   }
 
   async update(userId: string, id: string, dto: UpdatePayoutProfileDto) {
+    await this.assertVerifiedForMutate(userId);
     await this.findOne(userId, id);
     if (dto.isDefault === true) {
       await this.prisma.userPayoutProfile.updateMany({
@@ -64,6 +81,7 @@ export class PayoutProfilesService {
   }
 
   async remove(userId: string, id: string) {
+    await this.assertVerifiedForMutate(userId);
     const profile = await this.findOne(userId, id);
 
     // Block deletion if any campaign is pointing directly at this profile.

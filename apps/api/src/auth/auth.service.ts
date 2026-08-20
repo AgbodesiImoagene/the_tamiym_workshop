@@ -32,6 +32,7 @@ import {
   REFRESH_TOKEN_TTL_MS,
 } from '../constants';
 import { ObservabilityService } from '../observability/observability.service';
+import { AccountPolicyService } from './account-policy.service';
 
 /** Normalized Google userinfo / id_token claims used to sign in or link accounts. */
 export type GoogleOAuthProfile = {
@@ -50,6 +51,7 @@ export class AuthService {
     private observability: ObservabilityService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private accountPolicy: AccountPolicyService,
     @InjectQueue(MAIL_QUEUE_NAME) private mailQueue: Queue,
   ) {}
 
@@ -229,6 +231,10 @@ export class AuthService {
         data: { passwordHash },
       });
       await tx.authToken.delete({ where: { id: record.id } });
+      // Close all sessions after password recovery (TTW-023).
+      await tx.authToken.deleteMany({
+        where: { userId: record.userId, tokenType: TokenType.REFRESH },
+      });
       await this.audit.log(
         {
           eventName: 'auth.password.reset',
@@ -237,7 +243,7 @@ export class AuthService {
           entityId: record.userId,
           actorUserId: record.userId,
           actorRole: record.user.role,
-          note: 'User reset password via recovery flow',
+          note: 'User reset password via recovery flow — all refresh tokens revoked',
         },
         tx,
       );
@@ -389,6 +395,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     return this.completeLoginSession(
       user,
       'User authenticated successfully',
@@ -509,6 +520,16 @@ export class AuthService {
         'This account cannot sign in with Google',
       );
     }
+    if (user.status !== UserStatus.ACTIVE) {
+      this.observability.recordAuthLogin({ outcome: 'failure' });
+      throw new UnauthorizedException('Account is not active');
+    }
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException(
+        'This account cannot sign in with Google',
+      );
+    }
 
     return this.completeLoginSession(
       user,
@@ -622,6 +643,7 @@ export class AuthService {
             phone: true,
             role: true,
             status: true,
+            emailVerifiedAt: true,
           },
         },
       },
@@ -636,7 +658,12 @@ export class AuthService {
     }
 
     const user = record.user;
-    if (user.status === UserStatus.DELETED) {
+    if (user.status !== UserStatus.ACTIVE) {
+      await this.prisma.authToken.delete({ where: { id: record.id } });
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
       await this.prisma.authToken.delete({ where: { id: record.id } });
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

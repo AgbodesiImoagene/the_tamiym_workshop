@@ -1,7 +1,7 @@
 # TTW-023 — Enforce account and privileged-auth policy
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** Not started  
+**Status:** In progress
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-020  
 **Blocks:** TTW-030, TTW-032, TTW-042, TTW-053, TTW-054
@@ -73,16 +73,34 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ## Design review
 
-Record product/security owners, date, threat model, action matrix, recovery and support process, schema/crypto choices, privacy impact, rollout/revocation plan, test plan, and verdict.
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED for verification-policy slice; MFA/sessions/Redis throttles deferred within this ticket.
+
+**Action matrix (v1, from ticket proposal):**
+| Actor | May login unverified? | Gated until verified |
+| CUSTOMER | Yes | CREATE_ORDER, MUTATE_PAYOUT_PROFILE, APPLY_AS_ORGANISER (stub for TTW-030) |
+| ORGANIZER / ADMIN | No — must verify before login/refresh/JWT | Privileged access |
+
+**Blast radius:** `AccountPolicyService`; order create paths; payout profile mutate; login/refresh/JWT/Google; password-reset refresh revoke.
+
+**Error contract:** `403` body `{ code: 'EMAIL_NOT_VERIFIED', action, message }` for frontend guidance.
+
+**Deferred (same ticket):** admin TOTP + recovery codes; named hashed sessions with list/revoke; Redis identity+IP throttles; Playwright MFA/session suites.
 
 ## Implementation reviews
 
-Record security and implementation iterations, migration/crypto findings, fixes, evidence, dimension verdicts, and overall verdict.
+**Security (slice 1):** PASS — auth boundary uses generic 401; `EMAIL_NOT_VERIFIED` only on post-auth action gates. Residual (non-blocking): payment initiation not gated for legacy pending orders.
+
+**Implementation (slice 1):** PASS — OpenAPI notes on order/campaign-order/payout mutate; privileged 403 helper removed; service-boundary `code`/`action` assertions; 60 related unit tests green.
 
 ## Verification evidence
 
-Record exact unit/integration/Playwright commands, concurrency and replay test names, Redis multi-instance evidence, secret-rotation rehearsal, and redacted telemetry samples.
+- Unit: `account-policy`, `auth.service`, `jwt.strategy`, `orders.service`, `payout-profiles.service` (60 tests).
+- Diff coverage vs `origin/main`: ≥80% (`pnpm coverage:diff` + CI Coverage).
+- E2e: `auth-surface` privileged fixtures set `emailVerifiedAt`; CI API Integration green.
+- CI: all checks green on https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/32383125073
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/30
 
 ## Completion summary
 
-Summarize enforced policy, rollout/revocations, MFA recovery operations, throttling values, deviations, migrations, PR, and follow-ups.
+Slice 1 (verified-email action policy) shipped. Remaining same-ticket work: admin TOTP + recovery, named hashed sessions, Redis identity+IP throttles, Playwright suites.

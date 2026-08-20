@@ -61,6 +61,11 @@ export class PayoutProfilesController {
   @ApiBody({ type: CreatePayoutProfileDto })
   @ApiResponse({ status: 201 })
   @ApiResponse({ status: 400 })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before managing payout details',
+  })
   async create(
     @CurrentUser() user: RequestUser,
     @Body() dto: CreatePayoutProfileDto,
@@ -73,7 +78,11 @@ export class PayoutProfilesController {
   @ApiParam({ name: 'id' })
   @ApiBody({ type: UpdatePayoutProfileDto })
   @ApiResponse({ status: 200 })
-  @ApiResponse({ status: 403 })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before managing payout details',
+  })
   @ApiResponse({ status: 404 })
   async update(
     @CurrentUser() user: RequestUser,
@@ -88,7 +97,11 @@ export class PayoutProfilesController {
   @ApiOperation({ summary: 'Delete payout profile' })
   @ApiParam({ name: 'id' })
   @ApiResponse({ status: 204 })
-  @ApiResponse({ status: 403 })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before managing payout details',
+  })
   @ApiResponse({ status: 404 })
   async remove(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     await this.payoutProfilesService.remove(user.id, id);

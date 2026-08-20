@@ -12,6 +12,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AdminNotificationsModule } from '../admin-notifications/admin-notificat
     PayoutsModule,
     ModerationModule,
     AdminNotificationsModule,
+    AuthModule,
   ],
   controllers: [
     CampaignsController,

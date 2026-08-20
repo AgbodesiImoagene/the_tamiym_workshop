@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole, UserStatus } from '../../generated/prisma/client';
 import { AuthSurface } from '../../generated/prisma/enums';
 import { surfaceCookieNames } from '../auth-cookies';
+import { AccountPolicyService } from '../account-policy.service';
 
 const mockDbUser = {
   id: 'user-1',
@@ -15,6 +16,7 @@ const mockDbUser = {
   firstName: 'Test',
   lastName: 'User',
   phone: null,
+  emailVerifiedAt: new Date(),
 };
 
 describe('JwtStrategy', () => {
@@ -34,6 +36,7 @@ describe('JwtStrategy', () => {
           },
         },
         { provide: PrismaService, useValue: prisma },
+        AccountPolicyService,
       ],
     }).compile();
 
@@ -63,7 +66,16 @@ describe('JwtStrategy', () => {
       surface: AuthSurface.CUSTOMER,
     });
 
-    expect(result).toEqual({ ...mockDbUser, surface: AuthSurface.CUSTOMER });
+    expect(result).toEqual({
+      id: mockDbUser.id,
+      email: mockDbUser.email,
+      role: mockDbUser.role,
+      status: mockDbUser.status,
+      firstName: mockDbUser.firstName,
+      lastName: mockDbUser.lastName,
+      phone: mockDbUser.phone,
+      surface: AuthSurface.CUSTOMER,
+    });
   });
 
   it('throws when the user no longer exists', async () => {
@@ -233,6 +245,24 @@ describe('JwtStrategy', () => {
     });
 
     expect(result.surface).toBe(AuthSurface.ADMIN);
+  });
+
+  it('rejects unverified ADMIN JWT with generic Unauthorized', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+      emailVerifiedAt: null,
+    });
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.ADMIN,
+        surface: AuthSurface.ADMIN,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   describe('cookie extraction (surface-scoped)', () => {

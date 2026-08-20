@@ -10,6 +10,7 @@ import { ObservabilityService } from '../observability/observability.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAIL_QUEUE_NAME } from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
+import { AccountPolicyService } from './account-policy.service';
 import { AuthSurface } from '../generated/prisma/enums';
 
 jest.mock('bcrypt', () => ({
@@ -92,6 +93,7 @@ describe('AuthService', () => {
           provide: getQueueToken(MAIL_QUEUE_NAME),
           useValue: { add: jest.fn() },
         },
+        AccountPolicyService,
       ],
     }).compile();
 
@@ -122,6 +124,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.user.update.mockResolvedValue({});
@@ -158,6 +161,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -188,6 +192,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -213,6 +218,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(
@@ -238,6 +244,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(
@@ -262,6 +269,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ORGANIZER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -273,6 +281,96 @@ describe('AuthService', () => {
     );
 
     expect(result.access_token).toBe('jwt');
+  });
+
+  it('rejects unverified admin login with generic Invalid credentials', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      passwordHash: await bcrypt.hash('password123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: null,
+    });
+
+    await expect(
+      service.login(
+        { email: 'admin@example.com', password: 'password123' },
+        AuthSurface.ADMIN,
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(observability.recordAuthLogin).toHaveBeenCalledWith({
+      outcome: 'denied',
+    });
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('revokes all refresh tokens on password reset', async () => {
+    prisma.authToken.findFirst.mockResolvedValue({
+      id: 'reset-1',
+      userId: 'user-1',
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { id: 'user-1', role: UserRole.CUSTOMER },
+    });
+    prisma.authToken.delete.mockResolvedValue({});
+    prisma.authToken.deleteMany.mockResolvedValue({ count: 2 });
+    prisma.user.update.mockResolvedValue({});
+
+    await service.resetPassword('reset-token', 'new-password-123');
+
+    expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', tokenType: TokenType.REFRESH },
+    });
+  });
+
+  it('rejects refresh for unverified privileged roles', async () => {
+    prisma.authToken.findFirst.mockResolvedValue({
+      id: 'tok-1',
+      expiresAt: new Date(Date.now() + 60_000),
+      authSurface: AuthSurface.ADMIN,
+      user: {
+        id: 'user-1',
+        email: 'admin@example.com',
+        firstName: 'A',
+        lastName: 'B',
+        phone: null,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: null,
+      },
+    });
+    prisma.authToken.delete.mockResolvedValue({});
+
+    await expect(
+      service.refresh('refresh-token', AuthSurface.ADMIN),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects Google login for unverified organisers', async () => {
+    prisma.userOAuthAccount.findUnique.mockResolvedValue({
+      user: {
+        id: 'user-1',
+        email: 'org@example.com',
+        role: UserRole.ORGANIZER,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: null,
+        firstName: 'O',
+        lastName: 'G',
+        phone: null,
+      },
+    });
+
+    await expect(
+      service.loginWithGoogleProfile({
+        providerAccountId: 'g-1',
+        email: 'org@example.com',
+        emailVerified: false,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it('record a failed login metric when credentials are invalid', async () => {
@@ -300,6 +398,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(
