@@ -90,8 +90,7 @@ export default function WorkshopCanvas({
         });
 
         if (effect?.effectType === 'TINT' && effect.tintHex) {
-          const BlendColor =
-            fabric.filters?.BlendColor ?? fabric.Image?.filters?.BlendColor;
+          const BlendColor = fabric.filters?.BlendColor ?? fabric.Image?.filters?.BlendColor;
           if (BlendColor) {
             img.filters = [
               new BlendColor({

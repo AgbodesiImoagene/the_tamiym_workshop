@@ -47,7 +47,7 @@ export class MailTransportService implements OnModuleDestroy {
     });
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): void {
     this.transporter.close();
   }
 }
