@@ -66,14 +66,18 @@ Exempt:
 
 - Origin is the only trusted surface signal for a browser. A request that presents surface session cookies with an unresolvable Origin, or an Origin belonging to the other surface, is rejected (`401`) — it is never defaulted to CUSTOMER.
 - CUSTOMER is assumed only for a cookie-less call that supplies `refresh_token` in the body (non-browser client).
-- Logout revokes only the resolved surface's refresh row (legacy `authSurface: null` rows are revocable from either surface) and clears only that surface's cookies plus the legacy names.
+- Logout revokes only a live `AuthSession` whose `authSurface` matches the resolved surface (exact match — no null-surface legacy path) and clears only that surface's cookies plus the legacy names.
 
 ## JWT / refresh
 
-Access JWT claims: `sub`, `email`, `role`, `surface`.
-`validate` rejects a token with a missing/unknown `surface`, and re-checks role×surface on every request — for bearer tokens as well as cookies — so a role change invalidates sessions minted on the wrong surface. Cookie requests must additionally match the Origin-derived surface.
-Refresh `AuthToken` rows store `authSurface`. Login/refresh for surface S revokes that user’s refresh tokens with a different or null surface.
+Access JWT claims: `sub`, `email`, `role`, `surface`, `sid` (AuthSession id).
+`validate` rejects a token with a missing/unknown `surface` or `sid`, re-checks role×surface on every request, and requires the named `AuthSession` to be live (not revoked/expired) with a matching surface. Cookie requests must additionally match the Origin-derived surface.
+
+Refresh credentials are stored only as `sha256` hashes on `AuthSession` rows (`auth_sessions`), never as plaintext. Login/refresh for surface S revokes this user’s live sessions on other surfaces. Password reset/change and admin role change revoke all live sessions. Clients may `GET /auth/sessions`, `DELETE /auth/sessions/:id`, and `DELETE /auth/sessions`.
+
+Legacy plaintext `AuthToken` REFRESH rows are deleted on the TTW-023 session cutover migration; remaining `AuthToken` rows are for email verification and password reset only.
 
 ## Migration
 
-Deploy additive `authSurface` column → issue only surface-scoped cookies → revoke null-surface refresh tokens on next login/refresh → clear legacy cookies.
+1. TTW-020: additive `authSurface` on `auth_tokens` + surface-scoped cookies (complete).
+2. TTW-023: create `auth_sessions`, delete all `AuthToken` REFRESH rows (force re-login), issue hashed refresh + JWT `sid` only. Clear any leftover legacy cookie names on set/clear.

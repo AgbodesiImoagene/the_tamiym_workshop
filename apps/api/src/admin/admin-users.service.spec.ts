@@ -13,6 +13,7 @@ describe('AdminUsersService', () => {
       update: jest.Mock;
     };
     authToken: { deleteMany: jest.Mock };
+    authSession: { updateMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
@@ -26,6 +27,7 @@ describe('AdminUsersService', () => {
         update: jest.fn(),
       },
       authToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      authSession: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
       $transaction: jest.fn((fn: (tx: typeof prisma) => Promise<unknown>) =>
         fn(prisma),
       ),
@@ -82,7 +84,7 @@ describe('AdminUsersService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('setUserRole updates role, clears refresh tokens, audits', async () => {
+  it('setUserRole updates role, clears refresh tokens and sessions, audits', async () => {
     const before = {
       id: 'u2',
       email: 'b@x.com',
@@ -107,6 +109,10 @@ describe('AdminUsersService', () => {
     expect(result.role).toBe(UserRole.ADMIN);
     expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'u2', tokenType: TokenType.REFRESH },
+    });
+    expect(prisma.authSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u2', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
     });
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({

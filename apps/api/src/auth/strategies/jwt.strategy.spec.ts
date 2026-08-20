@@ -7,6 +7,7 @@ import { UserRole, UserStatus } from '../../generated/prisma/client';
 import { AuthSurface } from '../../generated/prisma/enums';
 import { surfaceCookieNames } from '../auth-cookies';
 import { AccountPolicyService } from '../account-policy.service';
+import { AuthSessionService } from '../auth-session.service';
 
 const mockDbUser = {
   id: 'user-1',
@@ -19,12 +20,18 @@ const mockDbUser = {
   emailVerifiedAt: new Date(),
 };
 
+const SID = 'sess-1';
+
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let prisma: { user: { findUnique: jest.Mock } };
+  let authSession: { assertAccessSession: jest.Mock };
 
   beforeEach(async () => {
     prisma = { user: { findUnique: jest.fn() } };
+    authSession = {
+      assertAccessSession: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -36,6 +43,7 @@ describe('JwtStrategy', () => {
           },
         },
         { provide: PrismaService, useValue: prisma },
+        { provide: AuthSessionService, useValue: authSession },
         AccountPolicyService,
       ],
     }).compile();
@@ -55,17 +63,36 @@ describe('JwtStrategy', () => {
     };
   }
 
-  it('attaches the payload surface to the returned user', async () => {
-    prisma.user.findUnique.mockResolvedValue(mockDbUser);
-    const req = buildRequest({ origin: 'http://localhost:3000' });
-
-    const result = await strategy.validate(req, {
+  function payload(
+    overrides: Partial<{
+      sub: string;
+      email: string;
+      role: UserRole;
+      surface: AuthSurface;
+      sid: string;
+    }> = {},
+  ) {
+    return {
       sub: 'user-1',
       email: 'user@example.com',
       role: UserRole.CUSTOMER,
       surface: AuthSurface.CUSTOMER,
-    });
+      sid: SID,
+      ...overrides,
+    };
+  }
 
+  it('attaches the payload surface and sessionId to the returned user', async () => {
+    prisma.user.findUnique.mockResolvedValue(mockDbUser);
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    const result = await strategy.validate(req, payload());
+
+    expect(authSession.assertAccessSession).toHaveBeenCalledWith(
+      SID,
+      'user-1',
+      AuthSurface.CUSTOMER,
+    );
     expect(result).toEqual({
       id: mockDbUser.id,
       email: mockDbUser.email,
@@ -75,7 +102,18 @@ describe('JwtStrategy', () => {
       lastName: mockDbUser.lastName,
       phone: mockDbUser.phone,
       surface: AuthSurface.CUSTOMER,
+      sessionId: SID,
     });
+  });
+
+  it('rejects a token with missing sid', async () => {
+    prisma.user.findUnique.mockResolvedValue(mockDbUser);
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    await expect(strategy.validate(req, payload({ sid: '' }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(authSession.assertAccessSession).not.toHaveBeenCalled();
   });
 
   it('throws when the user no longer exists', async () => {
@@ -83,12 +121,7 @@ describe('JwtStrategy', () => {
     const req = buildRequest({ origin: 'http://localhost:3000' });
 
     await expect(
-      strategy.validate(req, {
-        sub: 'missing',
-        email: 'missing@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.CUSTOMER,
-      }),
+      strategy.validate(req, payload({ sub: 'missing' })),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -99,58 +132,37 @@ describe('JwtStrategy', () => {
     });
     const req = buildRequest({ origin: 'http://localhost:3000' });
 
-    await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.CUSTOMER,
-      }),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(req, payload())).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a CUSTOMER-surface JWT presented on the admin Origin (cookie auth)', async () => {
     prisma.user.findUnique.mockResolvedValue(mockDbUser);
     const req = buildRequest({ origin: 'http://localhost:3003' });
 
-    await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.CUSTOMER,
-      }),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(req, payload())).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a cookie-authenticated request with no resolvable Origin', async () => {
     prisma.user.findUnique.mockResolvedValue(mockDbUser);
     const req = buildRequest({});
 
-    await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.CUSTOMER,
-      }),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(req, payload())).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('allows a bearer-authenticated request with no resolvable Origin', async () => {
     prisma.user.findUnique.mockResolvedValue(mockDbUser);
-    // Bearer callers have no cookie jar and no Origin; the role×surface check
-    // is their surface gate.
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
-    const result = await strategy.validate(req, {
-      sub: 'user-1',
-      email: 'user@example.com',
-      role: UserRole.CUSTOMER,
-      surface: AuthSurface.CUSTOMER,
-    });
+    const result = await strategy.validate(req, payload());
 
     expect(result.surface).toBe(AuthSurface.CUSTOMER);
+    expect(result.sessionId).toBe(SID);
   });
 
   it('rejects a bearer token whose surface the account role may not use', async () => {
@@ -158,12 +170,7 @@ describe('JwtStrategy', () => {
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
     await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.ADMIN,
-      }),
+      strategy.validate(req, payload({ surface: AuthSurface.ADMIN })),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -175,32 +182,20 @@ describe('JwtStrategy', () => {
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
     await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.ORGANIZER,
-        surface: AuthSurface.ADMIN,
-      }),
+      strategy.validate(req, payload({ surface: AuthSurface.ADMIN })),
     ).rejects.toThrow(UnauthorizedException);
   });
 
   it('rejects a session whose account was promoted to ADMIN after it was minted', async () => {
-    // The JWT still claims CUSTOMER surface; the account is now ADMIN, which
-    // is not permitted on that surface, so the old session must stop working.
     prisma.user.findUnique.mockResolvedValue({
       ...mockDbUser,
       role: UserRole.ADMIN,
     });
     const req = buildRequest({ origin: 'http://localhost:3000' });
 
-    await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
-        surface: AuthSurface.CUSTOMER,
-      }),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(strategy.validate(req, payload())).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a token with no surface claim', async () => {
@@ -212,6 +207,7 @@ describe('JwtStrategy', () => {
         sub: 'user-1',
         email: 'user@example.com',
         role: UserRole.CUSTOMER,
+        sid: SID,
       } as any),
     ).rejects.toThrow(UnauthorizedException);
   });
@@ -222,9 +218,7 @@ describe('JwtStrategy', () => {
 
     await expect(
       strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.CUSTOMER,
+        ...payload(),
         surface: 'SUPERUSER',
       } as any),
     ).rejects.toThrow(UnauthorizedException);
@@ -237,12 +231,13 @@ describe('JwtStrategy', () => {
     });
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
-    const result = await strategy.validate(req, {
-      sub: 'user-1',
-      email: 'user@example.com',
-      role: UserRole.ADMIN,
-      surface: AuthSurface.ADMIN,
-    });
+    const result = await strategy.validate(
+      req,
+      payload({
+        role: UserRole.ADMIN,
+        surface: AuthSurface.ADMIN,
+      }),
+    );
 
     expect(result.surface).toBe(AuthSurface.ADMIN);
   });
@@ -256,19 +251,18 @@ describe('JwtStrategy', () => {
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
     await expect(
-      strategy.validate(req, {
-        sub: 'user-1',
-        email: 'user@example.com',
-        role: UserRole.ADMIN,
-        surface: AuthSurface.ADMIN,
-      }),
+      strategy.validate(
+        req,
+        payload({
+          role: UserRole.ADMIN,
+          surface: AuthSurface.ADMIN,
+        }),
+      ),
     ).rejects.toThrow(UnauthorizedException);
   });
 
   describe('cookie extraction (surface-scoped)', () => {
     function extractFromStrategy(req: any): string | null {
-      // The private extractor closure is not exported; exercise it via the
-      // configured passport-jwt `jwtFromRequest` option on the strategy.
       const options = (strategy as any)._jwtFromRequest as (
         req: any,
       ) => string | null;

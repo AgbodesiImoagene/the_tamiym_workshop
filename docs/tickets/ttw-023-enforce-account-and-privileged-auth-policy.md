@@ -73,6 +73,8 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ## Design review
 
+### Slice 1 — verification policy (shipped)
+
 **Reviewer:** implementing agent — 2026-08-20\
 **Verdict:** APPROVED for verification-policy slice; MFA/sessions/Redis throttles deferred within this ticket.
 
@@ -85,7 +87,24 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Error contract:** `403` body `{ code: 'EMAIL_NOT_VERIFIED', action, message }` for frontend guidance.
 
-**Deferred (same ticket):** admin TOTP + recovery codes; named hashed sessions with list/revoke; Redis identity+IP throttles; Playwright MFA/session suites.
+### Slice 2 — hashed audience-bound sessions (in progress)
+
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED to implement before MFA.
+
+**Decisions:**
+
+- New `AuthSession` table: `refreshTokenHash` (sha256), `authSurface`, optional coarse `deviceLabel`, `createdAt`/`lastSeenAt`/`expiresAt`/`revokedAt`.
+- Access JWT gains required `sid`; `JwtStrategy` rejects missing/revoked/mismatched sessions via `assertAccessSession`.
+- Plaintext refresh returned once; cutover deletes legacy `AuthToken` REFRESH rows (force re-login).
+- Multi-session allowed on the same surface; login/refresh revokes other-surface sessions.
+- Concurrent refresh: optimistic `updateMany` on prior hash — losers get generic 401.
+- `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `DELETE /auth/sessions` expose no tokens or fingerprints.
+- Password reset/change and admin role change revoke all live sessions; cleanup cron deletes expired sessions and revoked sessions older than 7d.
+
+**Blast radius:** `AuthService` login/refresh/logout; `JwtStrategy`; session list/revoke APIs; admin role change; token cleanup cron; auth-surface e2e refresh helpers.
+
+**Deferred (same ticket):** admin TOTP + recovery codes; Redis identity+IP throttles; Playwright MFA/session suites.
 
 ## Implementation reviews
 
@@ -93,7 +112,11 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Implementation (slice 1):** PASS — OpenAPI notes on order/campaign-order/payout mutate; privileged 403 helper removed; service-boundary `code`/`action` assertions; 60 related unit tests green.
 
+**Slice 2 reviews:** pending (implementation wiring complete; independent review next).
+
 ## Verification evidence
+
+### Slice 1
 
 - Unit: `account-policy`, `auth.service`, `jwt.strategy`, `orders.service`, `payout-profiles.service` (60 tests).
 - Diff coverage vs `origin/main`: ≥80% (`pnpm coverage:diff` + CI Coverage).
@@ -101,6 +124,13 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 - CI: all checks green on https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/32383125073
 - PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/30
 
+### Slice 2 (hashed sessions wiring)
+
+- `pnpm --filter api exec tsc --noEmit` — pass.
+- Unit: auth session/crypto/service, auth.service, jwt.strategy, auth-token-cleanup, admin-users, related auth specs — 118 tests pass.
+- `pnpm coverage:diff` — 81.48% (≥80%).
+- MFA / Redis throttles / Playwright — still deferred.
+
 ## Completion summary
 
-Slice 1 (verified-email action policy) shipped. Remaining same-ticket work: admin TOTP + recovery, named hashed sessions, Redis identity+IP throttles, Playwright suites.
+Slice 1 (verified-email action policy) shipped. Slice 2 (hashed `AuthSession` wiring: JWT `sid`, list/revoke APIs, cleanup, tests) implemented on this branch. Remaining same-ticket work: admin TOTP + recovery, Redis identity+IP throttles, Playwright suites.

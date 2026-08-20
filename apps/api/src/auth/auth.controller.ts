@@ -9,6 +9,9 @@ import {
   UnauthorizedException,
   UseGuards,
   Get,
+  Delete,
+  Param,
+  Headers,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
@@ -18,6 +21,7 @@ import {
   ApiBody,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -107,6 +111,7 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async register(
     @Body() registerDto: RegisterDto,
+    @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.register(registerDto);
@@ -118,6 +123,7 @@ export class AuthController {
         password: registerDto.password,
       },
       AuthSurface.CUSTOMER,
+      { deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent) },
     );
 
     const csrfToken = setSurfaceAuthCookies(
@@ -172,9 +178,14 @@ export class AuthController {
   })
   async login(
     @Body() loginDto: LoginDto,
+    @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(loginDto, AuthSurface.CUSTOMER);
+    const result = await this.authService.login(
+      loginDto,
+      AuthSurface.CUSTOMER,
+      { deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent) },
+    );
 
     const csrfToken = setSurfaceAuthCookies(
       res,
@@ -228,9 +239,12 @@ export class AuthController {
   })
   async adminLogin(
     @Body() loginDto: LoginDto,
+    @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(loginDto, AuthSurface.ADMIN);
+    const result = await this.authService.login(loginDto, AuthSurface.ADMIN, {
+      deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent),
+    });
 
     const csrfToken = setSurfaceAuthCookies(
       res,
@@ -562,6 +576,10 @@ export class AuthController {
         role: { type: 'string', enum: Object.values(UserRole) },
         status: { type: 'string', example: 'ACTIVE' },
         surface: { type: 'string', enum: Object.values(AuthSurface) },
+        sessionId: {
+          type: 'string',
+          description: 'Live AuthSession id bound to this access JWT',
+        },
         csrf_token: {
           ...CSRF_TOKEN_SCHEMA,
           description: `${CSRF_TOKEN_SCHEMA.description} Absent for bearer-only callers, which hold no cookie session.`,
@@ -577,5 +595,105 @@ export class AuthController {
   ) {
     const csrfToken = ensureSurfaceCsrfCookie(req, res, user.surface);
     return csrfToken ? { ...user, csrf_token: csrfToken } : { ...user };
+  }
+
+  /**
+   * List live sessions for the authenticated user (no refresh credentials).
+   */
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'List active auth sessions',
+    description:
+      'Returns live (non-revoked, non-expired) sessions for the current user. Does not include refresh tokens or hashes.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiResponse({
+    status: 200,
+    description: 'Active sessions (metadata only)',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          authSurface: { type: 'string', enum: Object.values(AuthSurface) },
+          deviceLabel: { type: 'string', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          lastSeenAt: { type: 'string', format: 'date-time' },
+          expiresAt: { type: 'string', format: 'date-time' },
+          current: {
+            type: 'boolean',
+            description:
+              'True when this row is the session for the present access JWT',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  listSessions(@CurrentUser() user: RequestUser) {
+    return this.authService.listSessions(user.id, user.sessionId);
+  }
+
+  /**
+   * Revoke a single session owned by the authenticated user.
+   */
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke one auth session' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'AuthSession id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Session revoked',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Session revoked' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Session not found for this user' })
+  async revokeSession(
+    @CurrentUser() user: RequestUser,
+    @Param('id') sessionId: string,
+  ) {
+    await this.authService.revokeSession(user.id, sessionId);
+    return { message: 'Session revoked' };
+  }
+
+  /**
+   * Revoke all sessions for the authenticated user (sign out everywhere).
+   */
+  @Delete('sessions')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Revoke all auth sessions',
+    description:
+      'Revokes every live session for the user, including the current one. Access JWTs for revoked sessions fail on the next request.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiResponse({
+    status: 200,
+    description: 'All sessions revoked',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'All sessions revoked' },
+        revoked: { type: 'number' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async revokeAllSessions(@CurrentUser() user: RequestUser) {
+    const revoked = await this.authService.revokeAllSessions(user.id);
+    return { message: 'All sessions revoked', revoked };
   }
 }

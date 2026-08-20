@@ -66,6 +66,10 @@ describe('AuthController', () => {
       login: jest.fn(),
       refresh: jest.fn(),
       logout: jest.fn(),
+      deviceLabelFromUserAgent: jest.fn().mockReturnValue(null),
+      listSessions: jest.fn(),
+      revokeSession: jest.fn(),
+      revokeAllSessions: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -101,6 +105,7 @@ describe('AuthController', () => {
 
       const result = await controller.register(
         registerDto as any,
+        undefined,
         mockRes as unknown as Response,
       );
 
@@ -111,6 +116,7 @@ describe('AuthController', () => {
           password: registerDto.password,
         },
         AuthSurface.CUSTOMER,
+        { deviceLabel: null },
       );
       expect(result.user).toEqual(mockUser);
       expect(result.user).not.toHaveProperty('password');
@@ -132,7 +138,11 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.register(registerDto as any, mockRes as unknown as Response),
+        controller.register(
+          registerDto as any,
+          undefined,
+          mockRes as unknown as Response,
+        ),
       ).rejects.toThrow(ConflictException);
       expect(authService.login).not.toHaveBeenCalled();
     });
@@ -149,12 +159,14 @@ describe('AuthController', () => {
 
       const result = await controller.login(
         loginDto as any,
+        undefined,
         mockRes as unknown as Response,
       );
 
       expect(authService.login).toHaveBeenCalledWith(
         loginDto,
         AuthSurface.CUSTOMER,
+        { deviceLabel: null },
       );
       expect(result.user).toEqual(mockUser);
       expect(result.csrf_token).toBe(
@@ -179,7 +191,11 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.login(loginDto as any, mockRes as unknown as Response),
+        controller.login(
+          loginDto as any,
+          undefined,
+          mockRes as unknown as Response,
+        ),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -195,12 +211,14 @@ describe('AuthController', () => {
 
       const result = await controller.adminLogin(
         loginDto as any,
+        undefined,
         mockRes as unknown as Response,
       );
 
       expect(authService.login).toHaveBeenCalledWith(
         loginDto,
         AuthSurface.ADMIN,
+        { deviceLabel: null },
       );
       expect(result.user).toEqual(mockAdminUser);
       expect(result.csrf_token).toBe(
@@ -228,7 +246,11 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.adminLogin(loginDto as any, mockRes as unknown as Response),
+        controller.adminLogin(
+          loginDto as any,
+          undefined,
+          mockRes as unknown as Response,
+        ),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -471,6 +493,65 @@ describe('AuthController', () => {
         'access_token',
         'refresh_token',
       ]);
+    });
+  });
+
+  describe('sessions', () => {
+    const currentUser = {
+      id: 'user-1',
+      email: 'test@example.com',
+      role: 'CUSTOMER' as const,
+      status: 'ACTIVE' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      phone: null,
+      surface: AuthSurface.CUSTOMER,
+      sessionId: 'sess-current',
+    };
+
+    it('lists sessions for the authenticated user', async () => {
+      authService.listSessions.mockResolvedValue([
+        {
+          id: 'sess-current',
+          authSurface: AuthSurface.CUSTOMER,
+          deviceLabel: null,
+          createdAt: new Date(),
+          lastSeenAt: new Date(),
+          expiresAt: new Date(),
+          current: true,
+        },
+      ]);
+
+      const result = await controller.listSessions(currentUser as any);
+
+      expect(authService.listSessions).toHaveBeenCalledWith(
+        'user-1',
+        'sess-current',
+      );
+      expect(result[0].current).toBe(true);
+    });
+
+    it('revokes one session', async () => {
+      authService.revokeSession.mockResolvedValue(undefined);
+      const result = await controller.revokeSession(
+        currentUser as any,
+        'sess-other',
+      );
+      expect(authService.revokeSession).toHaveBeenCalledWith(
+        'user-1',
+        'sess-other',
+      );
+      expect(result).toEqual({ message: 'Session revoked' });
+    });
+
+    it('revokes all sessions', async () => {
+      authService.revokeAllSessions.mockResolvedValue(3);
+      const result = await controller.revokeAllSessions(currentUser as any);
+      expect(authService.revokeAllSessions).toHaveBeenCalledWith('user-1');
+      expect(result).toEqual({
+        message: 'All sessions revoked',
+        revoked: 3,
+      });
     });
   });
 });

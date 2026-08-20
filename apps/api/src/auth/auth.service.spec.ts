@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MAIL_QUEUE_NAME } from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
 import { AccountPolicyService } from './account-policy.service';
+import { AuthSessionService } from './auth-session.service';
 import { AuthSurface } from '../generated/prisma/enums';
 
 jest.mock('bcrypt', () => ({
@@ -39,6 +40,28 @@ describe('AuthService', () => {
   let audit: { log: jest.Mock };
   let observability: { recordAuthLogin: jest.Mock };
   let jwtService: { sign: jest.Mock };
+  let authSession: {
+    createSession: jest.Mock;
+    requireLiveSessionByRefreshToken: jest.Mock;
+    rotateSession: jest.Mock;
+    revokeByRefreshToken: jest.Mock;
+    revokeAllForUser: jest.Mock;
+    revokeOneForUser: jest.Mock;
+    listForUser: jest.Mock;
+    parseDeviceLabel: jest.Mock;
+  };
+
+  const liveSession = {
+    id: 'sess-1',
+    userId: 'user-1',
+    authSurface: AuthSurface.CUSTOMER,
+    refreshTokenHash: 'hash',
+    deviceLabel: null,
+    createdAt: new Date(),
+    lastSeenAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+    revokedAt: null,
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -74,6 +97,22 @@ describe('AuthService', () => {
     audit = { log: jest.fn().mockResolvedValue(undefined) };
     observability = { recordAuthLogin: jest.fn() };
     jwtService = { sign: jest.fn().mockReturnValue('jwt') };
+    authSession = {
+      createSession: jest.fn().mockResolvedValue({
+        session: liveSession,
+        refreshToken: 'refresh-plain',
+      }),
+      requireLiveSessionByRefreshToken: jest.fn(),
+      rotateSession: jest.fn().mockResolvedValue({
+        session: liveSession,
+        refreshToken: 'refresh-rotated',
+      }),
+      revokeByRefreshToken: jest.fn(),
+      revokeAllForUser: jest.fn().mockResolvedValue(1),
+      revokeOneForUser: jest.fn().mockResolvedValue(undefined),
+      listForUser: jest.fn().mockResolvedValue([]),
+      parseDeviceLabel: jest.fn((ua?: string) => ua?.slice(0, 120) ?? null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -93,6 +132,7 @@ describe('AuthService', () => {
           provide: getQueueToken(MAIL_QUEUE_NAME),
           useValue: { add: jest.fn() },
         },
+        { provide: AuthSessionService, useValue: authSession },
         AccountPolicyService,
       ],
     }).compile();
@@ -126,7 +166,7 @@ describe('AuthService', () => {
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
-    prisma.authToken.create.mockResolvedValue({});
+    prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
 
     const result = await service.login(
@@ -135,9 +175,22 @@ describe('AuthService', () => {
         password: 'password123',
       },
       AuthSurface.CUSTOMER,
+      { deviceLabel: 'Mozilla/5.0' },
     );
 
     expect(result.access_token).toBe('jwt');
+    expect(result.refresh_token).toBe('refresh-plain');
+    expect(authSession.createSession).toHaveBeenCalledWith(
+      'user-1',
+      AuthSurface.CUSTOMER,
+      expect.objectContaining({ deviceLabel: 'Mozilla/5.0' }),
+    );
+    expect(jwtService.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: AuthSurface.CUSTOMER,
+        sid: 'sess-1',
+      }),
+    );
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: 'auth.login.succeeded',
@@ -151,7 +204,7 @@ describe('AuthService', () => {
     });
   });
 
-  it('signs the JWT payload with the requested surface', async () => {
+  it('signs the JWT payload with the requested surface and sid', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       email: 'admin@example.com',
@@ -163,7 +216,10 @@ describe('AuthService', () => {
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
-    prisma.authToken.create.mockResolvedValue({});
+    authSession.createSession.mockResolvedValue({
+      session: { ...liveSession, authSurface: AuthSurface.ADMIN },
+      refreshToken: 'admin-refresh',
+    });
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
 
@@ -173,12 +229,15 @@ describe('AuthService', () => {
     );
 
     expect(jwtService.sign).toHaveBeenCalledWith(
-      expect.objectContaining({ surface: AuthSurface.ADMIN }),
-    );
-    expect(prisma.authToken.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ authSurface: AuthSurface.ADMIN }),
+        surface: AuthSurface.ADMIN,
+        sid: 'sess-1',
       }),
+    );
+    expect(authSession.createSession).toHaveBeenCalledWith(
+      'user-1',
+      AuthSurface.ADMIN,
+      expect.anything(),
     );
   });
 
@@ -194,7 +253,6 @@ describe('AuthService', () => {
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
-    prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
 
@@ -231,7 +289,7 @@ describe('AuthService', () => {
     expect(observability.recordAuthLogin).toHaveBeenCalledWith({
       outcome: 'denied',
     });
-    expect(prisma.authToken.create).not.toHaveBeenCalled();
+    expect(authSession.createSession).not.toHaveBeenCalled();
   });
 
   it('rejects CUSTOMER credentials on the ADMIN surface (role×surface)', async () => {
@@ -271,7 +329,6 @@ describe('AuthService', () => {
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
-    prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
 
@@ -309,7 +366,7 @@ describe('AuthService', () => {
     expect(jwtService.sign).not.toHaveBeenCalled();
   });
 
-  it('revokes all refresh tokens on password reset', async () => {
+  it('revokes all sessions on password reset', async () => {
     prisma.authToken.findFirst.mockResolvedValue({
       id: 'reset-1',
       userId: 'user-1',
@@ -322,32 +379,35 @@ describe('AuthService', () => {
 
     await service.resetPassword('reset-token', 'new-password-123');
 
+    expect(authSession.revokeAllForUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.anything(),
+    );
     expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-1', tokenType: TokenType.REFRESH },
     });
   });
 
   it('rejects refresh for unverified privileged roles', async () => {
-    prisma.authToken.findFirst.mockResolvedValue({
-      id: 'tok-1',
-      expiresAt: new Date(Date.now() + 60_000),
+    authSession.requireLiveSessionByRefreshToken.mockResolvedValue({
+      ...liveSession,
       authSurface: AuthSurface.ADMIN,
-      user: {
-        id: 'user-1',
-        email: 'admin@example.com',
-        firstName: 'A',
-        lastName: 'B',
-        phone: null,
-        role: UserRole.ADMIN,
-        status: UserStatus.ACTIVE,
-        emailVerifiedAt: null,
-      },
     });
-    prisma.authToken.delete.mockResolvedValue({});
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      firstName: 'A',
+      lastName: 'B',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: null,
+    });
 
     await expect(
       service.refresh('refresh-token', AuthSurface.ADMIN),
     ).rejects.toThrow(UnauthorizedException);
+    expect(authSession.revokeOneForUser).toHaveBeenCalled();
   });
 
   it('rejects Google login for unverified organisers', async () => {
@@ -414,102 +474,63 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    const logoutRecord = (authSurface: AuthSurface | null) => ({
-      id: 'auth-token-1',
-      userId: 'user-1',
-      token: 'refresh-token',
-      tokenType: TokenType.REFRESH,
-      authSurface,
-      expiresAt: new Date(Date.now() + 60_000),
-      user: { id: 'user-1', role: UserRole.ADMIN },
-    });
-
-    it('should write an audit log on logout when the refresh token exists', async () => {
-      prisma.authToken.findFirst.mockResolvedValue(
-        logoutRecord(AuthSurface.ADMIN),
-      );
-      prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
+    it('should write an audit log on logout when the session is revoked', async () => {
+      authSession.revokeByRefreshToken.mockResolvedValue({ userId: 'user-1' });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        role: UserRole.ADMIN,
+      });
 
       await service.logout('refresh-token', AuthSurface.ADMIN);
 
-      expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
-        where: {
-          token: 'refresh-token',
-          tokenType: TokenType.REFRESH,
-          OR: [{ authSurface: null }, { authSurface: AuthSurface.ADMIN }],
-        },
-      });
+      expect(authSession.revokeByRefreshToken).toHaveBeenCalledWith(
+        'refresh-token',
+        AuthSurface.ADMIN,
+      );
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           eventName: 'auth.logout',
           actorUserId: 'user-1',
         }),
-        expect.anything(),
       );
     });
 
-    it('does not revoke a refresh token belonging to the other surface', async () => {
-      prisma.authToken.findFirst.mockResolvedValue(
-        logoutRecord(AuthSurface.ADMIN),
-      );
+    it('does not audit when revoke is a no-op (other surface / unknown)', async () => {
+      authSession.revokeByRefreshToken.mockResolvedValue(null);
 
       await service.logout('refresh-token', AuthSurface.CUSTOMER);
 
-      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
       expect(audit.log).not.toHaveBeenCalled();
-    });
-
-    it('revokes a legacy null-surface refresh token from either surface', async () => {
-      prisma.authToken.findFirst.mockResolvedValue(logoutRecord(null));
-      prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
-
-      await service.logout('refresh-token', AuthSurface.CUSTOMER);
-
-      expect(prisma.authToken.deleteMany).toHaveBeenCalled();
     });
 
     it('is a no-op without a refresh token', async () => {
       await service.logout(undefined, AuthSurface.CUSTOMER);
 
-      expect(prisma.authToken.findFirst).not.toHaveBeenCalled();
-      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it('is a no-op for an unknown refresh token', async () => {
-      prisma.authToken.findFirst.mockResolvedValue(null);
-
-      await service.logout('missing-token', AuthSurface.CUSTOMER);
-
-      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
+      expect(authSession.revokeByRefreshToken).not.toHaveBeenCalled();
     });
   });
 
   describe('refresh', () => {
-    const baseRecord = {
-      id: 'auth-token-1',
-      userId: 'user-1',
-      token: 'refresh-token',
-      tokenType: TokenType.REFRESH,
-      expiresAt: new Date(Date.now() + 60_000),
-      user: {
-        id: 'user-1',
-        email: 'user@example.com',
-        firstName: 'User',
-        lastName: 'Example',
-        phone: null,
-        role: UserRole.CUSTOMER,
-        status: UserStatus.ACTIVE,
-      },
+    const activeUser = {
+      id: 'user-1',
+      email: 'user@example.com',
+      firstName: 'User',
+      lastName: 'Example',
+      phone: null,
+      role: UserRole.CUSTOMER,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     };
 
-    it('rotates the refresh token and upgrades a legacy (null-surface) token', async () => {
-      prisma.authToken.findFirst.mockResolvedValue({
-        ...baseRecord,
-        authSurface: null,
+    it('rotates the session and signs a JWT with sid', async () => {
+      authSession.requireLiveSessionByRefreshToken.mockResolvedValue(
+        liveSession,
+      );
+      prisma.user.findUnique.mockResolvedValue(activeUser);
+      authSession.rotateSession.mockResolvedValue({
+        session: { ...liveSession, id: 'sess-1' },
+        refreshToken: 'refresh-rotated',
       });
-      prisma.authToken.delete.mockResolvedValue({});
-      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
-      prisma.authToken.create.mockResolvedValue({});
 
       const result = await service.refresh(
         'refresh-token',
@@ -517,50 +538,107 @@ describe('AuthService', () => {
       );
 
       expect(result.access_token).toBe('jwt');
+      expect(result.refresh_token).toBe('refresh-rotated');
       expect(jwtService.sign).toHaveBeenCalledWith(
-        expect.objectContaining({ surface: AuthSurface.CUSTOMER }),
-      );
-      expect(prisma.authToken.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            authSurface: AuthSurface.CUSTOMER,
-          }),
+          surface: AuthSurface.CUSTOMER,
+          sid: 'sess-1',
         }),
+      );
+      expect(authSession.rotateSession).toHaveBeenCalledWith(
+        liveSession,
+        AuthSurface.CUSTOMER,
       );
     });
 
-    it('rejects a CUSTOMER-surface refresh token presented on the ADMIN surface', async () => {
-      prisma.authToken.findFirst.mockResolvedValue({
-        ...baseRecord,
-        authSurface: AuthSurface.CUSTOMER,
-      });
+    it('rejects a CUSTOMER-surface session presented on the ADMIN surface', async () => {
+      authSession.requireLiveSessionByRefreshToken.mockResolvedValue(
+        liveSession,
+      );
+      prisma.user.findUnique.mockResolvedValue(activeUser);
 
       await expect(
         service.refresh('refresh-token', AuthSurface.ADMIN),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(prisma.authToken.create).not.toHaveBeenCalled();
+      expect(authSession.rotateSession).not.toHaveBeenCalled();
     });
 
     it('rejects when the user role is not permitted on the requested surface', async () => {
-      prisma.authToken.findFirst.mockResolvedValue({
-        ...baseRecord,
-        authSurface: null,
+      authSession.requireLiveSessionByRefreshToken.mockResolvedValue({
+        ...liveSession,
+        authSurface: AuthSurface.ADMIN,
       });
+      prisma.user.findUnique.mockResolvedValue(activeUser);
 
       await expect(
         service.refresh('refresh-token', AuthSurface.ADMIN),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(prisma.authToken.create).not.toHaveBeenCalled();
+      expect(authSession.rotateSession).not.toHaveBeenCalled();
     });
 
     it('rejects when the refresh token does not exist', async () => {
-      prisma.authToken.findFirst.mockResolvedValue(null);
+      authSession.requireLiveSessionByRefreshToken.mockRejectedValue(
+        new UnauthorizedException('Invalid or expired refresh token'),
+      );
 
       await expect(
         service.refresh('missing-token', AuthSurface.CUSTOMER),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('revokes the session when the account is no longer active', async () => {
+      authSession.requireLiveSessionByRefreshToken.mockResolvedValue(
+        liveSession,
+      );
+      prisma.user.findUnique.mockResolvedValue({
+        ...activeUser,
+        status: UserStatus.SUSPENDED,
+      });
+      authSession.revokeOneForUser.mockResolvedValue(undefined);
+
+      await expect(
+        service.refresh('refresh-token', AuthSurface.CUSTOMER),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(authSession.revokeOneForUser).toHaveBeenCalledWith(
+        'user-1',
+        'sess-1',
+      );
+    });
+  });
+
+  describe('session management wrappers', () => {
+    it('lists, revokes one, and revokes all sessions', async () => {
+      authSession.listForUser.mockResolvedValue([
+        { id: 'sess-1', current: true },
+      ]);
+      await expect(service.listSessions('user-1', 'sess-1')).resolves.toEqual([
+        { id: 'sess-1', current: true },
+      ]);
+      await service.revokeSession('user-1', 'sess-2');
+      expect(authSession.revokeOneForUser).toHaveBeenCalledWith(
+        'user-1',
+        'sess-2',
+      );
+      authSession.revokeAllForUser.mockResolvedValue(2);
+      await expect(service.revokeAllSessions('user-1')).resolves.toBe(2);
+      expect(service.deviceLabelFromUserAgent('Mozilla')).toBe('Mozilla');
+    });
+  });
+
+  it('revokes sessions when changing password', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      passwordHash: 'hashed',
+    });
+    prisma.user.update.mockResolvedValue({});
+    prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+
+    await service.changePassword('user-1', 'old-pass', 'new-pass-123');
+
+    expect(authSession.revokeAllForUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.anything(),
+    );
   });
 });

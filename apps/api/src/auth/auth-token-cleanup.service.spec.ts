@@ -12,6 +12,9 @@ describe('AuthTokenCleanupService', () => {
       authToken: {
         deleteMany: jest.fn().mockResolvedValue({ count: 3 }),
       },
+      authSession: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -42,11 +45,24 @@ describe('AuthTokenCleanupService', () => {
   });
 
   describe('handleExpiredTokensCleanup', () => {
-    it('should delete expired auth tokens', async () => {
+    it('should delete expired auth tokens and stale sessions', async () => {
       await service.handleExpiredTokensCleanup();
 
       expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
         where: { expiresAt: { lt: expect.any(Date) } },
+      });
+      expect(prisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { expiresAt: { lt: expect.any(Date) } },
+            {
+              AND: [
+                { revokedAt: { not: null } },
+                { revokedAt: { lt: expect.any(Date) } },
+              ],
+            },
+          ],
+        },
       });
     });
 
@@ -55,15 +71,37 @@ describe('AuthTokenCleanupService', () => {
       (prisma.authToken.deleteMany as jest.Mock).mockResolvedValue({
         count: 5,
       });
+      (prisma.authSession.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
 
       await service.handleExpiredTokensCleanup();
 
       expect(logSpy).toHaveBeenCalledWith('Deleted 5 expired auth token(s)');
     });
 
-    it('should not log when no tokens deleted', async () => {
+    it('should log when sessions are deleted', async () => {
       const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
       (prisma.authToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.authSession.deleteMany as jest.Mock).mockResolvedValue({
+        count: 4,
+      });
+
+      await service.handleExpiredTokensCleanup();
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'Deleted 4 expired/revoked auth session(s)',
+      );
+    });
+
+    it('should not log when nothing deleted', async () => {
+      const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
+      (prisma.authToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.authSession.deleteMany as jest.Mock).mockResolvedValue({
         count: 0,
       });
 
