@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { RefundsService } from './refunds.service';
 
 describe('OrderExpiryService', () => {
   let service: OrderExpiryService;
@@ -57,6 +58,12 @@ describe('OrderExpiryService', () => {
         {
           provide: AdminNotifyService,
           useValue: { emit: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: RefundsService,
+          useValue: {
+            failStaleInitiatedRefunds: jest.fn().mockResolvedValue(0),
+          },
         },
       ],
     }).compile();

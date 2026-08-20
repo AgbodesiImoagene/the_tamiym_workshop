@@ -174,6 +174,9 @@ export class RefundsService {
           throw new BadRequestException('Refund amount must be greater than 0');
         }
 
+        // Release immortal INITIATED / stale drive claims so retries can proceed.
+        await this.failStaleInitiatedRefunds();
+
         if (idempotencyKey) {
           const existing = await this.prisma.refund.findUnique({
             where: { idempotencyKey },
@@ -189,10 +192,11 @@ export class RefundsService {
                 'Idempotency key already used with a different amount',
               );
             }
-            // Re-drive provider only for stuck INITIATED with no providerRef.
+            // Re-drive provider for stuck INITIATED (no ref or stale drive claim).
             if (
               existing.status === RefundStatus.INITIATED &&
-              !existing.providerRef
+              (existing.providerRef == null ||
+                existing.providerRef.startsWith('driving:'))
             ) {
               return this.driveProviderForReservedRefund(
                 existing.id,
@@ -259,6 +263,29 @@ export class RefundsService {
       await tx.$executeRaw`
         SELECT id FROM "orders" WHERE id = ${orderId} FOR UPDATE
       `;
+
+      // Re-check under the order lock so concurrent identical keys share one row.
+      if (idempotencyKey) {
+        const existing = await tx.refund.findUnique({
+          where: { idempotencyKey },
+        });
+        if (existing) {
+          const payment = await tx.payment.findFirst({
+            where: {
+              orderId,
+              status: PaymentStatus.SUCCEEDED,
+              providerRef: { not: null },
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+          return {
+            refund: existing,
+            paymentProviderRef:
+              payment?.providerRef ?? existing.transactionReference ?? '',
+            reused: true,
+          };
+        }
+      }
 
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -349,10 +376,48 @@ export class RefundsService {
     reason: string | undefined,
     actorUserId: string | undefined,
   ) {
-    const refund = await this.prisma.refund.findUniqueOrThrow({
-      where: { id: refundId },
-      include: { payment: true },
+    // Single-flight: claim the drive under a row lock so concurrent identical
+    // retries cannot both POST to Paystack for the same reservation.
+    const claim = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT id FROM "refunds" WHERE id = ${refundId} FOR UPDATE
+      `;
+      const row = await tx.refund.findUniqueOrThrow({
+        where: { id: refundId },
+        include: { payment: true },
+      });
+      if (
+        row.status !== RefundStatus.INITIATED ||
+        (row.providerRef != null && !row.providerRef.startsWith('driving:'))
+      ) {
+        return { skip: true as const, refund: row };
+      }
+      const staleDriving =
+        row.providerRef?.startsWith('driving:') &&
+        row.updatedAt.getTime() < Date.now() - STALE_INITIATED_MS;
+      if (row.providerRef?.startsWith('driving:') && !staleDriving) {
+        return { skip: true as const, refund: row };
+      }
+      await tx.refund.update({
+        where: { id: refundId },
+        data: { providerRef: `driving:${refundId}` },
+      });
+      return {
+        skip: false as const,
+        refund: { ...row, providerRef: `driving:${refundId}` },
+      };
     });
+
+    if (claim.skip) {
+      this.observability.recordRefundSettlement('reused');
+      this.observability.recordRefund({
+        outcome:
+          claim.refund.status === RefundStatus.FAILED ? 'failure' : 'success',
+      });
+      return claim.refund;
+    }
+
+    const refund = claim.refund;
     const transactionReference =
       refund.transactionReference ?? refund.payment?.providerRef;
     if (!transactionReference) {
@@ -367,6 +432,7 @@ export class RefundsService {
         amountKobo: Math.round(amount * 100),
         customerNote: reason,
         merchantNote: reason,
+        idempotencyKey: refund.idempotencyKey ?? refund.id,
       });
 
       const nextStatus = providerStatusToRefundStatus(
@@ -376,6 +442,7 @@ export class RefundsService {
         where: {
           id: refund.id,
           status: RefundStatus.INITIATED,
+          providerRef: `driving:${refund.id}`,
         },
         data: {
           providerRef: providerResult.providerRefundId,
@@ -389,7 +456,6 @@ export class RefundsService {
         },
       });
       if (updated.count !== 1) {
-        // Another path already moved this row; return current truth.
         return this.prisma.refund.findUniqueOrThrow({
           where: { id: refund.id },
         });
@@ -444,6 +510,14 @@ export class RefundsService {
       return current;
     } catch (error) {
       if (error instanceof PaystackRefundTransientError) {
+        await this.prisma.refund.updateMany({
+          where: {
+            id: refund.id,
+            status: RefundStatus.INITIATED,
+            providerRef: `driving:${refund.id}`,
+          },
+          data: { providerRef: null },
+        });
         this.logger.warn(
           `Paystack refund transient failure for ${refund.id}: ${error.message}`,
         );
@@ -454,11 +528,14 @@ export class RefundsService {
         );
       }
 
-      // Hard provider rejection only: release reservation if still INITIATED.
       if (error instanceof BadRequestException) {
         await this.prisma.refund.updateMany({
-          where: { id: refund.id, status: RefundStatus.INITIATED },
-          data: { status: RefundStatus.FAILED },
+          where: {
+            id: refund.id,
+            status: RefundStatus.INITIATED,
+            providerRef: `driving:${refund.id}`,
+          },
+          data: { status: RefundStatus.FAILED, providerRef: null },
         });
         this.observability.recordRefund({ outcome: 'failure' });
         this.observability.recordRefundSettlement('provider_rejected');
@@ -871,13 +948,21 @@ export class RefundsService {
    */
   async failStaleInitiatedRefunds(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - STALE_INITIATED_MS);
-    const result = await this.prisma.refund.updateMany({
+    const stale = await this.prisma.refund.findMany({
       where: {
         status: RefundStatus.INITIATED,
-        providerRef: null,
-        createdAt: { lt: cutoff },
+        updatedAt: { lt: cutoff },
+        OR: [
+          { providerRef: null },
+          { providerRef: { startsWith: 'driving:' } },
+        ],
       },
-      data: { status: RefundStatus.FAILED },
+      select: { id: true },
+    });
+    if (stale.length === 0) return 0;
+    const result = await this.prisma.refund.updateMany({
+      where: { id: { in: stale.map((r) => r.id) } },
+      data: { status: RefundStatus.FAILED, providerRef: null },
     });
     if (result.count > 0) {
       this.observability.recordRefundSettlement('stale');

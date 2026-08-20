@@ -323,4 +323,43 @@ describe('Paystack refund lifecycle (e2e)', () => {
     const inFlightTotal = rows.reduce((sum, r) => sum + Number(r.amount), 0);
     expect(inFlightTotal).toBe(totalAmount);
   });
+
+  it('single-flights concurrent identical idempotency-key retries to one provider call', async () => {
+    const suffix = `samekey-${Date.now()}`;
+    const { order, providerRef, totalAmount } = await createPaidCampaignOrder(
+      suffix,
+      8_000,
+    );
+
+    let providerCalls = 0;
+    jest
+      .spyOn(paystackRefundClient, 'createRefund')
+      .mockImplementation(async () => {
+        providerCalls += 1;
+        await new Promise((r) => setTimeout(r, 40));
+        return {
+          providerRefundId: `5500${suffix.slice(-4)}`,
+          providerStatus: 'pending',
+          refundReference: null,
+          transactionReference: providerRef,
+          amountKobo: Math.round(totalAmount * 100),
+          currency: 'NGN',
+        };
+      });
+
+    const key = `idem-same-${suffix}`;
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        refunds.initiateRefund(order.id, totalAmount, 'same', undefined, key),
+      ),
+    );
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    expect(fulfilled.length).toBe(6);
+    expect(providerCalls).toBe(1);
+
+    const rows = await prisma.refund.findMany({ where: { orderId: order.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].providerRef).toBe(`5500${suffix.slice(-4)}`);
+  });
 });

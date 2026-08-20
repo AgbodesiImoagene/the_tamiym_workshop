@@ -6,10 +6,12 @@ import { ObservabilityService } from '../observability/observability.service';
 import { runWithRequestContext } from '../request-context/request-context.store';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { ADMIN_NOTIF_ORDER_PENDING_EXPIRED } from '../admin-notifications/admin-notification-events';
+import { RefundsService } from './refunds.service';
 
 /**
  * Scheduled task: expire PENDING_PAYMENT orders whose expiresAt has passed.
  * Marks them CANCELLED, sets cancelledAt, and releases reserved inventory.
+ * Also sweeps stale INITIATED refund reservations (TTW-013).
  * Runs every 5 minutes.
  */
 @Injectable()
@@ -20,6 +22,7 @@ export class OrderExpiryService {
     private readonly prisma: PrismaService,
     private readonly observability: ObservabilityService,
     private readonly adminNotify: AdminNotifyService,
+    private readonly refundsService: RefundsService,
   ) {}
 
   @Cron('*/5 * * * *')
@@ -35,6 +38,8 @@ export class OrderExpiryService {
           'cron.orders.expire_pending',
           {},
           async () => {
+            await this.refundsService.failStaleInitiatedRefunds(now);
+
             const expired = await this.prisma.order.findMany({
               where: {
                 status: OrderStatus.PENDING_PAYMENT,

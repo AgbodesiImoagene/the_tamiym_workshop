@@ -35,6 +35,7 @@ export class PaystackRefundClient {
     amountKobo: number;
     customerNote?: string;
     merchantNote?: string;
+    idempotencyKey?: string;
   }): Promise<PaystackCreateRefundResult> {
     const secretKey = this.config.get<string>('PAYSTACK_SECRET_KEY');
     if (!secretKey) {
@@ -48,6 +49,9 @@ export class PaystackRefundClient {
         headers: {
           Authorization: `Bearer ${secretKey}`,
           'Content-Type': 'application/json',
+          ...(params.idempotencyKey
+            ? { 'Idempotency-Key': params.idempotencyKey }
+            : {}),
         },
         body: JSON.stringify({
           transaction: params.transactionReference,
