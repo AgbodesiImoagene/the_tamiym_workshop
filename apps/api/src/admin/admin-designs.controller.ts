@@ -50,6 +50,17 @@ export class AdminDesignsController {
     return this.designsService.findAllByModerationStatus(status);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get design detail (admin)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Design ID' })
+  @ApiResponse({ status: 200, description: 'Design detail' })
+  @ApiResponse({ status: 404, description: 'Design not found' })
+  async findOne(@Param('id') id: string) {
+    return this.designsService.adminFindOne(id);
+  }
+
   @Patch(':id/moderation')
   @ApiOperation({ summary: 'Update design moderation status (admin)' })
   @ApiBearerAuth('JWT-auth')

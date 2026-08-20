@@ -1,0 +1,16 @@
+---
+description: Tamiym Workshop product scope and release priorities
+alwaysApply: true
+---
+
+# Product scope
+
+- Build the Nigeria-first custom merchandise and fundraising platform defined by the PRD and approved designs.
+- Preserve the four surfaces: public `web`, customer/organizer `app`, internal `admin`, and NestJS `api`.
+- Paystack is the current payment provider; PostgreSQL, Redis/BullMQ, and S3-compatible storage are production dependencies.
+- Do not invent flows or redesign approved UI without explicit approval.
+- Prioritize correctness, security, data integrity, operability, testability, documentation, then speed.
+
+# Release standard
+
+A feature is not complete until its user journey works end to end, including loading, empty, error, retry, authorization, and recovery states. Names and documentation must describe actual capability, not intended future behaviour.

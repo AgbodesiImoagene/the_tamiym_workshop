@@ -1,0 +1,23 @@
+---
+description: Browser acceptance and regression expectations for all user-facing flows
+globs:
+  - 'apps/{web,app,admin}/**/*.{ts,tsx}'
+  - 'tests/e2e/**/*.{ts,tsx}'
+  - 'playwright.config.ts'
+alwaysApply: false
+---
+
+# Playwright regression
+
+Treat `docs/16-playwright-regression-strategy.md` as the browser-test source of truth.
+
+- Every user-visible behaviour change adds or updates Playwright acceptance coverage in the same ticket.
+- Cover the observable outcome plus relevant API/data side effects; money and inventory invariants also require PostgreSQL-backed integration tests.
+- Use isolated per-worker data and role-specific auth state. Never commit Playwright storage-state files.
+- Exercise anonymous, customer, organiser, admin, denial, validation, empty, error, retry, refresh, and responsive states as applicable.
+- Prefer role/label/text locators. Use test IDs only when no stable user-facing locator exists.
+- Wait for URLs, responses, state, or assertions; never use arbitrary sleeps.
+- Do not mock first-party APIs in core acceptance journeys. Stub external providers through deterministic simulators.
+- Unexpected page errors, console errors, and failed non-allowlisted requests fail the test.
+- Snapshot changes require design review; do not bulk-update snapshots to obtain green CI.
+- Retries diagnose flakes. Quarantines require an owner, expiry, and ticket and cannot cover critical checkout, auth, payment, refund, payout, or inventory journeys.

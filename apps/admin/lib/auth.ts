@@ -6,6 +6,8 @@ import { apiClient, clearCsrfToken, setCsrfToken } from './api';
 export type { ApiError } from './api';
 import { UserRole } from '@tamiym/types';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+
 export interface User {
   id: string;
   email: string;
@@ -34,6 +36,21 @@ export interface AuthResponse {
    */
   csrf_token?: string;
 }
+
+/** Full-page redirect to API Google OAuth start for existing admin accounts only. */
+export function getAdminGoogleSignInUrl(next = '/admin'): string {
+  const q = new URLSearchParams({ next });
+  return `${API_BASE_URL}/auth/google/admin?${q.toString()}`;
+}
+
+export const GOOGLE_SIGN_IN_ERROR_MESSAGES: Record<string, string> = {
+  google_denied: 'Google sign-in was cancelled.',
+  google_state: 'Sign-in session expired. Please try again.',
+  google_failed: 'Google sign-in failed. Please try again.',
+  google_unavailable: 'Google sign-in is not available right now.',
+  google_admin_forbidden:
+    'This Google account is not allowed for admin sign-in. Use an existing admin account.',
+};
 
 export const authApi = {
   /**

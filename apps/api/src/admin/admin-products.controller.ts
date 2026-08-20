@@ -155,12 +155,16 @@ export class AdminProductsController {
   }
 
   @Get(':productId/options')
-  @ApiOperation({ summary: 'List product options (admin)' })
+  @ApiOperation({
+    summary: 'List product options (admin)',
+    description:
+      'Returns the same payload as GET /admin/products/:id (admin detail), including options for any product status.',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'productId', description: 'Product ID' })
   async listOptions(@Param('productId') productId: string) {
-    return this.productsService.findOne(productId);
+    return this.productsService.adminFindOne(productId);
   }
 
   @Patch(':productId/options/:optionId')

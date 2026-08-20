@@ -3,7 +3,7 @@
 **Epic:** 5 — Contracts, observability and release proof  
 **Status:** Not started  
 **Risk:** High  
-**Blocked by:** TTW-010–TTW-015, TTW-020–TTW-023, TTW-030–TTW-034, TTW-040–TTW-043, TTW-050–TTW-053  
+**Blocked by:** TTW-010–TTW-015, TTW-020–TTW-027, TTW-030–TTW-036, TTW-040–TTW-043, TTW-050–TTW-053, TTW-068\
 **Blocks:** None
 
 ## Background
@@ -12,7 +12,7 @@ The repository provides local PostgreSQL, Redis, MinIO and observability service
 
 ## Proposal
 
-Define an immutable release manifest and operator-controlled deployment checklist, then rehearse it in a production-like staging environment before any production action. Establish a reviewed Prisma migration baseline and forward-only migration policy with explicit application/schema compatibility windows. Prove backup creation and restoration, migration and roll-forward/rollback procedures, queue/scheduler/provider handling, secrets/config validation, observability and smoke/UAT gates. Execute production only with explicit user/change approval, named operators, stop/go criteria and a post-release reconciliation window.
+Define an immutable release manifest and operator-controlled deployment checklist, then rehearse it in an isolated temporary production-shaped DigitalOcean environment before any production action. Establish a reviewed Prisma migration baseline and forward-only migration policy with explicit application/schema compatibility windows. Prove backup creation and restoration, migration and roll-forward/rollback procedures, queue/scheduler/provider handling, secrets/config validation, observability and smoke/UAT gates. Execute production only with explicit user/change approval, named operators, stop/go criteria and a post-release reconciliation window.
 
 ## Invariants
 
@@ -32,13 +32,13 @@ Define an immutable release manifest and operator-controlled deployment checklis
 4. Write and automate safe preflight checks for target identity, backup destination, capacity, database/Redis/object-store/provider connectivity, configuration/secrets presence, queue depth, reconciliation status and active incidents.
 5. Create backup, restore, migration, application rollback/roll-forward, queue/scheduler/webhook, object-storage and incident-communication runbooks with exact commands, permissions and abort criteria.
 6. Rehearse backup restoration into an isolated environment; validate row/object counts, checksums and sampled domain invariants. Rehearse forward migration, old/new application compatibility, failure injection and recovery on production-like volume.
-7. Deploy the candidate to staging, run TTW-050 contract checks, TTW-051 telemetry/alerts and TTW-053 UAT, then hold a documented go/no-go review with business, engineering and operations.
+7. Deploy the candidate to temporary validation, run TTW-050 contract checks, TTW-051 telemetry/alerts and TTW-053 UAT, tear down temporary resources after evidence capture, then hold a documented go/no-go review with business, engineering and operations.
 8. After explicit production approval, execute the controlled rollout with canary/health gates where supported, monitor provider/queue/money indicators, reconcile controlled and organic transactions, and record final sign-off or recovery.
 
 ## Test and observability plan
 
 - Unit/component: Validate release-manifest schema, configuration checks, migration checksum/drift logic and invariant/reconciliation queries.
-- Integration/e2e: Migrate both blank and restored production-like databases; boot previous and candidate applications across the compatibility window; restore object/database data; execute staging smoke and controlled UAT.
+- Integration/e2e: Migrate both blank and restored production-like databases; boot previous and candidate applications across the compatibility window; restore object/database data; execute temporary-environment smoke and controlled UAT.
 - Failure, retry, and concurrency: Inject failed migration step, incompatible app/schema ordering, worker interruption, delayed/duplicate webhook, queue retry exhaustion, provider outage and restore failure; prove stop/go logic and safe roll-forward/rollback without duplicate business effects.
 - Logs, metrics, traces, and alerts: Dashboard API, database, webhook/provider, money reconciliation, queues, media and auth before/during/after rollout; preserve redacted deployment audit, alert delivery, trace correlation and reconciliation evidence through the approved retention period.
 
@@ -65,7 +65,7 @@ Define an immutable release manifest and operator-controlled deployment checklis
 
 ## Out of scope
 
-- Implementing unresolved product, correctness or security blockers → TTW-010–TTW-043.
+- Implementing unresolved product, correctness or security blockers → TTW-010–TTW-015, TTW-020–TTW-027, TTW-030–TTW-036 and TTW-040–TTW-043.
 - Building observability or acceptance coverage → TTW-051 and TTW-053.
 - Selecting a hosting vendor or changing geographic/product scope without a separately approved architecture/business ticket.
 

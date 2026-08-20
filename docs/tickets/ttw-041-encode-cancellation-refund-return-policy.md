@@ -83,8 +83,8 @@ Recommended v1: customers request rather than directly execute paid cancellation
 - Provider refund state/idempotency/cumulative accounting mechanics → TTW-013.
 - Inventory movement mechanics → TTW-014.
 - Shipment/tracking evidence and exception state → TTW-040.
-- Chargebacks and bank disputes → follow-up ticket after Paystack dispute requirements are approved.
-- Automated reverse logistics/return labels → follow-up after a carrier is selected.
+- Chargebacks and bank disputes → TTW-046.
+- Automated reverse logistics/return labels → TTW-047.
 
 ## Design review
 

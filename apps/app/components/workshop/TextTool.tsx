@@ -1,7 +1,17 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
-import { Button } from '@tamiym/ui';
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@tamiym/ui';
 
 const FONT_FAMILIES = [
   'Arial',
@@ -17,6 +27,12 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
+
+const ALIGN_ICONS: Record<'left' | 'center' | 'right', string> = {
+  left: '⬛ L',
+  center: '⬛ C',
+  right: '⬛ R',
+};
 
 interface TextToolProps {
   /** Called with a fabric.IText-compatible JSON to add to the canvas */
@@ -70,84 +86,96 @@ export default function TextTool({ onAddText }: TextToolProps) {
       />
 
       <div className="grid grid-cols-2 gap-2">
-        {/* Font family */}
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none"
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
+        <Select value={fontFamily} onValueChange={setFontFamily}>
+          <SelectTrigger className="rounded-lg text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FONT_FAMILIES.map((f) => (
+              <SelectItem key={f} value={f}>
+                {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        {/* Font size */}
-        <select
-          value={fontSize}
-          onChange={(e) => setFontSize(Number(e.target.value))}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none"
-        >
-          {FONT_SIZES.map((s) => (
-            <option key={s} value={s}>
-              {s}px
-            </option>
-          ))}
-        </select>
+        <Select value={String(fontSize)} onValueChange={(val) => setFontSize(Number(val))}>
+          <SelectTrigger className="rounded-lg text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FONT_SIZES.map((s) => (
+              <SelectItem key={s} value={String(s)}>
+                {s}px
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Bold */}
-        <button
-          type="button"
-          onClick={() => setBold((v) => !v)}
-          className={`rounded px-2 py-1 text-sm font-bold ${bold ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
-          aria-pressed={bold}
-          title="Bold"
-        >
-          B
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setBold((v) => !v)}
+              className={`rounded px-2 py-1 text-sm font-bold ${bold ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+              aria-pressed={bold}
+            >
+              B
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Bold</TooltipContent>
+        </Tooltip>
 
-        {/* Italic */}
-        <button
-          type="button"
-          onClick={() => setItalic((v) => !v)}
-          className={`rounded px-2 py-1 text-sm italic ${italic ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
-          aria-pressed={italic}
-          title="Italic"
-        >
-          I
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setItalic((v) => !v)}
+              className={`rounded px-2 py-1 text-sm italic ${italic ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+              aria-pressed={italic}
+            >
+              I
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Italic</TooltipContent>
+        </Tooltip>
 
-        {/* Align */}
         {(['left', 'center', 'right'] as const).map((align) => (
-          <button
-            key={align}
-            type="button"
-            onClick={() => setTextAlign(align)}
-            className={`rounded px-2 py-1 text-xs ${textAlign === align ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
-            aria-pressed={textAlign === align}
-            title={`Align ${align}`}
-          >
-            {align === 'left' ? '≡' : align === 'center' ? '≡' : '≡'}
-          </button>
+          <Tooltip key={align}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setTextAlign(align)}
+                className={`rounded px-2 py-1 text-xs ${textAlign === align ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+                aria-pressed={textAlign === align}
+              >
+                {ALIGN_ICONS[align]}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Align {align}</TooltipContent>
+          </Tooltip>
         ))}
 
-        {/* Colour picker */}
-        <label className="flex items-center gap-1 text-xs text-zinc-600" title="Text colour">
-          <span
-            className="h-5 w-5 rounded border border-zinc-300"
-            style={{ backgroundColor: fill }}
-          />
-          <input
-            type="color"
-            value={fill}
-            onChange={(e) => setFill(e.target.value)}
-            className="sr-only"
-          />
-          Colour
-        </label>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <label className="flex cursor-pointer items-center gap-1 text-xs text-zinc-600">
+              <span
+                className="h-5 w-5 rounded border border-zinc-300"
+                style={{ backgroundColor: fill }}
+              />
+              <input
+                type="color"
+                value={fill}
+                onChange={(e) => setFill(e.target.value)}
+                className="sr-only"
+              />
+              Colour
+            </label>
+          </TooltipTrigger>
+          <TooltipContent>Text colour</TooltipContent>
+        </Tooltip>
       </div>
 
       <Button variant="secondary" size="sm" onClick={handleAdd} disabled={!text.trim()}>

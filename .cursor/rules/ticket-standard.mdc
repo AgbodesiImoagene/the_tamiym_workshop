@@ -1,0 +1,19 @@
+---
+description: Structure and lifecycle for Tamiym ticket files
+globs: "docs/tickets/ttw-*.md"
+alwaysApply: false
+---
+
+# Ticket standard
+
+- Use `docs/tickets/TEMPLATE.md`; one ticket owns one independently reviewable concern.
+- Use IDs `TTW-XXX` and imperative outcome titles.
+- Declare risk, status, dependencies, and reverse dependencies.
+- Background states the observed problem with file/line or reproduction evidence; it does not prescribe the solution.
+- Proposal names interfaces and deliberate trade-offs.
+- State behavioural and data invariants for refactors and high-risk work.
+- Keep implementation steps ordered and update them when implementation diverges.
+- Acceptance criteria must be independently observable commands, tests, or behaviours.
+- Name explicit out-of-scope work and its owning ticket.
+- Append design reviews, implementation review iterations, evidence, deviations, and completion summary to the same ticket file.
+- Keep `docs/tickets/README.md` in sync when present; do not create separate log files.

@@ -1,0 +1,18 @@
+---
+description: Required verification, CI, debt-ratchet, and release evidence
+alwaysApply: true
+---
+
+# Quality gates
+
+Use repository scripts as the source of truth. Prefer `pnpm verify` for ordinary tickets and `pnpm verify:critical` for high/critical work once those scripts exist.
+
+Until consolidated scripts exist, record results for formatting, lint, type-check, affected tests, production build, and `git diff --check`. High/critical work also requires PostgreSQL/Redis-backed integration tests, OpenAPI validation, migrations, coverage, and production dependency audit.
+
+- CI must use a Node version supported by every workspace package and run the same commands used locally.
+- Tests must be deterministic and must close database, Redis, queue, HTTP, timer, and worker resources.
+- Generated files and vendored assets should be excluded from inappropriate lint/format/coverage gates.
+- Do not lower thresholds, disable tests, suppress findings, or regenerate snapshots merely to obtain green output.
+- Existing non-critical debt may use an explicit ticketed ratchet: no new failures and measurable improvement in touched areas.
+- Critical security, authorization, financial-integrity, migration-safety, or data-loss failures block completion.
+- A production build is required before PR; deployment additionally requires migration, rollback, smoke-test, monitoring, and reconciliation evidence.

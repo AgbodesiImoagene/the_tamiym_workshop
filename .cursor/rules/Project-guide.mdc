@@ -1,6 +1,7 @@
 ---
+description: Load the repository documentation index before project work
 alwaysApply: true
 ---
 
-Always add /home/agbodesi-imoagene/GitHub/the_tamiym_workshop/docs/README.md to your context.
+Always add `docs/README.md` to your context.
 Attach further documentation as required.

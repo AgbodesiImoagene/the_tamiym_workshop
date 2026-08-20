@@ -76,6 +76,7 @@ The repo currently defines controllers for these route groups:
 - `/v1/admin/categories/*`
 - `/v1/admin/inventory/*`
 - `/v1/admin/designs/*`
+- `/v1/admin/media/*`
 - `/v1/admin/campaigns/*`
 - `/v1/admin/payout-runs/*`
 - `/v1/admin/payouts/*`
@@ -94,6 +95,7 @@ The campaign status machine is: `DRAFT → REVIEW → ACTIVE → PAUSED / DISABL
 - **DRAFT → REVIEW** (`POST /v1/campaigns/:id/submit-for-review`, organiser): AI text moderation runs on the campaign's title, description, and story. Auto-rejects obvious violations (back to DRAFT with `rejectionReason`). Moves clean/ambiguous content to REVIEW with `moderationStatus` reflecting the AI confidence tier. Products and designs are locked once in REVIEW.
 - **REVIEW → ACTIVE** (`POST /v1/admin/campaigns/:id/activate`, admin): validates all attached designs are `APPROVED`. Makes the campaign publicly live.
 - **REVIEW → DRAFT** (`POST /v1/admin/campaigns/:id/reject`, admin): returns the campaign to DRAFT with a `rejectionReason` shown to the organiser. They may edit and resubmit.
+- `GET /v1/admin/campaigns` now includes linked campaign-product design moderation summaries (`design.id`, `design.name`, `design.moderationStatus`, `design.moderationNotes`) so the admin moderation queue can spot blocked submissions without fetching each campaign detail first.
 
 ## Moderation architecture
 

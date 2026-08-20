@@ -316,6 +316,34 @@ export class DesignsService {
   }
 
   /**
+   * Get a single design for admin review — no ownership check.
+   * Includes owner, product, and all design views.
+   */
+  async adminFindOne(id: string) {
+    const design = await this.prisma.design.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        product: { select: { id: true, name: true, slug: true } },
+        views: {
+          select: {
+            id: true,
+            productViewId: true,
+            isUsed: true,
+            layerCount: true,
+          },
+        },
+      },
+    });
+    if (!design) {
+      throw new NotFoundException('Design not found');
+    }
+    return design;
+  }
+
+  /**
    * Update a design (customer, own only). Re-runs AI moderation if designData
    * or thumbnailUrl changes.
    */

@@ -54,6 +54,8 @@ export const GOOGLE_SIGN_IN_ERROR_MESSAGES: Record<string, string> = {
   google_state: 'Sign-in session expired. Please try again.',
   google_failed: 'Google sign-in failed. Please try again.',
   google_unavailable: 'Google sign-in is not available right now.',
+  google_admin_forbidden:
+    'This Google account is not allowed for admin sign-in. Use an existing admin account.',
 };
 
 export const authApi = {

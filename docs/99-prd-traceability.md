@@ -16,11 +16,11 @@ This file maps PRD requirements to implementation deliverables to avoid drift.
 
 ## Checkout & Orders
 
-- Shipping info, payment method selection (Paystack), success states, order history — apps/app + api/orders + api/payments
+- Shipping info, payment method selection (Paystack), success states, order history — apps/web + apps/app + api/orders + api/payments
 
 ## Fundraising
 
-- Campaign creation workflow, shareable pages, performance snapshot — apps/app + apps/web (public pages) + api/fundraising
+- Campaign creation workflow, shareable pages, fundraiser-scoped commerce, performance snapshot — apps/app + apps/web + api/fundraising
 
 ## Admin Dashboard
 
@@ -35,6 +35,7 @@ This file maps PRD requirements to implementation deliverables to avoid drift.
 - Responsive UI, error handling, modern browser support — frontend
 - Security separation (admin/customer), avoid storing sensitive payment details — backend
 - Observability — api + frontends
+- Site-boundary and session-sharing model — see `14-auth-and-session-architecture.md`
 
 ## Deadline
 

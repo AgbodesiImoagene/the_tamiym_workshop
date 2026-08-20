@@ -68,7 +68,7 @@ Add web-owned checkout and order-confirmation routes. Authenticated, verified cu
 
 ## Out of scope
 
-- Standard catalogue cart unification across `web` and `app` → follow-up after TTW-053.
+- Standard catalogue cart unification across `web` and `app` → TTW-055.
 - Customer account order detail → TTW-033.
 - Payment/refund/inventory correctness internals → TTW-010, TTW-012, TTW-013, TTW-014.
 - Returns, shipment tracking, and delivery exceptions → TTW-040, TTW-041.

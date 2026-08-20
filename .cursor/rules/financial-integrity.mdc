@@ -1,0 +1,20 @@
+---
+description: Critical invariants for orders, payments, refunds, inventory, payouts, and ledgers
+globs: "apps/api/src/{orders,payouts,pricing,inventory,fundraising}/**/*.ts,apps/api/prisma/**/*"
+alwaysApply: false
+---
+
+# Financial integrity
+
+Treat every change in scope as critical risk.
+
+- Provider events and commands must have stable idempotency keys and at-most-once database effects.
+- Enforce idempotency with unique constraints and conditional state transitions, not pre-read checks alone.
+- Concurrent delivery of the same webhook must produce the same final state and one ledger effect.
+- One order has at most one active payment attempt unless an explicit expiry/retry policy allows another.
+- Amount, currency, reference, provider, order ownership, and allowed prior state must be verified before settlement.
+- Ledger entries are immutable and uniquely attributable to their source event, order, refund, or payout transition.
+- Payout reserve, success, failure, and reversal transitions must conserve balance exactly once.
+- Inventory reservation/release must be atomic, never negative, and safe under concurrent checkout/cancellation.
+- Use decimal database values and documented boundary rounding; never use floating point as the money source of truth.
+- Test success, rejection, duplicate sequential delivery, concurrent delivery, retry after partial failure, and reconciliation.

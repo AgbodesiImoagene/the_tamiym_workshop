@@ -24,10 +24,13 @@ export interface PublicFundraiser {
   id: string;
   title: string;
   slug: string;
+  /** Present on API payload; only ACTIVE campaigns are returned from the public slug endpoint. */
+  status?: string;
   description?: string | null;
   story?: string | null;
   goalAmount?: number | null;
   currentAmount: number;
+  currency?: string;
   organizer?: {
     firstName?: string | null;
     lastName?: string | null;

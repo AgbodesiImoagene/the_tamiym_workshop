@@ -1,0 +1,18 @@
+---
+description: Authentication, authorization, cookies, CSRF, and admin-surface security
+globs: "apps/api/src/auth/**/*.ts,apps/api/src/admin/**/*.ts,apps/*/lib/{auth,api}.ts,apps/*/app/auth/**/*.tsx"
+alwaysApply: false
+---
+
+# Auth and authorization
+
+- Keep customer and admin sessions distinct by server-controlled endpoints, token audience/purpose, cookie names, lifetime, and logout behaviour.
+- Never use a client-controlled header alone to decide token audience or privileged cookie issuance.
+- Customer-facing sessions must not grant ambient admin-console access, even for an admin identity.
+- Require role checks on every admin controller and ownership/capability checks in services.
+- Protect all cookie-authenticated state changes with a defined CSRF mechanism and strict origin allowlist.
+- Cookies must be HttpOnly and Secure in production; document SameSite and Domain decisions per deployment topology.
+- Normalize identifiers consistently during registration, login, lookup, reset, and OAuth linking.
+- Rotate refresh tokens; revoke sessions after password or privilege changes; detect replay where practical.
+- Rate-limit and audit authentication and sensitive admin actions without logging secrets.
+- Test customer/admin cross-surface isolation, CSRF rejection, suspended/deleted users, token replay, role changes, and logout independence.

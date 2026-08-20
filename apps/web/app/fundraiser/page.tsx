@@ -1,38 +1,33 @@
-import Image from 'next/image';
 import { MarketingShell } from '@/components/marketing-shell';
+import { MarketingHero } from '@/components/marketing-hero';
 import { marketingAssets } from '@/lib/assets';
-import { customerAppPath } from '@/lib/site';
+import { webRegisterWithNext } from '@/lib/site';
+import Image from 'next/image';
 
 export default function FundraiserPage() {
   return (
     <MarketingShell>
-      <section className="relative h-[454px] overflow-hidden">
-        <Image
-          src={marketingAssets.fundraiserHero}
-          alt="People enjoying the water during a fundraiser campaign visual"
-          fill
-          className="object-cover"
-          priority
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-black/25" />
-        <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-center px-6 lg:px-8">
-          <div className="max-w-[36rem] space-y-8 text-white">
-            <div className="space-y-3">
-              <h1 className="text-[3.2rem] font-bold leading-[1.05] tracking-[-0.03em]">
-                Raise funds with custom merch!
-              </h1>
-              <p className="text-sm font-bold">Turn your cause into a movement</p>
-            </div>
-            <a
-              href={customerAppPath('/auth/register')}
-              className="inline-flex rounded-lg bg-accent px-4 py-2 text-sm font-bold text-tamiym-blue"
-            >
-              Start A Fundraiser
-            </a>
+      <MarketingHero
+        imageSrc={marketingAssets.fundraiserHero}
+        imageAlt="People enjoying the water during a fundraiser campaign visual"
+        priority
+        overlayClassName="bg-black/25"
+      >
+        <div className="max-w-[36rem] space-y-8 text-white">
+          <div className="space-y-3">
+            <h1 className="text-[3.2rem] font-bold leading-[1.05] tracking-[-0.03em]">
+              Raise funds with custom merch!
+            </h1>
+            <p className="text-sm font-bold">Turn your cause into a movement</p>
           </div>
+          <a
+            href={webRegisterWithNext('/fundraiser')}
+            className="inline-flex rounded-lg bg-accent px-4 py-2 text-sm font-bold text-tamiym-blue"
+          >
+            Start A Fundraiser
+          </a>
         </div>
-      </section>
+      </MarketingHero>
 
       <section className="mx-auto max-w-7xl px-6 py-16 text-center lg:px-8">
         <div className="space-y-4 text-tamiym-blue">
@@ -67,7 +62,7 @@ export default function FundraiserPage() {
               and risk-free way.
             </p>
             <a
-              href={customerAppPath('/auth/register')}
+              href={webRegisterWithNext('/fundraiser')}
               className="inline-flex rounded-lg bg-accent px-5 py-3 text-sm font-bold text-tamiym-blue"
             >
               Get Started

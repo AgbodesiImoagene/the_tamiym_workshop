@@ -10,6 +10,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { Tabs, TabsList, TabsTrigger } from '@tamiym/ui';
 
 const categoryTabs = [
   'All',
@@ -123,22 +124,25 @@ export default function DashboardProductsPage() {
           </div>
 
           <div className="overflow-x-auto border-b border-black/10 pb-1">
-            <div className="flex min-w-max gap-6 text-sm font-medium">
-              {categoryTabs.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={`border-b-[4px] pb-2 pt-1 whitespace-nowrap transition ${
-                    activeCategory === category
-                      ? 'border-[#1e39d2] text-[#1e39d2]'
-                      : 'border-transparent text-black'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              value={activeCategory}
+              onValueChange={(val) => setActiveCategory(val as typeof activeCategory)}
+            >
+              <TabsList
+                variant="line"
+                className="h-auto w-auto justify-start rounded-none bg-transparent px-0 pb-0"
+              >
+                {categoryTabs.map((category) => (
+                  <TabsTrigger
+                    key={category}
+                    value={category}
+                    className="rounded-none border-x-0 border-t-0 pb-2 pt-1 text-sm font-medium whitespace-nowrap data-active:border-b-[4px] data-active:border-[#1e39d2] data-active:bg-transparent data-active:text-[#1e39d2] data-active:shadow-none"
+                  >
+                    {category}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
           {cartMessage ? <p className="text-sm text-[#004385]">{cartMessage}</p> : null}
         </div>

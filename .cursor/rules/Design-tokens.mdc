@@ -1,5 +1,7 @@
 ---
-alwaysApply: true
+description: Shared Tailwind design tokens and approved Figma parity
+globs: "apps/{web,app,admin}/**/*.{ts,tsx,css},packages/{ui,config}/**/*.{ts,tsx,css}"
+alwaysApply: false
 ---
 
 # Design Tokens & UI Parity

@@ -1,7 +1,21 @@
 'use client';
 
 import { customerAssets } from '@/lib/assets';
-import { Input, Label, Textarea } from '@tamiym/ui';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormProvider,
+  Input,
+  Separator,
+  Textarea,
+} from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { useEffect } from 'react';
@@ -43,12 +57,13 @@ interface AddressFormValues {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)] lg:p-8">
-      <div className="border-b border-black/10 pb-4">
-        <h2 className="text-[20px] font-bold text-black/90">{title}</h2>
-      </div>
-      <div className="pt-6">{children}</div>
-    </section>
+    <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
+      <CardHeader className="pb-0">
+        <CardTitle className="text-[20px] font-bold text-black/90">{title}</CardTitle>
+        <Separator className="mt-4" />
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
@@ -63,6 +78,8 @@ function SaveButton({ label, loading }: { label: string; loading: boolean }) {
     </button>
   );
 }
+
+const labelClassName = 'text-[20px] font-bold text-black';
 
 export function CustomerSettingsForm({
   pageTitle,
@@ -83,29 +100,15 @@ export function CustomerSettingsForm({
   });
 
   const profileForm = useForm<ProfileFormValues>({
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-    },
+    defaultValues: { firstName: '', lastName: '', email: '', phone: '' },
   });
 
   const passwordForm = useForm<PasswordFormValues>({
-    defaultValues: {
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    },
+    defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
 
   const addressForm = useForm<AddressFormValues>({
-    defaultValues: {
-      country: 'Nigeria',
-      state: '',
-      city: '',
-      addressLine1: '',
-    },
+    defaultValues: { country: 'Nigeria', state: '', city: '', addressLine1: '' },
   });
 
   useEffect(() => {
@@ -170,181 +173,243 @@ export function CustomerSettingsForm({
         <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">{pageTitle}</h1>
       </div>
 
+      {/* ── Profile ── */}
       <SectionCard title={personalTitle}>
-        <form
-          className="space-y-8"
-          onSubmit={profileForm.handleSubmit(async (values) => {
-            await profileMutation.mutateAsync({
-              firstName: values.firstName,
-              lastName: values.lastName,
-              phone: values.phone,
-            });
-          })}
-        >
-          <div className="flex flex-col items-center gap-4">
-            <Image
-              src={customerAssets.settingsProfilePhoto}
-              alt="Profile"
-              width={220}
-              height={220}
-              className="h-[220px] w-[220px] rounded-full object-cover"
-            />
-            <button
-              type="button"
-              className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
-            >
-              {pageTitle === 'Profile' ? 'Upload Profile Picture' : 'Update Profile Picture'}
-            </button>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="firstName" className="text-[20px] font-bold text-black">
-                First Name
-              </Label>
-              <Input
-                id="firstName"
-                placeholder="Enter name"
-                {...profileForm.register('firstName')}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName" className="text-[20px] font-bold text-black">
-                Surname
-              </Label>
-              <Input id="lastName" placeholder="Enter name" {...profileForm.register('lastName')} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-[20px] font-bold text-black">
-              Email
-            </Label>
-            <Input id="email" disabled {...profileForm.register('email')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-[20px] font-bold text-black">
-              Phone
-            </Label>
-            <Input id="phone" placeholder="Enter number" {...profileForm.register('phone')} />
-          </div>
-
-          <SaveButton label="Save" loading={profileMutation.isPending} />
-        </form>
-      </SectionCard>
-
-      <SectionCard title={passwordTitle}>
-        <form
-          className="space-y-8"
-          onSubmit={passwordForm.handleSubmit(async (values) => {
-            if (values.newPassword !== values.confirmPassword) {
-              passwordForm.setError('confirmPassword', {
-                type: 'validate',
-                message: 'Passwords must match',
+        <FormProvider {...profileForm}>
+          <form
+            className="space-y-8"
+            onSubmit={profileForm.handleSubmit(async (values) => {
+              await profileMutation.mutateAsync({
+                firstName: values.firstName,
+                lastName: values.lastName,
+                phone: values.phone,
               });
-              return;
-            }
+            })}
+          >
+            <div className="flex flex-col items-center gap-4">
+              <Image
+                src={customerAssets.settingsProfilePhoto}
+                alt="Profile"
+                width={220}
+                height={220}
+                className="h-[220px] w-[220px] rounded-full object-cover"
+              />
+              <button
+                type="button"
+                className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
+              >
+                {pageTitle === 'Profile' ? 'Upload Profile Picture' : 'Update Profile Picture'}
+              </button>
+            </div>
 
-            await passwordMutation.mutateAsync({
-              currentPassword: values.currentPassword,
-              newPassword: values.newPassword,
-            });
-          })}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword" className="text-[20px] font-bold text-black">
-              {pageTitle === 'Profile' ? 'Create Password' : 'Previous Password'}
-            </Label>
-            <Input
-              id="currentPassword"
-              type="password"
-              placeholder="********************"
-              {...passwordForm.register('currentPassword')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="newPassword" className="text-[20px] font-bold text-black">
-              {pageTitle === 'Profile' ? 'Confirm Password' : 'New Password'}
-            </Label>
-            <Input
-              id="newPassword"
-              type="password"
-              placeholder="********************"
-              {...passwordForm.register('newPassword')}
-            />
-          </div>
-
-          {pageTitle !== 'Profile' ? (
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-[20px] font-bold text-black">
-                Confirm Password
-              </Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="********************"
-                {...passwordForm.register('confirmPassword')}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <FormField
+                control={profileForm.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClassName}>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={profileForm.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClassName}>Surname</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          ) : null}
 
-          <SaveButton label="Save" loading={passwordMutation.isPending} />
-        </form>
+            <FormField
+              control={profileForm.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>Email</FormLabel>
+                  <FormControl>
+                    <Input disabled {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={profileForm.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>Phone</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <SaveButton label="Save" loading={profileMutation.isPending} />
+          </form>
+        </FormProvider>
       </SectionCard>
 
+      {/* ── Password ── */}
+      <SectionCard title={passwordTitle}>
+        <FormProvider {...passwordForm}>
+          <form
+            className="space-y-8"
+            onSubmit={passwordForm.handleSubmit(async (values) => {
+              if (values.newPassword !== values.confirmPassword) {
+                passwordForm.setError('confirmPassword', {
+                  type: 'validate',
+                  message: 'Passwords must match',
+                });
+                return;
+              }
+              await passwordMutation.mutateAsync({
+                currentPassword: values.currentPassword,
+                newPassword: values.newPassword,
+              });
+            })}
+          >
+            <FormField
+              control={passwordForm.control}
+              name="currentPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>
+                    {pageTitle === 'Profile' ? 'Create Password' : 'Previous Password'}
+                  </FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********************" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={passwordForm.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>
+                    {pageTitle === 'Profile' ? 'Confirm Password' : 'New Password'}
+                  </FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********************" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {pageTitle !== 'Profile' ? (
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClassName}>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="********************" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
+
+            <SaveButton label="Save" loading={passwordMutation.isPending} />
+          </form>
+        </FormProvider>
+      </SectionCard>
+
+      {/* ── Shipping address ── */}
       <SectionCard title={shippingTitle}>
-        <form
-          className="space-y-8"
-          onSubmit={addressForm.handleSubmit(async (values) => {
-            await addressMutation.mutateAsync({
-              country: values.country,
-              state: values.state,
-              city: values.city,
-              addressLine1: values.addressLine1,
-            });
-          })}
-        >
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="country" className="text-[20px] font-bold text-black">
-                Select Country
-              </Label>
-              <Input
-                id="country"
-                placeholder="Enter country"
-                {...addressForm.register('country')}
+        <FormProvider {...addressForm}>
+          <form
+            className="space-y-8"
+            onSubmit={addressForm.handleSubmit(async (values) => {
+              await addressMutation.mutateAsync({
+                country: values.country,
+                state: values.state,
+                city: values.city,
+                addressLine1: values.addressLine1,
+              });
+            })}
+          >
+            <div className="grid gap-6 lg:grid-cols-2">
+              <FormField
+                control={addressForm.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClassName}>Select Country</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter country" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addressForm.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={labelClassName}>Select State/City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter state" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="state" className="text-[20px] font-bold text-black">
-                Select State/City
-              </Label>
-              <Input id="state" placeholder="Enter state" {...addressForm.register('state')} />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="city" className="text-[20px] font-bold text-black">
-              City
-            </Label>
-            <Input id="city" placeholder="Enter city" {...addressForm.register('city')} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="addressLine1" className="text-[20px] font-bold text-black">
-              Street Address
-            </Label>
-            <Textarea
-              id="addressLine1"
-              placeholder="Enter address"
-              {...addressForm.register('addressLine1')}
+            <FormField
+              control={addressForm.control}
+              name="city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>City</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter city" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <SaveButton label="Save" loading={addressMutation.isPending} />
-        </form>
+            <FormField
+              control={addressForm.control}
+              name="addressLine1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>Street Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Enter address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <SaveButton label="Save" loading={addressMutation.isPending} />
+          </form>
+        </FormProvider>
       </SectionCard>
     </div>
   );

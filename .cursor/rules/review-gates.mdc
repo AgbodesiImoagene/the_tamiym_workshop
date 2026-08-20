@@ -1,0 +1,22 @@
+---
+description: Risk-based design and independent implementation review gates
+alwaysApply: true
+---
+
+# Review gates
+
+Follow the risk levels in `AGENTS.md`.
+
+## Design review
+
+Before code, record blast radius and callers, duplication check, proposed interfaces, invariants, edge/failure/concurrency cases, migration/rollback impact, observability, and test plan. Split the ticket if these do not form one concern.
+
+## Implementation review
+
+Use a fresh reviewer that did not implement the change. Review UX, correctness, edge cases, performance, testing, architecture, consistency, accessibility, security, data integrity, API contracts, and operability. Verdicts are PASS, CHANGES_REQUIRED, or BLOCKED.
+
+CHANGES_REQUIRED requires fixes followed by a complete new review. BLOCKED requires escalation, not a workaround. One independent implementation reviewer is the default at every risk level. Add a second reviewer only when the ticket defines a materially different charter that the first reviewer cannot adequately cover; shared interfaces or critical paths alone do not justify duplicate general reviews. Use a security-focused charter for auth, uploads, data access, secrets, or money movement.
+
+No model or price tier is required. Use the least costly reviewer capable of the charter and escalate only for unresolved specialist risk or explicit user direction.
+
+Every PASS must cite acceptance-criterion code paths, relevant test names, and actual quality-gate output. Unverified claims remain unverified.

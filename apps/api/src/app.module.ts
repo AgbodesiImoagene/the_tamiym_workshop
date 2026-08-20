@@ -22,9 +22,18 @@ import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
 import { CsrfGuard } from './auth/guards/csrf/csrf.guard';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { BulkPricingModule } from './bulk-pricing/bulk-pricing.module';
 import { DesignsModule } from './designs/designs.module';
 import { DesignAssetsModule } from './design-assets/design-assets.module';
+import { DiscountsModule } from './discounts/discounts.module';
+import { FundraisingModule } from './fundraising/fundraising.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { MailModule } from './mail/mail.module';
+import { MediaModule } from './media/media.module';
+import { OrdersModule } from './orders/orders.module';
+import { PayoutsModule } from './payouts/payouts.module';
+import { ProductsModule } from './products/products.module';
+import { ShippingModule } from './shipping/shipping.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
 import { ObservabilityModule } from './observability/observability.module';
@@ -123,9 +132,18 @@ import { validateEnv } from './config/env-validation';
     AnalyticsModule,
     AuditModule,
     AuthModule,
+    BulkPricingModule,
     DesignAssetsModule,
     DesignsModule,
+    DiscountsModule,
+    FundraisingModule,
+    InventoryModule,
     MailModule,
+    MediaModule,
+    OrdersModule,
+    PayoutsModule,
+    ProductsModule,
+    ShippingModule,
     ObservabilityModule,
     PrismaModule,
     UsersModule,
@@ -157,7 +175,7 @@ import { validateEnv } from './config/env-validation';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestContextMiddleware).forRoutes({
-      path: '*',
+      path: '*path',
       method: RequestMethod.ALL,
     });
   }

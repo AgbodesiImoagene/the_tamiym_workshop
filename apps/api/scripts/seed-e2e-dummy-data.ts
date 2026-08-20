@@ -14,6 +14,9 @@ import {
   CampaignStatus,
   CurrencyCode,
   LedgerEntryType,
+  MediaAssetStatus,
+  MediaDerivativeType,
+  MediaSourceType,
   ModerationStatus,
   PaymentProvider,
   PaymentStatus,
@@ -26,6 +29,7 @@ import {
   ShippingRuleMatchType,
   UserRole,
   UserStatus,
+  VirusScanStatus,
 } from '../src/generated/prisma/client';
 import {
   assertTestDatabase,
@@ -52,6 +56,10 @@ const IDS = {
   products: {
     tee: 'e2e-product-classic-tee',
     hoodie: 'e2e-product-campus-hoodie',
+  },
+  productViews: {
+    teeFront: 'e2e-product-view-tee-front',
+    hoodieFront: 'e2e-product-view-hoodie-front',
   },
   options: {
     teeSize: 'e2e-option-tee-size',
@@ -81,6 +89,30 @@ const IDS = {
   campaigns: {
     active: 'e2e-campaign-campus-outreach',
     review: 'e2e-campaign-choir-fundraiser',
+  },
+  mediaAssets: {
+    pendingUpload: 'e2e-media-asset-pending-upload',
+    flaggedUpload: 'e2e-media-asset-flagged-upload',
+  },
+  mediaDerivatives: {
+    pendingOriginal: 'e2e-media-derivative-pending-original',
+    pendingDisplay: 'e2e-media-derivative-pending-display',
+    pendingThumb: 'e2e-media-derivative-pending-thumb',
+    flaggedOriginal: 'e2e-media-derivative-flagged-original',
+    flaggedDisplay: 'e2e-media-derivative-flagged-display',
+    flaggedThumb: 'e2e-media-derivative-flagged-thumb',
+  },
+  designAssets: {
+    pendingUpload: 'e2e-design-asset-pending-upload',
+    flaggedUpload: 'e2e-design-asset-flagged-upload',
+  },
+  designs: {
+    pending: 'e2e-design-pending-community-tee',
+    flaggedCampaign: 'e2e-design-flagged-choir-hoodie',
+  },
+  designViews: {
+    pendingFront: 'e2e-design-view-pending-front',
+    flaggedFront: 'e2e-design-view-flagged-front',
   },
   campaignProducts: {
     activeTee: 'e2e-campaign-product-campus-tee',
@@ -160,6 +192,15 @@ function variantSnapshot(
   return [{ option, optionCode, value, valueCode }];
 }
 
+function placeholderImage(
+  size: string,
+  label: string,
+  bg = 'e5e7eb',
+  fg = '111827',
+) {
+  return `https://placehold.co/${size}/${bg}/${fg}.png?text=${encodeURIComponent(label)}`;
+}
+
 async function clearFixtureData() {
   const context = createPrismaScriptContext();
   const { prisma } = context;
@@ -198,6 +239,37 @@ async function clearFixtureData() {
     await prisma.campaign.deleteMany({
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
+    await prisma.designView.deleteMany({
+      where: {
+        OR: [
+          { designId: { startsWith: FIXTURE_PREFIX } },
+          { productViewId: { startsWith: FIXTURE_PREFIX } },
+        ],
+      },
+    });
+    await prisma.designAsset.deleteMany({
+      where: {
+        OR: [
+          { id: { startsWith: FIXTURE_PREFIX } },
+          { mediaAssetId: { startsWith: FIXTURE_PREFIX } },
+          { ownerUserId: { startsWith: FIXTURE_PREFIX } },
+        ],
+      },
+    });
+    await prisma.mediaDerivative.deleteMany({
+      where: {
+        OR: [
+          { id: { startsWith: FIXTURE_PREFIX } },
+          { assetId: { startsWith: FIXTURE_PREFIX } },
+        ],
+      },
+    });
+    await prisma.design.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.mediaAsset.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
     await prisma.userPayoutProfile.deleteMany({
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
@@ -226,6 +298,9 @@ async function clearFixtureData() {
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
     await prisma.productVariant.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.productView.deleteMany({
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
     await prisma.product.deleteMany({
@@ -476,6 +551,29 @@ async function main() {
       ],
     });
 
+    await prisma.productView.createMany({
+      data: [
+        {
+          id: IDS.productViews.teeFront,
+          productId: IDS.products.tee,
+          key: 'front',
+          displayName: 'Front',
+          sortOrder: 0,
+          isDesignable: true,
+          isDefault: true,
+        },
+        {
+          id: IDS.productViews.hoodieFront,
+          productId: IDS.products.hoodie,
+          key: 'front',
+          displayName: 'Front',
+          sortOrder: 0,
+          isDesignable: true,
+          isDefault: true,
+        },
+      ],
+    });
+
     await prisma.productOption.createMany({
       data: [
         {
@@ -698,6 +796,116 @@ async function main() {
       ],
     });
 
+    await prisma.mediaAsset.createMany({
+      data: [
+        {
+          id: IDS.mediaAssets.pendingUpload,
+          sourceType: MediaSourceType.UPLOAD,
+          status: MediaAssetStatus.READY,
+          scanStatus: VirusScanStatus.CLEAN,
+          moderationStatus: ModerationStatus.PENDING,
+          moderationNotes: 'Queued for human review after customer upload.',
+          originalKey: 'e2e/media/pending/original.png',
+          originalUrl: placeholderImage('1200x1200', 'Pending Upload'),
+          originalMime: 'image/png',
+          originalBytes: 148000,
+          originalWidth: 1200,
+          originalHeight: 1200,
+          checksum: 'checksum-e2e-pending-upload',
+        },
+        {
+          id: IDS.mediaAssets.flaggedUpload,
+          sourceType: MediaSourceType.UPLOAD,
+          status: MediaAssetStatus.READY,
+          scanStatus: VirusScanStatus.CLEAN,
+          moderationStatus: ModerationStatus.FLAGGED,
+          moderationNotes: 'Logo-like artwork needs a manual decision.',
+          originalKey: 'e2e/media/flagged/original.png',
+          originalUrl: placeholderImage(
+            '1200x1200',
+            'Flagged Artwork',
+            'fde68a',
+          ),
+          originalMime: 'image/png',
+          originalBytes: 173000,
+          originalWidth: 1200,
+          originalHeight: 1200,
+          checksum: 'checksum-e2e-flagged-upload',
+        },
+      ],
+    });
+
+    await prisma.mediaDerivative.createMany({
+      data: [
+        {
+          id: IDS.mediaDerivatives.pendingOriginal,
+          assetId: IDS.mediaAssets.pendingUpload,
+          type: MediaDerivativeType.ORIGINAL,
+          key: 'e2e/media/pending/original.png',
+          url: placeholderImage('1200x1200', 'Pending Upload'),
+          mimeType: 'image/png',
+          sizeBytes: 148000,
+          width: 1200,
+          height: 1200,
+        },
+        {
+          id: IDS.mediaDerivatives.pendingDisplay,
+          assetId: IDS.mediaAssets.pendingUpload,
+          type: MediaDerivativeType.DISPLAY,
+          key: 'e2e/media/pending/display.png',
+          url: placeholderImage('800x800', 'Pending Upload'),
+          mimeType: 'image/png',
+          sizeBytes: 91000,
+          width: 800,
+          height: 800,
+        },
+        {
+          id: IDS.mediaDerivatives.pendingThumb,
+          assetId: IDS.mediaAssets.pendingUpload,
+          type: MediaDerivativeType.THUMB,
+          key: 'e2e/media/pending/thumb.png',
+          url: placeholderImage('240x240', 'Pending'),
+          mimeType: 'image/png',
+          sizeBytes: 18000,
+          width: 240,
+          height: 240,
+        },
+        {
+          id: IDS.mediaDerivatives.flaggedOriginal,
+          assetId: IDS.mediaAssets.flaggedUpload,
+          type: MediaDerivativeType.ORIGINAL,
+          key: 'e2e/media/flagged/original.png',
+          url: placeholderImage('1200x1200', 'Flagged Artwork', 'fde68a'),
+          mimeType: 'image/png',
+          sizeBytes: 173000,
+          width: 1200,
+          height: 1200,
+        },
+        {
+          id: IDS.mediaDerivatives.flaggedDisplay,
+          assetId: IDS.mediaAssets.flaggedUpload,
+          type: MediaDerivativeType.DISPLAY,
+          key: 'e2e/media/flagged/display.png',
+          url: placeholderImage('800x800', 'Flagged Artwork', 'fde68a'),
+          mimeType: 'image/png',
+          sizeBytes: 102000,
+          width: 800,
+          height: 800,
+        },
+        {
+          id: IDS.mediaDerivatives.flaggedThumb,
+          assetId: IDS.mediaAssets.flaggedUpload,
+          type: MediaDerivativeType.THUMB,
+          key: 'e2e/media/flagged/thumb.png',
+          url: placeholderImage('240x240', 'Flagged', 'fde68a'),
+          mimeType: 'image/png',
+          sizeBytes: 21000,
+          width: 240,
+          height: 240,
+        },
+      ],
+    });
+
     await prisma.campaign.createMany({
       data: [
         {
@@ -739,6 +947,97 @@ async function main() {
       ],
     });
 
+    await prisma.design.createMany({
+      data: [
+        {
+          id: IDS.designs.pending,
+          userId: IDS.users.customer,
+          productId: IDS.products.tee,
+          name: 'Community Tee Draft',
+          designData: {
+            version: 1,
+            views: {
+              front: {
+                productViewId: IDS.productViews.teeFront,
+                isUsed: true,
+                layerCount: 2,
+                fabricJson: {
+                  objects: [
+                    { type: 'textbox', text: 'Community Day 2026' },
+                    { type: 'image', src: IDS.designAssets.pendingUpload },
+                  ],
+                },
+              },
+            },
+          },
+          thumbnailUrl: placeholderImage('640x640', 'Pending Design'),
+          moderationStatus: ModerationStatus.PENDING,
+          moderationNotes: 'Queued for manual review after save.',
+        },
+        {
+          id: IDS.designs.flaggedCampaign,
+          userId: IDS.users.organizer,
+          productId: IDS.products.hoodie,
+          campaignId: IDS.campaigns.review,
+          name: 'Choir Hoodie Artwork',
+          designData: {
+            version: 1,
+            views: {
+              front: {
+                productViewId: IDS.productViews.hoodieFront,
+                isUsed: true,
+                layerCount: 2,
+                fabricJson: {
+                  objects: [
+                    { type: 'textbox', text: 'Choir Tour 2026' },
+                    { type: 'image', src: IDS.designAssets.flaggedUpload },
+                  ],
+                },
+              },
+            },
+          },
+          thumbnailUrl: placeholderImage('640x640', 'Flagged Design', 'fde68a'),
+          moderationStatus: ModerationStatus.FLAGGED,
+          moderationNotes:
+            'Possible trademark-style crest requires human review.',
+        },
+      ],
+    });
+
+    await prisma.designView.createMany({
+      data: [
+        {
+          id: IDS.designViews.pendingFront,
+          designId: IDS.designs.pending,
+          productViewId: IDS.productViews.teeFront,
+          isUsed: true,
+          layerCount: 2,
+        },
+        {
+          id: IDS.designViews.flaggedFront,
+          designId: IDS.designs.flaggedCampaign,
+          productViewId: IDS.productViews.hoodieFront,
+          isUsed: true,
+          layerCount: 2,
+        },
+      ],
+    });
+
+    await prisma.designAsset.createMany({
+      data: [
+        {
+          id: IDS.designAssets.pendingUpload,
+          ownerUserId: IDS.users.customer,
+          mediaAssetId: IDS.mediaAssets.pendingUpload,
+        },
+        {
+          id: IDS.designAssets.flaggedUpload,
+          ownerUserId: IDS.users.organizer,
+          mediaAssetId: IDS.mediaAssets.flaggedUpload,
+        },
+      ],
+    });
+
     await prisma.campaignProduct.createMany({
       data: [
         {
@@ -750,6 +1049,7 @@ async function main() {
           id: IDS.campaignProducts.reviewHoodie,
           campaignId: IDS.campaigns.review,
           productId: IDS.products.hoodie,
+          designId: IDS.designs.flaggedCampaign,
         },
       ],
     });
@@ -1246,6 +1546,10 @@ async function main() {
     console.log('Fixtures:');
     console.log('- Products: classic-tee-e2e, campus-hoodie-e2e');
     console.log('- Campaigns: campus-outreach-drive-e2e, choir-fundraiser-e2e');
+    console.log(
+      '- Designs: Community Tee Draft (pending), Choir Hoodie Artwork (flagged)',
+    );
+    console.log('- Media assets: pending upload, flagged artwork');
   } finally {
     await closePrismaScriptContext(context);
   }

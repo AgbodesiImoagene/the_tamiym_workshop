@@ -3,6 +3,7 @@
 import { AdminShell, formatAdminCurrency } from '@/components/admin-shell';
 import { AdminStatusBadge } from '@/components/admin-status-badge';
 import {
+  downloadAdminAnalyticsCsv,
   getAdminCampaigns,
   getAdminMoneyMetrics,
   getAdminOrders,
@@ -10,9 +11,22 @@ import {
   getAdminPayoutOverview,
 } from '@/lib/dashboard';
 import { CampaignStatus, OrderStatus, PaymentStatus, PayoutStatus } from '@tamiym/types';
-import { Card, CardContent, CardHeader, CardTitle, EmptyState, StatCard } from '@tamiym/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Input,
+  Label,
+  Skeleton,
+  StatCard,
+} from '@tamiym/ui';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useState } from 'react';
 
 function ActionQueueCard({
   title,
@@ -44,9 +58,18 @@ function ActionQueueCard({
 }
 
 export default function AdminDashboardPage() {
+  const [rangeDraftFrom, setRangeDraftFrom] = useState('');
+  const [rangeDraftTo, setRangeDraftTo] = useState('');
+  const [appliedFrom, setAppliedFrom] = useState<string | undefined>();
+  const [appliedTo, setAppliedTo] = useState<string | undefined>();
+
   const overviewQuery = useQuery({
-    queryKey: ['admin-overview'],
-    queryFn: getAdminOverview,
+    queryKey: ['admin-overview', appliedFrom, appliedTo],
+    queryFn: () =>
+      getAdminOverview({
+        dateFrom: appliedFrom,
+        dateTo: appliedTo,
+      }),
   });
   const payoutOverviewQuery = useQuery({
     queryKey: ['admin-payout-overview'],
@@ -89,6 +112,80 @@ export default function AdminDashboardPage() {
       description="Use this page to route into the highest-priority queues instead of treating admin as a passive analytics dashboard."
     >
       <div className="space-y-8">
+        <Card className="rounded-[1.75rem] border-black/8 shadow-none">
+          <CardHeader>
+            <CardTitle>Overview period & exports</CardTitle>
+            <CardDescription>
+              Optional date range filters the top-row overview stats (counts use each record’s
+              creation time). CSV exports use the same applied range. Leave blank for all time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ov-from">From</Label>
+                <Input
+                  id="ov-from"
+                  type="date"
+                  value={rangeDraftFrom}
+                  onChange={(e) => setRangeDraftFrom(e.target.value)}
+                  className="w-44"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ov-to">To</Label>
+                <Input
+                  id="ov-to"
+                  type="date"
+                  value={rangeDraftTo}
+                  onChange={(e) => setRangeDraftTo(e.target.value)}
+                  className="w-44"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setAppliedFrom(rangeDraftFrom || undefined);
+                  setAppliedTo(rangeDraftTo || undefined);
+                }}
+              >
+                Apply to overview
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  downloadAdminAnalyticsCsv({
+                    entity: 'orders',
+                    dateFrom: appliedFrom,
+                    dateTo: appliedTo,
+                  })
+                }
+              >
+                Download orders CSV
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  downloadAdminAnalyticsCsv({
+                    entity: 'campaigns',
+                    dateFrom: appliedFrom,
+                    dateTo: appliedTo,
+                  })
+                }
+              >
+                Download campaigns CSV
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <StatCard
             label="Total orders"
@@ -235,7 +332,11 @@ export default function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               {ordersQuery.isLoading ? (
-                <p className="text-sm text-black/55">Loading order queue...</p>
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+                  ))}
+                </div>
               ) : ordersQuery.isError ? (
                 <p className="text-sm text-red-700">We could not load orders right now.</p>
               ) : ordersNeedingIntervention.length ? (
@@ -279,7 +380,11 @@ export default function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               {campaignsQuery.isLoading ? (
-                <p className="text-sm text-black/55">Loading campaign queue...</p>
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+                  ))}
+                </div>
               ) : campaignsQuery.isError ? (
                 <p className="text-sm text-red-700">We could not load campaigns right now.</p>
               ) : campaignsNeedingAttention.length ? (

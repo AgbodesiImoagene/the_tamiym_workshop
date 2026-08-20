@@ -1,0 +1,18 @@
+---
+description: Next.js frontend, shared UI, forms, state, accessibility, and testing conventions
+globs: "apps/{web,app,admin}/**/*.{ts,tsx},packages/ui/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend conventions
+
+- Respect surface ownership: public acquisition/checkout in `web`, customer/organizer workspace in `app`, privileged operations in `admin`.
+- Use shared design tokens and `@tamiym/ui`; avoid one-off primitives and duplicated transport logic.
+- Keep business rules and data transformations in typed services/hooks, not large JSX blocks.
+- Validate forms with Zod/React Hook Form and show actionable field and submission errors.
+- Model loading, empty, success, error, unauthorized, stale, and retry states explicitly.
+- Preserve user intent through authentication, navigation, checkout, payment return, and recoverable failures.
+- Use semantic controls, keyboard access, visible focus, sufficient contrast, labelled icon controls, and screen-reader announcements.
+- Cancel or ignore stale async work and clean up listeners, timers, object URLs, canvases, and subscriptions.
+- Add component tests for behaviour rather than markup; critical journeys require browser-level e2e coverage.
+- A visible control that has no working action is incomplete and must not be presented as functional.

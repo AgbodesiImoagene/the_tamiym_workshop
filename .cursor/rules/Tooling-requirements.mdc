@@ -1,7 +1,7 @@
 ---
+description: Prefer official generators, CLIs, and maintained integrations
 alwaysApply: true
 ---
-
 ## Mandatory Rule: Prefer Tools and CLIs Over Manual Generation
 
 The AI agent must **always prefer using existing tools, CLIs, and generators**

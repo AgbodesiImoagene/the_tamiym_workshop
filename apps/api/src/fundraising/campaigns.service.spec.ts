@@ -71,6 +71,8 @@ describe('CampaignsService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let pricingService: jest.Mocked<PricingService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let auditService: jest.Mocked<AuditService>;
+  let adminNotifyService: jest.Mocked<AdminNotifyService>;
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -119,6 +121,8 @@ describe('CampaignsService', () => {
     prisma = module.get(PrismaService);
     pricingService = module.get(PricingService);
     moderationService = module.get(ModerationService);
+    auditService = module.get(AuditService);
+    adminNotifyService = module.get(AdminNotifyService);
   });
 
   it('should be defined', () => {
@@ -181,6 +185,39 @@ describe('CampaignsService', () => {
     });
   });
 
+  describe('findAllForAdmin', () => {
+    it('includes linked design moderation context for moderation queues', async () => {
+      (prisma.campaign.findMany as jest.Mock).mockResolvedValue([
+        mockReviewCampaign,
+      ]);
+
+      await service.findAllForAdmin(CampaignStatus.REVIEW);
+
+      expect(prisma.campaign.findMany).toHaveBeenCalledWith({
+        where: { status: CampaignStatus.REVIEW },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          organizer: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+          products: {
+            include: {
+              product: { select: { id: true, name: true } },
+              design: {
+                select: {
+                  id: true,
+                  name: true,
+                  moderationStatus: true,
+                  moderationNotes: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+  });
+
   // -------------------------------------------------------------------------
   // getBySlug
   // -------------------------------------------------------------------------
@@ -204,6 +241,32 @@ describe('CampaignsService', () => {
       await expect(service.getBySlug('invalid')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('ends an expired active campaign before returning the public payload', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ACTIVE,
+        endDate: new Date(Date.now() - 60_000),
+        organizer: {},
+        products: [],
+      });
+      (prisma.campaign.update as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ENDED,
+      });
+
+      await expect(service.getBySlug('school-fundraiser')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(prisma.campaign.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: CampaignStatus.ENDED }),
+        }),
+      );
+      expect(auditService.log).toHaveBeenCalled();
+      expect(adminNotifyService.emit).toHaveBeenCalled();
     });
   });
 
@@ -558,6 +621,41 @@ describe('CampaignsService', () => {
         where: { id: 'camp-1' },
         data: { payoutModeOverride: PayoutMode.AUTO_EXECUTE },
       });
+    });
+  });
+
+  describe('endExpiredCampaigns', () => {
+    it('transitions expired ACTIVE campaigns to ENDED', async () => {
+      (prisma.campaign.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'camp-1',
+          title: 'School Fundraiser',
+          status: CampaignStatus.ACTIVE,
+        },
+      ]);
+      (prisma.campaign.update as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ENDED,
+      });
+
+      const count = await service.endExpiredCampaigns(new Date());
+
+      expect(count).toBe(1);
+      expect(prisma.campaign.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'camp-1' },
+          data: { status: CampaignStatus.ENDED },
+        }),
+      );
+      expect(auditService.log).toHaveBeenCalled();
+      expect(adminNotifyService.emit).toHaveBeenCalled();
+    });
+
+    it('returns zero when there are no expired active campaigns', async () => {
+      (prisma.campaign.findMany as jest.Mock).mockResolvedValue([]);
+
+      await expect(service.endExpiredCampaigns(new Date())).resolves.toBe(0);
+      expect(prisma.campaign.update).not.toHaveBeenCalled();
     });
   });
 });

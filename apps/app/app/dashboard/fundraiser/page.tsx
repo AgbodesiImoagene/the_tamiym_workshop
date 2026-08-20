@@ -4,6 +4,23 @@ import { CustomerDashboardShell, formatCurrency } from '@/components/customer-da
 import { authApi, ApiError, User } from '@/lib/auth';
 import { getCustomerCampaigns } from '@/lib/dashboard';
 import { createPayoutProfile, getBanks, getPayoutProfiles } from '@/lib/fundraising';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+  FormProvider,
+  Progress,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -166,12 +183,7 @@ export default function DashboardFundraiserPage() {
                           {campaign.slug}
                         </span>
                       </div>
-                      <div className="mt-4 h-3 rounded-full bg-black/10">
-                        <div
-                          className="h-3 rounded-full bg-[#00cb2f]"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
+                      <Progress value={progress} className="mt-4 h-3 [&>div]:bg-[#00cb2f]" />
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-black/70">
                         <span>{formatCurrency(raised, campaign.currency)} raised</span>
                         <span>
@@ -190,99 +202,165 @@ export default function DashboardFundraiserPage() {
           </div>
 
           <div className="space-y-8">
-            <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
-              <h2 className="text-[24px] font-bold text-black/90">Payout Setup</h2>
-              <p className="mt-2 text-sm text-black/65">
-                Add the bank account that should receive campaign payouts.
-              </p>
-
-              {organizerLocked ? (
-                <p className="mt-5 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
-                  Organizer access is required before payout details can be managed on this account.
+            <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
+              <CardHeader>
+                <CardTitle className="text-[24px] font-bold text-black/90">Payout Setup</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-black/65">
+                  Add the bank account that should receive campaign payouts.
                 </p>
-              ) : (
-                <form
-                  className="mt-6 space-y-4"
-                  onSubmit={payoutForm.handleSubmit(async (values) => {
-                    setSubmitMessage(null);
-                    const bank = banksQuery.data?.find((item) => item.code === values.bankCode);
-                    await payoutMutation.mutateAsync({
-                      label: values.label || undefined,
-                      bankCode: values.bankCode,
-                      bankName: bank?.name,
-                      accountNumber: values.accountNumber,
-                      accountName: values.accountName,
-                    });
-                  })}
-                >
-                  <input
-                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
-                    placeholder="Profile label"
-                    {...payoutForm.register('label')}
-                  />
-                  <select
-                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
-                    {...payoutForm.register('bankCode', { required: true })}
-                  >
-                    <option value="">Select bank</option>
-                    {(banksQuery.data ?? []).map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
-                    placeholder="Account number"
-                    {...payoutForm.register('accountNumber', { required: true })}
-                  />
-                  <input
-                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
-                    placeholder="Account name"
-                    {...payoutForm.register('accountName', { required: true })}
-                  />
-                  <button
-                    type="submit"
-                    disabled={payoutMutation.isPending}
-                    className="h-10 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
-                  >
-                    {payoutMutation.isPending ? 'Saving...' : 'Save payout profile'}
-                  </button>
-                  {submitMessage ? <p className="text-sm text-black/70">{submitMessage}</p> : null}
-                </form>
-              )}
-            </section>
 
-            <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
-              <h2 className="text-[24px] font-bold text-black/90">Saved Payout Profiles</h2>
-              <div className="mt-6 space-y-3">
-                {payoutProfilesQuery.isLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading payout profiles...</p>
-                ) : payoutProfilesQuery.data?.length ? (
-                  payoutProfilesQuery.data.map((profile) => (
-                    <div key={profile.id} className="rounded-2xl border border-black/10 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-black">
-                            {profile.label || profile.bankName || 'Bank account'}
-                          </p>
-                          <p className="text-sm text-black/60">
-                            {profile.accountName} · {profile.accountNumber}
-                          </p>
-                        </div>
-                        {profile.isDefault ? (
-                          <span className="rounded-full bg-[#cfddf8] px-3 py-1 text-xs font-medium text-[#004385]">
-                            Default
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))
+                {organizerLocked ? (
+                  <p className="mt-5 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                    Organizer access is required before payout details can be managed on this
+                    account.
+                  </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No payout profiles saved yet.</p>
+                  <FormProvider {...payoutForm}>
+                    <form
+                      className="mt-6 space-y-4"
+                      onSubmit={payoutForm.handleSubmit(async (values) => {
+                        setSubmitMessage(null);
+                        const bank = banksQuery.data?.find((item) => item.code === values.bankCode);
+                        await payoutMutation.mutateAsync({
+                          label: values.label || undefined,
+                          bankCode: values.bankCode,
+                          bankName: bank?.name,
+                          accountNumber: values.accountNumber,
+                          accountName: values.accountName,
+                        });
+                      })}
+                    >
+                      <FormField
+                        control={payoutForm.control}
+                        name="label"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <input
+                                className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
+                                placeholder="Profile label"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={payoutForm.control}
+                        name="bankCode"
+                        rules={{ required: true }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger className="h-12 w-full rounded-xl border-black/20">
+                                  <SelectValue placeholder="Select bank" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(banksQuery.data ?? []).map((bank) => (
+                                    <SelectItem key={bank.code} value={bank.code}>
+                                      {bank.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={payoutForm.control}
+                        name="accountNumber"
+                        rules={{ required: true }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <input
+                                className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
+                                placeholder="Account number"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={payoutForm.control}
+                        name="accountName"
+                        rules={{ required: true }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <input
+                                className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
+                                placeholder="Account name"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <button
+                        type="submit"
+                        disabled={payoutMutation.isPending}
+                        className="h-10 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
+                      >
+                        {payoutMutation.isPending ? 'Saving...' : 'Save payout profile'}
+                      </button>
+                      {submitMessage ? (
+                        <p className="text-sm text-black/70">{submitMessage}</p>
+                      ) : null}
+                    </form>
+                  </FormProvider>
                 )}
-              </div>
-            </section>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
+              <CardHeader>
+                <CardTitle className="text-[24px] font-bold text-black/90">
+                  Saved Payout Profiles
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {payoutProfilesQuery.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading payout profiles...</p>
+                  ) : payoutProfilesQuery.data?.length ? (
+                    payoutProfilesQuery.data.map((profile) => (
+                      <div
+                        key={profile.id}
+                        className="rounded-2xl border border-black/10 px-4 py-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-black">
+                              {profile.label || profile.bankName || 'Bank account'}
+                            </p>
+                            <p className="text-sm text-black/60">
+                              {profile.accountName} · {profile.accountNumber}
+                            </p>
+                          </div>
+                          {profile.isDefault ? (
+                            <span className="rounded-full bg-[#cfddf8] px-3 py-1 text-xs font-medium text-[#004385]">
+                              Default
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No payout profiles saved yet.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
       </div>

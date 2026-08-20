@@ -2,12 +2,22 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { PrintArea } from '@/lib/products';
-import { Button } from '@tamiym/ui';
+import { Button, Checkbox } from '@tamiym/ui';
+
+export type PrintAreaSavePayload = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotationAllowed?: boolean;
+  maxLayers?: number;
+  maxColors?: number;
+};
 
 interface PrintAreaEditorProps {
   baseImageUrl?: string | null;
   printArea?: PrintArea | null;
-  onSave: (area: { x: number; y: number; width: number; height: number }) => Promise<void>;
+  onSave: (area: PrintAreaSavePayload) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -131,10 +141,10 @@ export function PrintAreaEditor({
   const handleSave = async () => {
     await onSave({
       ...rect,
-      ...(maxLayers ? { maxLayers: Number(maxLayers) } : {}),
-      ...(maxColors ? { maxColors: Number(maxColors) } : {}),
+      ...(maxLayers.trim() !== '' ? { maxLayers: Number(maxLayers) } : {}),
+      ...(maxColors.trim() !== '' ? { maxColors: Number(maxColors) } : {}),
       rotationAllowed,
-    } as Parameters<typeof onSave>[0]);
+    });
   };
 
   const HANDLE_POSITIONS: Record<Handle, { top: string; left: string; cursor: string }> = {
@@ -256,11 +266,9 @@ export function PrintAreaEditor({
           />
         </label>
         <label className="flex items-center gap-2 pt-5">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={rotationAllowed}
-            onChange={(e) => setRotationAllowed(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
+            onCheckedChange={(checked) => setRotationAllowed(checked as boolean)}
           />
           <span className="text-sm text-foreground">Allow rotation</span>
         </label>

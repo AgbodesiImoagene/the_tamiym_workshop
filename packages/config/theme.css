@@ -70,8 +70,13 @@
   /* ─── Semantic ─────────────────────────────────────────────────────────── */
   --color-background: #fefefe;
   --color-foreground: #171717;
-  --color-muted: #6b7280;
-  --color-muted-foreground: #4b5563;
+  /* Surfaces (shadcn `bg-muted`, cards) + helper text (`text-muted-foreground`) */
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+  --color-card: #fefefe;
+  --color-card-foreground: #171717;
+  --color-popover: #fefefe;
+  --color-popover-foreground: #171717;
   --color-border: #e5e7eb;
   --color-input: #e5e7eb;
   --color-ring: #1d99ff;
@@ -86,6 +91,7 @@
 @theme inline {
   --color-primary: var(--color-primary-500);
   --color-accent: var(--color-accent-400);
+  --color-accent-foreground: var(--color-primary-900);
 }
 
 @theme {
@@ -121,43 +127,13 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Compatibility: shadcn/ui-style CSS variables (HSL triplets, no hsl() wrapper).
-   Aligned to design_rules: Dodger Blue (primary), Tamiym Green (accent),
-   Tamiym Red (destructive), brand White (#FEFEFE).
+   Tokens needed by shadcn but not exposed as Tailwind color utilities.
    ────────────────────────────────────────────────────────────────────────── */
 
-:root {
-  --background: 0 0% 99.6%;   /* #FEFEFE */
-  --foreground: 0 0% 9%;
-  --muted: 220 13% 91%;
-  --muted-foreground: 220 9% 40%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 207 100% 56%;        /* Dodger Blue #1D99FF */
-
-  --primary: 207 100% 56%;     /* Dodger Blue */
-  --primary-foreground: 0 0% 100%;
-  --accent: 134 100% 64%;     /* Tamiym Green #45FF70 */
-  --accent-foreground: 0 0% 9%;
-  --destructive: 356 91% 36%; /* Tamiym Red #B10813 */
-  --destructive-foreground: 0 0% 100%;
-
-  --radius: 0.75rem;
-}
-
-.dark {
-  --background: 210 100% 13%; /* Tamiym Blue #004385 */
-  --foreground: 0 0% 99.6%;
-  --muted: 210 50% 18%;
-  --muted-foreground: 210 10% 70%;
-  --border: 210 40% 22%;
-  --input: 210 40% 22%;
-  --ring: 207 100% 56%;
-
-  --primary: 207 100% 56%;
-  --primary-foreground: 0 0% 100%;
-  --accent: 134 100% 64%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 356 91% 36%;
-  --destructive-foreground: 0 0% 100%;
+@theme {
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #b10813;           /* Tamiym Red */
+  --color-destructive-foreground: #ffffff;
+  --color-secondary: #f3f4f6;
+  --color-secondary-foreground: #171717;
 }

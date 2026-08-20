@@ -68,7 +68,7 @@ Replace the locked fundraiser state with eligibility/application/status UI. Once
 ## Out of scope
 
 - Email verification, MFA, and session architecture → TTW-023.
-- Full organiser campaign product/design/price builder and submission UX → TTW-035 (new follow-up to author).
+- Full organiser campaign product/design/price builder and submission UX → TTW-035.
 - Campaign activation readiness and decision notifications → TTW-034.
 - Payout KYC/cadence/minimum/reversal policy → TTW-042.
 

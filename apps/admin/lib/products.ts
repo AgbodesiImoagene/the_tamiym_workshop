@@ -1,4 +1,4 @@
-import { apiClient, csrfHeaders } from './api';
+import { apiClient } from './api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
@@ -28,7 +28,11 @@ export type BlendMode =
   | 'EXCLUSION';
 
 export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
-export type EffectType = 'TINT' | 'REPLACE_IMAGE';
+
+/** Option-value → template layer rules (workshop). */
+export type WorkshopTemplateEffectType = 'TINT' | 'SHOW' | 'HIDE' | 'REPLACE_IMAGE';
+
+export type CatalogImageRole = 'THUMBNAIL' | 'GALLERY' | 'WORKSHOP_TEMPLATE';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,8 +85,9 @@ export interface TemplateEffect {
   optionId: string | null;
   optionValueId: string;
   templateLayerId: string;
-  effectType: EffectType;
+  effectType: WorkshopTemplateEffectType;
   tintHex: string | null;
+  replacementImageId: string | null;
   meta: Record<string, unknown> | null;
 }
 
@@ -115,6 +120,7 @@ export interface OptionValue {
   valueCode: string;
   displayName: string;
   sortOrder: number;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ProductOption {
@@ -123,6 +129,26 @@ export interface ProductOption {
   name: string;
   sortOrder: number;
   values: OptionValue[];
+}
+
+export interface AdminProductPrice {
+  id: string;
+  currency: string;
+  amount: string;
+  compareAt: string | null;
+}
+
+export interface AdminProductImageRoleRow {
+  id: string;
+  role: CatalogImageRole;
+  sortOrder: number | null;
+  productViewId: string | null;
+  image: {
+    id: string;
+    altText: string | null;
+    sortOrder: number;
+    mediaAsset: ProductImage['mediaAsset'];
+  };
 }
 
 export interface AdminProductDetail {
@@ -134,8 +160,59 @@ export interface AdminProductDetail {
   updatedAt: string;
   category: { id: string; name: string; slug: string } | null;
   options: ProductOption[];
+  prices: AdminProductPrice[];
+  productImageRoles: AdminProductImageRoleRow[];
   images: ProductImage[];
   views: ProductView[];
+}
+
+export interface AdminCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminVariantInventory {
+  id: string;
+  variantId: string;
+  stockOnHand: number;
+  reserved: number;
+  trackInventory: boolean;
+  lowStockThreshold: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  isAvailable: boolean;
+  weightGrams: number | null;
+  packageLengthMm: number | null;
+  packageWidthMm: number | null;
+  packageHeightMm: number | null;
+  createdAt: string;
+  updatedAt: string;
+  optionValues: Array<{
+    option: { code: string; name: string };
+    optionValue: {
+      valueCode: string;
+      displayName: string;
+      metadata: unknown;
+    };
+  }>;
+  prices: Array<{
+    id: string;
+    currency: string;
+    amount: string;
+    compareAt: string | null;
+  }>;
+  inventory: AdminVariantInventory | null;
 }
 
 // ─── API Helpers ──────────────────────────────────────────────────────────────
@@ -144,15 +221,223 @@ export async function getAdminProductList() {
   return apiClient.get<AdminProductSummary[]>('/admin/products');
 }
 
+export async function getAdminCategoryList() {
+  return apiClient.get<AdminCategory[]>('/admin/categories');
+}
+
+export async function createAdminCategory(dto: {
+  name: string;
+  slug?: string;
+  description?: string;
+}) {
+  return apiClient.post<AdminCategory>('/admin/categories', dto);
+}
+
+export async function updateAdminCategory(
+  id: string,
+  dto: { name?: string; slug?: string; description?: string }
+) {
+  return apiClient.patch<AdminCategory>(`/admin/categories/${id}`, dto);
+}
+
+export async function deleteAdminCategory(id: string) {
+  return apiClient.delete<void>(`/admin/categories/${id}`);
+}
+
 export async function getAdminProductDetail(id: string) {
   return apiClient.get<AdminProductDetail>(`/admin/products/${id}`);
 }
 
 export async function updateAdminProduct(
   id: string,
-  dto: { name?: string; slug?: string; description?: string; status?: ProductStatus }
+  dto: {
+    categoryId?: string;
+    name?: string;
+    slug?: string;
+    description?: string;
+    status?: ProductStatus;
+    weightGrams?: number;
+    packageLengthMm?: number;
+    packageWidthMm?: number;
+    packageHeightMm?: number;
+  }
 ) {
   return apiClient.patch<AdminProductDetail>(`/admin/products/${id}`, dto);
+}
+
+export async function createAdminProduct(dto: {
+  categoryId: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  status?: ProductStatus;
+  weightGrams?: number;
+  packageLengthMm?: number;
+  packageWidthMm?: number;
+  packageHeightMm?: number;
+}) {
+  return apiClient.post<{ id: string; name: string; slug: string }>('/admin/products', dto);
+}
+
+export async function deleteAdminProduct(id: string) {
+  return apiClient.delete<void>(`/admin/products/${id}`);
+}
+
+// ─── Options & option values ─────────────────────────────────────────────────
+
+export async function createAdminProductOption(
+  productId: string,
+  dto: { code: string; name: string; sortOrder?: number }
+) {
+  return apiClient.post<ProductOption>(`/admin/products/${productId}/options`, dto);
+}
+
+export async function updateAdminProductOption(
+  productId: string,
+  optionId: string,
+  dto: { code?: string; name?: string; sortOrder?: number }
+) {
+  return apiClient.patch<ProductOption>(`/admin/products/${productId}/options/${optionId}`, dto);
+}
+
+export async function deleteAdminProductOption(productId: string, optionId: string) {
+  return apiClient.delete<void>(`/admin/products/${productId}/options/${optionId}`);
+}
+
+export async function createAdminOptionValue(
+  productId: string,
+  optionId: string,
+  dto: {
+    valueCode: string;
+    displayName: string;
+    metadata?: Record<string, unknown>;
+    sortOrder?: number;
+  }
+) {
+  return apiClient.post<OptionValue>(
+    `/admin/products/${productId}/options/${optionId}/values`,
+    dto
+  );
+}
+
+export async function updateAdminOptionValue(
+  productId: string,
+  optionId: string,
+  valueId: string,
+  dto: {
+    valueCode?: string;
+    displayName?: string;
+    metadata?: Record<string, unknown>;
+    sortOrder?: number;
+  }
+) {
+  return apiClient.patch<OptionValue>(
+    `/admin/products/${productId}/options/${optionId}/values/${valueId}`,
+    dto
+  );
+}
+
+export async function deleteAdminOptionValue(productId: string, optionId: string, valueId: string) {
+  return apiClient.delete<void>(
+    `/admin/products/${productId}/options/${optionId}/values/${valueId}`
+  );
+}
+
+// ─── Product-level prices ─────────────────────────────────────────────────────
+
+export async function upsertAdminProductPrice(
+  productId: string,
+  dto: { currency: string; amount: number; compareAt?: number }
+) {
+  return apiClient.post<AdminProductPrice>(`/admin/products/${productId}/prices`, dto);
+}
+
+export async function updateAdminProductPrice(
+  productId: string,
+  priceId: string,
+  dto: { currency?: string; amount?: number; compareAt?: number | null }
+) {
+  return apiClient.patch<AdminProductPrice>(`/admin/products/${productId}/prices/${priceId}`, dto);
+}
+
+export async function deleteAdminProductPrice(productId: string, priceId: string) {
+  return apiClient.delete<void>(`/admin/products/${productId}/prices/${priceId}`);
+}
+
+// ─── Variant catalog, prices & inventory ──────────────────────────────────────
+
+export async function listAdminProductVariants(productId: string) {
+  return apiClient.get<AdminProductVariant[]>(`/admin/products/${productId}/variants`);
+}
+
+export async function patchAdminVariantInventory(
+  variantId: string,
+  dto: {
+    stockOnHand?: number;
+    reserved?: number;
+    lowStockThreshold?: number;
+    trackInventory?: boolean;
+    isAvailable?: boolean;
+  }
+) {
+  return apiClient.patch<unknown>(`/admin/inventory/variant/${variantId}`, dto);
+}
+
+export async function updateAdminProductVariant(
+  productId: string,
+  variantId: string,
+  dto: {
+    name?: string;
+    sku?: string;
+    isAvailable?: boolean;
+    weightGrams?: number;
+    packageLengthMm?: number;
+    packageWidthMm?: number;
+    packageHeightMm?: number;
+  }
+) {
+  return apiClient.patch<unknown>(`/admin/products/${productId}/variants/${variantId}`, dto);
+}
+
+export async function deleteAdminProductVariant(productId: string, variantId: string) {
+  return apiClient.delete<void>(`/admin/products/${productId}/variants/${variantId}`);
+}
+
+export async function upsertAdminVariantPrice(
+  productId: string,
+  variantId: string,
+  dto: { currency: string; amount: number; compareAt?: number }
+) {
+  return apiClient.post<{
+    id: string;
+    currency: string;
+    amount: string;
+    compareAt: string | null;
+  }>(`/admin/products/${productId}/variants/${variantId}/prices`, dto);
+}
+
+export async function updateAdminVariantPrice(
+  productId: string,
+  variantId: string,
+  priceId: string,
+  dto: { currency?: string; amount?: number; compareAt?: number | null }
+) {
+  return apiClient.patch<{
+    id: string;
+    currency: string;
+    amount: string;
+    compareAt: string | null;
+  }>(`/admin/products/${productId}/variants/${variantId}/prices/${priceId}`, dto);
+}
+
+export async function deleteAdminVariantPrice(
+  productId: string,
+  variantId: string,
+  priceId: string
+) {
+  return apiClient.delete<void>(
+    `/admin/products/${productId}/variants/${variantId}/prices/${priceId}`
+  );
 }
 
 // ─── Product Image ────────────────────────────────────────────────────────────
@@ -173,7 +458,6 @@ export async function uploadAdminProductImage(
     method: 'POST',
     body: form,
     credentials: 'include',
-    headers: csrfHeaders(),
   });
 
   if (!res.ok) {
@@ -183,8 +467,62 @@ export async function uploadAdminProductImage(
   return res.json();
 }
 
+export async function createAdminProductImageFromUrl(
+  productId: string,
+  dto: {
+    sourceUrl: string;
+    sortOrder?: number;
+    altText?: string;
+    variantId?: string;
+  }
+) {
+  return apiClient.post<ProductImage & { id: string }>(`/admin/products/${productId}/images`, dto);
+}
+
+export async function updateAdminProductImageMeta(
+  productId: string,
+  imageId: string,
+  dto: {
+    sortOrder?: number;
+    altText?: string;
+    variantId?: string | null;
+    mediaAssetId?: string;
+  }
+) {
+  return apiClient.patch<ProductImage>(`/admin/products/${productId}/images/${imageId}`, dto);
+}
+
 export async function deleteAdminProductImage(productId: string, imageId: string) {
   return apiClient.delete(`/admin/products/${productId}/images/${imageId}`);
+}
+
+// ─── Image roles ──────────────────────────────────────────────────────────────
+
+export async function createAdminProductImageRole(
+  productId: string,
+  imageId: string,
+  dto: { role: CatalogImageRole; productViewId?: string; sortOrder?: number }
+) {
+  return apiClient.post<{ id: string }>(
+    `/admin/products/${productId}/images/${imageId}/roles`,
+    dto
+  );
+}
+
+export async function updateAdminProductImageRole(
+  productId: string,
+  roleId: string,
+  dto: {
+    role?: CatalogImageRole;
+    productViewId?: string | null;
+    sortOrder?: number | null;
+  }
+) {
+  return apiClient.patch<{ id: string }>(`/admin/products/${productId}/image-roles/${roleId}`, dto);
+}
+
+export async function deleteAdminProductImageRole(productId: string, roleId: string) {
+  return apiClient.delete<void>(`/admin/products/${productId}/image-roles/${roleId}`);
 }
 
 // ─── Product Views ────────────────────────────────────────────────────────────
@@ -202,10 +540,18 @@ export async function createAdminProductView(
   return apiClient.post<ProductView>(`/admin/products/${productId}/views`, dto);
 }
 
+export type UpdateAdminProductViewDto = {
+  key?: string;
+  displayName?: string;
+  sortOrder?: number;
+  isDesignable?: boolean;
+  isDefault?: boolean;
+};
+
 export async function updateAdminProductView(
   productId: string,
   viewId: string,
-  dto: { displayName?: string; sortOrder?: number; isDesignable?: boolean; isDefault?: boolean }
+  dto: UpdateAdminProductViewDto
 ) {
   return apiClient.patch<ProductView>(`/admin/products/${productId}/views/${viewId}`, dto);
 }
@@ -272,6 +618,55 @@ export async function updateAdminTemplateLayer(
 
 export async function deleteAdminTemplateLayer(productId: string, viewId: string, layerId: string) {
   return apiClient.delete(`/admin/products/${productId}/views/${viewId}/layers/${layerId}`);
+}
+
+// ─── Template effects (option → layer rules) ───────────────────────────────────
+
+export async function createAdminTemplateEffect(
+  productId: string,
+  viewId: string,
+  dto: {
+    optionId: string;
+    optionValueId: string;
+    templateLayerId: string;
+    effectType: WorkshopTemplateEffectType;
+    tintHex?: string;
+    replacementImageId?: string;
+    meta?: Record<string, unknown>;
+  }
+) {
+  return apiClient.post<TemplateEffect>(
+    `/admin/products/${productId}/views/${viewId}/effects`,
+    dto
+  );
+}
+
+export async function updateAdminTemplateEffect(
+  productId: string,
+  viewId: string,
+  effectId: string,
+  dto: {
+    optionId?: string;
+    optionValueId?: string;
+    templateLayerId?: string;
+    effectType?: WorkshopTemplateEffectType;
+    tintHex?: string | null;
+    replacementImageId?: string | null;
+    meta?: Record<string, unknown> | null;
+  }
+) {
+  return apiClient.patch<TemplateEffect>(
+    `/admin/products/${productId}/views/${viewId}/effects/${effectId}`,
+    dto
+  );
+}
+
+export async function deleteAdminTemplateEffect(
+  productId: string,
+  viewId: string,
+  effectId: string
+) {
+  return apiClient.delete<void>(`/admin/products/${productId}/views/${viewId}/effects/${effectId}`);
 }
 
 // ─── CSS blend mode map ───────────────────────────────────────────────────────

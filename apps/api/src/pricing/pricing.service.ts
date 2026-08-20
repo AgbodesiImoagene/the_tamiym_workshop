@@ -18,6 +18,7 @@ import type { QuoteRequestDto } from './dto/quote-request.dto';
 import { roundToMinor, roundToDisplayGranularity } from './currency-rounding';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
+import { CampaignStatus } from '../generated/prisma/enums';
 import type {
   CanonicalShippingAddress,
   ShipmentSummary,
@@ -71,10 +72,16 @@ export class PricingService {
   ): Promise<QuoteResult> {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id: campaignId },
-      select: { id: true },
+      select: { id: true, status: true, endDate: true },
     });
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
+    }
+    if (campaign.status !== CampaignStatus.ACTIVE) {
+      throw new BadRequestException('Campaign is not active');
+    }
+    if (campaign.endDate && campaign.endDate.getTime() <= Date.now()) {
+      throw new BadRequestException('Campaign has ended');
     }
     const address = await this.validateAddressForUser(
       dto.shippingAddressId,

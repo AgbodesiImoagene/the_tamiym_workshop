@@ -25,6 +25,8 @@ Startup validation in `apps/api/src/app.module.ts` rejects missing values and kn
 - `NODE_ENV`
 - `LOG_LEVEL`
 - `CORS_ORIGIN`
+- `FRONTEND_URL`
+- `ADMIN_APP_URL`
 - `JWT_ACCESS_EXPIRES_IN`
 - `JWT_REFRESH_EXPIRES_IN`
 
@@ -110,6 +112,24 @@ Before a production deployment, the repo still needs:
 Treat deployment documentation as backend-first for now. Pair this document with:
 
 - `03-backend.md`
+- `14-auth-and-session-architecture.md`
 - `09-observability-otel.md`
 - `release-criteria.md`
 - `backend-production-readiness.md`
+
+## Session and cookie direction
+
+The target frontend/domain model should assume:
+
+- `web` and `app` share customer session across subdomains
+- `admin` uses an isolated admin session policy
+
+That means production deployment still needs explicit decisions for:
+
+- API host and subdomain layout
+- parent-domain cookie scope
+- distinct customer vs admin cookie names
+- CORS allowlist for `web`, `app`, and `admin`
+- CSRF strategy for cookie-authenticated cross-subdomain browser requests
+
+See `14-auth-and-session-architecture.md` for the recommended target model.

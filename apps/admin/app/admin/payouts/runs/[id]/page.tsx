@@ -9,7 +9,20 @@ import {
   retryAdminPayout,
 } from '@/lib/dashboard';
 import { PayoutStatus } from '@tamiym/types';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@tamiym/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -84,7 +97,11 @@ export default function AdminPayoutRunDetailPage() {
       description="Run-level approvals and payout retries stay on the detail screen so financial actions happen with clear batch context."
     >
       {runsQuery.isLoading ? (
-        <p className="text-sm text-black/55">Loading payout run...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+          ))}
+        </div>
       ) : !run ? (
         <Card className="rounded-[1.75rem] border-black/8 shadow-none">
           <CardContent className="space-y-4 p-8">
@@ -157,60 +174,68 @@ export default function AdminPayoutRunDetailPage() {
                 <CardTitle>Payouts in this run</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-separate border-spacing-y-3">
-                    <thead>
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
-                        <th className="px-4 py-2">Payout</th>
-                        <th className="px-4 py-2">Campaign</th>
-                        <th className="px-4 py-2">Amount</th>
-                        <th className="px-4 py-2">Status</th>
-                        <th className="px-4 py-2">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {run.payouts.map((payout) => (
-                        <tr key={payout.id} className="bg-white">
-                          <td className="rounded-l-2xl border-y border-l border-black/8 px-4 py-4 text-sm font-semibold text-tamiym-blue">
-                            {payout.id}
-                          </td>
-                          <td className="border-y border-black/8 px-4 py-4 text-sm text-black/68">
-                            {payout.campaignId}
-                            {payout.providerRef ? (
-                              <p className="mt-1 text-xs text-black/55">
-                                Provider ref: {payout.providerRef}
-                              </p>
-                            ) : null}
-                          </td>
-                          <td className="border-y border-black/8 px-4 py-4 text-sm font-semibold text-black">
-                            {formatAdminCurrency(Number(payout.amount), 'NGN')}
-                          </td>
-                          <td className="border-y border-black/8 px-4 py-4">
-                            <AdminStatusBadge value={payout.status} />
-                          </td>
-                          <td className="rounded-r-2xl border-y border-r border-black/8 px-4 py-4">
-                            {payout.status === PayoutStatus.FAILED ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setMessage(null);
-                                  setError(null);
-                                  retryMutation.mutate(payout.id);
-                                }}
-                                disabled={retryMutation.isPending}
-                              >
-                                Retry
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-black/45">No action</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table className="border-separate border-spacing-y-3">
+                  <TableHeader>
+                    <TableRow className="border-0 hover:bg-transparent">
+                      <TableHead className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                        Payout
+                      </TableHead>
+                      <TableHead className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                        Campaign
+                      </TableHead>
+                      <TableHead className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                        Amount
+                      </TableHead>
+                      <TableHead className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                        Status
+                      </TableHead>
+                      <TableHead className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {run.payouts.map((payout) => (
+                      <TableRow key={payout.id} className="bg-white hover:bg-white">
+                        <TableCell className="rounded-l-2xl border-y border-l border-black/8 px-4 py-4 text-sm font-semibold text-tamiym-blue">
+                          {payout.id}
+                        </TableCell>
+                        <TableCell className="border-y border-black/8 px-4 py-4 text-sm text-black/68">
+                          {payout.campaignId}
+                          {payout.providerRef ? (
+                            <p className="mt-1 text-xs text-black/55">
+                              Provider ref: {payout.providerRef}
+                            </p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="border-y border-black/8 px-4 py-4 text-sm font-semibold text-black">
+                          {formatAdminCurrency(Number(payout.amount), 'NGN')}
+                        </TableCell>
+                        <TableCell className="border-y border-black/8 px-4 py-4">
+                          <AdminStatusBadge value={payout.status} />
+                        </TableCell>
+                        <TableCell className="rounded-r-2xl border-y border-r border-black/8 px-4 py-4">
+                          {payout.status === PayoutStatus.FAILED ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setMessage(null);
+                                setError(null);
+                                retryMutation.mutate(payout.id);
+                              }}
+                              disabled={retryMutation.isPending}
+                            >
+                              Retry
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-black/45">No action</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </div>

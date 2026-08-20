@@ -46,3 +46,43 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 ### Known non-fatal noise
 
 - The optional native `canvas` module (a transitive optional dep of `jsdom`) fails to compile on this VM (no prebuilt binary for Node 24, no Cairo dev headers). This is harmless: `jsdom` runs without it and `pnpm install` still exits 0.
+
+## Tamiym Workshop contributor workflow
+
+### Source of truth
+
+- The PRD, approved designs, and current code define product behaviour.
+- `AGENTS.md` is the canonical workflow. `.cursor/rules/` adds scoped technical rules; do not duplicate this workflow elsewhere.
+- Work from a clean tree. Preserve user changes and stop if unrelated changes overlap the ticket.
+
+### Ticket workflow
+
+1. Create or update `docs/tickets/ttw-XXX.md` from `docs/tickets/TEMPLATE.md`.
+2. Classify the ticket risk: low, standard, high, or critical.
+3. Start `codex/ttw-XXX-short-name` from current `main`; never stack work on an unfinished ticket branch.
+4. For standard, high, and critical tickets, record a design review before implementation.
+5. Implement only the ticket scope; update its plan when reality differs.
+6. Run the required quality gates and record exact evidence in the ticket.
+7. Obtain an independent implementation review. Fix and repeat the full review until PASS.
+8. Open a PR only when acceptance criteria and required gates pass. Merge only after user confirmation and green CI, then delete the ticket branch.
+
+Independent tickets may use separate worktrees. Dependent or overlapping tickets remain sequential.
+
+### Review levels
+
+- Low: implementation review.
+- Standard: design review plus implementation review.
+- High: standard gates plus security review and integration coverage.
+- Critical: high gates plus explicit invariants, threat/concurrency analysis, database enforcement, and one comprehensive independent implementation review.
+- Add a second independent reviewer only when the ticket records a materially different review charter that the first reviewer cannot adequately cover, such as financial/database/concurrency correctness versus security/provider/operations. Do not duplicate a general review merely because a path is shared or critical.
+- No model or price tier is mandated. Use the least costly reviewer capable of the defined charter and escalate capability only for unresolved specialist risk or when the user requests it.
+
+Auth, authorization, uploads, schema changes, queues, admin privileges, and external integrations are high risk. Payments, refunds, payouts, ledgers, webhook settlement, and inventory concurrency are critical.
+
+### Evidence and completion
+
+- A claim is unverified unless supported by command output, a test name, or a file-and-line reference.
+- Tests must exercise production modules and include relevant failure, retry, and boundary paths.
+- Update Swagger, shared contracts, migrations, observability, and docs in the same ticket as behaviour changes.
+- Existing debt may be ratcheted temporarily: introduce no new failure and reduce debt in touched areas. Critical correctness or security failures cannot be waived.
+- Never commit, push, open a PR, merge, deploy, or delete a branch unless the user requested that action.

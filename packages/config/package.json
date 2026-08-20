@@ -6,8 +6,8 @@
   "files": [
     "tsconfig.json",
     "theme.css",
-    "eslint.config.js",
-    "theme.css"
+    "shadcn.css",
+    "eslint.config.js"
   ],
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.53.1",

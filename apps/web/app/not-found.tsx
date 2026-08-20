@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { MarketingShell } from '@/components/marketing-shell';
-import { customerAppPath } from '@/lib/site';
+import { webRegisterWithNext } from '@/lib/site';
 
 export default function NotFound() {
   return (
@@ -25,7 +25,7 @@ export default function NotFound() {
               Back to Fundraiser
             </Link>
             <Link
-              href={customerAppPath('/auth/register')}
+              href={webRegisterWithNext('/')}
               className="inline-flex rounded-lg bg-accent px-5 py-3 text-sm font-bold text-tamiym-blue"
             >
               Create An Account

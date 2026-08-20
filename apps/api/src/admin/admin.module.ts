@@ -25,9 +25,13 @@ import { MailModule } from '../mail/mail.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { AdminNotificationsController } from './admin-notifications.controller';
 import { AdminEmailBroadcastService } from './admin-email-broadcast.service';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminUsersService } from './admin-users.service';
+import { AdminMediaController } from './admin-media.controller';
 import { ShippingModule } from '../shipping/shipping.module';
 import { ReconciliationModule } from '../reconciliation/reconciliation.module';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
@@ -44,8 +48,9 @@ import { AdminReconciliationController } from './admin-reconciliation.controller
     PayoutsModule,
     ShippingModule,
     ReconciliationModule,
+    MediaModule,
   ],
-  providers: [AdminEmailBroadcastService],
+  providers: [AdminEmailBroadcastService, AdminUsersService],
   controllers: [
     AdminOrdersController,
     AdminCategoriesController,
@@ -53,6 +58,7 @@ import { AdminReconciliationController } from './admin-reconciliation.controller
     AdminInventoryController,
     AdminDesignsController,
     AdminCampaignsController,
+    AdminMediaController,
     AdminSiteSettingsController,
     AdminShippingController,
     AdminPayoutsController,
@@ -62,6 +68,7 @@ import { AdminReconciliationController } from './admin-reconciliation.controller
     AdminBulkPricingController,
     AdminNotificationsController,
     AdminReconciliationController,
+    AdminUsersController,
   ],
 })
 export class AdminModule {}

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,6 +34,129 @@ export class MediaService {
     private s3Service: S3Service,
     @InjectQueue(MEDIA_QUEUE) private mediaQueue: Queue,
   ) {}
+
+  // ─── Admin methods ────────────────────────────────────────────────────────────
+
+  /**
+   * List media assets for admin review, optionally filtered by moderation status.
+   * Includes context from linked design assets (uploader + design) or product images (product).
+   */
+  async adminFindAll(status?: ModerationStatus) {
+    const where = status ? { moderationStatus: status } : {};
+    return this.prisma.mediaAsset.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        moderationStatus: true,
+        moderationNotes: true,
+        originalMime: true,
+        originalBytes: true,
+        originalWidth: true,
+        originalHeight: true,
+        createdAt: true,
+        updatedAt: true,
+        derivatives: {
+          select: { type: true, url: true },
+        },
+        designAssets: {
+          take: 1,
+          select: {
+            owner: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        productImages: {
+          take: 1,
+          select: {
+            product: { select: { id: true, name: true, slug: true } },
+          },
+        },
+      },
+    });
+  }
+
+  /** Get a single media asset with full context for admin review. */
+  async adminFindOne(id: string) {
+    const asset = await this.prisma.mediaAsset.findUnique({
+      where: { id },
+      include: {
+        derivatives: {
+          select: {
+            type: true,
+            url: true,
+            width: true,
+            height: true,
+            sizeBytes: true,
+          },
+        },
+        designAssets: {
+          select: {
+            id: true,
+            owner: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        productImages: {
+          select: {
+            id: true,
+            altText: true,
+            product: { select: { id: true, name: true, slug: true } },
+          },
+        },
+      },
+    });
+    if (!asset) {
+      throw new NotFoundException('Media asset not found');
+    }
+    return asset;
+  }
+
+  /**
+   * Admin override of an asset's moderation status. Accepts APPROVED, FLAGGED, or REJECTED.
+   * Does not reprocess the asset — only updates the moderation fields.
+   */
+  async adminUpdateModeration(
+    id: string,
+    status: ModerationStatus,
+    notes?: string,
+  ) {
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
+    if (!asset) {
+      throw new NotFoundException('Media asset not found');
+    }
+    if (
+      status !== ModerationStatus.APPROVED &&
+      status !== ModerationStatus.REJECTED &&
+      status !== ModerationStatus.FLAGGED
+    ) {
+      throw new BadRequestException(
+        'status must be APPROVED, REJECTED, or FLAGGED',
+      );
+    }
+    return this.prisma.mediaAsset.update({
+      where: { id },
+      data: {
+        moderationStatus: status,
+        ...(notes !== undefined && { moderationNotes: notes }),
+      },
+    });
+  }
+
+  // ─── Asset creation ───────────────────────────────────────────────────────────
 
   async createAssetFromUrl(sourceUrl: string): Promise<MediaAsset> {
     const normalizedUrl = this.normalizeSourceUrl(sourceUrl);

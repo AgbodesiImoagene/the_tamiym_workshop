@@ -79,8 +79,8 @@ Add append-only `NotificationDeliveryAttempt` evidence and admin dead-letter API
 
 - Adding campaign decision events/templates → TTW-034.
 - Broad observability dashboard program → TTW-051; this ticket must still emit its domain metrics/alerts.
-- Selecting or migrating email/SMS providers → follow-up ticket.
-- Marketing campaign segmentation/content authoring → follow-up after consent policy is approved.
+- Selecting, migrating or adding failover for email/SMS providers → TTW-048.
+- Marketing campaign segmentation/content authoring → TTW-049.
 
 ## Design review
 

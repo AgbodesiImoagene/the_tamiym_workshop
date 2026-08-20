@@ -4,6 +4,7 @@ import { PricingService } from './pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
+import { CampaignStatus } from '../generated/prisma/enums';
 
 describe('PricingService', () => {
   let service: PricingService;
@@ -82,7 +83,11 @@ describe('PricingService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       campaign: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'camp-1' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'camp-1',
+          status: CampaignStatus.ACTIVE,
+          endDate: null,
+        }),
       },
       campaignProduct: { findFirst: jest.fn().mockResolvedValue(null) },
       designView: { findMany: jest.fn().mockResolvedValue([]) },
@@ -183,6 +188,36 @@ describe('PricingService', () => {
           items: [{ variantId: 'var-1', quantity: 1 }],
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw when campaign is not active', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        id: 'camp-1',
+        status: CampaignStatus.PAUSED,
+        endDate: null,
+      });
+
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when campaign endDate has passed', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        id: 'camp-1',
+        status: CampaignStatus.ACTIVE,
+        endDate: new Date(Date.now() - 60_000),
+      });
+
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

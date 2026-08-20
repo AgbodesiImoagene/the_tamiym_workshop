@@ -1,4 +1,12 @@
-import { CampaignStatus, OrderStatus, PaymentStatus, PayoutStatus } from '@tamiym/types';
+import {
+  CampaignStatus,
+  CurrencyCode,
+  OrderStatus,
+  PaymentStatus,
+  PayoutMode,
+  PayoutStatus,
+  UserRole,
+} from '@tamiym/types';
 import { apiClient } from './api';
 
 export type AdminCampaignStatus = CampaignStatus | 'REVIEW';
@@ -76,6 +84,8 @@ export interface AdminCampaign {
   title: string;
   slug: string;
   status: AdminCampaignStatus;
+  createdAt: string;
+  updatedAt: string;
   currency: string;
   goalAmount?: number | null;
   currentAmount?: number | null;
@@ -95,6 +105,49 @@ export interface AdminCampaign {
       id: string;
       name: string;
     };
+    design?: {
+      id: string;
+      name: string;
+      moderationStatus: string;
+      moderationNotes?: string | null;
+    } | null;
+  }>;
+}
+
+export interface AdminCampaignDetail {
+  id: string;
+  title: string;
+  slug: string;
+  status: AdminCampaignStatus;
+  currency: string;
+  goalAmount?: number | null;
+  currentAmount?: number | null;
+  description?: string | null;
+  story?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  rejectionReason?: string | null;
+  moderationStatus?: string | null;
+  moderationNotes?: string | null;
+  payoutModeOverride?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  organizer: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  products: Array<{
+    id: string;
+    product: { id: string; name: string; slug: string };
+    design: {
+      id: string;
+      name: string;
+      thumbnailUrl: string | null;
+      moderationStatus: string;
+      moderationNotes: string | null;
+    } | null;
   }>;
 }
 
@@ -179,8 +232,45 @@ export interface SiteSettings {
   autoRetryFailedPayouts: boolean;
 }
 
-export async function getAdminOverview() {
-  return apiClient.get<AdminOverview>('/admin/analytics/overview');
+export interface UpdateSiteSettingsInput {
+  vatRate?: number;
+  pricesIncludeVat?: boolean;
+  vatAppliesToShipping?: boolean;
+  currency?: CurrencyCode;
+  payoutMode?: PayoutMode;
+  payoutCadenceDays?: number;
+  payoutSettlementHoldDays?: number;
+  minimumPayoutAmount?: number | null;
+  autoRetryFailedPayouts?: boolean;
+}
+
+export async function getAdminOverview(opts?: { dateFrom?: string; dateTo?: string }) {
+  const params = new URLSearchParams();
+  if (opts?.dateFrom) params.set('dateFrom', opts.dateFrom);
+  if (opts?.dateTo) params.set('dateTo', opts.dateTo);
+  const q = params.toString();
+  const suffix = q ? `?${q}` : '';
+  return apiClient.get<AdminOverview>(`/admin/analytics/overview${suffix}`);
+}
+
+/** Triggers a browser download. Uses the same cookie session as other admin calls. */
+export async function downloadAdminAnalyticsCsv(opts: {
+  entity: 'orders' | 'campaigns';
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const params = new URLSearchParams({ entity: opts.entity });
+  if (opts.dateFrom) params.set('dateFrom', opts.dateFrom);
+  if (opts.dateTo) params.set('dateTo', opts.dateTo);
+  const blob = await apiClient.getBlob(`/admin/analytics/export?${params.toString()}`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${opts.entity}-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function getAdminOrders() {
@@ -224,6 +314,10 @@ export async function createAdminRefund(
 
 export async function getAdminCampaigns() {
   return apiClient.get<AdminCampaign[]>('/admin/campaigns');
+}
+
+export async function getAdminCampaign(id: string) {
+  return apiClient.get<AdminCampaignDetail>(`/admin/campaigns/${id}`);
 }
 
 export async function getAdminCampaignsByStatus(status?: string) {
@@ -377,4 +471,33 @@ export async function approveAdminManualAdjustment(payoutId: string, approvalRea
 
 export async function getAdminSiteSettings() {
   return apiClient.get<SiteSettings>('/admin/site-settings');
+}
+
+export async function updateAdminSiteSettings(input: UpdateSiteSettingsInput) {
+  return apiClient.patch<SiteSettings>('/admin/site-settings', input);
+}
+
+export interface AdminDirectoryUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  status: string;
+  createdAt: string;
+  emailVerifiedAt: string | null;
+}
+
+export async function searchAdminUsers(params?: { q?: string; take?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.q?.trim()) sp.set('q', params.q.trim());
+  if (params?.take != null) sp.set('take', String(params.take));
+  const qs = sp.toString();
+  return apiClient.get<AdminDirectoryUser[]>(`/admin/users${qs ? `?${qs}` : ''}`);
+}
+
+export async function updateAdminUserRole(userId: string, role: UserRole) {
+  return apiClient.patch<AdminDirectoryUser>(`/admin/users/${userId}/role`, {
+    role,
+  });
 }

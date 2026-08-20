@@ -64,7 +64,12 @@ export default function AdminCatalogProductsPage() {
     <AdminShell
       activeNav="catalog"
       title="Products"
-      description="Manage product views, workshop layers, and print areas."
+      description="Create products, manage catalog fields, workshop layers, print areas, and variant inventory."
+      actions={
+        <Link href="/admin/catalog/products/new">
+          <Button size="sm">New product</Button>
+        </Link>
+      }
     >
       <div className="space-y-3">
         {productsQuery.isLoading ? (

@@ -84,7 +84,7 @@ Recommended launch posture: `MANUAL` or `AUTO_APPROVAL_REQUIRED`; do not enable 
 - Reconciliation implementation → TTW-015.
 - General identity verification and organiser application → TTW-023, TTW-030.
 - Campaign sellability/readiness beyond payout eligibility → TTW-034.
-- International payouts/currencies, tax withholding and accounting integrations → future market/accounting tickets.
+- International payouts/currencies and tax withholding → TTW-057; accounting integration → TTW-056.
 
 ## Design review
 

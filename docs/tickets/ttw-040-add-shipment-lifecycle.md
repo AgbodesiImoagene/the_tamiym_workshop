@@ -79,8 +79,8 @@ Use a one-to-many schema to avoid a future destructive migration, but enforce on
 - Inventory consumption/restoration → TTW-014.
 - Cancellation, return, refund and delivery-dispute remedies → TTW-041.
 - Full customer order-detail journey → TTW-033.
-- Carrier purchasing, label generation and carrier webhooks → follow-up after a carrier/provider is selected.
-- Multi-package/partial shipment UX → follow-up; the schema must not preclude it.
+- Carrier purchasing, label generation and carrier webhooks → TTW-044.
+- Multi-package/partial shipment UX → TTW-045; the schema must not preclude it.
 
 ## Design review
 

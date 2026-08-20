@@ -2,7 +2,18 @@
 
 import { authApi, type ApiError, type User } from '@/lib/auth';
 import { UserRole } from '@tamiym/types';
-import { Button, Card, CardContent, cn } from '@tamiym/ui';
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  Card,
+  CardContent,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  cn,
+} from '@tamiym/ui';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,6 +28,7 @@ type AdminNavKey =
   | 'shipping'
   | 'moderation'
   | 'notifications'
+  | 'team'
   | 'settings';
 
 interface AdminShellProps {
@@ -58,8 +70,8 @@ const secondaryNavItems: AdminNavItem[] = [
   {
     key: 'moderation',
     label: 'Moderation',
-    href: '/admin/moderation/designs',
-    hint: 'Design review',
+    href: '/admin/moderation/campaigns',
+    hint: 'Campaigns, designs, media',
   },
   {
     key: 'notifications',
@@ -67,6 +79,7 @@ const secondaryNavItems: AdminNavItem[] = [
     href: '/admin/notifications',
     hint: 'Operational alerts',
   },
+  { key: 'team', label: 'Admins', href: '/admin/team', hint: 'User roles' },
   { key: 'settings', label: 'Settings', href: '/admin/settings/site', hint: 'Site policies' },
 ];
 
@@ -74,6 +87,13 @@ function formatName(user: User | null) {
   if (!user) return 'Admin user';
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
   return fullName || user.email;
+}
+
+function getInitials(user: User | null): string {
+  if (!user) return 'AU';
+  const first = user.firstName?.trim()[0]?.toUpperCase() ?? '';
+  const last = user.lastName?.trim()[0]?.toUpperCase() ?? '';
+  return first + last || (user.email[0]?.toUpperCase() ?? 'AU');
 }
 
 export function formatAdminCurrency(amount: number, currency: string) {
@@ -198,8 +218,24 @@ export function AdminShell({ activeNav, title, description, actions, children }:
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-white/70">
-        Loading admin workspace...
+      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="bg-slate-950 px-5 py-6">
+          <Skeleton className="mb-6 h-28 w-full rounded-2xl bg-white/10" />
+          <div className="space-y-2">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-2xl bg-white/10" />
+            ))}
+          </div>
+        </aside>
+        <div className="px-8 py-8">
+          <Skeleton className="mb-4 h-9 w-64 rounded-xl" />
+          <Skeleton className="mb-8 h-5 w-96 rounded-xl" />
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-2xl" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -272,22 +308,36 @@ export function AdminShell({ activeNav, title, description, actions, children }:
 
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                 {actions}
-                <div className="rounded-2xl border border-black/8 bg-[#f7f9fc] px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
-                    Signed in as
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-tamiym-blue">{formatName(user)}</p>
-                  <div className="mt-3 flex items-center gap-3">
+                <div className="flex items-center gap-3 rounded-2xl border border-black/8 bg-[#f7f9fc] px-4 py-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-tamiym-blue text-xs font-semibold text-white">
+                      {getInitials(user)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
+                      Signed in as
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold text-tamiym-blue">
+                      {formatName(user)}
+                    </p>
+                  </div>
+                  <div className="ml-2 flex items-center gap-3">
                     <span className="rounded-full bg-tamiym-blue px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
                       {user?.role}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleLogout()}
-                      className="text-xs font-semibold text-black/55 transition hover:text-black"
-                    >
-                      Sign out
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => void handleLogout()}
+                          className="text-xs font-semibold text-black/55 transition hover:text-black"
+                        >
+                          Sign out
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Sign out of admin</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </div>

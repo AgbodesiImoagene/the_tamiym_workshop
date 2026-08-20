@@ -1,0 +1,19 @@
+---
+description: NestJS, Prisma, queue, and service-layer conventions
+globs: "apps/api/**/*.ts,apps/api/prisma/**/*"
+alwaysApply: false
+---
+
+# Backend conventions
+
+- Keep domain behaviour in focused services and modules; controllers validate, authorize, document, and delegate.
+- Use dependency injection and existing domain modules instead of new global helpers or duplicate services.
+- Validate all external input with DTOs; never trust TypeScript types at runtime.
+- Enforce authorization centrally with guards and re-check ownership in service queries.
+- Put multi-record state transitions in transactions and enforce concurrency invariants in PostgreSQL constraints or conditional writes.
+- Never hold a database transaction open during an external network call.
+- Queue jobs must be idempotent, retry-safe, observable, bounded, and recoverable after worker restarts.
+- Use Prisma CLI-generated migrations. Document rollout, backfill, compatibility, and rollback considerations.
+- Avoid unsafe raw SQL. Parameterize justified raw queries and test them against PostgreSQL.
+- Log structured identifiers and outcomes without credentials, cookies, tokens, personal data, or provider secrets.
+- Keep public response DTOs explicit; do not leak Prisma records by accident.

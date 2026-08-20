@@ -4,6 +4,7 @@ import { PublicFundraisersController } from './public-fundraisers.controller';
 import { PayoutProfilesController } from './payout-profiles.controller';
 import { BanksController } from './banks.controller';
 import { CampaignsService } from './campaigns.service';
+import { CampaignExpiryService } from './campaign-expiry.service';
 import { PayoutProfilesService } from './payout-profiles.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -27,7 +28,7 @@ import { AdminNotificationsModule } from '../admin-notifications/admin-notificat
     PayoutProfilesController,
     BanksController,
   ],
-  providers: [CampaignsService, PayoutProfilesService],
+  providers: [CampaignsService, CampaignExpiryService, PayoutProfilesService],
   exports: [CampaignsService, PayoutProfilesService],
 })
 export class FundraisingModule {}

@@ -51,17 +51,25 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 10. `10-deployment-and-environments.md` — environments, secrets, deployment
 11. `11-development-setup.md` — local dev environment setup & workflows
 12. `12-testing-strategy.md` — unit/integration tests + coverage requirements
-    <<<<<<< Updated upstream
-13. `backend-production-readiness.md` — repo-state backend gaps, todos, and production checklist
+13. `13-public-site-fundraiser-supporter-flow.md` — current public fundraiser behavior and known checkout gaps
+14. `14-auth-and-session-architecture.md` — target split for `web` / `app` / `admin`, customer vs admin session policy, and fundraiser-on-web auth direction
+15. `15-public-fundraiser-checkout-implementation-plan.md` — concrete execution sequence for web auth, session policy, fundraiser cart, and checkout
+16. `16-playwright-regression-strategy.md` — browser acceptance architecture, feature inventory, execution tiers, and adoption plan
+17. `17-backend-business-completeness-audit.md` — actor-lifecycle assessment, critical invariants, policy decisions, and delivery order
+18. `18-production-infrastructure-options.md` — retained AWS/DigitalOcean comparison, workload contract, and evidence gate
+19. `19-digitalocean-production-architecture-decision.md` — accepted cost-constrained DigitalOcean architecture, consequences, recovery and scale triggers
+20. `epics/06-production-infrastructure-as-code.md` — DigitalOcean production IaC outcome and dependency graph
+21. `epics/07-organic-discovery-seo-aeo-geo.md` — SEO, AEO and GEO discovery outcome and dependency graph
+22. `backend-production-readiness.md` — repo-state backend gaps, todos, and production checklist
+23. `tickets/README.md` — prioritized epics, deferred work, and implementation-ticket backlog
 
 ## Deep Dives
 
 - `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
+- `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
+- `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout
 - `pricing-strategy.md` — pricing pipeline, money model, discount and bulk-pricing constraints, and rounding policy
-- # `backend-production-readiness.md` — module-by-module backend readiness tracker and next steps
-
-13. `design-rules.md` — Design parity rules and UI tokens (Figma TTW-Site → `packages/config/theme.css`)
-    > > > > > > > Stashed changes
+- `backend-production-readiness.md` — module-by-module backend readiness tracker and next steps
 
 ## Output expectations for the AI agent
 

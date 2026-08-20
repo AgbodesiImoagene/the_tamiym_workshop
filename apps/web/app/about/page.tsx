@@ -1,42 +1,41 @@
-import Image from 'next/image';
 import { MarketingShell } from '@/components/marketing-shell';
+import { MarketingHero } from '@/components/marketing-hero';
 import { EditorialSection, StatsStrip } from '@/components/marketing-sections';
 import { marketingAssets } from '@/lib/assets';
 
 export default function AboutPage() {
   return (
     <MarketingShell>
-      <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <div className="space-y-10">
-          <div className="relative h-[260px] overflow-hidden rounded-2xl sm:h-[382px]">
-            <Image
-              src={marketingAssets.aboutHero}
-              alt="Bulk apparel billboard showcasing product categories"
-              fill
-              className="object-cover"
-              priority
-              sizes="100vw"
-            />
-          </div>
+      <MarketingHero
+        imageSrc={marketingAssets.aboutHero}
+        imageAlt="Bulk apparel billboard showcasing product categories"
+        priority
+        overlayClassName="bg-black/30"
+      >
+        <div className="max-w-[40rem] space-y-5 text-white">
+          <h1 className="text-[2.75rem] font-bold leading-[1.08] tracking-[-0.03em] sm:text-[3.25rem]">
+            Elevating Events, Effortlessly
+          </h1>
+          <p className="max-w-2xl text-sm font-semibold leading-relaxed text-white/95 sm:text-base">
+            Quality bulk printing and custom merch for organizers who want memorable events without
+            the logistics headache.
+          </p>
+        </div>
+      </MarketingHero>
 
-          <div className="space-y-5 text-tamiym-blue">
-            <h1 className="text-[3.25rem] font-bold leading-[1.1] tracking-[-0.03em]">
-              Elevating Events,Effortlessly
-            </h1>
-            <div className="max-w-6xl space-y-4 text-lg leading-[1.45] text-black">
-              <p>
-                We envision a world where event organizers and communities can focus on creating
-                unforgettable experiences without being held back by logistical or creative
-                limitations. By providing high-quality, affordable bulk-printing solutions, we
-                eliminate the barriers to personalized event branding.
-              </p>
-              <p>
-                Our mission is to empower individuals, organizations, and businesses to bring their
-                events to life with ease, fostering creativity and connection while enabling them to
-                celebrate their passions and milestones in style.
-              </p>
-            </div>
-          </div>
+      <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <div className="max-w-6xl space-y-4 text-lg leading-[1.45] text-black">
+          <p>
+            We envision a world where event organizers and communities can focus on creating
+            unforgettable experiences without being held back by logistical or creative limitations.
+            By providing high-quality, affordable bulk-printing solutions, we eliminate the barriers
+            to personalized event branding.
+          </p>
+          <p>
+            Our mission is to empower individuals, organizations, and businesses to bring their
+            events to life with ease, fostering creativity and connection while enabling them to
+            celebrate their passions and milestones in style.
+          </p>
         </div>
       </section>
 

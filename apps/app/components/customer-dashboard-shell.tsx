@@ -2,7 +2,15 @@
 
 import { authApi } from '@/lib/auth';
 import { customerAssets } from '@/lib/assets';
-import { Button, cn } from '@tamiym/ui';
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  cn,
+} from '@tamiym/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -52,13 +60,11 @@ export function CustomerDashboardShell({
         <aside className="hidden min-h-screen w-[300px] flex-col justify-between bg-black px-[15px] py-12 text-white lg:flex">
           <div className="space-y-10">
             <div className="flex items-center gap-3 px-1">
-              <Image
-                src={customerAssets.profileIcon}
-                alt=""
-                width={40}
-                height={40}
-                className="h-10 w-10 shrink-0 rounded-full"
-              />
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarFallback className="bg-white/20 text-sm font-semibold text-white">
+                  {displayName.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <p className="text-base font-medium">{displayName}</p>
             </div>
 
@@ -105,24 +111,29 @@ export function CustomerDashboardShell({
                 height={32}
                 className="h-8 w-[125px] object-contain"
               />
-              <Button
-                variant="ghost"
-                onClick={handleLogout}
-                className="h-10 w-10 rounded-full border border-white/20 p-0 text-white hover:bg-white/10"
-              >
-                <span className="sr-only">Logout</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M10 17 15 12 10 7" />
-                  <path d="M15 12H3" />
-                  <path d="M20 4v16" />
-                </svg>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className="h-10 w-10 rounded-full border border-white/20 p-0 text-white hover:bg-white/10"
+                  >
+                    <span className="sr-only">Logout</span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M10 17 15 12 10 7" />
+                      <path d="M15 12H3" />
+                      <path d="M20 4v16" />
+                    </svg>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Sign out</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </aside>

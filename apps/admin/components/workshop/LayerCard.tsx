@@ -3,7 +3,15 @@
 import { useRef, useState } from 'react';
 import type { TemplateLayer, TemplateLayerType, BlendMode } from '@/lib/products';
 import { LAYER_TYPE_LABELS, LAYER_TYPE_COLORS, BLEND_MODE_CSS } from '@/lib/products';
-import { Button } from '@tamiym/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@tamiym/ui';
 
 const LAYER_TYPES: TemplateLayerType[] = [
   'BASE',
@@ -50,6 +58,7 @@ export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: Laye
   const [zIndex, setZIndex] = useState(layer.zIndex);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const isDirty =
     blendMode !== layer.blendMode ||
@@ -77,13 +86,7 @@ export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: Laye
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete layer "${layer.displayName ?? layer.key}"?`)) return;
-    setDeleting(true);
-    try {
-      await onDelete(layer.id);
-    } finally {
-      setDeleting(false);
-    }
+    setConfirmDeleteOpen(true);
   };
 
   const blendCss = BLEND_MODE_CSS[blendMode] ?? 'normal';
@@ -143,17 +146,18 @@ export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: Laye
           <div className="flex flex-wrap gap-3">
             <label className="flex-1 space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Blend mode</span>
-              <select
-                value={blendMode}
-                onChange={(e) => setBlendMode(e.target.value as BlendMode)}
-                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                {BLEND_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
+              <Select value={blendMode} onValueChange={(val) => setBlendMode(val as BlendMode)}>
+                <SelectTrigger className="w-full rounded-lg text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BLEND_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             <label className="w-28 space-y-1">
               <span className="text-xs font-medium text-muted-foreground">
@@ -188,11 +192,26 @@ export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: Laye
           size="sm"
           onClick={handleSave}
           disabled={!isDirty || saving}
-          variant={isDirty ? 'primary' : 'secondary'}
+          variant={isDirty ? 'default' : 'secondary'}
         >
           {saving ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={`Delete layer "${layer.displayName ?? layer.key}"?`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          setDeleting(true);
+          try {
+            await onDelete(layer.id);
+          } finally {
+            setDeleting(false);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -332,29 +351,31 @@ export function NewLayerCard({ productId, viewId, existingCount, onUpload }: New
         />
 
         <div className="flex gap-2">
-          <select
-            value={layerType}
-            onChange={(e) => setLayerType(e.target.value as TemplateLayerType)}
-            className="flex-1 rounded-lg border border-border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            {LAYER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {LAYER_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+          <Select value={layerType} onValueChange={(val) => setLayerType(val as TemplateLayerType)}>
+            <SelectTrigger className="flex-1 rounded-lg text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LAYER_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {LAYER_TYPE_LABELS[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            value={blendMode}
-            onChange={(e) => setBlendMode(e.target.value as BlendMode)}
-            className="flex-1 rounded-lg border border-border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            {BLEND_MODES.map((m) => (
-              <option key={m} value={m}>
-                {m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          <Select value={blendMode} onValueChange={(val) => setBlendMode(val as BlendMode)}>
+            <SelectTrigger className="flex-1 rounded-lg text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BLEND_MODES.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m.charAt(0) + m.slice(1).toLowerCase().replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <label className="block space-y-1">

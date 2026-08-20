@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "@tamiym/config/theme.css";
+@import "@tamiym/config/shadcn.css";
+
+/* Tailwind v4 doesn't follow pnpm-symlinked workspace packages by default. */
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 :root {
   color-scheme: light;
@@ -13,14 +17,18 @@ html {
   scroll-behavior: smooth;
 }
 
-body {
-  margin: 0;
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
-}
-
 a {
   color: inherit;
   text-decoration: none;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply min-h-0 bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    margin: 0;
+  }
 }

@@ -1,0 +1,17 @@
+---
+description: Secure upload, remote import, processing, moderation, and object-storage rules
+globs: "apps/api/src/{media,design-assets,storage,moderation}/**/*.ts"
+alwaysApply: false
+---
+
+# Media security
+
+- Quarantine untrusted uploads and imports until type validation, size limits, decoding, malware scan, and moderation complete.
+- Production must fail closed when malware scanning is unavailable; a stub may never report CLEAN.
+- Verify content from bytes/decoder, not filename or client MIME alone.
+- Remote imports must allow only HTTP(S), resolve and pin public IPs, reject all private/reserved ranges, revalidate every redirect, limit redirects/bytes/time, and block DNS rebinding.
+- Image decoding and metadata extraction must be resource-bounded and isolated from request latency.
+- Store originals privately by default; issue controlled URLs and define lifecycle cleanup for failed, rejected, orphaned, and temporary objects.
+- Do not expose moderation notes, internal object keys, or storage credentials publicly.
+- Queue processing must be idempotent and leave a recoverable state after upload, database, scanner, moderator, or derivative failures.
+- Test polyglots, malformed images, oversized/chunked bodies, redirect SSRF, rebinding, scanner failure, retries, and cleanup.

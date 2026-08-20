@@ -69,6 +69,45 @@ export class CampaignsService {
     }
   }
 
+  private isCampaignExpired(
+    endDate?: Date | null,
+    now: Date = new Date(),
+  ): boolean {
+    return !!endDate && endDate.getTime() <= now.getTime();
+  }
+
+  private async transitionCampaignToEnded(
+    campaign: { id: string; title: string; status: CampaignStatus },
+    now: Date,
+  ) {
+    const updated = await this.prisma.campaign.update({
+      where: { id: campaign.id },
+      data: { status: CampaignStatus.ENDED },
+    });
+
+    await this.audit.log({
+      eventName: 'system.campaign.ended',
+      action: AuditAction.STATUS_CHANGE,
+      entityType: 'Campaign',
+      entityId: campaign.id,
+      actorUserId: null,
+      actorRole: null,
+      before: { status: campaign.status },
+      after: { status: CampaignStatus.ENDED },
+      note: `Campaign automatically ended at ${now.toISOString()} because endDate passed.`,
+    });
+
+    await this.adminNotify.emit(ADMIN_NOTIF_CAMPAIGN_STATUS_CHANGED, {
+      campaignId: campaign.id,
+      campaignTitle: campaign.title,
+      previousStatus: campaign.status,
+      newStatus: CampaignStatus.ENDED,
+      actorUserId: '',
+    });
+
+    return updated;
+  }
+
   /**
    * Create a campaign (organizer)
    */
@@ -136,6 +175,41 @@ export class CampaignsService {
     }
     if (campaign.organizerId !== organizerId) {
       throw new ForbiddenException('Access denied');
+    }
+    return campaign;
+  }
+
+  /**
+   * Get full campaign detail for admin review — no ownership check.
+   * Includes organizer, all campaign products with their linked designs and
+   * design moderation statuses, plus the campaign content fields needed for review.
+   */
+  async adminFindOne(id: string) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+      include: {
+        organizer: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        products: {
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+            design: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+                moderationStatus: true,
+                moderationNotes: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
     }
     return campaign;
   }
@@ -343,6 +417,10 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
+    if (this.isCampaignExpired(campaign.endDate)) {
+      await this.transitionCampaignToEnded(campaign, new Date());
+      throw new NotFoundException('Campaign not found');
+    }
     return {
       ...campaign,
       performance: {
@@ -366,7 +444,17 @@ export class CampaignsService {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
         products: {
-          include: { product: { select: { id: true, name: true } } },
+          include: {
+            product: { select: { id: true, name: true } },
+            design: {
+              select: {
+                id: true,
+                name: true,
+                moderationStatus: true,
+                moderationNotes: true,
+              },
+            },
+          },
         },
       },
     });
@@ -658,5 +746,32 @@ export class CampaignsService {
       actorUserId: actorUserId ?? '',
     });
     return updated;
+  }
+
+  async endExpiredCampaigns(now: Date = new Date()) {
+    const campaigns = await this.prisma.campaign.findMany({
+      where: {
+        status: CampaignStatus.ACTIVE,
+        endDate: { lte: now, not: null },
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+      },
+    });
+
+    if (campaigns.length === 0) {
+      return 0;
+    }
+
+    for (const campaign of campaigns) {
+      await this.transitionCampaignToEnded(campaign, now);
+    }
+
+    this.logger.log(
+      `Automatically ended ${campaigns.length} expired campaign(s)`,
+    );
+    return campaigns.length;
   }
 }

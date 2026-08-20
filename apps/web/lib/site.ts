@@ -9,3 +9,11 @@ export function customerAppPath(path = '') {
 export function adminAppPath(path = '') {
   return `${adminAppUrl}${path}`;
 }
+
+export function webRegisterWithNext(nextPath: string) {
+  return `/auth/register?next=${encodeURIComponent(nextPath)}`;
+}
+
+export function webLoginWithNext(nextPath: string) {
+  return `/auth/login?next=${encodeURIComponent(nextPath)}`;
+}

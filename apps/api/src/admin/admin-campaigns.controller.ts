@@ -64,6 +64,20 @@ export class AdminCampaignsController {
     return this.campaignsService.findAllForAdmin(status);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get full campaign detail for admin review' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Campaign detail with organizer, products, and designs',
+  })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async findOne(@Param('id') id: string) {
+    return this.campaignsService.adminFindOne(id);
+  }
+
   /**
    * Activate a campaign from REVIEW → ACTIVE.
    * Validates all attached designs are APPROVED before making the campaign live.

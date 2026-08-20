@@ -150,6 +150,32 @@ export class ApiClient {
     return response.json();
   }
 
+  /** GET a binary response such as an admin CSV export. */
+  async getBlob(endpoint: string): Promise<Blob> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = {
+        message: response.statusText,
+        statusCode: response.status,
+      };
+
+      try {
+        const data = (await response.json()) as { message?: string; error?: string };
+        error.message = data.message || data.error || response.statusText;
+      } catch {
+        // If the response is not JSON, retain the HTTP status text.
+      }
+
+      throw error;
+    }
+
+    return response.blob();
+  }
+
   async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'GET' });
   }

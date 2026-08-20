@@ -1,0 +1,15 @@
+---
+description: API contract, Swagger, and behavior-documentation requirements
+globs: "apps/api/src/**/*.ts,packages/types/**/*.ts,docs/**/*.md"
+alwaysApply: false
+---
+
+# Contracts and documentation
+
+- Every mounted endpoint must document operation, auth, parameters/body, success schema, and meaningful error responses in Swagger.
+- DTO validation, runtime response, shared types, clients, examples, and OpenAPI must change together.
+- Generate or validate OpenAPI in CI and detect undocumented or drifted routes.
+- Document non-trivial state machines, idempotency, retries, webhooks, payouts, refunds, moderation, queues, and admin-only behaviour near the implementation.
+- Update repo-state and deployment documentation in the same ticket as changed behaviour.
+- Distinguish implemented behaviour, target architecture, and backlog explicitly; never describe planned work as current capability.
+- Public docs must not expose internal object keys, secrets, unsafe examples, or operationally sensitive details.

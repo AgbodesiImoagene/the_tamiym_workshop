@@ -549,11 +549,37 @@ export class ProductsService {
                 valueCode: true,
                 displayName: true,
                 sortOrder: true,
+                metadata: true,
               },
               orderBy: { sortOrder: 'asc' },
             },
           },
           orderBy: { sortOrder: 'asc' },
+        },
+        prices: {
+          select: { id: true, currency: true, amount: true, compareAt: true },
+        },
+        productImageRoles: {
+          select: {
+            id: true,
+            role: true,
+            sortOrder: true,
+            productViewId: true,
+            image: {
+              select: {
+                id: true,
+                altText: true,
+                sortOrder: true,
+                mediaAsset: {
+                  select: {
+                    status: true,
+                    originalUrl: true,
+                    derivatives: { select: { type: true, url: true } },
+                  },
+                },
+              },
+            },
+          },
         },
         images: {
           select: {
@@ -614,6 +640,7 @@ export class ProductsService {
                 templateLayerId: true,
                 effectType: true,
                 tintHex: true,
+                replacementImageId: true,
                 meta: true,
               },
             },
@@ -787,7 +814,9 @@ export class ProductsService {
             },
           },
         },
-        prices: { select: { currency: true, amount: true, compareAt: true } },
+        prices: {
+          select: { id: true, currency: true, amount: true, compareAt: true },
+        },
         inventory: true,
       },
       orderBy: { createdAt: 'asc' },

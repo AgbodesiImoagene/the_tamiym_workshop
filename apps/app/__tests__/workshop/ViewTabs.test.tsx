@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ViewTabs from '@/components/workshop/ViewTabs';
 import type { WorkshopView, DesignData } from '@/lib/designs';
 
@@ -61,7 +62,8 @@ describe('ViewTabs', () => {
     expect(screen.getByText('Back')).toBeInTheDocument();
   });
 
-  it('calls onViewChange with the correct view key when a tab is clicked', () => {
+  it('calls onViewChange with the correct view key when a tab is clicked', async () => {
+    const user = userEvent.setup();
     const onViewChange = jest.fn();
     render(
       <ViewTabs
@@ -72,7 +74,7 @@ describe('ViewTabs', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Back'));
+    await user.click(screen.getByRole('tab', { name: /^Back/ }));
     expect(onViewChange).toHaveBeenCalledWith('back');
   });
 
