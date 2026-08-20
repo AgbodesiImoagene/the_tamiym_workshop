@@ -19,7 +19,7 @@ variable "managed_by" {
 variable "ticket" {
   description = "Owning ticket for this composition."
   type        = string
-  default     = "TTW-062"
+  default     = "TTW-064"
 }
 
 variable "do_project_name" {
@@ -31,7 +31,7 @@ variable "do_project_name" {
 variable "do_project_description" {
   description = "DigitalOcean project description."
   type        = string
-  default     = "Tamiym Workshop production (TTW-062 network/DNS/edge)."
+  default     = "Tamiym Workshop production (TTW-062 network + TTW-064 data)."
 }
 
 variable "do_project_purpose" {
@@ -123,4 +123,46 @@ variable "admin_cookie_domain" {
   description = "Isolated admin cookie host (no parent-domain sharing with customers)."
   type        = string
   default     = "admin.tamiym.com"
+}
+
+variable "postgres_name" {
+  description = "Managed PostgreSQL cluster name."
+  type        = string
+  default     = "ttw-prod-pg"
+}
+
+variable "postgres_size" {
+  description = "Managed PostgreSQL size slug."
+  type        = string
+  default     = "db-s-1vcpu-1gb"
+}
+
+variable "postgres_version" {
+  description = "PostgreSQL major version."
+  type        = string
+  default     = "16"
+}
+
+variable "postgres_maintenance_day" {
+  description = "Weekly maintenance day (UTC)."
+  type        = string
+  default     = "sunday"
+}
+
+variable "postgres_maintenance_hour" {
+  description = "Maintenance window start hour (UTC)."
+  type        = string
+  default     = "04:00:00"
+}
+
+variable "spaces_name_prefix" {
+  description = "Globally unique Spaces bucket name prefix."
+  type        = string
+  default     = "ttw-prod"
+}
+
+variable "spaces_region" {
+  description = "Spaces region (Spaces unavailable in lon1; ams3 is EU-near London)."
+  type        = string
+  default     = "ams3"
 }

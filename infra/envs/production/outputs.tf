@@ -67,3 +67,53 @@ output "root_domain" {
   description = "Apex domain (Namecheap)."
   value       = var.root_domain
 }
+
+output "postgres_id" {
+  description = "Managed PostgreSQL cluster id."
+  value       = module.postgres.id
+}
+
+output "postgres_private_host" {
+  description = "Private VPC hostname for PostgreSQL."
+  value       = module.postgres.private_host
+}
+
+output "postgres_port" {
+  description = "PostgreSQL port."
+  value       = module.postgres.port
+}
+
+output "postgres_deletion_protection" {
+  description = "Whether OpenTofu prevent_destroy is enabled for PostgreSQL."
+  value       = module.postgres.deletion_protection
+}
+
+output "spaces_buckets" {
+  description = "Role → Spaces bucket name map."
+  value       = module.spaces.bucket_map
+}
+
+output "spaces_region" {
+  description = "Spaces region."
+  value       = module.spaces.region
+}
+
+output "spaces_derived_endpoint" {
+  description = "Derived/public bucket endpoint."
+  value       = module.spaces.derived_endpoint
+}
+
+output "valkey_maxmemory" {
+  description = "Host-local Valkey maxmemory contract."
+  value       = module.valkey_config.maxmemory
+}
+
+output "valkey_maxmemory_policy" {
+  description = "Host-local Valkey eviction policy (must be noeviction)."
+  value       = module.valkey_config.maxmemory_policy
+}
+
+output "valkey_conf_path" {
+  description = "Shipped Valkey config path for TTW-063 Compose."
+  value       = module.valkey_config.conf_path
+}

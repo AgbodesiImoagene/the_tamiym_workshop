@@ -7,14 +7,15 @@ Pinned CLI: **OpenTofu 1.9.1** (`.opentofu-version`).
 
 ## Layout
 
-| Path                         | Role                                                                                    |
-| ---------------------------- | --------------------------------------------------------------------------------------- |
-| `modules/`                   | Reusable modules (`labeling`, `digitalocean_project`, `vpc`, `firewall`, `reserved_ip`) |
-| `envs/production/`           | Production composition + isolated remote state                                          |
-| `envs/temporary-validation/` | Disposable validation composition + isolated state                                      |
-| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                            |
-| `policy/`                    | deny-secrets + network-invariant policy helpers                                         |
-| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                          |
+| Path                         | Role                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `modules/`                   | Reusable modules (`labeling`, `digitalocean_project`, `vpc`, `firewall`, `reserved_ip`, `postgres`, `spaces`, `valkey_config`) |
+| `runtime/valkey/`            | Host-local Valkey conf + Compose snippet for TTW-063                                                                           |
+| `envs/production/`           | Production composition + isolated remote state                                                                                 |
+| `envs/temporary-validation/` | Disposable validation composition + isolated state                                                                             |
+| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                                                                   |
+| `policy/`                    | deny-secrets + network/data invariant policy helpers                                                                           |
+| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                                                                 |
 
 ## Environments
 
@@ -69,5 +70,7 @@ CI trust model, and drift plan.
 - [TTW-061 IaC foundation](../docs/infrastructure/ttw-061-iac-foundation.md)
 - [TTW-062 network / edge](../docs/infrastructure/ttw-062-network-edge.md)
 - [TTW-062 Namecheap DNS](../docs/infrastructure/ttw-062-namecheap-dns.md)
+- [TTW-064 data services](../docs/infrastructure/ttw-064-data-services.md)
 - [TTW-061 ticket](../docs/tickets/ttw-061-establish-iac-foundation.md)
 - [TTW-062 ticket](../docs/tickets/ttw-062-provision-network-dns-edge.md)
+- [TTW-064 ticket](../docs/tickets/ttw-064-provision-managed-data-services.md)
