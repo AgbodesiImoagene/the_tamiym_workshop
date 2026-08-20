@@ -1,0 +1,44 @@
+name: Infra Plan
+
+# Owner-triggered speculative plan only. Never runs on pull_request heads
+# (untrusted HCL must not receive DIGITALOCEAN_TOKEN). Never applies.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'OpenTofu env root to plan'
+        required: true
+        default: temporary-validation
+        type: choice
+        options:
+          - temporary-validation
+          - production
+
+jobs:
+  plan:
+    name: Plan ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # Require the protected GitHub Environment so only authorized operators
+    # can inject DIGITALOCEAN_TOKEN (create env "production" / "temporary-validation"
+    # in repo settings and store the token there — not as an unprotected repo secret).
+    environment: ${{ inputs.environment == 'production' && 'production' || 'temporary-validation' }}
+    defaults:
+      run:
+        working-directory: infra/envs/${{ inputs.environment }}
+    env:
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install OpenTofu 1.9.1
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.9.1
+      - name: Init (backend disabled until Spaces bootstrap)
+        run: tofu init -backend=false -input=false -lockfile=readonly
+      - name: Plan (no apply)
+        run: tofu plan -input=false -no-color -out=tfplan
+      - name: Discard plan artefact
+        if: always()
+        run: rm -f tfplan

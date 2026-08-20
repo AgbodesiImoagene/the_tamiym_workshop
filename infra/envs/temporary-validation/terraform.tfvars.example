@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars for local overrides (do not commit secrets).
+project                = "tamiym-workshop"
+environment_label      = "temporary-validation"
+managed_by             = "opentofu"
+ticket                 = "TTW-061"
+do_project_name        = "ttw-tmpval"
+do_project_purpose     = "Web Application"
+do_project_environment = "Development"
+region                 = "lon1"
