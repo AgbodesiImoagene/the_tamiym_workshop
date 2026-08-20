@@ -293,6 +293,18 @@ jobs:
             test-results/
           if-no-files-found: ignore
 
+  infra:
+    name: Infra Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenTofu 1.9.1
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.9.1
+      - name: Format, init-without-backend, validate
+        run: bash infra/scripts/validate-all.sh
+
   build:
     name: Production Build
     runs-on: ubuntu-latest

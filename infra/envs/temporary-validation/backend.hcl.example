@@ -1,0 +1,6 @@
+# Spaces / S3-compatible backend — copy to backend.hcl (gitignored).
+# Never commit real keys. Prefer a distinct prefix or bucket from production.
+bucket     = "ttw-tofu-state"
+endpoint   = "https://lon1.digitaloceanspaces.com"
+access_key = "CHANGE_ME"
+secret_key = "CHANGE_ME"

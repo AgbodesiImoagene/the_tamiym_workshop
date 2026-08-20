@@ -26,7 +26,9 @@
     "db:generate": "pnpm --filter api exec prisma generate",
     "infra:cost-model": "node scripts/infrastructure/cost-model.mjs",
     "infra:budget-check": "node scripts/infrastructure/check-resource-budget.mjs",
-    "infra:cost-model:test": "node --test scripts/infrastructure/__tests__/cost-model.test.mjs"
+    "infra:cost-model:test": "node --test scripts/infrastructure/__tests__/cost-model.test.mjs",
+    "infra:fmt": "bash -c 'export PATH=\"$HOME/.local/bin:$PATH\"; cd infra && tofu fmt -recursive'",
+    "infra:validate": "bash infra/scripts/validate-all.sh"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

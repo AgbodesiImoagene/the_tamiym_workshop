@@ -69,10 +69,11 @@ dump.rdb
 
 # OpenTofu / Terraform
 **/.terraform/
-**/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
+*.tfplan.json
 crash.log
 crash.*.log
 override.tf
@@ -80,3 +81,7 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 infra/**/backend.hcl
+infra/**/terraform.tfvars
+!infra/**/terraform.tfvars.example
+*.auto.tfvars
+*.auto.tfvars.json
