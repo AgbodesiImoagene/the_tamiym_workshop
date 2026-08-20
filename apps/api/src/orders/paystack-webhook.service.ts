@@ -22,6 +22,8 @@ import {
   ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
 } from '../admin-notifications/admin-notification-events';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 export interface PaystackWebhookEvent {
   event: string;
@@ -59,6 +61,8 @@ export class PaystackWebhookService {
     private notificationOutboxDelivery: NotificationOutboxDeliveryService,
     private adminNotify: AdminNotifyService,
     private refundsService: RefundsService,
+    private inventoryLifecycle: InventoryLifecycleService,
+    private inventoryLowStockNotifier: InventoryLowStockNotifier,
   ) {}
 
   /**
@@ -93,7 +97,14 @@ export class PaystackWebhookService {
         const payment = await this.prisma.payment.findFirst({
           where: { providerRef: reference },
           include: {
-            order: { include: { user: { select: { id: true, email: true } } } },
+            order: {
+              include: {
+                user: { select: { id: true, email: true } },
+                items: {
+                  select: { id: true, variantId: true, quantity: true },
+                },
+              },
+            },
             settlementClaim: true,
           },
         });
@@ -143,6 +154,10 @@ export class PaystackWebhookService {
             'denied',
           );
           this.observability.recordChargeSettlement('rejected');
+          await this.cancelPendingAndReleaseInventory(
+            order,
+            'charge_success_expired_reject',
+          );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -171,6 +186,10 @@ export class PaystackWebhookService {
               'denied',
             );
             this.observability.recordChargeSettlement('rejected');
+            await this.cancelPendingAndReleaseInventory(
+              order,
+              'charge_success_amount_mismatch_reject',
+            );
             await this.adminNotify.emit(
               ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
               {
@@ -197,6 +216,10 @@ export class PaystackWebhookService {
             'denied',
           );
           this.observability.recordChargeSettlement('rejected');
+          await this.cancelPendingAndReleaseInventory(
+            order,
+            'charge_success_currency_mismatch_reject',
+          );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -259,6 +282,20 @@ export class PaystackWebhookService {
                 `charge.success claim won but order ${order.id} was not PENDING_PAYMENT`,
               );
             }
+
+            await this.inventoryLifecycle.consumeOrderItems(
+              order.id,
+              order.items.map((i) => ({
+                id: i.id,
+                variantId: i.variantId,
+                quantity: i.quantity,
+              })),
+              tx,
+              {
+                reason: 'charge_success',
+                settlementBusinessKey: businessKey,
+              },
+            );
 
             if (order.campaignId) {
               await tx.campaign.update({
@@ -336,6 +373,22 @@ export class PaystackWebhookService {
 
         this.observability.recordChargeSettlement('settled');
 
+        // Low-stock alerts after commit so counters reflect consume (TTW-014).
+        await Promise.all(
+          order.items.map(async (item) => {
+            const inv = await this.prisma.inventoryItem.findUnique({
+              where: { variantId: item.variantId },
+            });
+            if (!inv?.trackInventory) return;
+            const afterAvailable = inv.stockOnHand - inv.reserved;
+            const previousAvailable = afterAvailable + item.quantity;
+            await this.inventoryLowStockNotifier.afterInventoryChange(
+              item.variantId,
+              previousAvailable,
+            );
+          }),
+        );
+
         if (notificationId) {
           await this.notificationOutboxDelivery.enqueueDelivery(notificationId);
         }
@@ -352,6 +405,41 @@ export class PaystackWebhookService {
         });
       },
     );
+  }
+
+  /**
+   * Reject unsettled charge.success paths that must not leave reserved stock
+   * while an INITIATED payment blocks expiry cron (TTW-014).
+   */
+  private async cancelPendingAndReleaseInventory(
+    order: {
+      id: string;
+      items: Array<{ id: string; variantId: string; quantity: number }>;
+    },
+    reason: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.PENDING_PAYMENT,
+        },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: new Date(),
+        },
+      });
+      await this.inventoryLifecycle.releaseOrderItems(
+        order.id,
+        order.items.map((i) => ({
+          id: i.id,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
+        tx,
+        { reason },
+      );
+    });
   }
 
   /**

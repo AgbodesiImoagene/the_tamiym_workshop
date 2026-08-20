@@ -88,6 +88,14 @@ export class ObservabilityService {
     },
   );
 
+  private readonly inventoryMovements = this.meter.createCounter(
+    'inventory_movement_total',
+    {
+      description:
+        'Inventory lifecycle outcomes by kind (reserve/release/consume) and outcome.',
+    },
+  );
+
   private readonly payoutTransferEvents = this.meter.createCounter(
     'payout_transfer_event_total',
     {
@@ -198,6 +206,13 @@ export class ObservabilityService {
 
   recordChargeSettlement(outcome: 'settled' | 'duplicate' | 'rejected'): void {
     this.chargeSettlements.add(1, { outcome });
+  }
+
+  recordInventoryMovement(
+    kind: 'reserve' | 'release' | 'consume',
+    outcome: 'applied' | 'duplicate' | 'rejected',
+  ): void {
+    this.inventoryMovements.add(1, { kind, outcome });
   }
 
   recordPayoutTransferEvent(outcome: 'applied' | 'duplicate' | 'stale'): void {

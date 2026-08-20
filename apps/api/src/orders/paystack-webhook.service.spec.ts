@@ -13,6 +13,8 @@ import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 describe('PaystackWebhookService', () => {
   let service: PaystackWebhookService;
@@ -52,6 +54,13 @@ describe('PaystackWebhookService', () => {
     const mockPrisma = {
       payment: { findFirst: jest.fn(), update: jest.fn() },
       order: { findFirst: jest.fn(), update: jest.fn() },
+      inventoryItem: {
+        findUnique: jest.fn().mockResolvedValue({
+          trackInventory: true,
+          stockOnHand: 10,
+          reserved: 0,
+        }),
+      },
       notificationOutbox: {
         create: jest.fn().mockResolvedValue({ id: 'outbox-pay-1' }),
       },
@@ -117,6 +126,19 @@ describe('PaystackWebhookService', () => {
             applyRefundWebhookEvent: jest.fn().mockResolvedValue(true),
           },
         },
+        {
+          provide: InventoryLifecycleService,
+          useValue: {
+            consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+            releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: InventoryLowStockNotifier,
+          useValue: {
+            afterInventoryChange: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -180,6 +202,13 @@ describe('PaystackWebhookService', () => {
         mockDelivery as never,
         mockAdminNotify as never,
         mockRefunds as never,
+        {
+          consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+          releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+        } as never,
+        {
+          afterInventoryChange: jest.fn().mockResolvedValue(undefined),
+        } as never,
       );
       expect(svc.verifySignature(rawBody, signature)).toBe(false);
     });
@@ -267,6 +296,7 @@ describe('PaystackWebhookService', () => {
           id: 'order-1',
           status: OrderStatus.PENDING_PAYMENT,
           expiresAt: new Date(Date.now() - 1000),
+          items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
         },
       });
 
@@ -275,7 +305,7 @@ describe('PaystackWebhookService', () => {
         data: { reference: 'ref-123' },
       });
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
         'rejected',
       );
@@ -293,6 +323,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
         },
       });
 
@@ -301,7 +332,7 @@ describe('PaystackWebhookService', () => {
         data: { reference: 'ref-123', amount: 999 },
       });
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
         'rejected',
       );
@@ -319,6 +350,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
         },
       });
 
@@ -327,7 +359,7 @@ describe('PaystackWebhookService', () => {
         data: { reference: 'ref-123', currency: 'USD' },
       });
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
         'rejected',
       );
@@ -346,6 +378,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [],
         },
       });
       (prisma.$transaction as jest.Mock).mockRejectedValue(
@@ -378,6 +411,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [],
         },
       });
 
@@ -430,6 +464,13 @@ describe('PaystackWebhookService', () => {
         mockDelivery as never,
         mockAdminNotify as never,
         mockRefunds as never,
+        {
+          consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+          releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+        } as never,
+        {
+          afterInventoryChange: jest.fn().mockResolvedValue(undefined),
+        } as never,
       );
 
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
@@ -446,6 +487,7 @@ describe('PaystackWebhookService', () => {
           totalAmount: 250,
           campaignId: 'camp-1',
           user: { id: 'user-1', email: 'buyer@example.com' },
+          items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
         },
       });
 
@@ -489,6 +531,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [],
         },
       });
       (prisma.$transaction as jest.Mock).mockRejectedValue(
@@ -517,6 +560,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [],
         },
       });
 
@@ -553,6 +597,7 @@ describe('PaystackWebhookService', () => {
           expiresAt: new Date(Date.now() + 3600000),
           currency: 'NGN',
           totalAmount: 100,
+          items: [],
         },
       });
 
@@ -586,6 +631,13 @@ describe('PaystackWebhookService', () => {
         { enqueueDelivery: jest.fn() } as never,
         { emit: jest.fn() } as never,
         refunds as never,
+        {
+          consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+          releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+        } as never,
+        {
+          afterInventoryChange: jest.fn().mockResolvedValue(undefined),
+        } as never,
       );
 
       const result = await svc.handleWebhook(body, signature);

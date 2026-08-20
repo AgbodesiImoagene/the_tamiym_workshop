@@ -7,10 +7,11 @@ import { runWithRequestContext } from '../request-context/request-context.store'
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { ADMIN_NOTIF_ORDER_PENDING_EXPIRED } from '../admin-notifications/admin-notification-events';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 /**
  * Scheduled task: expire PENDING_PAYMENT orders whose expiresAt has passed.
- * Marks them CANCELLED, sets cancelledAt, and releases reserved inventory.
+ * Marks them CANCELLED, sets cancelledAt, and releases reserved inventory (TTW-014).
  * Also sweeps stale INITIATED refund reservations (TTW-013).
  * Runs every 5 minutes.
  */
@@ -23,6 +24,7 @@ export class OrderExpiryService {
     private readonly observability: ObservabilityService,
     private readonly adminNotify: AdminNotifyService,
     private readonly refundsService: RefundsService,
+    private readonly inventoryLifecycle: InventoryLifecycleService,
   ) {}
 
   @Cron('*/5 * * * *')
@@ -47,7 +49,9 @@ export class OrderExpiryService {
               },
               select: {
                 id: true,
-                items: { select: { variantId: true, quantity: true } },
+                items: {
+                  select: { id: true, variantId: true, quantity: true },
+                },
               },
             });
 
@@ -80,27 +84,37 @@ export class OrderExpiryService {
                 continue;
               }
 
+              let didCancel = false;
               await this.prisma.$transaction(async (tx) => {
-                await tx.order.update({
-                  where: { id: order.id },
+                const cancelled = await tx.order.updateMany({
+                  where: {
+                    id: order.id,
+                    status: OrderStatus.PENDING_PAYMENT,
+                  },
                   data: {
                     status: OrderStatus.CANCELLED,
                     cancelledAt: now,
                   },
                 });
-                for (const item of order.items) {
-                  const inv = await tx.inventoryItem.findUnique({
-                    where: { variantId: item.variantId },
-                  });
-                  if (inv?.trackInventory) {
-                    await tx.inventoryItem.update({
-                      where: { variantId: item.variantId },
-                      data: { reserved: { decrement: item.quantity } },
-                    });
-                  }
+                if (cancelled.count !== 1) {
+                  // Lost race to payment settlement or another cancel.
+                  return;
                 }
+                await this.inventoryLifecycle.releaseOrderItems(
+                  order.id,
+                  order.items.map((i) => ({
+                    id: i.id,
+                    variantId: i.variantId,
+                    quantity: i.quantity,
+                  })),
+                  tx,
+                  { reason: 'order_expiry' },
+                );
+                didCancel = true;
               });
-              cancelledCount++;
+              if (didCancel) {
+                cancelledCount++;
+              }
             }
 
             const cancelledIds = expired

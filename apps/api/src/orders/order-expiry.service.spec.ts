@@ -5,6 +5,7 @@ import { OrderStatus } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 describe('OrderExpiryService', () => {
   let service: OrderExpiryService;
@@ -16,6 +17,7 @@ describe('OrderExpiryService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
       },
+      payment: { findFirst: jest.fn().mockResolvedValue(null) },
       inventoryItem: {
         findUnique: jest.fn().mockResolvedValue({
           variantId: 'var-1',
@@ -26,7 +28,10 @@ describe('OrderExpiryService', () => {
       },
       $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
-          order: { update: jest.fn().mockResolvedValue({}) },
+          order: {
+            update: jest.fn().mockResolvedValue({}),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
               variantId: 'var-1',
@@ -65,6 +70,12 @@ describe('OrderExpiryService', () => {
             failStaleInitiatedRefunds: jest.fn().mockResolvedValue(0),
           },
         },
+        {
+          provide: InventoryLifecycleService,
+          useValue: {
+            releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -87,7 +98,9 @@ describe('OrderExpiryService', () => {
         },
         select: {
           id: true,
-          items: { select: { variantId: true, quantity: true } },
+          items: {
+            select: { id: true, variantId: true, quantity: true },
+          },
         },
       });
     });
@@ -96,6 +109,76 @@ describe('OrderExpiryService', () => {
       (prisma.order.findMany as jest.Mock).mockResolvedValue([]);
       await service.expirePendingOrders();
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('cancels expired orders and releases inventory', async () => {
+      const release = jest.fn().mockResolvedValue(undefined);
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          OrderExpiryService,
+          {
+            provide: ObservabilityService,
+            useValue: {
+              startSpan: jest.fn(
+                async (
+                  _name: string,
+                  _attributes: Record<string, unknown>,
+                  callback: () => Promise<unknown>,
+                ) => callback(),
+              ),
+            },
+          },
+          {
+            provide: PrismaService,
+            useValue: {
+              order: {
+                findMany: jest.fn().mockResolvedValue([
+                  {
+                    id: 'ord-exp',
+                    items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+                  },
+                ]),
+              },
+              payment: { findFirst: jest.fn().mockResolvedValue(null) },
+              $transaction: jest.fn(
+                async (cb: (tx: unknown) => Promise<unknown>) => {
+                  const tx = {
+                    order: {
+                      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+                    },
+                  };
+                  return cb(tx);
+                },
+              ),
+            },
+          },
+          {
+            provide: AdminNotifyService,
+            useValue: { emit: jest.fn().mockResolvedValue(undefined) },
+          },
+          {
+            provide: RefundsService,
+            useValue: {
+              failStaleInitiatedRefunds: jest.fn().mockResolvedValue(0),
+            },
+          },
+          {
+            provide: InventoryLifecycleService,
+            useValue: { releaseOrderItems: release },
+          },
+        ],
+      }).compile();
+
+      const expiry = module.get(OrderExpiryService);
+      const notify = module.get(AdminNotifyService);
+      await expiry.expirePendingOrders();
+      expect(release).toHaveBeenCalledWith(
+        'ord-exp',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        expect.anything(),
+        { reason: 'order_expiry' },
+      );
+      expect(notify.emit).toHaveBeenCalled();
     });
   });
 });

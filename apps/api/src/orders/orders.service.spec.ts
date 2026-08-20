@@ -14,6 +14,7 @@ import { OrderStatus } from '../generated/prisma/enums';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 const mockAddress = {
   id: 'addr-1',
@@ -128,7 +129,12 @@ describe('OrdersService', () => {
       },
       $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
-          order: { create: jest.fn().mockResolvedValue(mockOrder) },
+          order: {
+            create: jest.fn().mockResolvedValue({
+              ...mockOrder,
+              items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+            }),
+          },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
               trackInventory: true,
@@ -180,6 +186,14 @@ describe('OrdersService', () => {
           provide: InventoryLowStockNotifier,
           useValue: mockInventoryLowStock,
         },
+        {
+          provide: InventoryLifecycleService,
+          useValue: {
+            reserveOrderItems: jest.fn().mockResolvedValue(undefined),
+            releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+            consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -216,7 +230,7 @@ describe('OrdersService', () => {
         }),
       );
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw BadRequestException when stock is insufficient', async () => {
@@ -251,7 +265,7 @@ describe('OrdersService', () => {
       const result = await service.create('user-1', dto);
 
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw NotFoundException when address not found', async () => {
@@ -337,7 +351,7 @@ describe('OrdersService', () => {
 
       const result = await service.findOne('user-1', 'order-1');
 
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw NotFoundException when order not found', async () => {
@@ -353,6 +367,84 @@ describe('OrdersService', () => {
 
       await expect(service.findOne('other-user', 'order-1')).rejects.toThrow(
         ForbiddenException,
+      );
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('releases inventory when cancelling unpaid orders', async () => {
+      const release = jest.fn().mockResolvedValue(undefined);
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          OrdersService,
+          { provide: AuditService, useValue: { log: jest.fn() } },
+          {
+            provide: PrismaService,
+            useValue: {
+              order: {
+                findUnique: jest.fn().mockResolvedValue({
+                  id: 'order-1',
+                  status: OrderStatus.PENDING_PAYMENT,
+                  items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+                  user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+                }),
+                findUniqueOrThrow: jest.fn().mockResolvedValue({
+                  id: 'order-1',
+                  status: OrderStatus.CANCELLED,
+                  items: [],
+                }),
+              },
+              notificationOutbox: {
+                create: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+              },
+              $transaction: jest.fn(
+                async (cb: (tx: unknown) => Promise<unknown>) => {
+                  const tx = {
+                    order: {
+                      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+                      findUniqueOrThrow: jest.fn().mockResolvedValue({
+                        id: 'order-1',
+                        status: OrderStatus.CANCELLED,
+                        items: [],
+                      }),
+                    },
+                  };
+                  return cb(tx);
+                },
+              ),
+            },
+          },
+          {
+            provide: PricingService,
+            useValue: { quoteStandard: jest.fn(), quoteCampaign: jest.fn() },
+          },
+          { provide: ConfigService, useValue: { get: jest.fn() } },
+          {
+            provide: NotificationOutboxDeliveryService,
+            useValue: { enqueueDelivery: jest.fn() },
+          },
+          {
+            provide: AdminNotifyService,
+            useValue: { emit: jest.fn().mockResolvedValue(undefined) },
+          },
+          {
+            provide: InventoryLowStockNotifier,
+            useValue: { afterInventoryChange: jest.fn() },
+          },
+          {
+            provide: InventoryLifecycleService,
+            useValue: { releaseOrderItems: release },
+          },
+        ],
+      }).compile();
+
+      const orders = module.get(OrdersService);
+      await orders.updateOrderStatus('order-1', OrderStatus.CANCELLED);
+      expect(release).toHaveBeenCalledWith(
+        'order-1',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        expect.anything(),
+        { reason: 'admin_cancel_unpaid' },
       );
     });
   });
