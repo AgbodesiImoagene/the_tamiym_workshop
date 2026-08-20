@@ -19,7 +19,7 @@
     "test:e2e:matrix": "playwright test --project=setup --project=chromium-web --project=chromium-app --project=chromium-admin --project=chromium-journeys --project=firefox-web --project=webkit-web",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md}\"",
-    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter api test:coverage && pnpm coverage:ratchet && pnpm coverage:diff && pnpm build",
+    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm --filter api test:coverage && pnpm coverage:ratchet && pnpm coverage:diff && pnpm audit:prod && pnpm build",
     "prepare": "pnpm exec husky || true",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:seed": "pnpm --filter api db:seed",
@@ -28,7 +28,28 @@
     "infra:budget-check": "node scripts/infrastructure/check-resource-budget.mjs",
     "infra:cost-model:test": "node --test scripts/infrastructure/__tests__/cost-model.test.mjs",
     "infra:fmt": "bash -c 'export PATH=\"$HOME/.local/bin:$PATH\"; cd infra && tofu fmt -recursive'",
-    "infra:validate": "bash infra/scripts/validate-all.sh"
+    "infra:validate": "bash infra/scripts/validate-all.sh",
+    "audit:prod": "pnpm audit --prod --audit-level=high",
+    "audit:prod:json": "pnpm audit --prod --json > audit-prod.json || true"
+  },
+  "pnpm": {
+    "overrides": {
+      "fast-xml-parser": ">=5.3.5",
+      "protobufjs": ">=7.5.5",
+      "ws": "^8.21.0",
+      "multer": ">=2.1.0",
+      "path-to-regexp": ">=8.4.0",
+      "js-yaml": ">=4.3.0",
+      "lodash": ">=4.18.0",
+      "@grpc/grpc-js": ">=1.14.4",
+      "deepmerge-ts": ">=8.0.0",
+      "defu": ">=6.1.5",
+      "effect": ">=3.20.0",
+      "hono": ">=4.12.4",
+      "@hono/node-server": ">=1.19.10",
+      "tar": ">=7.5.7",
+      "form-data": ">=4.0.6"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

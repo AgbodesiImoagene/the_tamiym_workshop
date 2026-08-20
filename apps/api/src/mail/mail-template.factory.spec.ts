@@ -1,6 +1,10 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
-  buildMailTemplateOptions,
-  buildMailerModuleOptions,
+  buildMailTemplateRenderer,
+  buildMailTransportConfig,
+  createMailTransporter,
   formatAmountHelper,
 } from './mail-template.factory';
 
@@ -22,33 +26,38 @@ describe('formatAmountHelper', () => {
   });
 });
 
-describe('buildMailTemplateOptions', () => {
+describe('buildMailTemplateRenderer', () => {
   const previousEnv = process.env.NODE_ENV;
 
   afterEach(() => {
     process.env.NODE_ENV = previousEnv;
   });
 
-  it('uses a stub adapter under NODE_ENV=test', async () => {
+  it('uses a stub renderer under NODE_ENV=test', () => {
     process.env.NODE_ENV = 'test';
-    const template = buildMailTemplateOptions('/tmp/ttw-mail-templates');
-    expect(template.dir).toBe('/tmp/ttw-mail-templates');
-    const compile = (
-      template.adapter as { compile: () => () => Promise<string> }
-    ).compile();
-    await expect(compile()).resolves.toContain('e2e test template stub');
+    const renderer = buildMailTemplateRenderer('/tmp/ttw-mail-templates');
+    expect(renderer.render('verification', {})).toContain(
+      'e2e test template stub',
+    );
   });
 
-  it('loads HandlebarsAdapter outside test', () => {
+  it('compiles Handlebars templates outside test', () => {
     process.env.NODE_ENV = 'development';
-    const template = buildMailTemplateOptions('/tmp/ttw-mail-templates');
-    expect(template.adapter?.constructor?.name).toMatch(/Handlebars/i);
+    const dir = mkdtempSync(join(tmpdir(), 'ttw-mail-'));
+    const partials = join(dir, 'partials');
+    mkdirSync(partials);
+    writeFileSync(join(partials, 'header.hbs'), '<header>H</header>');
+    writeFileSync(join(dir, 'hello.hbs'), '{{> header}}<p>{{name}}</p>');
+    const renderer = buildMailTemplateRenderer(dir);
+    expect(renderer.render('hello', { name: 'Ada' })).toContain('Ada');
+    expect(renderer.render('hello', { name: 'Ada' })).toContain(
+      '<header>H</header>',
+    );
   });
 });
 
-describe('buildMailerModuleOptions', () => {
-  it('builds transport defaults and template options', () => {
-    process.env.NODE_ENV = 'test';
+describe('buildMailTransportConfig', () => {
+  it('builds transport defaults with optional auth', () => {
     const config = {
       get: jest.fn((key: string, fallback?: unknown) => {
         if (key === 'MAIL_USER') return 'user';
@@ -56,9 +65,23 @@ describe('buildMailerModuleOptions', () => {
         return fallback;
       }),
     };
-    const options = buildMailerModuleOptions(config as never);
-    expect(options.transport.host).toBe('localhost');
-    expect(options.transport.auth).toEqual({ user: 'user', pass: 'pass' });
-    expect(options.template).toBeDefined();
+    const options = buildMailTransportConfig(config as never);
+    expect(options.host).toBe('localhost');
+    expect(options.auth).toEqual({ user: 'user', pass: 'pass' });
+    expect(options.from).toContain('Tamiym');
+  });
+});
+
+describe('createMailTransporter', () => {
+  it('creates a nodemailer transport from config', () => {
+    const transport = createMailTransporter({
+      host: 'localhost',
+      port: 1025,
+      secure: false,
+      from: 'test@example.com',
+    });
+    expect(transport).toBeDefined();
+    expect(typeof transport.sendMail).toBe('function');
+    transport.close();
   });
 });

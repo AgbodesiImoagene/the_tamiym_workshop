@@ -185,28 +185,29 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   const handleAddText = useCallback((textObject: Record<string, unknown>) => {
     if (!canvasRef.current) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    import('fabric').then(({ fabric }: any) => {
-      const itext = new fabric.IText(String(textObject.text ?? 'Text'), textObject);
+    import('fabric').then((mod: any) => {
+      const IText = mod.IText ?? mod.fabric?.IText;
+      const itext = new IText(String(textObject.text ?? 'Text'), textObject);
       canvasRef.current.add(itext);
       canvasRef.current.setActiveObject(itext);
-      canvasRef.current.renderAll();
+      canvasRef.current.requestRenderAll?.();
+      canvasRef.current.renderAll?.();
     });
   }, []);
 
   const handleAddImage = useCallback((imageObject: Record<string, unknown>) => {
     if (!canvasRef.current) return;
-    import('fabric').then(({ fabric }) => {
-      fabric.Image.fromURL(
-        String(imageObject.src ?? ''),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (img: any) => {
-          img.set(imageObject);
-          canvasRef.current.add(img);
-          canvasRef.current.setActiveObject(img);
-          canvasRef.current.renderAll();
-        },
-        { crossOrigin: 'anonymous' }
-      );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    import('fabric').then(async (mod: any) => {
+      const ImageCtor = mod.FabricImage ?? mod.Image ?? mod.fabric?.Image;
+      const img = await ImageCtor.fromURL(String(imageObject.src ?? ''), {
+        crossOrigin: 'anonymous',
+      });
+      img.set(imageObject);
+      canvasRef.current.add(img);
+      canvasRef.current.setActiveObject(img);
+      canvasRef.current.requestRenderAll?.();
+      canvasRef.current.renderAll?.();
     });
   }, []);
 

@@ -4,9 +4,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FabricModule = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricCanvas = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FabricNS = any;
 
 interface WorkshopCanvasProps {
   viewKey: string;
@@ -24,13 +24,13 @@ const DEFAULT_SIZE = 600;
 
 /**
  * WorkshopCanvas wraps a Fabric.js canvas. It:
- * - Renders template layers as non-interactive fabric.Image objects at their zIndex/blendMode
+ * - Renders template layers as non-interactive FabricImage objects at their zIndex/blendMode
  * - Applies option-value effects (TINT via BlendColor filter, REPLACE_IMAGE by swapping src)
  * - Clips user layers to the PrintArea bounds
  * - Fires `onLayersChange` on every modification with the serialised user-layer JSON
  *
  * Template layers are always reconstructed from props — they are never in fabricJson.
- * Fabric.js is imported dynamically (browser-only).
+ * Fabric.js is imported dynamically (browser-only). Compatible with fabric v7 named exports.
  */
 export default function WorkshopCanvas({
   viewKey,
@@ -45,7 +45,7 @@ export default function WorkshopCanvas({
 }: WorkshopCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas>(null);
-  const fabricModuleRef = useRef<FabricModule>(null);
+  const fabricModuleRef = useRef<FabricNS>(null);
   const lastJsonRef = useRef<string>('');
 
   const buildLayerKey = (layerId: string) => `__template_${layerId}`;
@@ -61,8 +61,9 @@ export default function WorkshopCanvas({
   );
 
   const loadTemplateLayers = useCallback(
-    async (canvas: FabricCanvas, fabric: FabricModule) => {
+    async (canvas: FabricCanvas, fabric: FabricNS) => {
       clearTemplateLayers(canvas);
+      const ImageCtor = fabric.FabricImage ?? fabric.Image;
 
       for (const layer of [...templateLayers].sort((a, b) => a.zIndex - b.zIndex)) {
         const effect = getEffectForLayer(layer.id);
@@ -73,39 +74,41 @@ export default function WorkshopCanvas({
 
         if (!imageUrl) continue;
 
-        await new Promise<void>((resolve) => {
-          fabric.Image.fromURL(
-            imageUrl,
-            (img: FabricCanvas) => {
-              img.set({
-                left: 0,
-                top: 0,
-                scaleX: width / (img.width || width),
-                scaleY: height / (img.height || height),
-                selectable: false,
-                evented: false,
-                opacity: layer.opacity,
-                globalCompositeOperation: blendModeToComposite(layer.blendMode),
-                data: { isTemplateLayer: true, layerKey: buildLayerKey(layer.id) },
-              });
-
-              if (effect?.effectType === 'TINT' && effect.tintHex) {
-                const filter = new fabric.Image.filters.BlendColor({
-                  color: effect.tintHex,
-                  mode: 'tint',
-                  alpha: 0.6,
-                });
-                img.filters = [filter];
-                img.applyFilters();
-              }
-
-              canvas.add(img);
-              canvas.sendToBack(img);
-              resolve();
-            },
-            { crossOrigin: 'anonymous' }
-          );
+        const img = await ImageCtor.fromURL(imageUrl, {
+          crossOrigin: 'anonymous',
         });
+        img.set({
+          left: 0,
+          top: 0,
+          scaleX: width / (img.width || width),
+          scaleY: height / (img.height || height),
+          selectable: false,
+          evented: false,
+          opacity: layer.opacity,
+          globalCompositeOperation: blendModeToComposite(layer.blendMode),
+          data: { isTemplateLayer: true, layerKey: buildLayerKey(layer.id) },
+        });
+
+        if (effect?.effectType === 'TINT' && effect.tintHex) {
+          const BlendColor = fabric.filters?.BlendColor ?? fabric.Image?.filters?.BlendColor;
+          if (BlendColor) {
+            img.filters = [
+              new BlendColor({
+                color: effect.tintHex,
+                mode: 'tint',
+                alpha: 0.6,
+              }),
+            ];
+            img.applyFilters();
+          }
+        }
+
+        canvas.add(img);
+        if (typeof canvas.sendObjectToBack === 'function') {
+          canvas.sendObjectToBack(img);
+        } else if (typeof canvas.sendToBack === 'function') {
+          canvas.sendToBack(img);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,26 +118,23 @@ export default function WorkshopCanvas({
   const loadUserLayers = useCallback(
     async (canvas: FabricCanvas, json: FabricJson | null) => {
       if (!json || json.objects.length === 0) return;
-
-      await new Promise<void>((resolve) => {
-        canvas.loadFromJSON({ ...json }, () => {
-          canvas.getObjects().forEach((o: FabricCanvas) => {
-            if (!o.data?.isTemplateLayer) {
-              o.set({ selectable: !readOnly, evented: !readOnly });
-            }
-          });
-          canvas.renderAll();
-          resolve();
-        });
+      await canvas.loadFromJSON({ ...json });
+      canvas.getObjects().forEach((o: FabricCanvas) => {
+        if (!o.data?.isTemplateLayer) {
+          o.set({ selectable: !readOnly, evented: !readOnly });
+        }
       });
+      canvas.requestRenderAll?.();
+      canvas.renderAll?.();
     },
     [readOnly]
   );
 
   const buildClipPath = useCallback(
-    (canvas: FabricCanvas, fabric: FabricModule) => {
+    (canvas: FabricCanvas, fabric: FabricNS) => {
       if (!printArea) return;
-      const rect = new fabric.Rect({
+      const Rect = fabric.Rect;
+      const rect = new Rect({
         left: printArea.x * width,
         top: printArea.y * height,
         width: printArea.width * width,
@@ -171,14 +171,15 @@ export default function WorkshopCanvas({
 
     let mounted = true;
 
-    import('fabric').then((mod: FabricModule) => {
+    import('fabric').then((mod: FabricNS) => {
       if (!mounted || !canvasRef.current) return;
 
-      // fabric v5 exports as mod.fabric
+      // fabric v5: mod.fabric; fabric v7: named exports on mod
       const fabric = mod.fabric ?? mod;
       fabricModuleRef.current = fabric;
 
-      const canvas = new fabric.Canvas(canvasRef.current, {
+      const Canvas = fabric.Canvas;
+      const canvas = new Canvas(canvasRef.current, {
         width,
         height,
         selection: !readOnly,
@@ -217,7 +218,8 @@ export default function WorkshopCanvas({
     const fabric = fabricModuleRef.current;
     if (!canvas || !fabric) return;
     loadTemplateLayers(canvas, fabric).then(() => {
-      canvas.renderAll();
+      canvas.requestRenderAll?.();
+      canvas.renderAll?.();
     });
   }, [loadTemplateLayers]);
 

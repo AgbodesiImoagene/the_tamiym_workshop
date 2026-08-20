@@ -1,25 +1,19 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailerModule } from '@nestjs-modules/mailer';
+import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { MailService } from './mail.service';
+import { MailTransportService } from './mail-transport.service';
 import { MailProcessor } from './processors/mail.processor';
 import { MAIL_QUEUE_NAME } from '../constants';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationOutboxDeliveryService } from './notification-outbox-delivery.service';
 import { NotificationOutboxBackfillService } from './notification-outbox-backfill.service';
 import { SmsService } from './sms.service';
-import { buildMailerModuleOptions } from './mail-template.factory';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: buildMailerModuleOptions,
-      inject: [ConfigService],
-    }),
     BullModule.registerQueue({
       name: MAIL_QUEUE_NAME,
       defaultJobOptions: {
@@ -31,6 +25,7 @@ import { buildMailerModuleOptions } from './mail-template.factory';
     }),
   ],
   providers: [
+    MailTransportService,
     MailService,
     SmsService,
     MailProcessor,

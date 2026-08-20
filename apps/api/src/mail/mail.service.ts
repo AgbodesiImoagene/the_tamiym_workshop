@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
 import { join } from 'node:path';
+import { MailTransportService } from './mail-transport.service';
 
 // Simple RFC-5321 check: at least one character @ at least one character . at least 2 chars
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -31,7 +31,7 @@ export class MailService {
     'logo-lockup-light.png',
   );
 
-  constructor(private readonly mailer: MailerService) {}
+  constructor(private readonly mailer: MailTransportService) {}
 
   private logoAttachments() {
     return [
