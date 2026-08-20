@@ -1,0 +1,115 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
+import { ReconciliationRepairService } from './reconciliation-repair.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { ReconciliationRunsService } from './reconciliation-runs.service';
+import {
+  ReconciliationDomain,
+  ReconciliationFindingStatus,
+  ReconciliationRepairStatus,
+} from '../generated/prisma/enums';
+
+describe('ReconciliationRepairService', () => {
+  let service: ReconciliationRepairService;
+  let prisma: {
+    reconciliationFinding: { findUnique: jest.Mock; update: jest.Mock };
+    reconciliationRepairRequest: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    campaignBalanceLedgerEntry: { aggregate: jest.Mock };
+    campaign: { update: jest.Mock };
+  };
+  let runs: { runTargeted: jest.Mock };
+
+  beforeEach(async () => {
+    prisma = {
+      reconciliationFinding: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'f1',
+          runId: 'r1',
+          domain: ReconciliationDomain.CAMPAIGN,
+          status: ReconciliationFindingStatus.OPEN,
+          leftValue: '10',
+          rightValue: '12',
+          sourceIds: { campaignId: 'c1' },
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      reconciliationRepairRequest: {
+        create: jest.fn().mockResolvedValue({ id: 'rep1' }),
+        findUnique: jest.fn(),
+        update: jest.fn().mockResolvedValue({ id: 'rep1' }),
+      },
+      campaignBalanceLedgerEntry: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 12 } }),
+      },
+      campaign: { update: jest.fn().mockResolvedValue({}) },
+    };
+    runs = { runTargeted: jest.fn().mockResolvedValue({}) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ReconciliationRepairService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: { log: jest.fn() } },
+        { provide: ReconciliationRunsService, useValue: runs },
+      ],
+    }).compile();
+
+    service = module.get(ReconciliationRepairService);
+  });
+
+  it('rejects self-approval', async () => {
+    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+      id: 'rep1',
+      status: ReconciliationRepairStatus.REQUESTED,
+      requestedByUserId: 'admin-a',
+      domain: ReconciliationDomain.CAMPAIGN,
+      commandKey: 'campaign.recompute_current_amount',
+      findingId: 'f1',
+      finding: {
+        id: 'f1',
+        domain: ReconciliationDomain.CAMPAIGN,
+        sourceIds: { campaignId: 'c1' },
+        leftValue: '10',
+        rightValue: '12',
+      },
+    });
+
+    await expect(
+      service.approveAndApply({ repairId: 'rep1', actorUserId: 'admin-a' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('applies campaign recompute with second admin', async () => {
+    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+      id: 'rep1',
+      status: ReconciliationRepairStatus.REQUESTED,
+      requestedByUserId: 'admin-a',
+      domain: ReconciliationDomain.CAMPAIGN,
+      commandKey: 'campaign.recompute_current_amount',
+      findingId: 'f1',
+      finding: {
+        id: 'f1',
+        domain: ReconciliationDomain.CAMPAIGN,
+        sourceIds: { campaignId: 'c1' },
+        leftValue: '10',
+        rightValue: '12',
+      },
+    });
+
+    await service.approveAndApply({
+      repairId: 'rep1',
+      actorUserId: 'admin-b',
+    });
+
+    expect(prisma.campaign.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { currentAmount: 12 },
+    });
+    expect(runs.runTargeted).toHaveBeenCalledWith('f1');
+  });
+});

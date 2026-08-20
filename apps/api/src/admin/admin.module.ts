@@ -26,6 +26,8 @@ import { AdminNotificationsModule } from '../admin-notifications/admin-notificat
 import { AdminNotificationsController } from './admin-notifications.controller';
 import { AdminEmailBroadcastService } from './admin-email-broadcast.service';
 import { ShippingModule } from '../shipping/shipping.module';
+import { ReconciliationModule } from '../reconciliation/reconciliation.module';
+import { AdminReconciliationController } from './admin-reconciliation.controller';
 
 @Module({
   imports: [
@@ -41,6 +43,7 @@ import { ShippingModule } from '../shipping/shipping.module';
     FundraisingModule,
     PayoutsModule,
     ShippingModule,
+    ReconciliationModule,
   ],
   providers: [AdminEmailBroadcastService],
   controllers: [
@@ -58,6 +61,7 @@ import { ShippingModule } from '../shipping/shipping.module';
     AdminDiscountsController,
     AdminBulkPricingController,
     AdminNotificationsController,
+    AdminReconciliationController,
   ],
 })
 export class AdminModule {}

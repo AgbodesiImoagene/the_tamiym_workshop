@@ -41,6 +41,9 @@ export const ADMIN_NOTIF_CAMPAIGN_REJECTED_BY_ADMIN =
 export const ADMIN_NOTIF_CAMPAIGN_STATUS_CHANGED =
   'admin.campaign.status_changed';
 
+/** Reconciliation run finished with open findings or incomplete/failed status (TTW-015). */
+export const ADMIN_NOTIF_RECONCILIATION_RUN = 'admin.reconciliation.run';
+
 export const ADMIN_NOTIFICATION_EVENT_CATALOG: {
   key: string;
   description: string;
@@ -126,5 +129,10 @@ export const ADMIN_NOTIFICATION_EVENT_CATALOG: {
     key: ADMIN_NOTIF_CAMPAIGN_STATUS_CHANGED,
     description:
       'Admin changed campaign status (e.g. PAUSED, ENDED) via status update — not activate/reject.',
+  },
+  {
+    key: ADMIN_NOTIF_RECONCILIATION_RUN,
+    description:
+      'Nightly/daily reconciliation finished with open findings or incomplete/failed status (TTW-015).',
   },
 ];

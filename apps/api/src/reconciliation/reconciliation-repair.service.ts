@@ -1,0 +1,215 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AuditAction,
+  AuditSource,
+  ReconciliationDomain,
+  ReconciliationFindingStatus,
+  ReconciliationRepairStatus,
+} from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { ReconciliationRunsService } from './reconciliation-runs.service';
+
+@Injectable()
+export class ReconciliationRepairService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly runs: ReconciliationRunsService,
+  ) {}
+
+  async requestRepair(params: {
+    findingId: string;
+    actorUserId: string;
+    commandKey: string;
+    payload?: Record<string, unknown>;
+  }) {
+    const finding = await this.prisma.reconciliationFinding.findUnique({
+      where: { id: params.findingId },
+    });
+    if (!finding) throw new NotFoundException('Finding not found');
+    if (
+      finding.status !== ReconciliationFindingStatus.OPEN &&
+      finding.status !== ReconciliationFindingStatus.ACKNOWLEDGED
+    ) {
+      throw new BadRequestException(
+        'Finding is not repairable in current status',
+      );
+    }
+
+    const repair = await this.prisma.reconciliationRepairRequest.create({
+      data: {
+        runId: finding.runId,
+        findingId: finding.id,
+        domain: finding.domain,
+        commandKey: params.commandKey,
+        payload: (params.payload ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
+        requestedByUserId: params.actorUserId,
+        beforeEvidence: {
+          leftValue: finding.leftValue,
+          rightValue: finding.rightValue,
+          sourceIds: finding.sourceIds,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.audit.log({
+      eventName: 'admin.reconciliation.repair.requested',
+      action: AuditAction.CREATE,
+      entityType: 'ReconciliationRepairRequest',
+      entityId: repair.id,
+      actorUserId: params.actorUserId,
+      source: AuditSource.ADMIN_API,
+      after: { commandKey: params.commandKey, findingId: finding.id },
+    });
+
+    return repair;
+  }
+
+  async approveAndApply(params: { repairId: string; actorUserId: string }) {
+    const repair = await this.prisma.reconciliationRepairRequest.findUnique({
+      where: { id: params.repairId },
+      include: { finding: true },
+    });
+    if (!repair) throw new NotFoundException('Repair request not found');
+    if (repair.status !== ReconciliationRepairStatus.REQUESTED) {
+      throw new BadRequestException('Repair is not awaiting approval');
+    }
+    if (repair.requestedByUserId === params.actorUserId) {
+      throw new ForbiddenException(
+        'A second distinct admin must approve money/stock repairs',
+      );
+    }
+
+    const moneyOrStock =
+      repair.domain === ReconciliationDomain.PAYMENT ||
+      repair.domain === ReconciliationDomain.REFUND ||
+      repair.domain === ReconciliationDomain.PAYOUT ||
+      repair.domain === ReconciliationDomain.CAMPAIGN ||
+      repair.domain === ReconciliationDomain.INVENTORY;
+    if (!moneyOrStock) {
+      throw new BadRequestException('Unsupported repair domain');
+    }
+
+    await this.prisma.reconciliationRepairRequest.update({
+      where: { id: repair.id },
+      data: {
+        status: ReconciliationRepairStatus.APPROVED,
+        approvedByUserId: params.actorUserId,
+      },
+    });
+
+    try {
+      const after = await this.applyCommand(repair.commandKey, repair.finding);
+      const applied = await this.prisma.reconciliationRepairRequest.update({
+        where: { id: repair.id },
+        data: {
+          status: ReconciliationRepairStatus.APPLIED,
+          afterEvidence: after as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.prisma.reconciliationFinding.update({
+        where: { id: repair.findingId },
+        data: {
+          status: ReconciliationFindingStatus.RESOLVED,
+          resolvedByUserId: params.actorUserId,
+          resolvedAt: new Date(),
+        },
+      });
+
+      await this.audit.log({
+        eventName: 'admin.reconciliation.repair.applied',
+        action: AuditAction.UPDATE,
+        entityType: 'ReconciliationRepairRequest',
+        entityId: repair.id,
+        actorUserId: params.actorUserId,
+        source: AuditSource.ADMIN_API,
+        after,
+      });
+
+      await this.runs.runTargeted(repair.findingId);
+      return applied;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'repair failed';
+      await this.prisma.reconciliationRepairRequest.update({
+        where: { id: repair.id },
+        data: {
+          status: ReconciliationRepairStatus.FAILED,
+          errorSummary: message.slice(0, 500),
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async applyCommand(
+    commandKey: string,
+    finding: {
+      domain: ReconciliationDomain;
+      sourceIds: unknown;
+      leftValue: string;
+      rightValue: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const sourceIds = (finding.sourceIds ?? {}) as Record<string, string>;
+
+    if (commandKey === 'campaign.recompute_current_amount') {
+      const campaignId = sourceIds.campaignId;
+      if (!campaignId) throw new BadRequestException('campaignId required');
+      const ledger = await this.prisma.campaignBalanceLedgerEntry.aggregate({
+        where: {
+          campaignId,
+          entryType: { in: ['PAYMENT_SETTLED', 'REFUND_APPLIED'] },
+        },
+        _sum: { amount: true },
+      });
+      const next = Number(ledger._sum.amount ?? 0);
+      await this.prisma.campaign.update({
+        where: { id: campaignId },
+        data: { currentAmount: next },
+      });
+      return { campaignId, currentAmount: next };
+    }
+
+    if (commandKey === 'inventory.noop_document_drift') {
+      // Safe no-op repair that records evidence; historical consume backfill
+      // is intentionally manual via TTW-014 effect keys when operators approve.
+      return {
+        variantId: sourceIds.variantId ?? null,
+        note: 'Documented inventory drift; no automatic counter rewrite',
+      };
+    }
+
+    if (commandKey === 'payout.document_ledger_gap') {
+      return {
+        payoutId: sourceIds.payoutId ?? null,
+        note: 'Documented payout/ledger gap; use payout retry/manual adjustment flows',
+      };
+    }
+
+    if (commandKey === 'payment.document_missing_claim') {
+      return {
+        paymentId: sourceIds.paymentId ?? null,
+        note: 'Documented missing settlement claim; do not invent a second claim',
+      };
+    }
+
+    if (commandKey === 'refund.document_missing_claim') {
+      return {
+        refundId: sourceIds.refundId ?? null,
+        note: 'Documented missing refund settlement claim',
+      };
+    }
+
+    throw new BadRequestException(`Unknown repair command: ${commandKey}`);
+  }
+}
