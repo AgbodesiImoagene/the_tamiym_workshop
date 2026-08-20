@@ -5,7 +5,10 @@ const redisMock = {
   incr: jest.fn(),
   pexpire: jest.fn(),
   eval: jest.fn(),
+  connect: jest.fn().mockResolvedValue(undefined),
   quit: jest.fn().mockResolvedValue('OK'),
+  disconnect: jest.fn(),
+  status: 'ready',
 };
 
 jest.mock('ioredis', () => {

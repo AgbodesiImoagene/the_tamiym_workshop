@@ -39,13 +39,15 @@ export class AuthRateLimitService implements OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     try {
-      if (this.redis.status === 'ready' || this.redis.status === 'connecting') {
+      if (typeof this.redis.quit === 'function') {
         await this.redis.quit();
-      } else {
+      } else if (typeof this.redis.disconnect === 'function') {
         this.redis.disconnect();
       }
     } catch {
-      this.redis.disconnect();
+      if (typeof this.redis.disconnect === 'function') {
+        this.redis.disconnect();
+      }
     }
   }
 
