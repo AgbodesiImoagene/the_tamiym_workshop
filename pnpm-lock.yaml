@@ -180,6 +180,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       google-auth-library:
         specifier: ^9.0.0
         version: 9.15.1
