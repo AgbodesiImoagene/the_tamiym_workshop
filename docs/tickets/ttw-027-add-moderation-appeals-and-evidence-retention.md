@@ -122,11 +122,10 @@ Allow an authenticated owner to appeal an eligible latest decision once within t
 
 ## Implementation reviews
 
-Pending. Require independent implementation and security/privacy review, including evidence authorization, internal-note disclosure and projection consistency.
+### Slice 1 dual review (2026-08-20) — PASS
 
-### Remediation (dual-review CHANGES_REQUIRED) — 2026-08-20
-
-Addressed concurrent appeal resolve races (`FOR UPDATE` + conditional `updateMany`), sanitized `customerExplanation` overrides that look like internal scores/notes, stripped `moderationNotes` from owner/organizer design and campaign APIs (admin paths retain notes), and made design create/update/duplicate, campaign submit/activate/reject, and media AI decision+projection writers share one transaction so `applyProjection` is the sole moderation field writer.
+- **Security/privacy:** PASS after remediations (`6902339`) — owner APIs strip `moderationNotes`; appeal owner views omit `internalEvidence`; resolve independence + FOR UPDATE race claim; customerExplanation sanitization; share remains APPROVED-only.
+- **Implementation:** PASS — atomic decision+projection writers; migration backfill; duplicate SYSTEM decision; unit coverage for withdraw-on-edit, UPHELD, concurrent resolve, sanitization.
 
 ## Verification evidence
 
@@ -137,4 +136,4 @@ Addressed concurrent appeal resolve races (`FOR UPDATE` + conditional `updateMan
 
 ## Completion summary
 
-Slice 1 in progress: immutable decisions, owner appeals, admin resolve, writer wiring, privacy withdraw, interim policy docs. Formal legal sign-off, Playwright UI, SLA/`ESCALATED`, and evidence uploads remain deferred.
+Slice 1 ready for PR: immutable decisions, owner appeals, admin resolve, atomic writers, privacy withdraw, interim policy, dual reviews PASS. Formal legal sign-off, Playwright UI, SLA/`ESCALATED`, and evidence uploads remain deferred.
