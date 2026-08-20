@@ -12,7 +12,7 @@ terraform {
 # - Public ingress only for SSH (restricted CIDRs), HTTP, HTTPS, and ICMP.
 # - Never publish PostgreSQL/Redis/Mongo/Docker/MinIO ports.
 # - SSH must never be open to 0.0.0.0/0 or ::/0.
-# - Outbound allows HTTPS/DNS/HTTP (ACME/mirrors) plus full TCP inside the VPC.
+# - Outbound allows HTTPS/DNS/HTTP (ACME/mirrors), NTP, and private DB ports inside the VPC.
 
 resource "digitalocean_firewall" "this" {
   name        = var.name
@@ -70,21 +70,29 @@ resource "digitalocean_firewall" "this" {
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  # NTP for TLS/ACME validity and coherent logs.
+  outbound_rule {
+    protocol              = "udp"
+    port_range            = "123"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
   outbound_rule {
     protocol              = "icmp"
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 
-  # Private VPC reachability (Managed PostgreSQL, host Valkey peers, etc.).
+  # Private Managed PostgreSQL only (DO uses 25060; 5432 kept for local-compat paths).
+  # Valkey is on-host/loopback and does not need VPC egress.
   outbound_rule {
     protocol              = "tcp"
-    port_range            = "1-65535"
+    port_range            = "25060"
     destination_addresses = [var.vpc_ip_range]
   }
 
   outbound_rule {
-    protocol              = "udp"
-    port_range            = "1-65535"
+    protocol              = "tcp"
+    port_range            = "5432"
     destination_addresses = [var.vpc_ip_range]
   }
 }

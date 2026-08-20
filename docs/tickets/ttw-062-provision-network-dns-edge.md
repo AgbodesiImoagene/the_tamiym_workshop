@@ -81,6 +81,14 @@ Provision a DigitalOcean VPC, Cloud Firewall, reserved IP and hardened Droplet n
 
 ## Implementation reviews
 
+### Iteration 1 — CHANGES_REQUIRED
+
+NTP egress missing; VPC outbound too broad.
+
+### Iteration 2 — PASS (infra + security)
+
+NTP UDP/123 added; VPC egress limited to TCP 5432 and 25060.
+
 ### Review 1 — Infrastructure
 
 - **Verdict:** Pending (parent)
