@@ -636,6 +636,7 @@ describe('Auth surface isolation (e2e)', () => {
         email,
         role: UserRole.ADMIN,
         surface: AuthSurface.ADMIN,
+        sid: 'forged-session',
       });
 
       await request(app.getHttpServer())
@@ -661,6 +662,136 @@ describe('Auth surface isolation (e2e)', () => {
           }),
         )
         .expect(401);
+    });
+  });
+
+  describe('hashed session list and revoke (TTW-023)', () => {
+    it('lists sessions and marks the current one', async () => {
+      const session = await createCustomerSession();
+      // Second same-surface session (multi-device).
+      const second = await authService.login(
+        {
+          email: (
+            await prisma.user.findUniqueOrThrow({ where: { id: session.id } })
+          ).email,
+          password: 'TestPassword1!',
+        },
+        AuthSurface.CUSTOMER,
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/v1/auth/sessions')
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [CUSTOMER_ACCESS_COOKIE]: second.access_token,
+          }),
+        )
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(2);
+      expect(
+        res.body.every((row: { refreshToken?: string }) => !row.refreshToken),
+      ).toBe(true);
+      const current = res.body.find(
+        (row: { current: boolean }) => row.current === true,
+      );
+      expect(current).toBeDefined();
+    });
+
+    it('revokes one other session without killing the current access JWT immediately if that session differs', async () => {
+      const first = await createCustomerSession();
+      const user = await prisma.user.findUniqueOrThrow({
+        where: { id: first.id },
+      });
+      const second = await authService.login(
+        { email: user.email, password: 'TestPassword1!' },
+        AuthSurface.CUSTOMER,
+      );
+
+      const listed = await request(app.getHttpServer())
+        .get('/v1/auth/sessions')
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [CUSTOMER_ACCESS_COOKIE]: second.access_token,
+          }),
+        )
+        .expect(200);
+
+      const other = listed.body.find(
+        (row: { current: boolean; id: string }) => !row.current,
+      );
+      expect(other).toBeDefined();
+
+      await request(app.getHttpServer())
+        .delete(`/v1/auth/sessions/${other.id}`)
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [CUSTOMER_ACCESS_COOKIE]: second.access_token,
+            [CUSTOMER_CSRF_COOKIE]: CSRF_TOKEN,
+          }),
+        )
+        .set('x-csrf-token', CSRF_TOKEN)
+        .expect(200);
+
+      expect(await refreshTokenExists(first.refreshToken)).toBe(false);
+      expect(await refreshTokenExists(second.refresh_token)).toBe(true);
+    });
+
+    it('revokes all sessions including the current one', async () => {
+      const session = await createCustomerSession();
+
+      await request(app.getHttpServer())
+        .delete('/v1/auth/sessions')
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [CUSTOMER_ACCESS_COOKIE]: session.accessToken,
+            [CUSTOMER_CSRF_COOKIE]: CSRF_TOKEN,
+          }),
+        )
+        .set('x-csrf-token', CSRF_TOKEN)
+        .expect(200);
+
+      expect(await refreshTokenExists(session.refreshToken)).toBe(false);
+
+      await request(app.getHttpServer())
+        .get('/v1/auth/me')
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [CUSTOMER_ACCESS_COOKIE]: session.accessToken,
+          }),
+        )
+        .expect(401);
+    });
+
+    it('concurrent refresh allows only one winner', async () => {
+      const session = await createCustomerSession();
+      const [a, b] = await Promise.allSettled([
+        authService.refresh(session.refreshToken, AuthSurface.CUSTOMER),
+        authService.refresh(session.refreshToken, AuthSurface.CUSTOMER),
+      ]);
+
+      const fulfilled = [a, b].filter((r) => r.status === 'fulfilled');
+      const rejected = [a, b].filter((r) => r.status === 'rejected');
+      expect(fulfilled.length).toBe(1);
+      expect(rejected.length).toBe(1);
+      expect(await refreshTokenExists(session.refreshToken)).toBe(false);
+      const winner = (
+        fulfilled[0] as PromiseFulfilledResult<{
+          refresh_token: string;
+        }>
+      ).value;
+      expect(await refreshTokenExists(winner.refresh_token)).toBe(true);
     });
   });
 });
