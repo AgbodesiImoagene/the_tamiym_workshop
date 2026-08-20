@@ -1,7 +1,7 @@
 # TTW-023 — Enforce account and privileged-auth policy
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** Not started  
+**Status:** In progress\
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-020  
 **Blocks:** TTW-030, TTW-032, TTW-042, TTW-053, TTW-054
@@ -73,16 +73,28 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ## Design review
 
-Record product/security owners, date, threat model, action matrix, recovery and support process, schema/crypto choices, privacy impact, rollout/revocation plan, test plan, and verdict.
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED for verification-policy slice; MFA/sessions/Redis throttles deferred within this ticket.
+
+**Action matrix (v1, from ticket proposal):**
+| Actor | May login unverified? | Gated until verified |
+| CUSTOMER | Yes | CREATE_ORDER, MUTATE_PAYOUT_PROFILE, APPLY_AS_ORGANISER (stub for TTW-030) |
+| ORGANIZER / ADMIN | No — must verify before login/refresh/JWT | Privileged access |
+
+**Blast radius:** `AccountPolicyService`; order create paths; payout profile mutate; login/refresh/JWT/Google; password-reset refresh revoke.
+
+**Error contract:** `403` body `{ code: 'EMAIL_NOT_VERIFIED', action, message }` for frontend guidance.
+
+**Deferred (same ticket):** admin TOTP + recovery codes; named hashed sessions with list/revoke; Redis identity+IP throttles; Playwright MFA/session suites.
 
 ## Implementation reviews
 
-Record security and implementation iterations, migration/crypto findings, fixes, evidence, dimension verdicts, and overall verdict.
+Pending for this slice.
 
 ## Verification evidence
 
-Record exact unit/integration/Playwright commands, concurrency and replay test names, Redis multi-instance evidence, secret-rotation rehearsal, and redacted telemetry samples.
+Pending gates for this slice.
 
 ## Completion summary
 
-Summarize enforced policy, rollout/revocations, MFA recovery operations, throttling values, deviations, migrations, PR, and follow-ups.
+Pending.

@@ -32,6 +32,7 @@ import {
 } from '../admin-notifications/admin-notification-events';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
+import { AccountPolicyService } from '../auth/account-policy.service';
 
 @Injectable()
 export class OrdersService {
@@ -44,12 +45,15 @@ export class OrdersService {
     private adminNotify: AdminNotifyService,
     private inventoryLowStockNotifier: InventoryLowStockNotifier,
     private inventoryLifecycle: InventoryLifecycleService,
+    private accountPolicy: AccountPolicyService,
   ) {}
 
   /**
    * Create a standard order (no campaign) in PENDING_PAYMENT. Uses PricingService for totals and breakdowns; reserves inventory; supports idempotency.
    */
   async create(userId: string, dto: CreateOrderDto) {
+    await this.assertEmailVerifiedForOrder(userId);
+
     if (dto.idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: {
@@ -201,6 +205,8 @@ export class OrdersService {
     userId: string,
     dto: CreateOrderDto,
   ) {
+    await this.assertEmailVerifiedForOrder(userId);
+
     const campaign = await this.prisma.campaign.findUnique({
       where: { id: campaignId },
       select: { id: true },
@@ -373,6 +379,17 @@ export class OrdersService {
         );
       }),
     );
+  }
+
+  private async assertEmailVerifiedForOrder(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerifiedAt: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('Access denied');
+    }
+    this.accountPolicy.assertVerifiedForAction(user, 'CREATE_ORDER');
   }
 
   private orderInclude() {

@@ -15,6 +15,7 @@ import { PayoutsModule } from '../payouts/payouts.module';
 import { MailModule } from '../mail/mail.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { InventoryModule } from '../inventory/inventory.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InventoryModule } from '../inventory/inventory.module';
     MailModule,
     AdminNotificationsModule,
     InventoryModule,
+    AuthModule,
   ],
   controllers: [OrdersController, WebhooksController],
   providers: [

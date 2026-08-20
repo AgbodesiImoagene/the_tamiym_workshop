@@ -10,6 +10,7 @@ import { ObservabilityService } from '../observability/observability.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAIL_QUEUE_NAME } from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
+import { AccountPolicyService } from './account-policy.service';
 import { AuthSurface } from '../generated/prisma/enums';
 
 jest.mock('bcrypt', () => ({
@@ -92,6 +93,7 @@ describe('AuthService', () => {
           provide: getQueueToken(MAIL_QUEUE_NAME),
           useValue: { add: jest.fn() },
         },
+        AccountPolicyService,
       ],
     }).compile();
 
@@ -122,6 +124,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.user.update.mockResolvedValue({});
@@ -158,6 +161,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -188,6 +192,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -213,6 +218,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ADMIN,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(
@@ -238,6 +244,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(
@@ -262,6 +269,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.ORGANIZER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
     prisma.authToken.create.mockResolvedValue({});
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
@@ -300,6 +308,7 @@ describe('AuthService', () => {
       phone: null,
       role: UserRole.CUSTOMER,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
     });
 
     await expect(

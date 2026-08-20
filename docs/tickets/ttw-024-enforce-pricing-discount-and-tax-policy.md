@@ -1,7 +1,7 @@
 # TTW-024 — Enforce pricing, discount and tax policy
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-003\
 **Blocks:** TTW-031, TTW-032, TTW-034, TTW-035, TTW-041, TTW-053, TTW-054
@@ -131,4 +131,4 @@ git diff --check  # clean
 
 Shipped interim NGN v1 pricing policy enforcement: corrected merchandise/discount totals, inclusive VAT extraction, order tax/rounding/policy snapshots, fail-closed campaign discount resolution, bulk quantity EXCLUDE, and discount exclusivity locks with advisory-serialized PCT/FIXED checks. Deferred: owner-signed legal VAT/receipts, immutable tax policy versions, quote-drift UX, Decimal migration, effective-window exclusion beyond ACTIVE locks.
 
-PR: pending.
+PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/27 (merged).

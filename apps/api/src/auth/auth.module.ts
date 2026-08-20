@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { GoogleOAuthController } from './google-oauth.controller';
 import { GoogleOAuthService } from './google-oauth.service';
 import { AuthTokenCleanupService } from './auth-token-cleanup.service';
+import { AccountPolicyService } from './account-policy.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { RolesGuard } from './guards/roles/roles.guard';
@@ -45,11 +46,18 @@ import { StringValue } from 'ms';
     AuthService,
     GoogleOAuthService,
     AuthTokenCleanupService,
+    AccountPolicyService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
     CsrfGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard],
+  exports: [
+    AuthService,
+    AccountPolicyService,
+    JwtAuthGuard,
+    RolesGuard,
+    CsrfGuard,
+  ],
 })
 export class AuthModule {}

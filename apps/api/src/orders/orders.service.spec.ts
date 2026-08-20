@@ -15,6 +15,7 @@ import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-d
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
+import { AccountPolicyService } from '../auth/account-policy.service';
 
 const mockAddress = {
   id: 'addr-1',
@@ -122,6 +123,11 @@ describe('OrdersService', () => {
       design: { findUnique: jest.fn() },
       productVariant: { findUnique: jest.fn() },
       productPrice: { findFirst: jest.fn() },
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ emailVerifiedAt: new Date() }),
+      },
       order: {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -200,6 +206,7 @@ describe('OrdersService', () => {
             consumeOrderItems: jest.fn().mockResolvedValue(undefined),
           },
         },
+        AccountPolicyService,
       ],
     }).compile();
 
@@ -441,6 +448,7 @@ describe('OrdersService', () => {
             provide: InventoryLifecycleService,
             useValue: { releaseOrderItems: release },
           },
+          AccountPolicyService,
         ],
       }).compile();
 
