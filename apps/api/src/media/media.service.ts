@@ -7,12 +7,14 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import type { MediaAsset } from '../generated/prisma/client';
 import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
   ModerationStatus,
+  ModerationSubjectType,
   VirusScanStatus,
 } from '../generated/prisma/enums';
 import {
@@ -33,6 +35,7 @@ export class MediaService {
   constructor(
     private prisma: PrismaService,
     private s3Service: S3Service,
+    private moderationDecisions: ModerationDecisionService,
     @InjectQueue(MEDIA_QUEUE) private mediaQueue: Queue,
   ) {}
 
@@ -136,6 +139,7 @@ export class MediaService {
     id: string,
     status: ModerationStatus,
     notes?: string,
+    actorUserId?: string,
   ) {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
     if (!asset) {
@@ -150,13 +154,16 @@ export class MediaService {
         'status must be APPROVED, REJECTED, or FLAGGED',
       );
     }
-    return this.prisma.mediaAsset.update({
-      where: { id },
-      data: {
-        moderationStatus: status,
-        ...(notes !== undefined && { moderationNotes: notes }),
-      },
+    await this.moderationDecisions.recordAdminDecision({
+      subjectType: ModerationSubjectType.MEDIA,
+      subjectId: id,
+      outcome: status,
+      actorUserId: actorUserId ?? null,
+      notes: notes ?? null,
+      revisionHash: asset.checksum ?? asset.originalKey ?? null,
+      withdrawPendingAppeals: true,
     });
+    return this.prisma.mediaAsset.findUniqueOrThrow({ where: { id } });
   }
 
   // ─── Asset creation ───────────────────────────────────────────────────────────

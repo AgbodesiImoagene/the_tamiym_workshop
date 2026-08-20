@@ -4,6 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { MEDIA_QUEUE } from './media.constants';
 import {
   MediaAssetStatus,
@@ -24,6 +25,8 @@ describe('MediaService', () => {
       mediaAsset: {
         create: jest.fn(),
         update: jest.fn(),
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       mediaDerivative: {
         create: jest.fn(),
@@ -35,12 +38,16 @@ describe('MediaService', () => {
     const mockQueue = {
       add: jest.fn(),
     };
+    const mockDecisions = {
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MediaService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: S3Service, useValue: mockS3 },
+        { provide: ModerationDecisionService, useValue: mockDecisions },
         { provide: getQueueToken(MEDIA_QUEUE), useValue: mockQueue },
       ],
     }).compile();

@@ -12,6 +12,7 @@ import { PrivacyService } from './privacy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthSessionService } from '../auth/auth-session.service';
 import { AuditService } from '../audit/audit.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
   PrivacyRequestStatus,
   PrivacyRequestType,
@@ -54,6 +55,9 @@ describe('PrivacyService', () => {
   };
   const authSessions = { revokeAllForUser: jest.fn() };
   const audit = { log: jest.fn() };
+  const moderationDecisions = {
+    withdrawPendingAppealsForOwnerInTx: jest.fn().mockResolvedValue(0),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -66,6 +70,10 @@ describe('PrivacyService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuthSessionService, useValue: authSessions },
         { provide: AuditService, useValue: audit },
+        {
+          provide: ModerationDecisionService,
+          useValue: moderationDecisions,
+        },
       ],
     }).compile();
     service = module.get(PrivacyService);

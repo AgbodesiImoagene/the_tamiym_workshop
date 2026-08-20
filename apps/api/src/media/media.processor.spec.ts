@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
 import { VirusScanService } from './virus-scan.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { ObservabilityService } from '../observability/observability.service';
 import { SafeRemoteMediaFetcher } from './safe-remote-fetch';
 import {
@@ -67,6 +68,7 @@ describe('MediaProcessor', () => {
   let s3Service: jest.Mocked<S3Service>;
   let virusScanService: jest.Mocked<VirusScanService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let moderationDecisions: { recordAiDecision: jest.Mock };
   let observability: jest.Mocked<ObservabilityService>;
   let safeRemoteFetcher: jest.Mocked<SafeRemoteMediaFetcher>;
 
@@ -93,6 +95,9 @@ describe('MediaProcessor', () => {
       moderateText: jest.fn(),
       moderateImage: jest.fn(),
     } as unknown as jest.Mocked<ModerationService>;
+    moderationDecisions = {
+      recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
     observability = {
       recordQueueJob: jest.fn(),
     } as unknown as jest.Mocked<ObservabilityService>;
@@ -105,6 +110,7 @@ describe('MediaProcessor', () => {
       s3Service,
       virusScanService,
       moderationService,
+      moderationDecisions as unknown as ModerationDecisionService,
       observability,
       safeRemoteFetcher,
     );

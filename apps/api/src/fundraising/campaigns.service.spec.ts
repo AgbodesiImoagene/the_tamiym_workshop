@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { AuditService } from '../audit/audit.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import {
   CampaignStatus,
@@ -102,6 +103,10 @@ describe('CampaignsService', () => {
       moderateText: jest.fn().mockResolvedValue(APPROVED_RESULT),
       moderateImage: jest.fn().mockResolvedValue(APPROVED_RESULT),
     };
+    const mockModerationDecisions = {
+      recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -110,6 +115,10 @@ describe('CampaignsService', () => {
         { provide: PricingService, useValue: mockPricingService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: ModerationService, useValue: mockModerationService },
+        {
+          provide: ModerationDecisionService,
+          useValue: mockModerationDecisions,
+        },
         {
           provide: AdminNotifyService,
           useValue: { emit: jest.fn().mockResolvedValue(undefined) },

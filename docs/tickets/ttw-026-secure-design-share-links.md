@@ -95,12 +95,14 @@ Define which moderation states may be shared and what happens when a design is e
 
 ## Implementation reviews
 
-Pending slice 1 dual review.
+Slice 1 dual reviews passed before merge (security + implementation). See PR #36.
 
 ## Verification evidence
 
-Pending slice 1 gates.
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/36
+- Merge: `741da00` on `main` (squash)
+- Local lint follow-up: unused `_baseUrl` in `generateShareToken` removed on TTW-027 branch (CI Lint had failed on that unused var after merge via API)
 
 ## Completion summary
 
-TTW-025 merged (`06d5a22`). TTW-026 slice 1 in progress on `codex/ttw-026-secure-design-shares`.
+Slice 1 shipped: digested expiring share links, owner CRUD, public GET with cache/robots headers, access-log URL redaction, privacy erasure revoke. Deferred: Playwright workshop UI, CDN purge, edit/re-moderation auto-invalidate, formal product/privacy sign-off.

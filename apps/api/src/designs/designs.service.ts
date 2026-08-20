@@ -8,10 +8,18 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
+import {
+  aiReasonCodesForOutcome,
+  hashRevision,
+} from '../moderation/moderation.constants';
 import { S3Service } from '../storage/s3.service';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
-import { ModerationStatus } from '../generated/prisma/enums';
+import {
+  ModerationStatus,
+  ModerationSubjectType,
+} from '../generated/prisma/enums';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import {
   ADMIN_NOTIF_DESIGN_MODERATION_UPDATED,
@@ -45,6 +53,7 @@ export class DesignsService {
   constructor(
     private prisma: PrismaService,
     private moderationService: ModerationService,
+    private moderationDecisions: ModerationDecisionService,
     private s3: S3Service,
     private adminNotify: AdminNotifyService,
     private config: ConfigService,
@@ -206,7 +215,11 @@ export class DesignsService {
   private async moderateDesign(
     designData: Record<string, unknown>,
     thumbnailUrl?: string | null,
-  ): Promise<{ moderationStatus: ModerationStatus; moderationNotes: string }> {
+  ): Promise<{
+    moderationStatus: ModerationStatus;
+    moderationNotes: string;
+    maxScore: number;
+  }> {
     const text = this.extractTextFromDesignData(designData);
 
     // Only pass the imageUrl to moderation when it originates from our own
@@ -226,6 +239,7 @@ export class DesignsService {
       return {
         moderationStatus: ModerationStatus.PENDING,
         moderationNotes: 'No screenable content (no text layers, no thumbnail)',
+        maxScore: 0,
       };
     }
 
@@ -236,6 +250,7 @@ export class DesignsService {
     return {
       moderationStatus: result.status,
       moderationNotes: result.notes,
+      maxScore: result.maxScore,
     };
   }
 
@@ -259,10 +274,8 @@ export class DesignsService {
       );
     }
 
-    const { moderationStatus, moderationNotes } = await this.moderateDesign(
-      dto.designData,
-      dto.thumbnailUrl,
-    );
+    const { moderationStatus, moderationNotes, maxScore } =
+      await this.moderateDesign(dto.designData, dto.thumbnailUrl);
 
     const created = await this.prisma.design.create({
       data: {
@@ -277,6 +290,20 @@ export class DesignsService {
       include: {
         product: { select: { id: true, name: true, slug: true } },
       },
+    });
+
+    await this.moderationDecisions.recordAiDecision({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: created.id,
+      outcome: moderationStatus,
+      notes: moderationNotes,
+      maxScore,
+      revisionHash: hashRevision({
+        designData: dto.designData,
+        thumbnailUrl: dto.thumbnailUrl ?? null,
+      }),
+      reasonCodes: aiReasonCodesForOutcome(moderationStatus, moderationNotes),
+      withdrawPendingAppeals: false,
     });
 
     await this.upsertDesignViews(created.id, dto.designData);
@@ -371,6 +398,7 @@ export class DesignsService {
     let moderationUpdate: {
       moderationStatus?: ModerationStatus;
       moderationNotes?: string;
+      maxScore?: number;
     } = {};
 
     if (contentChanged) {
@@ -382,11 +410,9 @@ export class DesignsService {
         dto.thumbnailUrl !== undefined
           ? dto.thumbnailUrl
           : existing.thumbnailUrl;
-      const { moderationStatus, moderationNotes } = await this.moderateDesign(
-        newData,
-        newThumb,
-      );
-      moderationUpdate = { moderationStatus, moderationNotes };
+      const { moderationStatus, moderationNotes, maxScore } =
+        await this.moderateDesign(newData, newThumb);
+      moderationUpdate = { moderationStatus, moderationNotes, maxScore };
     }
 
     const updated = await this.prisma.design.update({
@@ -399,12 +425,37 @@ export class DesignsService {
         ...(dto.thumbnailUrl !== undefined && {
           thumbnailUrl: dto.thumbnailUrl,
         }),
-        ...moderationUpdate,
+        ...(moderationUpdate.moderationStatus !== undefined && {
+          moderationStatus: moderationUpdate.moderationStatus,
+          moderationNotes: moderationUpdate.moderationNotes,
+        }),
       },
       include: {
         product: { select: { id: true, name: true, slug: true } },
       },
     });
+
+    if (contentChanged && moderationUpdate.moderationStatus !== undefined) {
+      await this.moderationDecisions.recordAiDecision({
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: id,
+        outcome: moderationUpdate.moderationStatus,
+        notes: moderationUpdate.moderationNotes,
+        maxScore: moderationUpdate.maxScore,
+        revisionHash: hashRevision({
+          designData: dto.designData ?? existing.designData,
+          thumbnailUrl:
+            dto.thumbnailUrl !== undefined
+              ? dto.thumbnailUrl
+              : existing.thumbnailUrl,
+        }),
+        reasonCodes: aiReasonCodesForOutcome(
+          moderationUpdate.moderationStatus,
+          moderationUpdate.moderationNotes,
+        ),
+        withdrawPendingAppeals: true,
+      });
+    }
 
     if (dto.designData !== undefined) {
       await this.upsertDesignViews(id, dto.designData);
@@ -448,7 +499,6 @@ export class DesignsService {
     notes?: string,
     actorUserId?: string,
   ) {
-    void actorUserId;
     const design = await this.prisma.design.findUnique({ where: { id } });
     if (!design) {
       throw new NotFoundException('Design not found');
@@ -462,12 +512,22 @@ export class DesignsService {
         'status must be APPROVED, REJECTED, or FLAGGED',
       );
     }
-    const updated = await this.prisma.design.update({
+
+    await this.moderationDecisions.recordAdminDecision({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: id,
+      outcome: status,
+      actorUserId: actorUserId ?? null,
+      notes: notes ?? null,
+      revisionHash: hashRevision({
+        designData: design.designData,
+        thumbnailUrl: design.thumbnailUrl,
+      }),
+      withdrawPendingAppeals: true,
+    });
+
+    const updated = await this.prisma.design.findUniqueOrThrow({
       where: { id },
-      data: {
-        moderationStatus: status,
-        ...(notes !== undefined && { moderationNotes: notes }),
-      },
       include: {
         user: { select: { id: true, email: true } },
         product: { select: { id: true, name: true, slug: true } },
@@ -631,7 +691,6 @@ export class DesignsService {
   async generateShareToken(
     userId: string,
     id: string,
-    _baseUrl?: string,
   ): Promise<{ shareToken: string; shareUrl: string }> {
     const created = await this.createShareLink(
       userId,

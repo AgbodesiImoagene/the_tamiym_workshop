@@ -8,12 +8,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
+import {
+  aiReasonCodesForOutcome,
+  hashRevision,
+} from '../moderation/moderation.constants';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { AddCampaignProductDto } from './dto/add-campaign-product.dto';
 import {
   CampaignStatus,
   ModerationStatus,
+  ModerationSubjectType,
   PayoutMode,
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
@@ -45,6 +51,7 @@ export class CampaignsService {
     private pricingService: PricingService,
     private audit: AuditService,
     private moderationService: ModerationService,
+    private moderationDecisions: ModerationDecisionService,
     private adminNotify: AdminNotifyService,
   ) {}
 
@@ -513,16 +520,35 @@ export class CampaignsService {
 
     // AI auto-reject: push back to DRAFT immediately so the organiser can fix.
     if (moderationResult.status === ModerationStatus.REJECTED) {
+      const rejectionReason =
+        'Your campaign content was automatically rejected by our moderation system. ' +
+        'Please review and update your campaign title, description, and story, then resubmit.';
       const updated = await this.prisma.campaign.update({
         where: { id },
         data: {
           status: CampaignStatus.DRAFT,
           moderationStatus: ModerationStatus.REJECTED,
           moderationNotes: moderationResult.notes,
-          rejectionReason:
-            'Your campaign content was automatically rejected by our moderation system. ' +
-            'Please review and update your campaign title, description, and story, then resubmit.',
+          rejectionReason,
         },
+      });
+      await this.moderationDecisions.recordAiDecision({
+        subjectType: ModerationSubjectType.CAMPAIGN,
+        subjectId: id,
+        outcome: ModerationStatus.REJECTED,
+        notes: moderationResult.notes,
+        maxScore: moderationResult.maxScore,
+        customerExplanation: rejectionReason,
+        revisionHash: hashRevision({
+          title: campaign.title,
+          description: campaign.description,
+          story: campaign.story,
+        }),
+        reasonCodes: aiReasonCodesForOutcome(
+          ModerationStatus.REJECTED,
+          moderationResult.notes,
+        ),
+        withdrawPendingAppeals: true,
       });
       await this.audit.log({
         eventName: 'campaign.review.auto_rejected',
@@ -556,6 +582,23 @@ export class CampaignsService {
         moderationNotes: moderationResult.notes,
         rejectionReason: null,
       },
+    });
+    await this.moderationDecisions.recordAiDecision({
+      subjectType: ModerationSubjectType.CAMPAIGN,
+      subjectId: id,
+      outcome: moderationResult.status,
+      notes: moderationResult.notes,
+      maxScore: moderationResult.maxScore,
+      revisionHash: hashRevision({
+        title: campaign.title,
+        description: campaign.description,
+        story: campaign.story,
+      }),
+      reasonCodes: aiReasonCodesForOutcome(
+        moderationResult.status,
+        moderationResult.notes,
+      ),
+      withdrawPendingAppeals: true,
     });
     await this.audit.log({
       eventName: 'campaign.review.submitted',
@@ -632,6 +675,19 @@ export class CampaignsService {
         rejectionReason: null,
       },
     });
+    await this.moderationDecisions.recordAdminDecision({
+      subjectType: ModerationSubjectType.CAMPAIGN,
+      subjectId: id,
+      outcome: ModerationStatus.APPROVED,
+      actorUserId: actorUserId ?? null,
+      notes: 'Admin activated campaign',
+      revisionHash: hashRevision({
+        title: campaign.title,
+        description: campaign.description,
+        story: campaign.story,
+      }),
+      withdrawPendingAppeals: true,
+    });
     await this.audit.log({
       eventName: 'admin.campaign.activated',
       action: AuditAction.ENABLE,
@@ -680,6 +736,20 @@ export class CampaignsService {
         rejectionReason,
         ...(notes !== undefined && { moderationNotes: notes }),
       },
+    });
+    await this.moderationDecisions.recordAdminDecision({
+      subjectType: ModerationSubjectType.CAMPAIGN,
+      subjectId: id,
+      outcome: ModerationStatus.REJECTED,
+      actorUserId: actorUserId ?? null,
+      notes: notes ?? null,
+      customerExplanation: rejectionReason,
+      revisionHash: hashRevision({
+        title: campaign.title,
+        description: campaign.description,
+        story: campaign.story,
+      }),
+      withdrawPendingAppeals: true,
     });
     await this.audit.log({
       eventName: 'admin.campaign.rejected',

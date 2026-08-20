@@ -9,9 +9,15 @@ import {
   MediaDerivativeType,
   MediaSourceType,
   ModerationStatus,
+  ModerationSubjectType,
   VirusScanStatus,
 } from '../generated/prisma/enums';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
+import {
+  aiReasonCodesForOutcome,
+  hashRevision,
+} from '../moderation/moderation.constants';
 import { VirusScanService } from './virus-scan.service';
 import { ObservabilityService } from '../observability/observability.service';
 import { runWithRequestContext } from '../request-context/request-context.store';
@@ -36,6 +42,7 @@ export class MediaProcessor extends WorkerHost {
     private s3Service: S3Service,
     private virusScanService: VirusScanService,
     private moderationService: ModerationService,
+    private moderationDecisions: ModerationDecisionService,
     private observability: ObservabilityService,
     private safeRemoteFetcher: SafeRemoteMediaFetcher,
   ) {
@@ -126,6 +133,22 @@ export class MediaProcessor extends WorkerHost {
                 errorMessage: 'Asset rejected by content moderation',
               },
             });
+            await this.moderationDecisions.recordAiDecision({
+              subjectType: ModerationSubjectType.MEDIA,
+              subjectId: assetId,
+              outcome: ModerationStatus.REJECTED,
+              notes: moderationResult.notes,
+              maxScore: moderationResult.maxScore,
+              revisionHash: hashRevision({
+                originalKey,
+                bytes: buffer.length,
+              }),
+              reasonCodes: aiReasonCodesForOutcome(
+                ModerationStatus.REJECTED,
+                moderationResult.notes,
+              ),
+              withdrawPendingAppeals: true,
+            });
             this.logger.warn(
               `Asset ${assetId} auto-rejected by AI moderation: ${moderationResult.notes}`,
             );
@@ -215,6 +238,22 @@ export class MediaProcessor extends WorkerHost {
               moderationNotes: moderationResult.notes,
               errorMessage: null,
             },
+          });
+          await this.moderationDecisions.recordAiDecision({
+            subjectType: ModerationSubjectType.MEDIA,
+            subjectId: assetId,
+            outcome: moderationResult.status,
+            notes: moderationResult.notes,
+            maxScore: moderationResult.maxScore,
+            revisionHash: hashRevision({
+              originalKey,
+              bytes: buffer.length,
+            }),
+            reasonCodes: aiReasonCodesForOutcome(
+              moderationResult.status,
+              moderationResult.notes,
+            ),
+            withdrawPendingAppeals: true,
           });
           this.observability.recordQueueJob({
             queue: MEDIA_QUEUE,

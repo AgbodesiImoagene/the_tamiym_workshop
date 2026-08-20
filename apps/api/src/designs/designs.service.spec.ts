@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { DesignsService } from './designs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { S3Service } from '../storage/s3.service';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
@@ -47,6 +48,10 @@ describe('DesignsService', () => {
   let service: DesignsService;
   let prisma: jest.Mocked<PrismaService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let moderationDecisions: {
+    recordAiDecision: jest.Mock;
+    recordAdminDecision: jest.Mock;
+  };
   let s3: jest.Mocked<S3Service>;
   let config: { get: jest.Mock };
 
@@ -57,6 +62,7 @@ describe('DesignsService', () => {
     );
     mockPrisma.design = {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -87,6 +93,11 @@ describe('DesignsService', () => {
       moderateImage: jest.fn().mockResolvedValue(APPROVED_RESULT),
     };
 
+    moderationDecisions = {
+      recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
+
     const mockS3 = {
       uploadObject: jest.fn().mockResolvedValue({
         key: 'thumbnails/design-1/thumb.png',
@@ -109,6 +120,10 @@ describe('DesignsService', () => {
         DesignsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ModerationService, useValue: mockModeration },
+        {
+          provide: ModerationDecisionService,
+          useValue: moderationDecisions,
+        },
         { provide: S3Service, useValue: mockS3 },
         {
           provide: AdminNotifyService,
@@ -391,24 +406,27 @@ describe('DesignsService', () => {
   describe('updateModeration', () => {
     it('updates moderation status with optional notes', async () => {
       (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
-      (prisma.design.update as jest.Mock).mockResolvedValue({
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockDesign,
         moderationStatus: ModerationStatus.REJECTED,
         moderationNotes: 'admin note',
+        user: { id: 'user-1', email: 'a@example.com' },
+        product: { id: 'prod-1', name: 'P', slug: 'p' },
       });
 
       await service.updateModeration(
         'design-1',
         ModerationStatus.REJECTED,
         'admin note',
+        'admin-1',
       );
 
-      expect(prisma.design.update).toHaveBeenCalledWith(
+      expect(moderationDecisions.recordAdminDecision).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            moderationStatus: ModerationStatus.REJECTED,
-            moderationNotes: 'admin note',
-          }),
+          subjectId: 'design-1',
+          outcome: ModerationStatus.REJECTED,
+          actorUserId: 'admin-1',
+          notes: 'admin note',
         }),
       );
     });
