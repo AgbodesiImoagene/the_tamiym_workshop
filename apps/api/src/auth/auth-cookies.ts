@@ -119,13 +119,23 @@ export function setSurfaceCsrfCookie(
   });
 }
 
-/** Surfaces whose access or refresh cookie is present on this request. */
+/**
+ * Surfaces whose access or refresh cookie is present on this request.
+ *
+ * Access and refresh are checked independently for truthiness — an
+ * empty-string cookie value (e.g. a cleared cookie the client re-sends
+ * before the browser drops it) must count as absent, not as "present but
+ * falsy so fall through to the other cookie".
+ */
 export function surfacesWithSessionCookies(
   req: Pick<Request, 'cookies'>,
 ): AuthSurface[] {
   return [AuthSurface.CUSTOMER, AuthSurface.ADMIN].filter((surface) => {
     const names = surfaceCookieNames(surface);
-    return Boolean(req.cookies?.[names.access] ?? req.cookies?.[names.refresh]);
+    return (
+      Boolean(req.cookies?.[names.access]) ||
+      Boolean(req.cookies?.[names.refresh])
+    );
   });
 }
 

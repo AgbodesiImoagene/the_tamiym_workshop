@@ -117,6 +117,36 @@ describe('auth cookies', () => {
     it('tolerates a request with no cookies at all', () => {
       expect(surfacesWithSessionCookies({} as Request)).toEqual([]);
     });
+
+    it('treats an empty-string access cookie as absent', () => {
+      expect(
+        surfacesWithSessionCookies(buildRequest({ [customer.access]: '' })),
+      ).toEqual([]);
+    });
+
+    it('treats an empty-string refresh cookie as absent', () => {
+      expect(
+        surfacesWithSessionCookies(buildRequest({ [admin.refresh]: '' })),
+      ).toEqual([]);
+    });
+
+    it('reports the surface when access is empty but refresh is present', () => {
+      // Guards against `access ?? refresh`-style logic: an empty string is
+      // not nullish, so it must not short-circuit past a real refresh cookie.
+      expect(
+        surfacesWithSessionCookies(
+          buildRequest({ [customer.access]: '', [customer.refresh]: 'r' }),
+        ),
+      ).toEqual([AuthSurface.CUSTOMER]);
+    });
+
+    it('reports the surface when refresh is empty but access is present', () => {
+      expect(
+        surfacesWithSessionCookies(
+          buildRequest({ [admin.access]: 'a', [admin.refresh]: '' }),
+        ),
+      ).toEqual([AuthSurface.ADMIN]);
+    });
   });
 
   describe('ensureSurfaceCsrfCookie', () => {
