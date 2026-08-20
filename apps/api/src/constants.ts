@@ -26,11 +26,32 @@ export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-/** Auth cookies */
+/**
+ * Auth cookies (TTW-020: surface-scoped).
+ *
+ * Legacy shared names are kept ONLY so we can clear them from browsers that
+ * still hold pre-cutover cookies. Never set these names; new sessions must use
+ * the surface-scoped names below. See docs/14-auth-and-session-architecture.md.
+ */
 export const ACCESS_TOKEN_COOKIE_NAME = 'access_token';
 export const ACCESS_TOKEN_COOKIE_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
 export const REFRESH_TOKEN_COOKIE_NAME = 'refresh_token';
 export const REFRESH_TOKEN_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/** Customer surface cookies (apps/app, apps/web). */
+export const CUSTOMER_ACCESS_COOKIE_NAME = 'ttw_customer_access';
+export const CUSTOMER_REFRESH_COOKIE_NAME = 'ttw_customer_refresh';
+/** Readable (non-httpOnly) double-submit CSRF cookie for the customer surface. */
+export const CUSTOMER_CSRF_COOKIE_NAME = 'ttw_customer_csrf';
+
+/** Admin surface cookies (apps/admin). */
+export const ADMIN_ACCESS_COOKIE_NAME = 'ttw_admin_access';
+export const ADMIN_REFRESH_COOKIE_NAME = 'ttw_admin_refresh';
+/** Readable (non-httpOnly) double-submit CSRF cookie for the admin surface. */
+export const ADMIN_CSRF_COOKIE_NAME = 'ttw_admin_csrf';
+
+/** Header a client must echo the surface CSRF cookie value in on mutating requests. */
+export const CSRF_HEADER_NAME = 'x-csrf-token';
 
 /** Google OAuth (CSRF state + post-login path); short-lived */
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = 'google_oauth_state';

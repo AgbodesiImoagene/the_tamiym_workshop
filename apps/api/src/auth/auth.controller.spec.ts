@@ -4,7 +4,8 @@ import type { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { REFRESH_TOKEN_COOKIE_NAME } from '../constants';
+import { surfaceCookieNames } from './auth-cookies';
+import { AuthSurface } from '../generated/prisma/enums';
 
 const mockUser = {
   id: 'user-1',
@@ -17,6 +18,13 @@ const mockUser = {
   createdAt: new Date(),
   updatedAt: new Date(),
 };
+
+const mockAdminUser = { ...mockUser, role: 'ADMIN' as const };
+
+const CUSTOMER_REFRESH_COOKIE = surfaceCookieNames(
+  AuthSurface.CUSTOMER,
+).refresh;
+const ADMIN_REFRESH_COOKIE = surfaceCookieNames(AuthSurface.ADMIN).refresh;
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -31,6 +39,7 @@ describe('AuthController', () => {
     const mockAuthService = {
       register: jest.fn(),
       login: jest.fn(),
+      refresh: jest.fn(),
       logout: jest.fn(),
     };
 
@@ -51,7 +60,7 @@ describe('AuthController', () => {
   });
 
   describe('register', () => {
-    it('should register a new user and return user (no password)', async () => {
+    it('should register a new user and log in on the CUSTOMER surface', async () => {
       const registerDto = {
         email: 'test@example.com',
         password: 'Password1!',
@@ -71,10 +80,13 @@ describe('AuthController', () => {
       );
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(authService.login).toHaveBeenCalledWith({
-        email: registerDto.email,
-        password: registerDto.password,
-      });
+      expect(authService.login).toHaveBeenCalledWith(
+        {
+          email: registerDto.email,
+          password: registerDto.password,
+        },
+        AuthSurface.CUSTOMER,
+      );
       expect(result).toEqual({ user: mockUser });
       expect(result.user).not.toHaveProperty('password');
       expect(mockRes.cookie).toHaveBeenCalled();
@@ -97,7 +109,7 @@ describe('AuthController', () => {
   });
 
   describe('login', () => {
-    it('should return user and set cookies on success', async () => {
+    it('logs in on the CUSTOMER surface and sets customer cookies', async () => {
       const loginDto = { email: 'test@example.com', password: 'password123' };
       authService.login.mockResolvedValue({
         user: mockUser,
@@ -110,9 +122,21 @@ describe('AuthController', () => {
         mockRes as unknown as Response,
       );
 
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(authService.login).toHaveBeenCalledWith(
+        loginDto,
+        AuthSurface.CUSTOMER,
+      );
       expect(result).toEqual({ user: mockUser });
-      expect(mockRes.cookie).toHaveBeenCalled();
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.CUSTOMER).access,
+        'access',
+        expect.anything(),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.CUSTOMER).refresh,
+        'refresh',
+        expect.anything(),
+      );
     });
 
     it('should throw UnauthorizedException for invalid credentials', async () => {
@@ -127,9 +151,55 @@ describe('AuthController', () => {
     });
   });
 
+  describe('adminLogin', () => {
+    it('logs in on the ADMIN surface and sets admin cookies', async () => {
+      const loginDto = { email: 'admin@example.com', password: 'password123' };
+      authService.login.mockResolvedValue({
+        user: mockAdminUser,
+        access_token: 'admin-access',
+        refresh_token: 'admin-refresh',
+      });
+
+      const result = await controller.adminLogin(
+        loginDto as any,
+        mockRes as unknown as Response,
+      );
+
+      expect(authService.login).toHaveBeenCalledWith(
+        loginDto,
+        AuthSurface.ADMIN,
+      );
+      expect(result).toEqual({ user: mockAdminUser });
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.ADMIN).access,
+        'admin-access',
+        expect.anything(),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.ADMIN).refresh,
+        'admin-refresh',
+        expect.anything(),
+      );
+    });
+
+    it('propagates UnauthorizedException for a role denied on the ADMIN surface', async () => {
+      const loginDto = {
+        email: 'customer@example.com',
+        password: 'password123',
+      };
+      authService.login.mockRejectedValue(
+        new UnauthorizedException('Invalid credentials'),
+      );
+
+      await expect(
+        controller.adminLogin(loginDto as any, mockRes as unknown as Response),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
   describe('getMe', () => {
     it('should return current user', () => {
-      const user = { ...mockUser } as any;
+      const user = { ...mockUser, surface: AuthSurface.CUSTOMER } as any;
       const result = controller.getMe(user);
       expect(result).toBe(user);
       expect(authService.login).not.toHaveBeenCalled();
@@ -137,11 +207,85 @@ describe('AuthController', () => {
     });
   });
 
+  describe('refresh', () => {
+    it('reads the CUSTOMER refresh cookie when Origin resolves to CUSTOMER', async () => {
+      authService.refresh.mockResolvedValue({
+        user: mockUser,
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+      });
+      const mockReq = {
+        headers: { origin: 'http://localhost:3000' },
+        cookies: { [CUSTOMER_REFRESH_COOKIE]: 'old-customer-refresh' },
+      };
+
+      const result = await controller.refresh(
+        mockReq as any,
+        mockRes as unknown as Response,
+      );
+
+      expect(authService.refresh).toHaveBeenCalledWith(
+        'old-customer-refresh',
+        AuthSurface.CUSTOMER,
+      );
+      expect(result).toEqual({ user: mockUser });
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.CUSTOMER).refresh,
+        'new-refresh',
+        expect.anything(),
+      );
+    });
+
+    it('reads the ADMIN refresh cookie when Origin resolves to ADMIN', async () => {
+      authService.refresh.mockResolvedValue({
+        user: mockAdminUser,
+        access_token: 'new-admin-access',
+        refresh_token: 'new-admin-refresh',
+      });
+      const mockReq = {
+        headers: { origin: 'http://localhost:3003' },
+        cookies: { [ADMIN_REFRESH_COOKIE]: 'old-admin-refresh' },
+      };
+
+      await controller.refresh(mockReq as any, mockRes as unknown as Response);
+
+      expect(authService.refresh).toHaveBeenCalledWith(
+        'old-admin-refresh',
+        AuthSurface.ADMIN,
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.ADMIN).refresh,
+        'new-admin-refresh',
+        expect.anything(),
+      );
+    });
+
+    it('defaults to CUSTOMER surface when Origin is unresolvable', async () => {
+      authService.refresh.mockResolvedValue({
+        user: mockUser,
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+      });
+      const mockReq = {
+        headers: {},
+        cookies: { [CUSTOMER_REFRESH_COOKIE]: 'old-customer-refresh' },
+      };
+
+      await controller.refresh(mockReq as any, mockRes as unknown as Response);
+
+      expect(authService.refresh).toHaveBeenCalledWith(
+        'old-customer-refresh',
+        AuthSurface.CUSTOMER,
+      );
+    });
+  });
+
   describe('logout', () => {
-    it('should call authService.logout and return message', async () => {
+    it('reads the surface-scoped refresh cookie and clears surface + legacy cookies', async () => {
       authService.logout.mockResolvedValue(undefined);
       const mockReq = {
-        cookies: { [REFRESH_TOKEN_COOKIE_NAME]: 'refresh-token' },
+        headers: { origin: 'http://localhost:3000' },
+        cookies: { [CUSTOMER_REFRESH_COOKIE]: 'refresh-token' },
       };
 
       const result = await controller.logout(
@@ -151,7 +295,22 @@ describe('AuthController', () => {
 
       expect(authService.logout).toHaveBeenCalledWith('refresh-token');
       expect(result).toEqual({ message: 'Logged out successfully' });
-      expect(mockRes.cookie).toHaveBeenCalled();
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        surfaceCookieNames(AuthSurface.CUSTOMER).access,
+        '',
+        expect.anything(),
+      );
+      // Legacy cookies are always cleared too.
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.anything(),
+      );
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.anything(),
+      );
     });
   });
 });

@@ -19,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
+import { CsrfGuard } from './auth/guards/csrf/csrf.guard';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { DesignsModule } from './designs/designs.module';
@@ -171,6 +172,13 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    // TTW-020: runs after JwtAuthGuard (which already rejects surface
+    // mismatches on cookie-authenticated requests); enforces Origin
+    // allowlist + double-submit CSRF token on cookie-authenticated mutations.
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     {
       provide: APP_INTERCEPTOR,

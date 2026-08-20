@@ -20,8 +20,9 @@ import {
   TokenType,
   OAuthProvider,
 } from '../generated/prisma/client';
-import { AuditAction } from '../generated/prisma/enums';
+import { AuditAction, AuthSurface } from '../generated/prisma/enums';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { isRoleAllowedForSurface } from './auth-surface';
 import {
   MAIL_QUEUE_NAME,
   JOB_VERIFICATION_EMAIL,
@@ -334,14 +335,23 @@ export class AuthService {
   }
 
   /**
-   * Authenticate user and return access + refresh tokens and user data
+   * Authenticate user and return access + refresh tokens and user data.
+   *
+   * `surface` is always server-derived (route path for login endpoints) —
+   * never a client-supplied field. Only roles permitted on `surface` may
+   * authenticate (TTW-020 role×surface invariant); e.g. an ADMIN cannot log
+   * in via `POST /auth/login` and a CUSTOMER cannot log in via
+   * `POST /auth/admin/login`.
+   *
    * @param loginDto Login credentials
+   * @param surface Auth surface this login is for (CUSTOMER or ADMIN)
    * @returns Access token, refresh token, and user data
    */
-  async login(loginDto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: loginDto.email },
-    });
+  async login(loginDto: LoginDto, surface: AuthSurface) {
+    // Normalize email consistently with register/Google to prevent
+    // case-sensitivity account-lookup mismatches.
+    const email = loginDto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user || user.status === UserStatus.DELETED) {
       this.observability.recordAuthLogin({ outcome: 'failure' });
@@ -369,7 +379,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.completeLoginSession(user, 'User authenticated successfully');
+    if (!isRoleAllowedForSurface(user.role, surface)) {
+      // Credentials were valid but this role may not authenticate on this
+      // surface (e.g. admin credentials on the customer login) — record as
+      // "denied" (distinct from bad-credentials "failure") for audit/metrics.
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.completeLoginSession(
+      user,
+      'User authenticated successfully',
+      surface,
+    );
   }
 
   /**
@@ -477,7 +499,20 @@ export class AuthService {
       });
     }
 
-    return this.completeLoginSession(user, 'User authenticated via Google');
+    // Google sign-in is a CUSTOMER-surface-only flow (TTW-020): admin
+    // accounts must never be reachable via the public OAuth callback.
+    if (!isRoleAllowedForSurface(user.role, AuthSurface.CUSTOMER)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException(
+        'This account cannot sign in with Google',
+      );
+    }
+
+    return this.completeLoginSession(
+      user,
+      'User authenticated via Google',
+      AuthSurface.CUSTOMER,
+    );
   }
 
   private async completeLoginSession(
@@ -491,11 +526,13 @@ export class AuthService {
       status: UserStatus;
     },
     auditNote: string,
+    surface: AuthSurface,
   ) {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      surface,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -508,11 +545,22 @@ export class AuthService {
         where: { id: user.id },
         data: { lastLoginAt: loggedInAt },
       });
+      // Revoke this user's refresh tokens issued for a different (or
+      // legacy/null pre-TTW-020) surface — a login on surface S must not
+      // leave a live session usable on another surface.
+      await tx.authToken.deleteMany({
+        where: {
+          userId: user.id,
+          tokenType: TokenType.REFRESH,
+          OR: [{ authSurface: null }, { authSurface: { not: surface } }],
+        },
+      });
       await tx.authToken.create({
         data: {
           userId: user.id,
           token: refreshToken,
           tokenType: TokenType.REFRESH,
+          authSurface: surface,
           expiresAt: refreshExpiresAt,
         },
       });
@@ -524,7 +572,7 @@ export class AuthService {
           entityId: user.id,
           actorUserId: user.id,
           actorRole: user.role,
-          after: { lastLoginAt: loggedInAt },
+          after: { lastLoginAt: loggedInAt, authSurface: surface },
           note: auditNote,
         },
         tx,
@@ -548,10 +596,18 @@ export class AuthService {
   }
 
   /**
-   * Issue new access token (and optionally rotate refresh token) using a valid refresh token.
-   * @throws UnauthorizedException if refresh token missing, invalid, or expired
+   * Issue new access token (and rotate refresh token) using a valid refresh
+   * token, scoped to `surface` (server-derived from request Origin — see
+   * `resolveSurfaceFromOrigin`).
+   *
+   * Rejects when the refresh token's role or stored `authSurface` does not
+   * match `surface`. A legacy (pre-TTW-020, `authSurface: null`) token may
+   * refresh — the rotated replacement is upgraded to the requested surface —
+   * but only if the user's role is permitted on that surface.
+   *
+   * @throws UnauthorizedException if refresh token missing, invalid, expired, or surface-mismatched
    */
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string, surface: AuthSurface) {
     const record = await this.prisma.authToken.findFirst({
       where: { token: refreshToken, tokenType: TokenType.REFRESH },
       include: {
@@ -583,23 +639,46 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
+    // A stored, non-null authSurface that disagrees with the requested
+    // surface is always rejected. A stored role that is not permitted on the
+    // requested surface is always rejected. (Legacy null-surface tokens for
+    // a role permitted on `surface` are allowed through and upgraded below.)
+    const surfaceMismatch =
+      record.authSurface !== null && record.authSurface !== surface;
+    if (surfaceMismatch || !isRoleAllowedForSurface(user.role, surface)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      surface,
     };
     const accessToken = this.jwtService.sign(payload);
 
-    // Rotate refresh token: delete old, create new
+    // Rotate refresh token: delete old, create new (upgraded to `surface`)
     const newRefreshToken = crypto.randomBytes(32).toString('hex');
     const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
     await this.prisma.$transaction(async (tx) => {
       await tx.authToken.delete({ where: { id: record.id } });
+      // Revoke any other refresh tokens for this user that are scoped to a
+      // different (or legacy/null) surface — refreshing on surface S should
+      // not leave sibling sessions usable on another surface.
+      await tx.authToken.deleteMany({
+        where: {
+          userId: user.id,
+          tokenType: TokenType.REFRESH,
+          OR: [{ authSurface: null }, { authSurface: { not: surface } }],
+        },
+      });
       await tx.authToken.create({
         data: {
           userId: user.id,
           token: newRefreshToken,
           tokenType: TokenType.REFRESH,
+          authSurface: surface,
           expiresAt: refreshExpiresAt,
         },
       });
@@ -611,6 +690,7 @@ export class AuthService {
           entityId: user.id,
           actorUserId: user.id,
           actorRole: user.role,
+          after: { authSurface: surface },
           note: 'Refresh token rotated',
         },
         tx,

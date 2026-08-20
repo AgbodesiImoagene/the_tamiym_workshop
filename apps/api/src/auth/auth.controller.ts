@@ -32,12 +32,15 @@ import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { RequestUser } from './strategies/jwt.strategy';
 import { UserRole } from '../generated/prisma/client';
+import { AuthSurface } from '../generated/prisma/enums';
+import { THROTTLE_LIMIT, THROTTLE_TTL_MS } from '../constants';
 import {
-  THROTTLE_LIMIT,
-  THROTTLE_TTL_MS,
-  REFRESH_TOKEN_COOKIE_NAME,
-} from '../constants';
-import { setAuthTokenCookies, clearAuthTokenCookies } from './auth-cookies';
+  setSurfaceAuthCookies,
+  clearSurfaceAuthCookies,
+  clearLegacyAuthCookies,
+  surfaceCookieNames,
+} from './auth-cookies';
+import { resolveSurfaceFromOrigin } from './auth-surface';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -85,14 +88,18 @@ export class AuthController {
   ) {
     await this.authService.register(registerDto);
 
-    // Auto-login after registration
-    const loginResult = await this.authService.login({
-      email: registerDto.email,
-      password: registerDto.password,
-    });
+    // Auto-login after registration (registration is always CUSTOMER surface).
+    const loginResult = await this.authService.login(
+      {
+        email: registerDto.email,
+        password: registerDto.password,
+      },
+      AuthSurface.CUSTOMER,
+    );
 
-    setAuthTokenCookies(
+    setSurfaceAuthCookies(
       res,
+      AuthSurface.CUSTOMER,
       loginResult.access_token,
       loginResult.refresh_token,
     );
@@ -103,14 +110,15 @@ export class AuthController {
   }
 
   /**
-   * Login with email and password
+   * Login with email and password (CUSTOMER surface — apps/app, apps/web).
+   * ADMIN-role credentials are rejected here; use `POST /auth/admin/login`.
    */
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
-  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOperation({ summary: 'Login with email and password (customer surface)' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
     status: 200,
@@ -133,14 +141,76 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials, or role not permitted on this surface',
+  })
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(loginDto);
+    const result = await this.authService.login(loginDto, AuthSurface.CUSTOMER);
 
-    setAuthTokenCookies(res, result.access_token, result.refresh_token);
+    setSurfaceAuthCookies(
+      res,
+      AuthSurface.CUSTOMER,
+      result.access_token,
+      result.refresh_token,
+    );
+
+    return {
+      user: result.user,
+    };
+  }
+
+  /**
+   * Login with email and password (ADMIN surface — apps/admin only).
+   * CUSTOMER/ORGANIZER-role credentials are rejected here (TTW-020).
+   */
+  @Public()
+  @Post('admin/login')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @ApiOperation({ summary: 'Login with email and password (admin surface)' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully authenticated as an admin',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            firstName: { type: 'string', nullable: true },
+            lastName: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
+            role: { type: 'string', enum: [UserRole.ADMIN] },
+            status: { type: 'string', example: 'ACTIVE' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials, or role not permitted on this surface',
+  })
+  async adminLogin(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto, AuthSurface.ADMIN);
+
+    setSurfaceAuthCookies(
+      res,
+      AuthSurface.ADMIN,
+      result.access_token,
+      result.refresh_token,
+    );
 
     return {
       user: result.user,
@@ -321,14 +391,24 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    // Surface is server-derived from Origin/Referer (never a client body
+    // field). Non-browser callers with no resolvable Origin default to
+    // CUSTOMER — genuine admin-app browser requests always send Origin.
+    const surface = resolveSurfaceFromOrigin(req) ?? AuthSurface.CUSTOMER;
+    const refreshCookieName = surfaceCookieNames(surface).refresh;
     const refreshToken =
-      (req?.cookies?.[REFRESH_TOKEN_COOKIE_NAME] as string | undefined) ??
+      (req?.cookies?.[refreshCookieName] as string | undefined) ??
       (req?.body && typeof req.body === 'object' && 'refresh_token' in req.body
         ? (req.body as { refresh_token?: string }).refresh_token
         : undefined);
-    const result = await this.authService.refresh(refreshToken ?? '');
+    const result = await this.authService.refresh(refreshToken ?? '', surface);
 
-    setAuthTokenCookies(res, result.access_token, result.refresh_token);
+    setSurfaceAuthCookies(
+      res,
+      surface,
+      result.access_token,
+      result.refresh_token,
+    );
 
     return { user: result.user };
   }
@@ -351,13 +431,16 @@ export class AuthController {
     },
   })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const surface = resolveSurfaceFromOrigin(req) ?? AuthSurface.CUSTOMER;
+    const refreshCookieName = surfaceCookieNames(surface).refresh;
     const refreshToken =
-      (req?.cookies?.[REFRESH_TOKEN_COOKIE_NAME] as string | undefined) ??
+      (req?.cookies?.[refreshCookieName] as string | undefined) ??
       (req?.body && typeof req.body === 'object' && 'refresh_token' in req.body
         ? (req.body as { refresh_token?: string }).refresh_token
         : undefined);
     await this.authService.logout(refreshToken);
-    clearAuthTokenCookies(res);
+    clearSurfaceAuthCookies(res, surface);
+    clearLegacyAuthCookies(res);
     return { message: 'Logged out successfully' };
   }
 
