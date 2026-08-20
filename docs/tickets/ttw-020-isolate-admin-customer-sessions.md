@@ -1,7 +1,7 @@
 # TTW-020 — Isolate admin and customer sessions
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** In review  
+**Status:** Complete  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004  
 **Blocks:** TTW-032, TTW-053
@@ -60,7 +60,7 @@ The first security review failed on four findings, all now fixed (see
 - [x] Server enforces surface/role/cookie matching for login, refresh, me and logout.
 - [x] Email normalization and session migration/revocation are covered.
 - [x] Integration and Playwright cross-surface denial tests pass.
-- [ ] High-risk security and independent implementation review pass.
+- [x] High-risk security and independent implementation review pass.
 
 ## Out of scope
 
