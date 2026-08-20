@@ -64,6 +64,5 @@ redis_data/
 # TypeScript
 *.tsbuildinfo
 
-
-apps/api/.env
+# Local redis dump
 dump.rdb
