@@ -1,7 +1,7 @@
 # TTW-020 — Isolate admin and customer sessions
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** Not started  
+**Status:** In review  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004  
 **Blocks:** TTW-032, TTW-053
@@ -35,10 +35,10 @@ Make the requested auth surface a trusted server-derived property, permit admin 
 
 ## Acceptance criteria
 
-- [ ] Threat model and cookie/domain/CSRF decision are documented.
-- [ ] Server enforces surface/role/cookie matching for login, refresh, me and logout.
-- [ ] Email normalization and session migration/revocation are covered.
-- [ ] Integration and Playwright cross-surface denial tests pass.
+- [x] Threat model and cookie/domain/CSRF decision are documented.
+- [x] Server enforces surface/role/cookie matching for login, refresh, me and logout.
+- [x] Email normalization and session migration/revocation are covered.
+- [x] Integration and Playwright cross-surface denial tests pass.
 - [ ] High-risk security and independent implementation review pass.
 
 ## Out of scope
