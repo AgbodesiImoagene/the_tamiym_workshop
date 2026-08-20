@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { apiLogin, createApiContext } from '../fixtures/api';
 import { e2eUsers, E2E_ADMIN_ENROLL_USER_ID, urls } from '../fixtures/identities';
 import { generateTotpCode } from '../fixtures/totp';
@@ -23,6 +23,14 @@ async function resetEnrollAdminMfa(): Promise<void> {
   await api.dispose();
 }
 
+async function fillAdminPasswordStep(page: Page, email: string, password: string): Promise<void> {
+  // Prefer placeholders / input types: FormLabel "Password" sits beside a
+  // helper span and is not reliably exposed as an accessible name in CI.
+  await page.getByPlaceholder('admin@tamiym.com').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole('button', { name: /^Continue$/i }).click();
+}
+
 /**
  * TTW-023 — Admin console MFA enrollment, challenge, recovery, and accessible errors
  * through the real login UI (not the API-only setup helper).
@@ -40,15 +48,13 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await page.goto('/auth/login');
     await expect(page.getByText('Admin sign in')).toBeVisible();
 
-    await page.getByLabel(/Email address/i).fill(e2eUsers.admin.email);
-    await page.getByLabel(/^Password$/i).fill(e2eUsers.admin.password);
-    await page.getByRole('button', { name: /^Continue$/i }).click();
+    await fillAdminPasswordStep(page, e2eUsers.admin.email, e2eUsers.admin.password);
 
     await expect(page.getByText('Two-factor authentication')).toBeVisible({
       timeout: 15_000,
     });
 
-    await page.getByLabel(/Authenticator code/i).fill('000000');
+    await page.getByPlaceholder('123456').fill('000000');
     await page.getByRole('button', { name: /Verify and sign in/i }).click();
 
     const alert = page.getByRole('alert');
@@ -56,7 +62,7 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
     await expect(page).toHaveURL(/\/auth\/login/);
 
-    await page.getByLabel(/Authenticator code/i).fill(generateTotpCode(e2eUsers.admin.totpSecret));
+    await page.getByPlaceholder('123456').fill(generateTotpCode(e2eUsers.admin.totpSecret));
     await page.getByRole('button', { name: /Verify and sign in/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
@@ -75,23 +81,21 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     const page = await context.newPage();
 
     await page.goto('/auth/login');
-    await page.getByLabel(/Email address/i).fill(e2eUsers.admin.email);
-    await page.getByLabel(/^Password$/i).fill(e2eUsers.admin.password);
-    await page.getByRole('button', { name: /^Continue$/i }).click();
+    await fillAdminPasswordStep(page, e2eUsers.admin.email, e2eUsers.admin.password);
     await expect(page.getByText('Two-factor authentication')).toBeVisible({
       timeout: 15_000,
     });
 
     await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    await page.getByLabel(/Recovery code/i).fill('0000-0000-0000-0000-0000-0000-0000-0000');
+    await page.getByPlaceholder('XXXX-XXXX-...').fill('0000-0000-0000-0000-0000-0000-0000-0000');
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
     const alert = page.getByRole('alert');
     await expect(alert).toBeVisible({ timeout: 10_000 });
     await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
-    await expect(page.getByLabel(/Recovery code/i)).toBeVisible();
+    await expect(page.getByPlaceholder('XXXX-XXXX-...')).toBeVisible();
 
-    await page.getByLabel(/Recovery code/i).fill(recoveryCode);
+    await page.getByPlaceholder('XXXX-XXXX-...').fill(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
@@ -107,9 +111,7 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     const page = await context.newPage();
 
     await page.goto('/auth/login');
-    await page.getByLabel(/Email address/i).fill(e2eUsers.adminEnroll.email);
-    await page.getByLabel(/^Password$/i).fill(e2eUsers.adminEnroll.password);
-    await page.getByRole('button', { name: /^Continue$/i }).click();
+    await fillAdminPasswordStep(page, e2eUsers.adminEnroll.email, e2eUsers.adminEnroll.password);
 
     await expect(page.getByText('Set up authenticator')).toBeVisible({
       timeout: 15_000,
@@ -123,7 +125,7 @@ test.describe('Admin MFA console login @smoke @admin', () => {
       .textContent();
     expect(secretText, 'enrollment secret visible').toBeTruthy();
 
-    await page.getByLabel(/Authenticator code/i).fill(generateTotpCode(secretText!.trim()));
+    await page.getByPlaceholder('123456').fill(generateTotpCode(secretText!.trim()));
     await page.getByRole('button', { name: /Enable MFA and sign in/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
