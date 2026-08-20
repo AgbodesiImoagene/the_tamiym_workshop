@@ -34,10 +34,15 @@ const COMMAND_RULES: Record<
   'refund.document_missing_claim': {
     domain: ReconciliationDomain.REFUND,
     outcomes: [ReconciliationOutcome.MISSING_INTERNAL],
-    rightLabels: ['refundSettlementClaim', 'expected'],
+    rightLabels: ['refundSettlementClaim'],
   },
   'payout.document_ledger_gap': {
     domain: ReconciliationDomain.PAYOUT,
+    outcomes: [
+      ReconciliationOutcome.MISMATCH,
+      ReconciliationOutcome.MISSING_INTERNAL,
+    ],
+    rightLabels: ['ledgerNet', 'expectedLedgerNet'],
   },
   'campaign.recompute_current_amount': {
     domain: ReconciliationDomain.CAMPAIGN,
@@ -46,6 +51,12 @@ const COMMAND_RULES: Record<
   },
   'inventory.noop_document_drift': {
     domain: ReconciliationDomain.INVENTORY,
+    outcomes: [ReconciliationOutcome.MISMATCH],
+    rightLabels: [
+      'sum(movement.reservedDelta)',
+      'expected',
+      'stockOnHand/reserved',
+    ],
   },
 };
 
