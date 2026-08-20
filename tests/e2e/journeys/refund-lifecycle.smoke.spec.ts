@@ -65,14 +65,11 @@ test.describe('Refund lifecycle @smoke', () => {
 
     const result = await page.evaluate(async () => {
       // Absolute URL: relative fetch fails on about:blank (no base origin).
-      const res = await fetch(
-        'http://localhost/admin/orders/order_playwright/refund',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: 2500, reason: 'smoke' }),
-        },
-      );
+      const res = await fetch('http://localhost/admin/orders/order_playwright/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 2500, reason: 'smoke' }),
+      });
       return res.json();
     });
 
