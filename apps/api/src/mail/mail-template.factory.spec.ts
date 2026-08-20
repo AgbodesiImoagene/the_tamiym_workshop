@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildMailTemplateRenderer,
   buildMailTransportConfig,
@@ -25,9 +28,6 @@ describe('formatAmountHelper', () => {
 
 describe('buildMailTemplateRenderer', () => {
   const previousEnv = process.env.NODE_ENV;
-  const fs = require('node:fs') as typeof import('node:fs');
-  const os = require('node:os') as typeof import('node:os');
-  const path = require('node:path') as typeof import('node:path');
 
   afterEach(() => {
     process.env.NODE_ENV = previousEnv;
@@ -43,14 +43,11 @@ describe('buildMailTemplateRenderer', () => {
 
   it('compiles Handlebars templates outside test', () => {
     process.env.NODE_ENV = 'development';
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttw-mail-'));
-    const partials = path.join(dir, 'partials');
-    fs.mkdirSync(partials);
-    fs.writeFileSync(path.join(partials, 'header.hbs'), '<header>H</header>');
-    fs.writeFileSync(
-      path.join(dir, 'hello.hbs'),
-      '{{> header}}<p>{{name}}</p>',
-    );
+    const dir = mkdtempSync(join(tmpdir(), 'ttw-mail-'));
+    const partials = join(dir, 'partials');
+    mkdirSync(partials);
+    writeFileSync(join(partials, 'header.hbs'), '<header>H</header>');
+    writeFileSync(join(dir, 'hello.hbs'), '{{> header}}<p>{{name}}</p>');
     const renderer = buildMailTemplateRenderer(dir);
     expect(renderer.render('hello', { name: 'Ada' })).toContain('Ada');
     expect(renderer.render('hello', { name: 'Ada' })).toContain(

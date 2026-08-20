@@ -41,7 +41,7 @@ describe('MailTransportService', () => {
       }),
     );
 
-    await transport.onModuleDestroy();
+    transport.onModuleDestroy();
     expect(close).toHaveBeenCalled();
   });
 });
