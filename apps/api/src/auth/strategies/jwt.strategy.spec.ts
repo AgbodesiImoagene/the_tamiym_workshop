@@ -247,6 +247,24 @@ describe('JwtStrategy', () => {
     expect(result.surface).toBe(AuthSurface.ADMIN);
   });
 
+  it('rejects unverified ADMIN JWT with generic Unauthorized', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+      emailVerifiedAt: null,
+    });
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.ADMIN,
+        surface: AuthSurface.ADMIN,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
   describe('cookie extraction (surface-scoped)', () => {
     function extractFromStrategy(req: any): string | null {
       // The private extractor closure is not exported; exercise it via the

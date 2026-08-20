@@ -35,6 +35,33 @@ describe('AccountPolicyService', () => {
         expect(body.action).toBe('CREATE_ORDER');
       }
     });
+
+    it('uses action-specific messages for payout and organiser apply', () => {
+      try {
+        service.assertVerifiedForAction(
+          { emailVerifiedAt: null },
+          'MUTATE_PAYOUT_PROFILE',
+        );
+        fail('expected');
+      } catch (err) {
+        const body = (err as ForbiddenException).getResponse() as {
+          message: string;
+        };
+        expect(body.message).toMatch(/payout/i);
+      }
+      try {
+        service.assertVerifiedForAction(
+          { emailVerifiedAt: null },
+          'APPLY_AS_ORGANISER',
+        );
+        fail('expected');
+      } catch (err) {
+        const body = (err as ForbiddenException).getResponse() as {
+          message: string;
+        };
+        expect(body.message).toMatch(/organiser/i);
+      }
+    });
   });
 
   describe('assertVerifiedForPrivilegedRole', () => {
@@ -60,6 +87,29 @@ describe('AccountPolicyService', () => {
           emailVerifiedAt: null,
         }),
       ).toThrow(ForbiddenException);
+    });
+  });
+
+  describe('isPrivilegedRoleUnverified', () => {
+    it('is true only for unverified organiser/admin', () => {
+      expect(
+        service.isPrivilegedRoleUnverified({
+          role: UserRole.ADMIN,
+          emailVerifiedAt: null,
+        }),
+      ).toBe(true);
+      expect(
+        service.isPrivilegedRoleUnverified({
+          role: UserRole.CUSTOMER,
+          emailVerifiedAt: null,
+        }),
+      ).toBe(false);
+      expect(
+        service.isPrivilegedRoleUnverified({
+          role: UserRole.ADMIN,
+          emailVerifiedAt: new Date(),
+        }),
+      ).toBe(false);
     });
   });
 });

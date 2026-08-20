@@ -61,6 +61,11 @@ export class PayoutProfilesController {
   @ApiBody({ type: CreatePayoutProfileDto })
   @ApiResponse({ status: 201 })
   @ApiResponse({ status: 400 })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before managing payout details',
+  })
   async create(
     @CurrentUser() user: RequestUser,
     @Body() dto: CreatePayoutProfileDto,

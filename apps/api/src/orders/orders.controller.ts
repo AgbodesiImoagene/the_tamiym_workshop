@@ -72,7 +72,11 @@ export class OrdersController {
     description: 'Invalid input or insufficient stock',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before ordering',
+  })
   async create(
     @CurrentUser() user: RequestUser,
     @Body() createOrderDto: CreateOrderDto,

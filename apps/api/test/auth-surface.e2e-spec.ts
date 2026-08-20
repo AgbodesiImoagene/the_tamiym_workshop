@@ -96,6 +96,11 @@ describe('Auth surface isolation (e2e)', () => {
         status: UserStatus.ACTIVE,
         firstName: 'Surface',
         lastName: role,
+        // ORGANIZER/ADMIN auth requires verification (TTW-023).
+        emailVerifiedAt:
+          role === UserRole.ADMIN || role === UserRole.ORGANIZER
+            ? new Date()
+            : null,
       },
     });
     return { id: user.id, email, password };

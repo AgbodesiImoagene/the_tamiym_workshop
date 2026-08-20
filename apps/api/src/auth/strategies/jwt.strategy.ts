@@ -108,7 +108,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found');
     }
 
-    this.accountPolicy.assertVerifiedForPrivilegedRole(user);
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      throw new UnauthorizedException('User not found');
+    }
 
     // Every access token must name the surface it was minted for, and the
     // account's *current* role must still be permitted on that surface. This

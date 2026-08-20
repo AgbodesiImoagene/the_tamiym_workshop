@@ -54,14 +54,24 @@ export class AccountPolicyService {
     return role === UserRole.ORGANIZER || role === UserRole.ADMIN;
   }
 
+  /**
+   * Auth-boundary check: never leak verification state via a distinct status
+   * from bad credentials (password-confirmation oracle).
+   */
+  isPrivilegedRoleUnverified(user: {
+    role: UserRole;
+    emailVerifiedAt: Date | null | undefined;
+  }): boolean {
+    return (
+      this.requiresVerifiedEmailForRole(user.role) && !user.emailVerifiedAt
+    );
+  }
+
   assertVerifiedForPrivilegedRole(user: {
     role: UserRole;
     emailVerifiedAt: Date | null | undefined;
   }): void {
-    if (!this.requiresVerifiedEmailForRole(user.role)) {
-      return;
-    }
-    if (user.emailVerifiedAt) {
+    if (!this.isPrivilegedRoleUnverified(user)) {
       return;
     }
     throw new ForbiddenException({

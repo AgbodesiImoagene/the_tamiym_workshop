@@ -395,7 +395,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.accountPolicy.assertVerifiedForPrivilegedRole(user);
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     return this.completeLoginSession(
       user,
@@ -521,7 +524,12 @@ export class AuthService {
       this.observability.recordAuthLogin({ outcome: 'failure' });
       throw new UnauthorizedException('Account is not active');
     }
-    this.accountPolicy.assertVerifiedForPrivilegedRole(user);
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      this.observability.recordAuthLogin({ outcome: 'denied' });
+      throw new UnauthorizedException(
+        'This account cannot sign in with Google',
+      );
+    }
 
     return this.completeLoginSession(
       user,
@@ -655,7 +663,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    this.accountPolicy.assertVerifiedForPrivilegedRole(user);
+    if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
+      await this.prisma.authToken.delete({ where: { id: record.id } });
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
     // A stored, non-null authSurface that disagrees with the requested
     // surface is always rejected. A stored role that is not permitted on the

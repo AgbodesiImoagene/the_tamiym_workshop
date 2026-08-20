@@ -1,7 +1,7 @@
 # TTW-023 — Enforce account and privileged-auth policy
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** In progress\
+**Status:** In progress
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-020  
 **Blocks:** TTW-030, TTW-032, TTW-042, TTW-053, TTW-054
@@ -89,11 +89,15 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ## Implementation reviews
 
-Pending for this slice.
+**Security (slice 1, round 2):** pending after auth-boundary 401 fix + e2e fixture verification.
+
+**Implementation (slice 1, round 2):** pending after coverage/e2e remediation.
 
 ## Verification evidence
 
-Pending gates for this slice.
+- Unit: `account-policy`, `auth.service`, `jwt.strategy`, `orders.service`, `payout-profiles.service` verification-gate suites.
+- Diff coverage vs `origin/main`: ≥80% on touched executable lines (local `pnpm coverage:diff` after targeted jest coverage).
+- E2e: admin/organiser fixtures set `emailVerifiedAt`; privileged auth denials use generic 401 (no verification oracle).
 
 ## Completion summary
 

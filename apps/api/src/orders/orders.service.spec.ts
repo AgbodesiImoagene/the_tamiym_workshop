@@ -246,6 +246,41 @@ describe('OrdersService', () => {
       expect(result.id).toBe(mockOrder.id);
     });
 
+    it('rejects unverified users with EMAIL_NOT_VERIFIED', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        emailVerifiedAt: null,
+      });
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(pricingService.quoteStandard).not.toHaveBeenCalled();
+    });
+
+    it('rejects unverified campaign order create', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        emailVerifiedAt: null,
+      });
+      await expect(
+        service.createCampaignOrder('camp-1', 'user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects order create when the user record is missing', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
     it('should throw BadRequestException when stock is insufficient', async () => {
       (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
         variantId: 'var-1',
