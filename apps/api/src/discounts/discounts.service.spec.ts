@@ -58,8 +58,8 @@ describe('DiscountsService active locks', () => {
       },
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation(
-      async (fn: (tx: unknown) => unknown) => fn(prisma),
+    prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prisma),
     );
 
     const module: TestingModule = await Test.createTestingModule({
