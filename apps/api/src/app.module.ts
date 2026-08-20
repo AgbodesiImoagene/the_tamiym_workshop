@@ -71,7 +71,17 @@ import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: createThrottlerModuleOptions,
+      useFactory: (config: ConfigService) => {
+        // Keep Nest Throttler in-memory under test to avoid an extra unmanaged
+        // Redis client leaking open handles across e2e suites. Auth abuse
+        // limits still use Redis via AuthRateLimitService (TTW-023).
+        if (process.env.NODE_ENV === 'test') {
+          return {
+            throttlers: [{ name: 'default', ttl: 60_000, limit: 100 }],
+          };
+        }
+        return createThrottlerModuleOptions(config);
+      },
     }),
     LoggerModule.forRoot({
       pinoHttp: {

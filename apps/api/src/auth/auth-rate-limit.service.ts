@@ -31,13 +31,22 @@ export class AuthRateLimitService implements OnModuleDestroy {
     this.redis = new Redis({
       ...redisConnectionOptions(config),
       maxRetriesPerRequest: 1,
-      enableReadyCheck: true,
-      lazyConnect: false,
+      enableReadyCheck: false,
+      enableOfflineQueue: false,
+      lazyConnect: true,
     });
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.redis.quit().catch(() => undefined);
+    try {
+      if (this.redis.status === 'ready' || this.redis.status === 'connecting') {
+        await this.redis.quit();
+      } else {
+        this.redis.disconnect();
+      }
+    } catch {
+      this.redis.disconnect();
+    }
   }
 
   /**
@@ -101,6 +110,9 @@ export class AuthRateLimitService implements OnModuleDestroy {
   }
 
   private async incrWithTtl(key: string, ttlMs: number): Promise<number> {
+    if (this.redis.status !== 'ready') {
+      await this.redis.connect();
+    }
     // Atomic INCR + PEXPIRE so a crashed/failed expire cannot leave a
     // permanent counter (TTW-023 review).
     const result = await this.redis.eval(

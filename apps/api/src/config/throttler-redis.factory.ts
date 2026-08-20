@@ -25,6 +25,8 @@ export function createThrottlerRedisStorage(
     new Redis({
       ...redisConnectionOptions(config),
       maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      lazyConnect: true,
     }),
   );
 }
