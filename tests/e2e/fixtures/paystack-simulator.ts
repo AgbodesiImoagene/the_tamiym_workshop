@@ -21,12 +21,21 @@ export type SimulatedInitializeResult = {
   outcome: 'created' | 'reused';
 };
 
+export type SimulatedRefundResult = {
+  providerRefundId: string;
+  transactionReference: string;
+  amountMajor: number;
+  outcome: 'created' | 'reused';
+};
+
 export class PaystackSimulator {
   private readonly queue: SimulatedWebhookEvent[] = [];
   private readonly delivered: SimulatedWebhookEvent[] = [];
   private readonly sessions = new Map<string, SimulatedInitializeResult>();
+  private readonly refunds = new Map<string, SimulatedRefundResult>();
   private seq = 0;
   initializeCalls = 0;
+  refundCreateCalls = 0;
 
   /**
    * Simulate transaction/initialize. Same reference returns the same session
@@ -50,6 +59,32 @@ export class PaystackSimulator {
 
   sessionCount(): number {
     return this.sessions.size;
+  }
+
+  /**
+   * Simulate refund create. Same transaction+amount returns the same refund id
+   * (mirrors admin idempotency / TTW-013 single provider refund).
+   */
+  createRefund(transactionReference: string, amountMajor: number): SimulatedRefundResult {
+    this.refundCreateCalls += 1;
+    const key = `${transactionReference}:${amountMajor}`;
+    const existing = this.refunds.get(key);
+    if (existing) {
+      return { ...existing, outcome: 'reused' };
+    }
+    this.seq += 1;
+    const created: SimulatedRefundResult = {
+      providerRefundId: String(900_000 + this.seq),
+      transactionReference,
+      amountMajor,
+      outcome: 'created',
+    };
+    this.refunds.set(key, created);
+    return created;
+  }
+
+  refundCount(): number {
+    return this.refunds.size;
   }
 
   enqueue(
@@ -108,8 +143,10 @@ export class PaystackSimulator {
     this.queue.length = 0;
     this.delivered.length = 0;
     this.sessions.clear();
+    this.refunds.clear();
     this.seq = 0;
     this.initializeCalls = 0;
+    this.refundCreateCalls = 0;
   }
 }
 

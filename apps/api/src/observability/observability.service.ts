@@ -57,6 +57,14 @@ export class ObservabilityService {
     description: 'Refund attempts grouped by outcome.',
   });
 
+  private readonly refundSettlements = this.meter.createCounter(
+    'refund_settlement_total',
+    {
+      description:
+        'Paystack refund lifecycle outcomes (initiated, settled, duplicate, failed, stale, unmatched).',
+    },
+  );
+
   private readonly payoutRuns = this.meter.createCounter('payout_runs_total', {
     description: 'Payout run events grouped by outcome.',
   });
@@ -154,6 +162,23 @@ export class ObservabilityService {
 
   recordRefund(metric: OutcomeMetric): void {
     this.refunds.add(1, { outcome: metric.outcome });
+  }
+
+  recordRefundSettlement(
+    outcome:
+      | 'initiated'
+      | 'reused'
+      | 'settled'
+      | 'duplicate'
+      | 'failed'
+      | 'stale'
+      | 'unmatched'
+      | 'status_updated'
+      | 'provider_transient'
+      | 'provider_rejected'
+      | 'rejected',
+  ): void {
+    this.refundSettlements.add(1, { outcome });
   }
 
   recordPayoutRun(metric: OutcomeMetric): void {

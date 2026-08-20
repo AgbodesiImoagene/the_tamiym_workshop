@@ -22,10 +22,11 @@
 
 ## Refunds (admin-triggered, policy-driven)
 
-- Admin triggers refund request.
-- Call Paystack refund (if supported for that payment type).
-- Track refund status via webhook.
-- Emit events and notify business owners.
+- Admin triggers refund request (optional `idempotencyKey`).
+- TTW-013: reserve an `INITIATED` refund row under a cumulative captured-value cap **before** calling Paystack. Provider acceptance moves the row to `PROCESSING` / `NEEDS_ATTENTION`; order/campaign/ledger values do **not** change yet.
+- Webhooks: `refund.pending|processing|needs-attention` update local status only; `refund.failed` releases the in-flight reservation; `refund.processed` takes an exactly-once `RefundSettlementClaim` (`provider` + `businessKey = refund.processed:{providerRef}`) and applies financial effects once.
+- On confirmed success: order becomes `PARTIALLY_REFUNDED` or `REFUNDED` from cumulative succeeded amounts; campaign `currentAmount` decrements; one `REFUND_APPLIED` ledger row per refund (partial unique index); customer/admin notifications use `dedupeKey = RefundCompleted:{refundId}`.
+- Metrics: `refund_settlement_total{outcome}`.
 
 ## Fundraiser organizer payouts (Nigeria-only)
 

@@ -59,6 +59,16 @@ export interface AdminOrderDetail extends AdminOrder {
       name: string;
     } | null;
   }>;
+  refunds?: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    reason?: string | null;
+    providerRef?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 export interface AdminCampaign {
@@ -190,8 +200,26 @@ export async function updateAdminOrderStatus(id: string, status: string) {
   return apiClient.patch<AdminOrderDetail>(`/admin/orders/${id}`, { status });
 }
 
-export async function createAdminRefund(id: string, amount: number, reason?: string) {
-  return apiClient.post(`/admin/orders/${id}/refund`, { amount, reason });
+export async function createAdminRefund(
+  id: string,
+  amount: number,
+  reason?: string,
+  idempotencyKey?: string
+) {
+  // Callers should pass a page-session-stable key so transient retries reuse
+  // the same reservation without collapsing distinct partial refunds.
+  const key = idempotencyKey ?? `admin-refund:${id}:${crypto.randomUUID()}`;
+  return apiClient.post<{
+    id: string;
+    orderId: string;
+    status: string;
+    amount: number;
+    providerRef?: string | null;
+  }>(`/admin/orders/${id}/refund`, {
+    amount,
+    reason,
+    idempotencyKey: key,
+  });
 }
 
 export async function getAdminCampaigns() {

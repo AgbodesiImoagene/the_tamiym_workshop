@@ -55,6 +55,7 @@ export enum OrderStatus {
   FULFILLED = 'FULFILLED',
   DELIVERED = 'DELIVERED',
   CANCELLED = 'CANCELLED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
   REFUNDED = 'REFUNDED',
 }
 
@@ -260,9 +261,11 @@ export enum PayoutRunStatus {
   CANCELLED = 'CANCELLED',
 }
 
-// Status of a refund against an order.
+// Financial/campaign/ledger effects apply only on SUCCEEDED after provider confirmation.
 export enum RefundStatus {
   INITIATED = 'INITIATED',
+  PROCESSING = 'PROCESSING',
+  NEEDS_ATTENTION = 'NEEDS_ATTENTION',
   SUCCEEDED = 'SUCCEEDED',
   FAILED = 'FAILED',
 }

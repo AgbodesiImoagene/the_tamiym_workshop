@@ -21,6 +21,7 @@ import {
   ADMIN_NOTIF_PAYMENT_CONFIRMED,
   ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
 } from '../admin-notifications/admin-notification-events';
+import { RefundsService } from './refunds.service';
 
 export interface PaystackWebhookEvent {
   event: string;
@@ -28,8 +29,12 @@ export interface PaystackWebhookEvent {
     reference?: string;
     id?: number;
     status?: string;
-    amount?: number;
+    amount?: number | string;
     currency?: string;
+    transaction_reference?: string;
+    refund_reference?: string | null;
+    transfer_code?: string;
+    [key: string]: unknown;
   };
 }
 
@@ -53,6 +58,7 @@ export class PaystackWebhookService {
     private observability: ObservabilityService,
     private notificationOutboxDelivery: NotificationOutboxDeliveryService,
     private adminNotify: AdminNotifyService,
+    private refundsService: RefundsService,
   ) {}
 
   /**
@@ -394,9 +400,18 @@ export class PaystackWebhookService {
       return true;
     }
 
-    const ref =
-      payload.data?.reference ??
-      (payload.data as { transfer_code?: string })?.transfer_code;
+    if (
+      payload.event === 'refund.pending' ||
+      payload.event === 'refund.processing' ||
+      payload.event === 'refund.needs-attention' ||
+      payload.event === 'refund.failed' ||
+      payload.event === 'refund.processed'
+    ) {
+      this.observability.recordWebhook(payload.event, 'success');
+      return this.refundsService.applyRefundWebhookEvent(payload);
+    }
+
+    const ref = payload.data?.reference ?? payload.data?.transfer_code;
     if (
       payload.event === 'transfer.success' ||
       payload.event === 'transfer.failed' ||

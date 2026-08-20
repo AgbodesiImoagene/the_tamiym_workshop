@@ -606,6 +606,19 @@ export class OrdersService {
           },
         },
         shippingAddress: true,
+        refunds: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            status: true,
+            reason: true,
+            providerRef: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
     if (!order) {
@@ -622,6 +635,7 @@ export class OrdersService {
   > = {
     [OrderStatus.PENDING_PAYMENT]: [OrderStatus.CANCELLED],
     [OrderStatus.PAID]: [OrderStatus.PROCESSING],
+    [OrderStatus.PARTIALLY_REFUNDED]: [OrderStatus.PROCESSING],
     [OrderStatus.PROCESSING]: [OrderStatus.FULFILLED, OrderStatus.CANCELLED],
     [OrderStatus.FULFILLED]: [OrderStatus.DELIVERED],
   };

@@ -89,18 +89,26 @@ export class AdminOrdersController {
 
   @Post(':id/refund')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Initiate refund for a PAID order (admin)' })
+  @ApiOperation({
+    summary:
+      'Initiate a provider refund (admin). Settles only after Paystack confirmation.',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiBody({ type: CreateRefundDto })
   @ApiResponse({
     status: 200,
-    description: 'Refund initiated and order updated',
+    description:
+      'Refund reserved/initiated; financial effects apply on refund.processed',
   })
   @ApiResponse({
     status: 400,
     description: 'Invalid amount or order not refundable',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Provider transient failure — retry with same idempotency key',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -115,6 +123,7 @@ export class AdminOrdersController {
       dto.amount,
       dto.reason,
       user.id,
+      dto.idempotencyKey,
     );
   }
 }

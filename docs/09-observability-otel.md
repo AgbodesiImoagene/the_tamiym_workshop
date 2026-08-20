@@ -14,6 +14,7 @@ Implemented in `apps/api`:
   - auth login outcomes
   - payment initiation outcomes (`payment_initiation_total`: created / reused / reconciled / blocked / failure)
   - refund outcomes
+  - refund settlement outcomes (`refund_settlement_total`: initiated / settled / duplicate / failed / stale / unmatched / …)
   - payout and payout-run outcomes
   - webhook events
   - charge settlement outcomes (`charge_settlement_total`: settled / duplicate / rejected)

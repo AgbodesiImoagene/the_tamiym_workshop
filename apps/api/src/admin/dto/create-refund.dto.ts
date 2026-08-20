@@ -17,4 +17,13 @@ export class CreateRefundDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Optional idempotency key so retries reuse the same refund attempt (TTW-013)',
+  })
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }

@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-012 diff-coverage fix.",
+  "notes": "Raised after TTW-013 stale-sweep cap-safe fix.",
   "floors": {
-    "statements": 48.17,
-    "branches": 42.89,
-    "functions": 45.85,
-    "lines": 48.2
+    "statements": 49.44,
+    "branches": 43.93,
+    "functions": 47.1,
+    "lines": 49.54
   }
 }

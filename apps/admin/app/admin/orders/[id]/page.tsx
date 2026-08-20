@@ -33,6 +33,7 @@ export default function AdminOrderDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState(OrderStatus.PROCESSING);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  const [refundIdempotencyKey] = useState(() => `admin-refund:${orderId}:${crypto.randomUUID()}`);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,9 +59,14 @@ export default function AdminOrderDetailPage() {
 
   const refundMutation = useMutation({
     mutationFn: (input: { amount: number; reason?: string }) =>
-      createAdminRefund(orderId, input.amount, input.reason),
-    onSuccess: async () => {
-      setMessage('Refund initiated successfully.');
+      createAdminRefund(orderId, input.amount, input.reason, refundIdempotencyKey),
+    onSuccess: async (result) => {
+      const status = result?.status ?? 'INITIATED';
+      setMessage(
+        status === 'SUCCEEDED'
+          ? 'Refund confirmed by provider.'
+          : `Refund ${status.toLowerCase().replaceAll('_', ' ')}. Money settles when Paystack confirms.`
+      );
       setError(null);
       setRefundAmount('');
       setRefundReason('');
@@ -190,6 +196,38 @@ export default function AdminOrderDetailPage() {
 
             <Card className="rounded-[1.75rem] border-black/8 shadow-none">
               <CardHeader>
+                <CardTitle>Refunds</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(order.refunds ?? []).length === 0 ? (
+                  <p className="text-sm text-black/55">No refunds recorded for this order.</p>
+                ) : (
+                  (order.refunds ?? []).map((refund) => (
+                    <div
+                      key={refund.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/8 bg-[#f7f9fc] p-4"
+                    >
+                      <div className="space-y-1">
+                        <AdminStatusBadge value={refund.status} />
+                        <p className="text-xs text-black/55">
+                          {formatAdminDate(refund.createdAt)}
+                          {refund.reason ? ` · ${refund.reason}` : ''}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-tamiym-blue">
+                        {formatAdminCurrency(
+                          Number(refund.amount),
+                          refund.currency || order.currency
+                        )}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[1.75rem] border-black/8 shadow-none">
+              <CardHeader>
                 <CardTitle>Payment and shipping totals</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-black/68">
@@ -304,6 +342,8 @@ export default function AdminOrderDetailPage() {
                 <p>`PROCESSING` after payment verification and production handoff.</p>
                 <p>`FULFILLED` when the order is ready to leave the workshop.</p>
                 <p>`DELIVERED` once the shipment has completed.</p>
+                <p>`PARTIALLY_REFUNDED` after a provider-confirmed partial refund.</p>
+                <p>`REFUNDED` only when confirmed refunds cover the full capture.</p>
                 <p>`CANCELLED` is only safe for orders that have not progressed.</p>
               </CardContent>
             </Card>
