@@ -36,7 +36,7 @@ See `docs/decisions/ttw-015-reconciliation-policy.md` and `docs/runbooks/reconci
 ## Implementation reviews
 
 - Reviewer A (iteration final): **PASS** — terminal payout, session locks, provider fail-closed, masking e2e, calendar-day windows verified; residuals non-blocking.
-- Reviewer B (iteration final blockers addressed): command↔invariant binding, per-domain e2e repairs (payment/refund/payout/campaign/inventory), targeted-run success required before close.
+- Reviewer B (iteration final): **PASS** — command↔invariant binding, per-domain e2e repairs, targeted-run success required before close.
 
 ## Verification evidence
 
