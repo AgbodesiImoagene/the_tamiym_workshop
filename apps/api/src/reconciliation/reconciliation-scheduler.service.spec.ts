@@ -95,20 +95,11 @@ describe('ReconciliationSchedulerService', () => {
       prisma as never,
     );
 
-    const RealDate = Date;
-    const fixed = new RealDate('2026-08-20T10:00:00.000Z'); // Lagos ~11:00
-    jest.spyOn(global, 'Date').mockImplementation(((...args: unknown[]) => {
-      if (args.length === 0) return fixed;
-      return new (RealDate as unknown as new (...a: unknown[]) => Date)(
-        ...(args as []),
-      );
-    }) as unknown as DateConstructor);
-    (global.Date as unknown as { now: () => number }).now = () =>
-      fixed.getTime();
-
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-08-20T10:00:00.000Z')); // Lagos ~11:00
     await service.monitorMissedAndStale();
     expect(adminNotify.emit).toHaveBeenCalled();
-    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('skips notify when runInternal returns null (lock held)', async () => {

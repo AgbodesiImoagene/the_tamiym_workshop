@@ -1,6 +1,15 @@
 import { PrismaService } from './prisma.service';
 
 describe('PrismaService.withSessionAdvisoryLock', () => {
+  function buildWithPool(connect: jest.Mock): PrismaService {
+    const service = Object.create(PrismaService.prototype) as PrismaService;
+    Object.defineProperty(service, 'pool', {
+      value: { connect },
+      configurable: true,
+    });
+    return service;
+  }
+
   it('runs fn when lock acquired and unlocks on the same client', async () => {
     const query = jest
       .fn()
@@ -8,10 +17,7 @@ describe('PrismaService.withSessionAdvisoryLock', () => {
       .mockResolvedValueOnce({ rows: [{ unlocked: true }] });
     const release = jest.fn();
     const connect = jest.fn().mockResolvedValue({ query, release });
-    const service = Object.create(PrismaService.prototype) as PrismaService & {
-      pool: { connect: typeof connect };
-    };
-    service.pool = { connect };
+    const service = buildWithPool(connect);
 
     const result = await service.withSessionAdvisoryLock('recon:test', () =>
       Promise.resolve(42),
@@ -25,10 +31,7 @@ describe('PrismaService.withSessionAdvisoryLock', () => {
     const query = jest.fn().mockResolvedValue({ rows: [{ locked: false }] });
     const release = jest.fn();
     const connect = jest.fn().mockResolvedValue({ query, release });
-    const service = Object.create(PrismaService.prototype) as PrismaService & {
-      pool: { connect: typeof connect };
-    };
-    service.pool = { connect };
+    const service = buildWithPool(connect);
 
     const result = await service.withSessionAdvisoryLock('recon:test', () =>
       Promise.resolve(1),
