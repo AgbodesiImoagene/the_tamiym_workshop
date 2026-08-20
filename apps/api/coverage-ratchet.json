@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-015 reconciliation unit coverage expansion.",
+  "notes": "Raised after TTW-020 auth surface isolation unit coverage.",
   "floors": {
-    "statements": 54.06,
-    "branches": 47.02,
-    "functions": 52.96,
-    "lines": 54.39
+    "statements": 55.5,
+    "branches": 48.17,
+    "functions": 54.41,
+    "lines": 55.81
   }
 }
