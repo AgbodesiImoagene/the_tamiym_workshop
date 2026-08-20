@@ -135,13 +135,32 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Deferred (same ticket):** Playwright MFA/session suites.
 
+### Slice 5 — Playwright MFA / session / verify-to-checkout (APPROVED)
+
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED
+
+**Decisions:**
+
+1. Admin console MFA covered via fresh-context UI smokes: challenge (wrong then valid TOTP), recovery (seeded single-use code), enrollment (`admin.enroll.e2e` without MFA).
+2. Seed adds deterministic recovery code for primary admin + unenrolled enroll admin; keep TOTP secret shared for primary/approver.
+3. Journey API smokes: session list/revoke on a **fresh** customer login (do not revoke setup `customer.json`); admin MFA challenge via **approver** to avoid Redis `admin_login` identity collisions with console smokes; verify-to-checkout registers an unverified user and asserts `403 EMAIL_NOT_VERIFIED` / `CREATE_ORDER`.
+4. Serial mode for admin MFA UI describe to stay under throttle buckets.
+5. No new product UI for session list (API-only until a later UX ticket); AC satisfied via HTTP session APIs + admin MFA console paths.
+
+**Blast radius:** `seed-e2e-dummy-data`, Playwright fixtures/specs under `tests/e2e/admin` and `tests/e2e/journeys`.
+
 ## Implementation reviews
 
 **Security (slice 1):** PASS — auth boundary uses generic 401; `EMAIL_NOT_VERIFIED` only on post-auth action gates. Residual (non-blocking): payment initiation not gated for legacy pending orders.
 
 **Implementation (slice 1):** PASS — OpenAPI notes on order/campaign-order/payout mutate; privileged 403 helper removed; service-boundary `code`/`action` assertions; 60 related unit tests green.
 
-**Slice 2–3 reviews:** PASS (merged PRs #31 / #32).
+**Slice 2–4 reviews:** PASS (merged PRs #31 / #32 / #33).
+
+**Security (slice 5):** PASS — hashed recovery at rest; fresh logins; no shared-setup revoke; no MFA skip. Residual: seed stdout prints fixture secrets (already in-repo).
+
+**Implementation (slice 5):** PASS — idempotent recovery (`testInfo.retry` codes) + enroll MFA reset; `role="alert"` error path; AC mapping for verify/enroll/challenge/recovery/session revoke.
 
 ## Verification evidence
 
@@ -160,8 +179,18 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 ### Slice 3 (admin TOTP + recovery)
 
 - PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/32 — merged (`20ccd99`).
-- Redis identity+IP throttles / Playwright MFA suites — deferred (same ticket).
+
+### Slice 4 (Redis identity+IP throttles)
+
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/33 — merged (`fe72fa8`).
+
+### Slice 5 (Playwright MFA / sessions / verify gate)
+
+- Specs: `tests/e2e/admin/admin-mfa.smoke.spec.ts`, `tests/e2e/journeys/auth-mfa-sessions.smoke.spec.ts`
+- Seed: enroll admin + multi recovery codes; admin login `role="alert"`
+- Quality gates: Prettier on touched files; `git diff --check`; CI Playwright smoke (pending PR)
+- Dual reviews: Security PASS; Implementation PASS (after retry/idempotency remediations)
 
 ## Completion summary
 
-Slice 1–3 shipped. Remaining same-ticket work: Redis identity+IP throttles (slice 4 in progress), Playwright suites.
+Slices 1–4 shipped (merged). Slice 5 (Playwright MFA/session/verify gates) ready for PR on `codex/ttw-023-playwright-mfa`.

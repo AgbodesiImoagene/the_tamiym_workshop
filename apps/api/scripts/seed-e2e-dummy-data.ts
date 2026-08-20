@@ -48,11 +48,22 @@ const FIXTURE_PREFIX = 'e2e-';
 const FIXTURE_PASSWORD = 'TestPassword1!';
 /** Deterministic admin TOTP secret for Playwright MFA challenge (TTW-023). */
 const E2E_ADMIN_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+/**
+ * Deterministic recovery codes for the primary e2e admin only (hashed at rest).
+ * Multiple codes so Playwright recovery smoke stays idempotent under CI retries.
+ * Keep in sync with `E2E_ADMIN_RECOVERY_CODES` in tests/e2e/fixtures/identities.ts.
+ */
+const E2E_ADMIN_RECOVERY_CODES = [
+  'A1B2-C3D4-E5F6-7890-ABCD-EF01-2345-6789',
+  'B2C3-D4E5-F678-90AB-CDEF-0123-4567-89AB',
+  'C3D4-E5F6-7890-ABCD-EF01-2345-6789-ABCD',
+] as const;
 
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
     adminApprover: 'e2e-user-admin-approver',
+    adminEnroll: 'e2e-user-admin-enroll',
     organizer: 'e2e-user-organizer',
     customer: 'e2e-user-customer',
   },
@@ -475,6 +486,18 @@ async function main() {
           emailVerifiedAt: daysAgo(14),
         },
         {
+          // No MFA credential — Playwright enrollment UI smoke (TTW-023).
+          id: IDS.users.adminEnroll,
+          email: 'admin.enroll.e2e@tamiym.test',
+          passwordHash: hashedPassword,
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          firstName: 'Efe',
+          lastName: 'Enroll',
+          phone: '08000000005',
+          emailVerifiedAt: daysAgo(14),
+        },
+        {
           id: IDS.users.organizer,
           email: 'organizer.e2e@tamiym.test',
           passwordHash: hashedPassword,
@@ -499,7 +522,8 @@ async function main() {
       ],
     });
 
-    // Pre-enroll admin MFA so Playwright can challenge with a known TOTP secret.
+    // Pre-enroll primary/approver MFA so Playwright can challenge with a known TOTP.
+    // Leave adminEnroll without credentials for enrollment UI coverage.
     const mfaKey = decodeMfaEncryptionKey(process.env.MFA_TOTP_ENCRYPTION_KEY);
     const encryptedTotp = encryptTotpSecret(E2E_ADMIN_TOTP_SECRET, mfaKey);
     const adminIds = [IDS.users.adminPrimary, IDS.users.adminApprover];
@@ -513,7 +537,10 @@ async function main() {
           enabledAt: daysAgo(7),
         },
       });
-      const recoveryCodes = generateRecoveryCodes(10);
+      const recoveryCodes =
+        userId === IDS.users.adminPrimary
+          ? [...E2E_ADMIN_RECOVERY_CODES, ...generateRecoveryCodes(7)]
+          : generateRecoveryCodes(10);
       await prisma.adminMfaRecoveryCode.createMany({
         data: recoveryCodes.map((code) => ({
           userId,
@@ -1586,6 +1613,12 @@ async function main() {
     console.log(`- Customer: customer.e2e@tamiym.test / ${FIXTURE_PASSWORD}`);
     console.log(
       `- Admin MFA TOTP secret (seed only): ${E2E_ADMIN_TOTP_SECRET}`,
+    );
+    console.log(
+      `- Admin MFA recovery codes (primary only, seed only): ${E2E_ADMIN_RECOVERY_CODES.join(', ')}`,
+    );
+    console.log(
+      `- Admin enroll (no MFA yet): admin.enroll.e2e@tamiym.test / ${FIXTURE_PASSWORD}`,
     );
     console.log('Fixtures:');
     console.log('- Products: classic-tee-e2e, campus-hoodie-e2e');
