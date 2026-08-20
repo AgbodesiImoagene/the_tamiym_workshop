@@ -87,7 +87,7 @@ See [the epic contract](../epics/06-production-infrastructure-as-code.md) and [p
 | [TTW-065](ttw-065-enforce-infrastructure-security.md)             | P0       | High     | Complete | Enforce workload identity, secrets, encryption and break-glass controls    |
 | [TTW-066](ttw-066-operationalize-infrastructure-observability.md) | P1       | High     | Complete | Route infrastructure telemetry, alerts and cost controls                   |
 | [TTW-067](ttw-067-prove-backup-disaster-recovery.md)              | P1       | Critical | Complete | Automate backups and prove recovery objectives through exercises           |
-| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Scoped   | Validate ephemeral release infrastructure and integrate CI/CD              |
+| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Complete | Validate ephemeral release infrastructure and integrate CI/CD              |
 
 ## Epic 7 — Organic discovery: SEO, AEO and GEO
 

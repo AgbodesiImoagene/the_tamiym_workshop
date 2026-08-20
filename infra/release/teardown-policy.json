@@ -1,0 +1,23 @@
+{
+  "ticket": "TTW-068",
+  "environment": "temporary-validation",
+  "do_project_name": "ttw-tmpval",
+  "max_lifetime_hours": 24,
+  "max_monthly_usd": 30,
+  "retention": {
+    "manifest_and_gate_artefacts_days": 90,
+    "plan_binaries": "discard_after_review_or_never_commit",
+    "live_resources": "destroy_after_evidence_capture"
+  },
+  "orphan_detection": {
+    "label_selectors": ["project=ttw", "environment=temporary-validation", "managed_by=opentofu"],
+    "notes": [
+      "Scan DigitalOcean project ttw-tmpval for resources older than max_lifetime_hours.",
+      "Flag Droplets, Managed Postgres, Spaces buckets, reserved IPs, and firewalls lacking a matching OpenTofu state entry.",
+      "Orphan scan is owner-gated (requires DIGITALOCEAN_TOKEN); credential-free CI only validates this policy file exists and max_lifetime_hours is set.",
+      "Never leave temporary-validation resources running overnight without an explicit owner waiver recorded in the release evidence."
+    ]
+  },
+  "owner_gated_live_apply": true,
+  "production_auto_apply": false
+}

@@ -7,21 +7,22 @@ Pinned CLI: **OpenTofu 1.9.1** (`.opentofu-version`).
 
 ## Layout
 
-| Path                         | Role                                                                                |
-| ---------------------------- | ----------------------------------------------------------------------------------- |
-| `modules/`                   | Reusable modules (incl. `droplet`, `postgres`, `spaces`, `valkey_config`, network)  |
-| `runtime/compose/`           | Production Compose stack (proxy/web/app/admin/api/worker/scheduler/valkey/migrate)  |
-| `runtime/edge/`              | Caddyfile for TLS + reverse proxy                                                   |
-| `runtime/valkey/`            | Host-local Valkey conf + Compose snippet                                            |
-| `runtime/secrets/`           | Root-owned host secrets pattern + PLACEHOLDER `.env.example` (TTW-065)              |
-| `runtime/observability/`     | Prod OTel collector, alert catalog, runbooks, dashboard inventory (TTW-066)         |
-| `runtime/backup/`            | Backup policy, export sketches, DR runbooks, post-restore queries (TTW-067)         |
-| `runtime/cloud-init/`        | Droplet hardening sketch (SSH, unattended-upgrades, fail2ban)                       |
-| `envs/production/`           | Production composition + isolated remote state                                      |
-| `envs/temporary-validation/` | Disposable validation composition + isolated state                                  |
-| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                        |
-| `policy/`                    | deny-secrets + network/data/security/runtime/observability/backup invariant helpers |
-| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                      |
+| Path                         | Role                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `modules/`                   | Reusable modules (incl. `droplet`, `postgres`, `spaces`, `valkey_config`, network) |
+| `runtime/compose/`           | Production Compose stack (proxy/web/app/admin/api/worker/scheduler/valkey/migrate) |
+| `runtime/edge/`              | Caddyfile for TLS + reverse proxy                                                  |
+| `runtime/valkey/`            | Host-local Valkey conf + Compose snippet                                           |
+| `runtime/secrets/`           | Root-owned host secrets pattern + PLACEHOLDER `.env.example` (TTW-065)             |
+| `runtime/observability/`     | Prod OTel collector, alert catalog, runbooks, dashboard inventory (TTW-066)        |
+| `runtime/backup/`            | Backup policy, export sketches, DR runbooks, post-restore queries (TTW-067)        |
+| `runtime/cloud-init/`        | Droplet hardening sketch (SSH, unattended-upgrades, fail2ban)                      |
+| `envs/production/`           | Production composition + isolated remote state                                     |
+| `envs/temporary-validation/` | Disposable validation composition + isolated state                                 |
+| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                       |
+| `release/`                   | Release manifest schema/builder, teardown policy (TTW-068)                         |
+| `policy/`                    | deny-secrets + network/data/security/runtime/observability/backup/release helpers  |
+| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                     |
 
 ## Environments
 
@@ -67,7 +68,8 @@ CI trust model, and drift plan.
 
 - **CI `infra` job:** format, deny-secrets, `init -backend=false -lockfile=readonly`, validate — **no** DO token, **no** apply.
 - **CI `infra-plan` workflow:** **workflow_dispatch only** into a protected GitHub Environment that holds `DIGITALOCEAN_TOKEN`; speculative `tofu plan` for the selected env; never on `pull_request` heads; never applies.
-- **Production apply:** human-approved, exact-plan, concurrency-controlled (TTW-065 identities/secrets).
+- **Release Candidate workflow:** **workflow_dispatch only**; credential-free validate + image build (`push: false`) + release-manifest artefact; live temporary-validation apply/deploy behind `enable_live_tmpval` (default false, fail-closed). See `docs/infrastructure/ttw-068-ephemeral-release.md`.
+- **Production apply:** human-approved, exact-plan, concurrency-controlled (TTW-054 / TTW-065 identities/secrets) — **never** auto-applied from release-candidate.
 - Runtime secrets live in root-owned `/etc/tamiym/secrets.env` — never in OpenTofu outputs/state (see `runtime/secrets/`).
 - State files, plans (`tfplan`), `backend.hcl`, `.terraform/`, and API tokens never enter git; `.terraform.lock.hcl` **is** committed.
 
@@ -82,6 +84,7 @@ CI trust model, and drift plan.
 - [TTW-065 identity / secrets](../docs/infrastructure/ttw-065-identity-secrets.md)
 - [TTW-066 observability / cost](../docs/infrastructure/ttw-066-observability-cost.md)
 - [TTW-067 backup / disaster recovery](../docs/infrastructure/ttw-067-backup-disaster-recovery.md)
+- [TTW-068 ephemeral release / CI](../docs/infrastructure/ttw-068-ephemeral-release.md)
 - [TTW-061 ticket](../docs/tickets/ttw-061-establish-iac-foundation.md)
 - [TTW-062 ticket](../docs/tickets/ttw-062-provision-network-dns-edge.md)
 - [TTW-063 ticket](../docs/tickets/ttw-063-deploy-production-runtime.md)
@@ -89,3 +92,4 @@ CI trust model, and drift plan.
 - [TTW-065 ticket](../docs/tickets/ttw-065-enforce-infrastructure-security.md)
 - [TTW-066 ticket](../docs/tickets/ttw-066-operationalize-infrastructure-observability.md)
 - [TTW-067 ticket](../docs/tickets/ttw-067-prove-backup-disaster-recovery.md)
+- [TTW-068 ticket](../docs/tickets/ttw-068-validate-ephemeral-release-infrastructure.md)

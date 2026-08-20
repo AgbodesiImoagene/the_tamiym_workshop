@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ticket": "TTW-068",
+  "commitSha": "PLACEHOLDER_COMMIT_SHA",
+  "createdAt": "1970-01-01T00:00:00.000Z",
+  "images": {
+    "web": {
+      "digest": "",
+      "tag": "PLACEHOLDER",
+      "repository": "PLACEHOLDER_REGISTRY/tamiym-web"
+    },
+    "app": {
+      "digest": "",
+      "tag": "PLACEHOLDER",
+      "repository": "PLACEHOLDER_REGISTRY/tamiym-app"
+    },
+    "admin": {
+      "digest": "",
+      "tag": "PLACEHOLDER",
+      "repository": "PLACEHOLDER_REGISTRY/tamiym-admin"
+    },
+    "api": {
+      "digest": "",
+      "tag": "PLACEHOLDER",
+      "repository": "PLACEHOLDER_REGISTRY/tamiym-api"
+    }
+  },
+  "sbomRefs": {
+    "web": "PLACEHOLDER_SBOM_WEB",
+    "app": "PLACEHOLDER_SBOM_APP",
+    "admin": "PLACEHOLDER_SBOM_ADMIN",
+    "api": "PLACEHOLDER_SBOM_API"
+  },
+  "opentofu": {
+    "lockfileHashes": {
+      "infra/envs/production/.terraform.lock.hcl": "PLACEHOLDER_LOCK_HASH",
+      "infra/envs/temporary-validation/.terraform.lock.hcl": "PLACEHOLDER_LOCK_HASH"
+    },
+    "planChecksum": "PLACEHOLDER_PLAN_CHECKSUM"
+  },
+  "gateResults": {
+    "infraValidate": "pending",
+    "contracts": "scoped_elsewhere",
+    "observability": "scoped_elsewhere",
+    "browserUat": "scoped_elsewhere",
+    "backupRecovery": "owner_gated"
+  },
+  "notes": "PLACEHOLDER-only example. Digests empty until push; TTW-050/051/053 gates remain Scoped elsewhere."
+}

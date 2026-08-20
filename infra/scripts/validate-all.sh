@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Credential-free OpenTofu validation for TTW-061/062/063/064/065/066/067.
+# Credential-free OpenTofu validation for TTW-061/062/063/064/065/066/067/068.
 # Requires OpenTofu on PATH (CI installs 1.9.1; local: $HOME/.local/bin/tofu).
 set -euo pipefail
 
@@ -35,6 +35,9 @@ bash "${INFRA}/policy/assert-observability-invariants.sh"
 
 echo "==> assert-backup-invariants"
 bash "${INFRA}/policy/assert-backup-invariants.sh"
+
+echo "==> assert-release-invariants"
+bash "${INFRA}/policy/assert-release-invariants.sh"
 
 echo "==> tofu fmt -check -recursive"
 (cd "$INFRA" && tofu fmt -check -recursive)
