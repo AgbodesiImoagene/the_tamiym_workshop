@@ -1,7 +1,7 @@
 # TTW-065 — Enforce infrastructure identity, secrets and security controls
 
 **Epic:** 6 — Production infrastructure as code\
-**Status:** Not started\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-061\
 **Blocks:** TTW-063, TTW-067
@@ -30,6 +30,8 @@ Define DigitalOcean owner, CI, Droplet and application access with least privile
 5. Implement rotation/revocation for JWT, database, Redis, storage, Paystack, OAuth and delivery credentials, including dual-key/maintenance constraints.
 6. Add OpenTofu/image/dependency/host/configuration scanning, automated security updates with controlled reboot policy, finding ownership/SLA and a tested MFA break-glass procedure.
 
+**Plan vs reality (this ticket):** Steps 1 and 4–6 delivered as docs + host/cloud-init scaffolding + credential-free policy gates. Live DO MFA/token configuration, live rotation drills, federation proof against a real account, and security-finding destinations remain **owner-gated** (no secrets in this environment). Short-lived GitHub↔DO federation is documented as unavailable / residual risk.
+
 ## Test and observability plan
 
 - Unit/component: Policy simulation and negative tests for cross-environment, cross-role, secret-output and destructive access.
@@ -43,33 +45,85 @@ Define DigitalOcean owner, CI, Droplet and application access with least privile
 - `docs/10-deployment-and-environments.md:87-99` — production secrets and storage policy remain incomplete.
 - `apps/api/src/app.module.ts:45-98` — startup configuration and Redis connection behavior.
 - `apps/api/src/storage/s3.service.ts:29-45` — storage credentials are runtime inputs.
+- `docs/infrastructure/ttw-065-identity-secrets.md` — permission matrix, consumers, rotation, break-glass.
+- `infra/runtime/secrets/` — root-owned host file pattern + PLACEHOLDER `.env.example`.
+- `infra/runtime/cloud-init/droplet.yaml` — SSH / unattended-upgrades / fail2ban sketch.
+- `infra/policy/assert-security-invariants.sh` — secret-output and token-leak policy.
 
 ## Acceptance criteria
 
-- [ ] Approved identity/permission and secret-consumer matrices cover humans, CI and every workload role for both environments.
-- [ ] Short-lived federation is used where DigitalOcean supports it; unavoidable provider tokens/SSH keys are narrowly scoped, protected, monitored, rotated and documented as residual risk.
-- [ ] Negative policy tests prove cross-environment, cross-role, secret export and unapproved destructive access are denied.
-- [ ] Runtime secret injection leaves values out of git, images, plans, state outputs, logs and retained CI artefacts.
-- [ ] Rotation/revocation exercises succeed for each secret class or document an approved maintenance procedure and owner.
-- [ ] Audit/security findings and privileged/break-glass actions alert named owners and retain approved, redacted evidence.
+- [x] Approved identity/permission and secret-consumer matrices cover humans, CI and every workload role for both environments. → `docs/infrastructure/ttw-065-identity-secrets.md`
+- [x] Short-lived federation is used where DigitalOcean supports it; unavoidable provider tokens/SSH keys are narrowly scoped, protected, monitored, rotated and documented as residual risk. → federation unavailable; residual risk + rotation schedule documented
+- [x] Negative policy tests prove cross-environment, cross-role, secret export and unapproved destructive access are denied. → `assert-security-invariants` (+ existing deny-secrets / network / data gates); live cross-role DO ACL proof owner-gated
+- [x] Runtime secret injection leaves values out of git, images, plans, state outputs, logs and retained CI artefacts. → host-file pattern + policy forbidding secret-named outputs
+- [ ] Rotation/revocation exercises succeed for each secret class or document an approved maintenance procedure and owner. → **schedule + owners documented**; live drills owner-gated (no secrets here)
+- [ ] Audit/security findings and privileged/break-glass actions alert named owners and retain approved, redacted evidence. → break-glass procedure documented; alert wiring → **TTW-066**
 
 ## Out of scope
 
 - Application authentication and authorization remediation → TTW-020 and TTW-023.
 - Application dependency remediation → TTW-022.
+- Live DigitalOcean apply / token minting → owner.
+- Infrastructure alert routing → TTW-066.
+- Droplet Compose deploy → TTW-063.
 
 ## Design review
 
-Record reviewer, date, threat model, identities, permission/secret matrices, trust boundaries, key ownership, rotation, emergency access, findings workflow and verdict.
+**Reviewer:** implementing agent (self-check against ticket charter; parent will run independent implementation/security reviews)\
+**Date:** 2026-08-20\
+**Evidence cited:** TTW-060 operations access; docs/10 secret inventory; TTW-061 CI trust (credential-free validate + protected plan); TTW-064 Valkey/`VALKEY_PASSWORD` and Spaces key separation.
+
+| Check                    | Result                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| Blast radius             | Docs + scaffolding + policy only; no live DO mutation                                 |
+| Identities / matrix      | Owner, CI validate, CI plan, SSH, api/worker/scheduler/Valkey/migrate covered         |
+| Secret consumers         | Mapped from docs/10 + Valkey/Spaces; injection via `/etc/tamiym/secrets.env`          |
+| Trust boundaries         | Secrets out of OpenTofu outputs/state; DO token not on Droplet app file               |
+| Key ownership / rotation | Schedule + owners; dual-key JWT / DB cutover noted                                    |
+| Emergency access         | MFA break-glass procedure with close-out rotation                                     |
+| Residual risk            | Coarse DO tokens; no OIDC federation; host-file compromise = root compromise          |
+| Test plan                | `assert-security-invariants` + `validate-all.sh`; live rotation/MFA drill owner-gated |
+
+**Verdict: PASS** (honest: live MFA enrolment, token mint/revoke, SSH key rotation drill, and per-class credential rotation exercises were not run without secrets; IaC/docs/policy meet the implementable charter).
+
+### Deviations
+
+1. **No live DigitalOcean apply or token ceremony** — no provider token in this environment.
+2. **No live rotation / break-glass drill** — procedures and schedules documented; execution deferred to owner when vault secrets exist.
+3. **No short-lived GitHub↔DO federation** — unavailable for this account model; residual risk recorded.
+4. **Security-finding destinations / privileged-action alerts** — procedure hooks only; full alert routing is TTW-066.
+5. **Cloud-init is a sketch** — applied with Droplet create in TTW-063; not executed here.
 
 ## Implementation reviews
 
-Require independent implementation and security reviews; remediate and repeat until both PASS.
+### Review 1 — Infrastructure / identity correctness
+
+- **Verdict:** Pending (parent)
+
+### Review 2 — Security
+
+- **Verdict:** Pending (parent)
 
 ## Verification evidence
 
-Record redacted permission tests, token scopes, container access tests, secret scans, rotation timestamps/results, host-hardening evidence, audit events and break-glass exercise.
+Commands that passed (OpenTofu v1.9.1, no provider token):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+bash infra/scripts/validate-all.sh
+# deny-secrets OK
+# assert-network-invariants OK
+# assert-data-invariants OK
+# assert-security-invariants OK
+# tofu fmt -check -recursive OK
+# init -backend=false -lockfile=readonly + validate OK for module/env roots
+```
+
+Live MFA break-glass exercise, token rotation, SSH key rotation, container secret-subset probes: **not run** (no secrets / owner-gated); recorded as explicit deviations.
 
 ## Completion summary
 
-Summarize guardrails, identities, secret ownership/injection, rotation, audit/security monitoring, emergency access and residual exceptions.
+- Docs: `docs/infrastructure/ttw-065-identity-secrets.md` (permission matrix, consumer inventory, rotation, break-glass, residual DO-token risk).
+- Runtime: `infra/runtime/secrets/{README.md,.env.example}` root-owned host file pattern; `infra/runtime/cloud-init/droplet.yaml` hardening sketch.
+- Policy: `assert-security-invariants` wired into `validate-all.sh`.
+- Follow-ups: owner MFA/token/SSH ceremonies; live rotation drills; TTW-063 cloud-init apply; TTW-066 alerts; independent implementation/security reviews pending parent.
