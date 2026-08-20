@@ -4,9 +4,8 @@ import { AuthSurface } from '../generated/prisma/enums';
 import * as crypto from './auth-session.crypto';
 
 jest.mock('./auth-session.crypto', () => {
-  const actual = jest.requireActual(
-    './auth-session.crypto',
-  ) as typeof import('./auth-session.crypto');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factory
+  const actual = jest.requireActual('./auth-session.crypto');
   return {
     ...actual,
     mintRefreshToken: jest.fn(),
