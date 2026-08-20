@@ -1349,10 +1349,21 @@ model Order {
 
   currency CurrencyCode @default(NGN)
 
+  /// Merchandise total before discounts. Invariant with discountAmount and line totals.
   subtotalAmount Decimal @db.Decimal(10, 2)
   shippingFee    Decimal @default(0) @db.Decimal(10, 2)
   discountAmount Decimal @default(0) @db.Decimal(10, 2)
-  totalAmount    Decimal @db.Decimal(10, 2)
+  /// VAT component from the quote (null on legacy orders created before TTW-024).
+  vatAmount Decimal? @db.Decimal(10, 2)
+  /// Display-granularity delta: totalAmount - (subtotal - discount + shipping [+ vat if exclusive]).
+  roundingAdjustment Decimal? @db.Decimal(10, 2)
+  /// Snapshot of SiteSettings.vatRate at order time (null = unreproducible legacy).
+  vatRateSnapshot Decimal? @db.Decimal(5, 4)
+  pricesIncludeVatSnapshot     Boolean?
+  vatAppliesToShippingSnapshot Boolean?
+  /// e.g. ngn-v1-interim-2026-08; null on unreproducible legacy rows.
+  pricingPolicyVersion String?
+  totalAmount Decimal @db.Decimal(10, 2)
 
   // Shipping snapshot (prevents drift if Address changes later)
   shipRecipientName String?
@@ -1874,6 +1885,7 @@ model Discount {
   variants       DiscountVariant[]
   campaigns      DiscountCampaign[]
   orderDiscounts OrderDiscount[]
+  activeLocks    DiscountActiveLock[]
 
   @@index([status, scope])
   @@index([status, scope, startAt, endAt])
@@ -1932,7 +1944,8 @@ model OrderDiscount {
 }
 
 /// Quantity-tier pricing for a product or variant (e.g. 10–24 units at X per unit).
-/// Enforced in app when creating/updating: (1) When maxQuantity is set, minQuantity <= maxQuantity. (2) Tiers for same (productId, variantId, currency) must not overlap in quantity range; enforce no overlapping [minQuantity, maxQuantity].
+/// App validates ranges; PostgreSQL also rejects overlaps via EXCLUDE USING gist
+/// (see migration ttw024_pricing_tax_snapshots). Null maxQuantity = unbounded upper.
 model BulkPricing {
   id String @id @default(cuid())
 
@@ -1957,6 +1970,25 @@ model BulkPricing {
   @@index([productId, minQuantity])
   @@index([variantId, minQuantity])
   @@map("bulk_pricing")
+}
+
+/// Concurrency lock for active discount exclusivity (TTW-024).
+/// One row per (subjectKind, subjectId, currencyKey) while the discount is ACTIVE.
+/// currencyKey is "*" for PERCENTAGE (and sitewide type mutex) or the FIXED currency code.
+/// Cross-type PERCENTAGE vs FIXED conflicts are rejected by a DB trigger on insert.
+model DiscountActiveLock {
+  id           String @id @default(cuid())
+  discountId   String
+  discount     Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  subjectKind  String /// SITEWIDE | CAMPAIGN | PRODUCT | VARIANT
+  subjectId    String /// empty string for SITEWIDE
+  currencyKey  String /// "*" or CurrencyCode
+
+  createdAt DateTime @default(now())
+
+  @@unique([subjectKind, subjectId, currencyKey])
+  @@index([discountId])
+  @@map("discount_active_locks")
 }
 
 /**

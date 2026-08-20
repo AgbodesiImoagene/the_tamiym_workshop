@@ -92,6 +92,7 @@ describe('PricingService', () => {
       campaignProduct: { findFirst: jest.fn().mockResolvedValue(null) },
       designView: { findMany: jest.fn().mockResolvedValue([]) },
       productViewPricing: { findMany: jest.fn().mockResolvedValue([]) },
+      discountCampaign: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const mockResolver = {
       resolveAddress: jest.fn().mockResolvedValue(null),
@@ -172,8 +173,20 @@ describe('PricingService', () => {
         shippingFee: expect.any(Number),
         vatAmount: expect.any(Number),
         totalAmount: expect.any(Number),
+        totalBeforeDisplayRounding: expect.any(Number),
+        roundingAdjustment: expect.any(Number),
+        vatRate: 0.075,
+        pricesIncludeVat: true,
+        vatAppliesToShipping: true,
+        pricingPolicyVersion: 'ngn-v1-interim-2026-08',
       });
       expect(result.items).toHaveLength(1);
+      expect(result.subtotalAmount - result.discountAmount).toBe(
+        result.items[0].lineTotal,
+      );
+      expect(result.totalAmount).toBe(
+        result.totalBeforeDisplayRounding + result.roundingAdjustment,
+      );
       expect(result.items[0].pricingBreakdown).toBeDefined();
       expect(result.items[0].variantSnapshot).toBeDefined();
     });
@@ -190,6 +203,145 @@ describe('PricingService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('should fail closed when multiple active campaign discounts match', async () => {
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 8000 }],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([
+        {
+          discountId: 'd1',
+          discount: {
+            id: 'd1',
+            status: 'ACTIVE',
+            scope: 'CAMPAIGN',
+            valuePercent: 10,
+            valueAmount: null,
+            currency: null,
+          },
+        },
+        {
+          discountId: 'd2',
+          discount: {
+            id: 'd2',
+            status: 'ACTIVE',
+            scope: 'CAMPAIGN',
+            valuePercent: 5,
+            valueAmount: null,
+            currency: null,
+          },
+        },
+      ]);
+
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should not double-subtract campaign discount from totals', async () => {
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 10000 }],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([
+        {
+          discountId: 'd1',
+          discount: {
+            id: 'd1',
+            status: 'ACTIVE',
+            scope: 'CAMPAIGN',
+            valuePercent: 10,
+            valueAmount: null,
+            currency: null,
+          },
+        },
+      ]);
+
+      const result = await service.quoteCampaign('user-1', 'camp-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(result.subtotalAmount).toBe(10000);
+      expect(result.discountAmount).toBe(1000);
+      expect(result.items[0].lineTotal).toBe(9000);
+      expect(result.subtotalAmount - result.discountAmount).toBe(
+        result.items[0].lineTotal,
+      );
+      // pricesIncludeVat: merchandise net 9000, shipping 0
+      expect(result.totalBeforeDisplayRounding).toBe(9000);
+      expect(result.totalAmount).toBe(9000);
+      expect(result.roundingAdjustment).toBe(0);
+      expect(result.appliedDiscountId).toBe('d1');
+      // Inclusive VAT extraction: 9000 * 0.075 / 1.075 → minor HALF_EVEN
+      expect(result.vatAmount).toBe(627.91);
+      expect(result.pricesIncludeVat).toBe(true);
+    });
+
+    it('should apply FIXED campaign discount per unit without dividing by quantity', async () => {
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 5000 }],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([
+        {
+          discountId: 'd-fixed',
+          discount: {
+            id: 'd-fixed',
+            status: 'ACTIVE',
+            scope: 'CAMPAIGN',
+            valuePercent: null,
+            valueAmount: 500,
+            currency: 'NGN',
+          },
+        },
+      ]);
+
+      const result = await service.quoteCampaign('user-1', 'camp-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 3 }],
+      });
+
+      expect(result.items[0].unitDiscountAmount).toBe(500);
+      expect(result.discountAmount).toBe(1500);
+      expect(result.subtotalAmount).toBe(15000);
+      expect(result.items[0].lineTotal).toBe(13500);
+    });
+
+    it('should add exclusive VAT and record non-zero display rounding', async () => {
+      (prisma.siteSettings.findUnique as jest.Mock).mockResolvedValue({
+        ...mockSiteSettings,
+        pricesIncludeVat: false,
+        vatRate: 0.075,
+      });
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 9050 }],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.quoteCampaign('user-1', 'camp-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      // exclusive: vat = 9050 * 0.075 = 678.75 → 678.75
+      expect(result.pricesIncludeVat).toBe(false);
+      expect(result.vatAmount).toBe(678.75);
+      expect(result.totalBeforeDisplayRounding).toBe(9728.75);
+      // NGN display granularity 100 → 9700
+      expect(result.totalAmount).toBe(9700);
+      expect(result.roundingAdjustment).toBe(-28.75);
+      expect(
+        result.totalBeforeDisplayRounding + result.roundingAdjustment,
+      ).toBe(result.totalAmount);
+    });
+  });
+
+  describe('quoteCampaign status guards', () => {
     it('should throw when campaign is not active', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         id: 'camp-1',

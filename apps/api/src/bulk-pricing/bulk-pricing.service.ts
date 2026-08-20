@@ -20,6 +20,19 @@ function rangesOverlap(
   return !(highA < minB || highB < minA);
 }
 
+function mapBulkConstraintError(err: unknown): never {
+  const message = err instanceof Error ? err.message : String(err);
+  if (
+    /bulk_pricing_quantity_no_overlap/i.test(message) ||
+    /conflicting key value violates exclusion constraint/i.test(message)
+  ) {
+    throw new BadRequestException(
+      'Quantity range overlaps an existing tier for this product/variant/currency. Tiers must not overlap.',
+    );
+  }
+  throw err;
+}
+
 @Injectable()
 export class BulkPricingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -88,16 +101,20 @@ export class BulkPricingService {
       data.minQuantity,
       data.maxQuantity ?? null,
     );
-    return this.prisma.bulkPricing.create({
-      data: {
-        productId: data.productId,
-        variantId: data.variantId ?? null,
-        currency: data.currency as 'NGN',
-        minQuantity: data.minQuantity,
-        maxQuantity: data.maxQuantity ?? null,
-        pricePerUnit: data.pricePerUnit,
-      },
-    });
+    try {
+      return await this.prisma.bulkPricing.create({
+        data: {
+          productId: data.productId,
+          variantId: data.variantId ?? null,
+          currency: data.currency as 'NGN',
+          minQuantity: data.minQuantity,
+          maxQuantity: data.maxQuantity ?? null,
+          pricePerUnit: data.pricePerUnit,
+        },
+      });
+    } catch (err: unknown) {
+      mapBulkConstraintError(err);
+    }
   }
 
   async update(
@@ -125,14 +142,18 @@ export class BulkPricingService {
       maxQuantity,
       id,
     );
-    return this.prisma.bulkPricing.update({
-      where: { id },
-      data: {
-        minQuantity: data.minQuantity,
-        maxQuantity: data.maxQuantity,
-        pricePerUnit: data.pricePerUnit,
-      },
-    });
+    try {
+      return await this.prisma.bulkPricing.update({
+        where: { id },
+        data: {
+          minQuantity: data.minQuantity,
+          maxQuantity: data.maxQuantity,
+          pricePerUnit: data.pricePerUnit,
+        },
+      });
+    } catch (err: unknown) {
+      mapBulkConstraintError(err);
+    }
   }
 
   async remove(id: string) {

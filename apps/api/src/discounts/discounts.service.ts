@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../generated/prisma/client';
 import {
   type DiscountScope,
   type DiscountStatus,
@@ -354,6 +355,16 @@ export class DiscountsService {
           data: { discountId: discount.id, variantId },
         });
       }
+      await this.syncActiveLocks(tx, {
+        discountId: discount.id,
+        type: data.type,
+        scope: data.scope,
+        status,
+        currency: data.currency ?? null,
+        campaignIds,
+        productIds,
+        variantIds,
+      });
       return this.findOne(discount.id);
     });
   }
@@ -453,7 +464,82 @@ export class DiscountsService {
           });
         }
       }
+      await this.syncActiveLocks(tx, {
+        discountId: id,
+        type: existing.type,
+        scope: existing.scope,
+        status,
+        currency: currency ?? null,
+        campaignIds,
+        productIds,
+        variantIds,
+      });
       return this.findOne(id);
     });
+  }
+
+  private async syncActiveLocks(
+    tx: Prisma.TransactionClient,
+    input: {
+      discountId: string;
+      type: DiscountType;
+      scope: DiscountScope;
+      status: DiscountStatus;
+      currency: string | null;
+      campaignIds: string[];
+      productIds: string[];
+      variantIds: string[];
+    },
+  ): Promise<void> {
+    await tx.discountActiveLock.deleteMany({
+      where: { discountId: input.discountId },
+    });
+    if (input.status !== 'ACTIVE') {
+      return;
+    }
+    const subjects = this.getSubjects({
+      scope: input.scope,
+      campaignIds: input.campaignIds,
+      productIds: input.productIds,
+      variantIds: input.variantIds,
+    });
+    const currencyKey =
+      input.type === TypeEnum.PERCENTAGE
+        ? '*'
+        : (input.currency ?? '').toUpperCase();
+    if (input.type === TypeEnum.FIXED && !currencyKey) {
+      throw new BadRequestException(
+        'Currency is required for FIXED discounts.',
+      );
+    }
+    for (const subject of subjects) {
+      const subjectKind =
+        subject.kind === 'sitewide' ? 'SITEWIDE' : subject.kind.toUpperCase();
+      const subjectId = subject.id ?? '';
+      try {
+        await tx.discountActiveLock.create({
+          data: {
+            discountId: input.discountId,
+            subjectKind,
+            subjectId,
+            currencyKey,
+          },
+        });
+      } catch (err: unknown) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new BadRequestException(
+            `Another active discount already locks subject ${subjectKind}:${subjectId || 'sitewide'} (${currencyKey}).`,
+          );
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        if (/conflicts with active/i.test(message)) {
+          throw new BadRequestException(message);
+        }
+        throw err;
+      }
+    }
   }
 }

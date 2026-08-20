@@ -112,9 +112,10 @@ What this prevents:
 
 - duplicate tiers with the same `minQuantity`
 
-Overlap enforcement (in app):
+Overlap enforcement:
 
-- when creating or updating a tier, the API rejects overlapping quantity ranges for the same `(productId, variantId, currency)` via `BulkPricingService.assertNoOverlap` and admin bulk-pricing endpoints.
+- API rejects overlapping quantity ranges via `BulkPricingService.assertNoOverlap`
+- PostgreSQL also rejects overlaps via `EXCLUDE USING gist` on `(productId, coalesced variantId, currency, int4range)` (TTW-024)
 
 ### Product view pricing
 
@@ -138,16 +139,18 @@ Discounts are stored in `Discount` and attached through join tables:
 
 Current campaign discount resolution in `PricingService`:
 
-- finds the first matching active `DiscountCampaign`
+- loads matching active `DiscountCampaign` rows (ordered by discount id for stable errors)
+- **fails closed** when more than one match is in effect
 - supports percentage or fixed discount
 - applies the discount per unit
 - returns `appliedDiscountId` on the quote so that order creation can persist an `OrderDiscount` record
 
-Enforced at discount create/update (admin, `DiscountsService.validateActiveDiscountRules`):
+Enforced at discount create/update (admin, `DiscountsService.validateActiveDiscountRules` + `discount_active_locks`):
 
 - **One active discount per subject** (sitewide, or per campaign/product/variant). Subject is determined by scope and link tables.
 - **FIXED requires currency.** For FIXED, only one active discount per (subject, currency).
-- **PERCENTAGE and FIXED cannot both be active** for the same subject.
+- **PERCENTAGE and FIXED cannot both be active** for the same subject (DB trigger on locks).
+- Concurrent ACTIVE writes collide on `@@unique([subjectKind, subjectId, currencyKey])`.
 
 OrderDiscount usage:
 
@@ -246,20 +249,34 @@ Strengths:
 
 Caveats:
 
-- arithmetic still uses JavaScript `number`, not exact decimal arithmetic
+- arithmetic still uses JavaScript `number`, not exact decimal arithmetic (acceptable for interim NGN v1 with minor-unit rounding at money boundaries; revisit if policy complexity grows)
 - display-granularity rounding can make `totalAmount` differ from the direct sum of persisted components
-- there is no explicit `roundingAdjustment` field stored on `Order`
-- `vatAmount` is returned in quotes but not currently stored on `Order`
-- rounding configuration is not snapshotted onto the order for audit
+- **TTW-024:** orders now persist `vatAmount`, `roundingAdjustment`, VAT basis/rate flags, and `pricingPolicyVersion`; legacy rows leave these null (unreproducible)
 
-Recommended follow-up improvements:
+Order total invariant (new orders):
 
-1. add `vatAmount` to the `Order` schema
-2. add `roundingAdjustment` to the `Order` schema
-3. document whether order reconciliation should use:
-   - raw component sum, or
-   - displayed final total with explicit adjustment
-4. consider migrating pricing internals to exact decimal arithmetic if complexity increases
+- `subtotalAmount` = merchandise **before** discounts
+- `discountAmount` = sum of unit discounts × quantity
+- `subtotalAmount - discountAmount` = sum of line totals
+- `totalAmount = totalBeforeDisplayRounding + roundingAdjustment`
+
+Campaign discount resolution:
+
+- fail-closed when more than one active campaign discount matches
+- never silently picks an unordered `findFirst` row
+
+Database enforcement (TTW-024):
+
+- `bulk_pricing` quantity ranges: `EXCLUDE USING gist` (concurrent overlap rejected)
+- `discount_active_locks`: unique subject locks + PCT/FIXED compatibility trigger
+- conflict inventory: `apps/api/scripts/inventory-pricing-conflicts.sql`
+
+Recommended follow-up (owner-gated / later tickets):
+
+1. signed legal VAT / receipt / accounting matrix and immutable effective-dated tax policy versions
+2. quote-drift confirmation UX before order/payment creation
+3. exact decimal/minor-unit arithmetic if complexity increases beyond NGN interim policy
+4. overlapping discount **effective-window** exclusion (today: one ACTIVE lock per subject, stricter than date-windowed app checks)
 
 ## Currency Strategy
 
