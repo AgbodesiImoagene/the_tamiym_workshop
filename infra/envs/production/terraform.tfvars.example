@@ -2,7 +2,7 @@
 project                = "tamiym-workshop"
 environment_label      = "production"
 managed_by             = "opentofu"
-ticket                 = "TTW-064"
+ticket                 = "TTW-063"
 do_project_name        = "ttw-prod"
 do_project_purpose     = "Web Application"
 do_project_environment = "Production"
@@ -24,3 +24,9 @@ postgres_size          = "db-s-1vcpu-1gb"
 postgres_version       = "16"
 spaces_name_prefix     = "ttw-prod"
 spaces_region          = "ams3"
+# Owner-gated: set true + SSH fingerprints only when applying the Droplet.
+enable_app_droplet               = false
+droplet_name                     = "ttw-prod-app"
+droplet_size                     = "s-2vcpu-4gb"
+droplet_image                    = "ubuntu-24-04-x64"
+droplet_ssh_key_fingerprints     = []

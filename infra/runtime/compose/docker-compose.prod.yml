@@ -1,0 +1,312 @@
+# TTW-063 — production Droplet Compose stack (single 4 GiB host).
+# Digests are deployment authority; replace image tags with immutable digests at deploy time.
+# Secrets: mount / provide env_file from /etc/tamiym/secrets.env (never bake credentials).
+#
+# One-off migration (authorized separately):
+#   docker compose -f infra/runtime/compose/docker-compose.prod.yml --profile migrate run --rm migrate
+#
+# Resource hard limits from docs/infrastructure/ttw-060-resource-budget.json.
+
+name: tamiym-prod
+
+x-api-image: &api_image
+  image: ${API_IMAGE:-ghcr.io/agbodesiimoagene/tamiym-api:local}
+  env_file:
+    - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+  networks:
+    - tamiym_internal
+  restart: unless-stopped
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp
+
+services:
+  proxy:
+    image: ${PROXY_IMAGE:-caddy:2.9-alpine}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../edge/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - tamiym_edge
+      - tamiym_internal
+    mem_limit: 128m
+    depends_on:
+      web:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/agbodesiimoagene/tamiym-web:local}
+    env_file:
+      - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+    environment:
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - tamiym_internal
+    mem_limit: 512m
+    restart: unless-stopped
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001:10001"
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/agbodesiimoagene/tamiym-app:local}
+    env_file:
+      - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+    environment:
+      PORT: "3002"
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - tamiym_internal
+    mem_limit: 512m
+    restart: unless-stopped
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001:10001"
+
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/agbodesiimoagene/tamiym-admin:local}
+    env_file:
+      - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+    environment:
+      PORT: "3003"
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - tamiym_internal
+    mem_limit: 512m
+    restart: unless-stopped
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001:10001"
+
+  api:
+    <<: *api_image
+    environment:
+      API_ROLE: api
+      PORT: "3001"
+    mem_limit: 768m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    depends_on:
+      valkey:
+        condition: service_healthy
+    user: "10001:10001"
+    networks:
+      - tamiym_internal
+
+  worker:
+    <<: *api_image
+    environment:
+      API_ROLE: worker
+      PORT: "3001"
+    mem_limit: 512m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/v1/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    depends_on:
+      valkey:
+        condition: service_healthy
+    user: "10001:10001"
+
+  scheduler:
+    <<: *api_image
+    environment:
+      API_ROLE: scheduler
+      PORT: "3001"
+    mem_limit: 256m
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/v1/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    depends_on:
+      valkey:
+        condition: service_healthy
+    user: "10001:10001"
+    # Singleton: never scale scheduler horizontally (Compose; not Swarm).
+    # Enforce with deploy tooling / ops runbook — do not add a second replica.
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    user: "999:999"
+    env_file:
+      - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?VALKEY_PASSWORD is required}
+    command:
+      - sh
+      - -c
+      - |
+        exec valkey-server /etc/valkey/valkey.conf --requirepass "$${VALKEY_PASSWORD}"
+    volumes:
+      - ../valkey/valkey.conf:/etc/valkey/valkey.conf:ro
+      - valkey_data:/data
+    networks:
+      - tamiym_internal
+    ports:
+      - "127.0.0.1:6379:6379"
+    mem_limit: 384m
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "valkey-cli -a \"$${VALKEY_PASSWORD}\" --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  migrate:
+    profiles: ["migrate"]
+    image: ${API_IMAGE:-ghcr.io/agbodesiimoagene/tamiym-api:local}
+    env_file:
+      - ${TAMIYM_SECRETS_FILE:-/etc/tamiym/secrets.env}
+    # Prefer a migration-specific DATABASE_URL when provided (TTW-065).
+    environment:
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:-${DATABASE_URL}}
+    networks:
+      - tamiym_internal
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: "no"
+    entrypoint:
+      [
+        "node",
+        "./node_modules/prisma/build/index.js",
+        "migrate",
+        "deploy",
+        "--schema",
+        "prisma/schema.prisma",
+      ]
+
+networks:
+  tamiym_edge:
+    driver: bridge
+  # Not marked internal: apps need VPC egress to Managed PostgreSQL / HTTPS providers.
+  # Isolation is Cloud Firewall + no public port publishes (except proxy 80/443).
+  tamiym_internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  valkey_data:

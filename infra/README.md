@@ -7,17 +7,19 @@ Pinned CLI: **OpenTofu 1.9.1** (`.opentofu-version`).
 
 ## Layout
 
-| Path                         | Role                                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `modules/`                   | Reusable modules (`labeling`, `digitalocean_project`, `vpc`, `firewall`, `reserved_ip`, `postgres`, `spaces`, `valkey_config`) |
-| `runtime/valkey/`            | Host-local Valkey conf + Compose snippet for TTW-063                                                                           |
-| `runtime/secrets/`           | Root-owned host secrets pattern + PLACEHOLDER `.env.example` (TTW-065)                                                         |
-| `runtime/cloud-init/`        | Droplet hardening sketch (SSH, unattended-upgrades, fail2ban)                                                                  |
-| `envs/production/`           | Production composition + isolated remote state                                                                                 |
-| `envs/temporary-validation/` | Disposable validation composition + isolated state                                                                             |
-| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                                                                   |
-| `policy/`                    | deny-secrets + network/data/security invariant policy helpers                                                                  |
-| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                                                                 |
+| Path                         | Role                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `modules/`                   | Reusable modules (incl. `droplet`, `postgres`, `spaces`, `valkey_config`, network) |
+| `runtime/compose/`           | Production Compose stack (proxy/web/app/admin/api/worker/scheduler/valkey/migrate) |
+| `runtime/edge/`              | Caddyfile for TLS + reverse proxy                                                  |
+| `runtime/valkey/`            | Host-local Valkey conf + Compose snippet                                           |
+| `runtime/secrets/`           | Root-owned host secrets pattern + PLACEHOLDER `.env.example` (TTW-065)             |
+| `runtime/cloud-init/`        | Droplet hardening sketch (SSH, unattended-upgrades, fail2ban)                      |
+| `envs/production/`           | Production composition + isolated remote state                                     |
+| `envs/temporary-validation/` | Disposable validation composition + isolated state                                 |
+| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                       |
+| `policy/`                    | deny-secrets + network/data/security invariant policy helpers                      |
+| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                     |
 
 ## Environments
 
@@ -73,9 +75,11 @@ CI trust model, and drift plan.
 - [TTW-061 IaC foundation](../docs/infrastructure/ttw-061-iac-foundation.md)
 - [TTW-062 network / edge](../docs/infrastructure/ttw-062-network-edge.md)
 - [TTW-062 Namecheap DNS](../docs/infrastructure/ttw-062-namecheap-dns.md)
+- [TTW-063 production runtime](../docs/infrastructure/ttw-063-production-runtime.md)
 - [TTW-064 data services](../docs/infrastructure/ttw-064-data-services.md)
 - [TTW-065 identity / secrets](../docs/infrastructure/ttw-065-identity-secrets.md)
 - [TTW-061 ticket](../docs/tickets/ttw-061-establish-iac-foundation.md)
 - [TTW-062 ticket](../docs/tickets/ttw-062-provision-network-dns-edge.md)
+- [TTW-063 ticket](../docs/tickets/ttw-063-deploy-production-runtime.md)
 - [TTW-064 ticket](../docs/tickets/ttw-064-provision-managed-data-services.md)
 - [TTW-065 ticket](../docs/tickets/ttw-065-enforce-infrastructure-security.md)

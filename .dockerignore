@@ -1,0 +1,27 @@
+# Docker build context must be the monorepo root.
+# Keep images free of .env*, secrets, state and local artefacts.
+.git
+.github
+.cursor
+.husky
+.turbo
+**/.next
+**/dist
+**/coverage
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+infra/bootstrap
+infra/**/.terraform
+infra/**/*.tfplan
+infra/**/backend.hcl
+infra/**/terraform.tfvars
+**/*.log
+playwright-report
+test-results
+tests/e2e/.auth
+agent-transcripts
+docs
+*.md
+!apps/**/README.md

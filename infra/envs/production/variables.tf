@@ -19,7 +19,7 @@ variable "managed_by" {
 variable "ticket" {
   description = "Owning ticket for this composition."
   type        = string
-  default     = "TTW-064"
+  default     = "TTW-063"
 }
 
 variable "do_project_name" {
@@ -165,4 +165,39 @@ variable "spaces_region" {
   description = "Spaces region (Spaces unavailable in lon1; ams3 is EU-near London)."
   type        = string
   default     = "ams3"
+}
+
+variable "enable_app_droplet" {
+  description = "When true, create the application Droplet and assign the reserved IP (owner-gated apply)."
+  type        = bool
+  default     = false
+}
+
+variable "droplet_name" {
+  description = "Application Droplet name."
+  type        = string
+  default     = "ttw-prod-app"
+}
+
+variable "droplet_size" {
+  description = "Application Droplet size (4 GiB launch envelope)."
+  type        = string
+  default     = "s-2vcpu-4gb"
+}
+
+variable "droplet_image" {
+  description = "Droplet image slug."
+  type        = string
+  default     = "ubuntu-24-04-x64"
+}
+
+variable "droplet_ssh_key_fingerprints" {
+  description = "DigitalOcean SSH key fingerprints for Droplet access. Required when enable_app_droplet is true."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !var.enable_app_droplet || length(var.droplet_ssh_key_fingerprints) > 0
+    error_message = "droplet_ssh_key_fingerprints must be non-empty when enable_app_droplet is true."
+  }
 }

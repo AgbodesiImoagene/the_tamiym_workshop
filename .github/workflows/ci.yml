@@ -305,6 +305,61 @@ jobs:
       - name: Format, init-without-backend, validate
         run: bash infra/scripts/validate-all.sh
 
+  container-build:
+    name: Container Build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            file: docker/Dockerfile.next
+            app_name: web
+            app_port: '3000'
+          - name: app
+            file: docker/Dockerfile.next
+            app_name: app
+            app_port: '3002'
+          - name: admin
+            file: docker/Dockerfile.next
+            app_name: admin
+            app_port: '3003'
+          - name: api
+            file: docker/Dockerfile.api
+            app_name: ''
+            app_port: ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }} image (no push)
+        if: matrix.name != 'api'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: false
+          tags: tamiym-${{ matrix.name }}:ci
+          build-args: |
+            APP_NAME=${{ matrix.app_name }}
+            APP_PORT=${{ matrix.app_port }}
+          cache-from: type=gha,scope=tamiym-${{ matrix.name }}
+          cache-to: type=gha,mode=min,scope=tamiym-${{ matrix.name }}
+          provenance: true
+          sbom: true
+      - name: Build api image (no push)
+        if: matrix.name == 'api'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: false
+          tags: tamiym-api:ci
+          cache-from: type=gha,scope=tamiym-api
+          cache-to: type=gha,mode=min,scope=tamiym-api
+          provenance: true
+          sbom: true
+
   build:
     name: Production Build
     runs-on: ubuntu-latest

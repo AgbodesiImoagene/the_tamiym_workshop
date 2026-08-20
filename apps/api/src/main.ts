@@ -10,9 +10,12 @@ import {
   shutdownOpenTelemetry,
   startOpenTelemetry,
 } from './observability/otel';
+import { resolveApiRole, roleIncludes } from './runtime/api-role';
 
 async function bootstrap() {
   await startOpenTelemetry();
+
+  const apiRole = resolveApiRole();
 
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
@@ -103,8 +106,14 @@ async function bootstrap() {
   app.enableShutdownHooks();
   await app.listen(port);
   const logger = app.get(Logger);
-  logger.log(`Application is running on: http://localhost:${port}`);
-  logger.log(`Swagger documentation: http://localhost:${port}/docs`);
+  logger.log(`API_ROLE=${apiRole} listening on http://localhost:${port}`);
+  if (roleIncludes(apiRole, 'http')) {
+    logger.log(`Swagger documentation: http://localhost:${port}/docs`);
+  } else {
+    logger.log(
+      `HTTP surface is internal/health-only for role=${apiRole}; edge must not route public traffic here`,
+    );
+  }
 }
 
 void bootstrap().catch(async (error) => {
