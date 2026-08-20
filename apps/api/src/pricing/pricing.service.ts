@@ -16,6 +16,7 @@ import type {
 } from './pricing.types';
 import type { QuoteRequestDto } from './dto/quote-request.dto';
 import { roundToMinor, roundToDisplayGranularity } from './currency-rounding';
+import { PRICING_POLICY_VERSION } from './pricing-policy';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
 import { CampaignStatus } from '../generated/prisma/enums';
@@ -156,7 +157,11 @@ export class PricingService {
     }
 
     const subtotalAmount = roundToMinor(
-      lineOutputs.reduce((sum, l) => sum + l.lineTotal, 0),
+      lineOutputs.reduce(
+        (sum, l) =>
+          sum + (l.unitFinalPrice + l.unitDiscountAmount) * l.quantity,
+        0,
+      ),
       currency,
     );
     const discountAmount = roundToMinor(
@@ -174,21 +179,35 @@ export class PricingService {
       shipmentSummary,
     );
     const shippingFee = shippingBreakdown ? shippingBreakdown.appliedFee : 0;
-    const taxableAmount =
-      subtotalAmount -
-      discountAmount +
-      (siteSettings.vatAppliesToShipping ? shippingFee : 0);
-    const vatAmount = roundToMinor(
-      Number(siteSettings.vatRate) * taxableAmount,
+    // subtotal is pre-discount; net merchandise = subtotal - discount (= sum of lineTotals).
+    const merchandiseNet = roundToMinor(
+      subtotalAmount - discountAmount,
       currency,
     );
-    const totalBeforeDisplayRounding =
-      subtotalAmount -
-      discountAmount +
-      shippingFee +
-      (siteSettings.pricesIncludeVat ? 0 : vatAmount);
+    const taxableAmount =
+      merchandiseNet + (siteSettings.vatAppliesToShipping ? shippingFee : 0);
+    const vatRate = Number(siteSettings.vatRate);
+    // Inclusive: extract embedded VAT. Exclusive: compute add-on VAT.
+    const vatAmount = roundToMinor(
+      siteSettings.pricesIncludeVat
+        ? vatRate === 0
+          ? 0
+          : (taxableAmount * vatRate) / (1 + vatRate)
+        : vatRate * taxableAmount,
+      currency,
+    );
+    const totalBeforeDisplayRounding = roundToMinor(
+      merchandiseNet +
+        shippingFee +
+        (siteSettings.pricesIncludeVat ? 0 : vatAmount),
+      currency,
+    );
     const totalAmount = roundToDisplayGranularity(
       totalBeforeDisplayRounding,
+      currency,
+    );
+    const roundingAdjustment = roundToMinor(
+      totalAmount - totalBeforeDisplayRounding,
       currency,
     );
 
@@ -205,6 +224,12 @@ export class PricingService {
       shippingFee,
       vatAmount,
       totalAmount,
+      totalBeforeDisplayRounding,
+      roundingAdjustment,
+      vatRate,
+      pricesIncludeVat: siteSettings.pricesIncludeVat,
+      vatAppliesToShipping: siteSettings.vatAppliesToShipping,
+      pricingPolicyVersion: PRICING_POLICY_VERSION,
       shippingBreakdown,
     };
   }
@@ -569,8 +594,9 @@ export class PricingService {
 
   /**
    * Find an active discount linked to this campaign and apply it to the unit price.
-   * Uses the first matching DiscountCampaign with valid dates; applies PERCENTAGE or FIXED per unit.
-   * Returns amount and discountId for OrderDiscount persistence.
+   * Fail-closed when more than one active matching DiscountCampaign exists (TTW-024).
+   * Prefer deterministic order by discount id only for stable error messaging; never
+   * silently pick an arbitrary row under overlap.
    */
   private async computeCampaignDiscount(
     campaignId: string,
@@ -579,7 +605,7 @@ export class PricingService {
     currency: string,
   ): Promise<{ amount: number; discountId: string | null }> {
     const now = new Date();
-    const link = await this.prisma.discountCampaign.findFirst({
+    const links = await this.prisma.discountCampaign.findMany({
       where: {
         campaignId,
         discount: {
@@ -594,8 +620,14 @@ export class PricingService {
         },
       },
       include: { discount: true },
+      orderBy: { discountId: 'asc' },
     });
-    const discount = link?.discount;
+    if (links.length > 1) {
+      throw new BadRequestException(
+        `Campaign ${campaignId} has ${links.length} active discounts in effect; exactly one is allowed. Resolve overlapping discounts before quoting.`,
+      );
+    }
+    const discount = links[0]?.discount;
     if (!discount) return { amount: 0, discountId: null };
     let amount = 0;
     if (discount.valuePercent != null) {
@@ -604,9 +636,9 @@ export class PricingService {
         currency,
       );
     } else if (discount.valueAmount != null && discount.currency === currency) {
-      const fixedPerUnit = Number(discount.valueAmount) / item.quantity;
+      // FIXED is per-unit (pricing-strategy); cap at unit before discount.
       amount = roundToMinor(
-        Math.min(fixedPerUnit, unitBeforeDiscount),
+        Math.min(Number(discount.valueAmount), unitBeforeDiscount),
         currency,
       );
     }

@@ -38,6 +38,12 @@ const mockQuote = {
   shippingFee: 2500,
   vatAmount: 0,
   totalAmount: 12500,
+  totalBeforeDisplayRounding: 12500,
+  roundingAdjustment: 0,
+  vatRate: 0.075,
+  pricesIncludeVat: true,
+  vatAppliesToShipping: true,
+  pricingPolicyVersion: 'ngn-v1-interim-2026-08',
   shippingBreakdown: {
     version: 2,
     provider: 'INTERNAL',

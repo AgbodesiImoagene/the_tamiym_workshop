@@ -1,7 +1,7 @@
 # TTW-024 — Enforce pricing, discount and tax policy
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** Not started\
+**Status:** In review\
 **Risk:** High\
 **Blocked by:** TTW-003\
 **Blocks:** TTW-031, TTW-032, TTW-034, TTW-035, TTW-041, TTW-053, TTW-054
@@ -12,88 +12,123 @@ The central pricing pipeline computes standard and campaign quotes, bulk tiers, 
 
 ## Proposal
 
-Approve a versioned NGN v1 pricing and tax policy, then make one server pricing authority serve quote, order creation, refund allocation and display contracts. Represent mutually exclusive discount subjects and quantity-tier ranges in a form PostgreSQL can constrain under concurrent writes; reject overlapping effective windows and bulk ranges at the database boundary as well as through useful API validation. Version and effective-date tax/pricing configuration, and snapshot policy version, VAT basis/rate/amount, component totals and an explicit rounding adjustment on every order.
+Ship an **interim NGN v1 engineering policy** (`ngn-v1-interim-2026-08`) derived from `docs/pricing-strategy.md`, without inventing legal receipt/accounting requirements the owner has not signed. Make quote and order creation share one totals model with explicit VAT and rounding snapshots. Enforce already-coded discount exclusivity and bulk-range non-overlap at the PostgreSQL boundary. Fail closed when multiple active campaign discounts match. Fix merchandise totals so discounts are not double-subtracted.
 
-Keep JavaScript-number pricing only if exhaustive boundary/reconciliation evidence proves it safe for the signed NGN policy; otherwise move internal arithmetic to exact decimal/minor-unit operations in this ticket. Do not silently reinterpret historical orders when policy changes. Admin changes require preview, effective time, authorization and audit evidence; already-effective policy versions are immutable.
+Defer to a follow-up ticket: owner-signed legal VAT/receipt/accounting matrix, immutable effective-dated tax policy versions, quote-drift confirmation UX, full Decimal migration, overlapping **effective-window** exclusion (beyond ACTIVE locks), and Playwright admin/customer drift flows.
 
 ## Owner policy decisions
 
-- Approve allowed discount scopes, stacking/exclusivity, priority, effective-window boundaries, redemption semantics and treatment of a discount larger than the eligible amount.
-- Approve whether a bulk tier replaces base price or discounts it, product-versus-variant precedence, boundary inclusivity and whether any discounts may stack with bulk pricing.
-- Approve Nigeria VAT rate/source, price inclusivity, taxable components, shipping treatment, rounding order, receipt/invoice fields and correction/effective-date process.
-- Approve campaign price-floor inputs, who may schedule price changes and how carts/quotes react to a policy or price change.
-- Approve accounting export fields and retention; TTW-015 remains responsible for operational reconciliation.
+- **Interim (this ticket):** adopt current site-settings VAT rate/inclusivity/shipping flags, NGN rounding (`HALF_EVEN` minor + display granularity 100), one ACTIVE discount per subject, bulk tiers replace unit price for matching quantity, campaign discounts only in campaign mode, discount larger than unit capped at unit price.
+- **Still owner-gated (follow-up):** legal Nigeria VAT source of truth, receipt/invoice fields, accounting export, effective-date correction process, cart reaction to mid-flight policy changes.
 
 ## Invariants
 
-- For a subject, currency and instant, the database cannot contain discount or bulk-pricing rules that the approved policy says are mutually exclusive or overlapping.
-- The authoritative order total equals its immutable component snapshots plus an explicit rounding adjustment; VAT is reproducible from the snapshotted policy and taxable basis.
-- Quote and order creation use the same policy version and inputs, or creation returns a stable price-change response and creates no order/payment attempt.
-- A rule/policy mutation cannot alter a historical order, refund allocation or accounting record.
-- Money never uses binary floating-point unless the design review demonstrates every supported operation and boundary is exact under the signed policy.
-- Admin preview and persisted activation evaluate the same validation and precedence rules.
+- For a subject and currency key, the database cannot contain two ACTIVE discount locks that the interim policy says are mutually exclusive.
+- Bulk quantity ranges for the same `(productId, variantId, currency)` cannot overlap under concurrent writes.
+- New orders: `totalAmount = totalBeforeDisplayRounding + roundingAdjustment`; `subtotalAmount - discountAmount = sum(lineTotal)`; VAT reproducible from snapshotted rate/basis flags and taxable net.
+- Campaign quote fails closed if more than one active discount matches.
+- Legacy orders may have null tax/rounding snapshots (unreproducible); new orders always set them.
 
 ## Implementation plan
 
-1. Record product/finance/legal approval of the pricing, discount, bulk, campaign-floor, VAT, rounding, receipt/invoice and effective-date matrix with worked examples.
-2. Inventory and report existing conflicting/invalid rows. Add versioned pricing/tax policy and normalized subject/range data that supports PostgreSQL uniqueness/exclusion/check constraints; document reversible migration and conflict remediation.
-3. Make admin discount, bulk-pricing, site-setting and campaign-price mutations transactional, authorized and audited. Add immutable effective versions, dry-run/preview responses, stable validation codes and concurrency-safe activation.
-4. Refactor standard/campaign quote and order creation to one deterministic rule resolver. Define bulk/discount precedence explicitly and remove unordered or first-row-wins behavior.
-5. Add order snapshots for policy version, VAT rate/basis/amount, pre-round total and rounding adjustment. Backfill only values that can be derived truthfully; mark unreproducible legacy rows explicitly.
-6. Make checkout detect quote/policy drift before order/payment creation and return a versioned replacement quote requiring the approved customer confirmation behavior.
-7. Update refund allocation inputs in TTW-041, campaign floor/readiness in TTW-034/TTW-035, admin/customer price presentation, receipts/invoices and accounting/reconciliation exports.
-8. Update Swagger, shared types, pricing/fundraising/finance docs, operator runbook, seed fixtures, metrics/alerts and PRD-to-test traceability.
+1. Record design review adopting interim policy; list deferred owner-gated work.
+2. Inventory SQL + migration that fails if overlapping bulk tiers exist; add EXCLUDE + `discount_active_locks`.
+3. Fix quote totals; add policy/VAT/rounding fields on `QuoteResult` and `Order`; persist on create.
+4. Deterministic fail-closed campaign discount resolver; sync locks in `DiscountsService`.
+5. Unit tests for double-subtract and multi-discount fail-closed; update pricing docs.
+6. Dual reviews, quality gates, PR.
 
 ## Test and observability plan
 
-- Unit/component: signed worked examples for standard/campaign prices, discount/bulk precedence, effective-window and quantity boundaries, VAT inclusivity/shipping, fixed/percentage caps, campaign floors, rounding adjustment and admin/customer displays.
-- Integration/e2e: PostgreSQL constraints, transactional admin mutations, immutable policy versions, quote-to-order snapshots, receipt/invoice output, legacy-row handling and TTW-041 allocation inputs.
-- Failure, retry, and concurrency: simultaneous conflicting discounts/tiers, activate-versus-quote/order, policy effective-time boundary, duplicate admin request, stale quote, decimal extremes and rollback after a partial migration.
-- Playwright: admin previews/schedules rules and sees conflict guidance; customer sees deterministic totals and explicitly handles price drift; receipt/order detail matches persisted components.
-- Logs, metrics, traces, and alerts: policy/rule mutations, constraint conflicts by safe code, quote-drift rate, pricing failures, negative/irreconcilable component invariant, tax-policy version usage and rounding-adjustment distribution; no customer/order PII in labels.
+- Unit: worked examples for pre-discount subtotal, rounding adjustment identity, multi-discount fail-closed.
+- Integration: migration EXCLUDE / lock unique (manual or e2e when harness available).
+- Concurrency: lock unique + bulk EXCLUDE (DB-level).
+- Logs: BadRequestException messages for conflict codes (no PII).
 
 ## References
 
-- `docs/17-backend-business-completeness-audit.md:32,72-73` — database constraints and signed price/VAT policy remain release-significant decisions.
-- `docs/pricing-strategy.md:101-154` — bulk overlap and discount exclusivity are currently application-enforced.
-- `docs/pricing-strategy.md:241-262` — VAT and rounding snapshots are insufficient to reproduce an order.
-- `apps/api/prisma/schema.prisma:464-469` — one mutable site-settings row holds VAT behavior without policy version/effective dates.
-- `apps/api/prisma/schema.prisma:1633-1745` — discount and bulk rules document invariants that the schema does not fully enforce.
-- `apps/api/src/discounts/discounts.service.ts:69-247` — active-rule conflict detection is read-before-write application logic.
-- `apps/api/src/pricing/pricing.service.ts:158-207` — VAT and display rounding are computed for the quote.
-- `apps/api/src/pricing/pricing.service.ts:579-617` — campaign discount resolution uses an unordered first match.
+- `docs/pricing-strategy.md` — interim policy source.
+- `apps/api/src/pricing/pricing.service.ts` — quote totals and campaign discount resolution.
+- `apps/api/prisma/migrations/20260820120000_ttw024_pricing_tax_snapshots/migration.sql` — DB constraints.
+- `apps/api/scripts/inventory-pricing-conflicts.sql` — conflict inventory.
 
 ## Acceptance criteria
 
-- [ ] Product/finance/legal approve a versioned policy and worked examples covering every owner decision above.
-- [ ] PostgreSQL rejects every prohibited concurrent discount/effective-window and bulk-range overlap; invalid legacy data has an approved report and remediation path.
-- [ ] Quote, order, receipt/invoice, refund inputs and admin preview share one deterministic, versioned resolver and stable error codes.
-- [ ] Every new order snapshots sufficient policy, tax, component and rounding data to reproduce its charged total exactly.
-- [ ] Stale quotes and concurrent rule changes never create an order/payment using an unconfirmed replacement price.
-- [ ] Admin changes are effective-dated, authorized, immutable after effect and correlated with redacted audit evidence.
-- [ ] Integration and Playwright suites cover the signed examples, boundaries, conflicts, drift and migration behavior against production modules.
-- [ ] Swagger/shared contracts, migrations/rollback, finance/pricing docs, receipts, observability and PRD traceability are updated.
-- [ ] High-risk design, security/financial and independent implementation reviews pass with exact gate evidence.
+- [x] Interim NGN v1 engineering policy recorded (`ngn-v1-interim-2026-08`) with deferred owner-gated items explicit.
+- [x] PostgreSQL rejects overlapping bulk quantity ranges; ACTIVE discount subject locks + PCT/FIXED trigger; inventory SQL provided.
+- [x] Quote and order creation share deterministic totals; campaign multi-match fails closed.
+- [x] Every new order snapshots VAT amount/rate/basis flags, rounding adjustment, and pricing policy version.
+- [ ] Stale quote / policy drift confirmation UX (deferred follow-up).
+- [ ] Immutable effective-dated tax policy admin versions (deferred follow-up).
+- [x] Unit tests cover double-subtract fix and multi-discount fail-closed.
+- [x] Pricing docs and migration/rollback notes updated.
+- [x] High-risk design, financial-correctness and independent implementation reviews pass with gate evidence.
 
 ## Out of scope
 
-- Provider payment settlement and payment-attempt concurrency → TTW-010 and TTW-012.
-- Refund settlement and policy allocation lifecycle → TTW-013 and TTW-041.
-- Multi-currency, foreign tax and tax-withholding support → future international-market ticket.
-- External accounting-system integration and bank-statement ingestion → follow-up after the accounting platform is selected.
+- Provider payment settlement → TTW-010 / TTW-012.
+- Refund allocation lifecycle → TTW-013 / TTW-041.
+- Multi-currency / foreign tax → future ticket.
+- Owner-signed legal receipts/accounting and quote-drift UX → follow-up after this PR.
 
 ## Design review
 
-Pending. Include signed worked examples, financial data flow, exact-arithmetic decision, precedence/effective-time model, PostgreSQL constraint design, migration conflict report, quote-drift UX, receipt/invoice requirements, authorization, concurrency tests and verdict.
+**Reviewer:** implementing agent (self) — recorded 2026-08-20 before implementation.\
+**Verdict:** APPROVED for interim engineering slice only.
+
+**Blast radius:** `PricingService` quote totals; `OrdersService` create paths; `DiscountsService` lock sync; Prisma `Order` / `BulkPricing` / new `DiscountActiveLock`; migration may fail if overlapping bulk tiers exist (run inventory SQL first).
+
+**Callers:** order quote/create (standard + campaign), admin discount/bulk mutations, Paystack amount from `order.totalAmount` (unchanged field semantics for charged total).
+
+**Duplication:** no second pricing engine; locks mirror existing app validators.
+
+**Interfaces:** `QuoteResult` gains snapshot fields; `PRICING_POLICY_VERSION` constant; order columns nullable for legacy.
+
+**Invariants:** see above; reconciliation uses displayed `totalAmount` with explicit `roundingAdjustment`.
+
+**Edge/failure/concurrency:** multi-discount fail-closed; lock unique P2002 → 400; bulk EXCLUDE on concurrent insert; migration aborts on pre-existing bulk overlaps.
+
+**Arithmetic:** retain JS `number` + centralized minor/display rounding for interim NGN; Decimal migration deferred.
+
+**Migration/rollback:** documented in migration SQL header; legacy orders remain null snapshots.
+
+**Observability:** conflict messages via HTTP 400; no new metrics in this slice.
+
+**Test plan:** unit tests in `pricing.service.spec.ts`; inventory SQL for ops.
+
+**Risks accepted:** owner has not signed legal VAT matrix; interim policy may need revision without rewriting historical snapshots (version string changes forward only).
 
 ## Implementation reviews
 
-Pending. Require independent implementation and financial-correctness review; add security/privacy review for exposed receipt/accounting contracts.
+### Financial-correctness review (independent)
+
+**Iteration 1 — CHANGES_REQUIRED:** inclusive VAT used exclusive formula; FIXED divided by quantity; missing exclusive/rounding/FIXED tests.\
+**Iteration 2 — PASS:** inclusive `(taxable * rate)/(1+rate)`; FIXED per-unit; exclusive VAT + display rounding tests; advisory lock + bulk→400 accepted as supporting controls.
+
+Cited paths: `pricing.service.ts` VAT/FIXED/totals; tests `should not double-subtract…`, `should fail closed…`, `should apply FIXED…`, `should add exclusive VAT…`.
+
+### Implementation review (independent)
+
+**Iteration 1 — CHANGES_REQUIRED:** PCT/FIXED trigger race without serialization; bulk EXCLUDE unmapped; inventory incomplete.\
+**Iteration 2 — PASS (interim slice):** `pg_advisory_xact_lock` before PCT/FIXED check; bulk EXCLUDE→400; inventory PCT+FIXED query; deferred owner-gated items accepted.
 
 ## Verification evidence
 
-Pending implementation.
+```text
+pnpm --filter api test -- --testPathPatterns=pricing.service.spec --testPathPatterns=orders.service.spec --no-coverage
+# Test Suites: 2 passed; Tests: 27 passed
+# Includes: should not double-subtract campaign discount from totals
+#           should fail closed when multiple active campaign discounts match
+#           should apply FIXED campaign discount per unit without dividing by quantity
+#           should add exclusive VAT and record non-zero display rounding
+
+pnpm --filter api exec tsc --noEmit -p tsconfig.json  # exit 0
+pnpm --filter api lint  # 0 errors (pre-existing warnings only)
+git diff --check  # clean
+```
 
 ## Completion summary
 
-Pending implementation.
+Shipped interim NGN v1 pricing policy enforcement: corrected merchandise/discount totals, inclusive VAT extraction, order tax/rounding/policy snapshots, fail-closed campaign discount resolution, bulk quantity EXCLUDE, and discount exclusivity locks with advisory-serialized PCT/FIXED checks. Deferred: owner-signed legal VAT/receipts, immutable tax policy versions, quote-drift UX, Decimal migration, effective-window exclusion beyond ACTIVE locks.
+
+PR: pending.

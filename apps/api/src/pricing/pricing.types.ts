@@ -57,6 +57,10 @@ export type ShippingBreakdown = ShippingQuoteBreakdown;
 export interface QuoteResult {
   currency: string;
   items: PricingLineItemOutput[];
+  /**
+   * Merchandise total before discounts (sum of unit-before-discount × quantity).
+   * Invariant: subtotalAmount - discountAmount === sum(lineTotal).
+   */
   subtotalAmount: number;
   discountAmount: number;
   /** When a campaign discount was applied, its ID for persisting OrderDiscount. */
@@ -64,7 +68,21 @@ export interface QuoteResult {
   shippingFee: number;
   /** VAT amount (already included in prices if pricesIncludeVat). */
   vatAmount: number;
+  /**
+   * Charged total after display-granularity rounding.
+   * Invariant: totalAmount === totalBeforeDisplayRounding + roundingAdjustment.
+   */
   totalAmount: number;
+  /** Component sum before display-granularity rounding. */
+  totalBeforeDisplayRounding: number;
+  /** Explicit display-rounding delta (may be negative). */
+  roundingAdjustment: number;
+  /** Site VAT rate used for this quote (e.g. 0.075). */
+  vatRate: number;
+  pricesIncludeVat: boolean;
+  vatAppliesToShipping: boolean;
+  /** Versioned interim policy id; persisted on orders for audit. */
+  pricingPolicyVersion: string;
   shippingBreakdown: ShippingBreakdown | null;
 }
 
