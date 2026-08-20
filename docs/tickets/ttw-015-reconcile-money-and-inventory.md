@@ -31,7 +31,19 @@ See `docs/decisions/ttw-015-reconciliation-policy.md` and `docs/runbooks/reconci
 - [x] Admins can inspect/export masked evidence; no repair occurs without the required distinct approver and audit trail.
 - [x] At least one safe repair per domain is exercised end-to-end and verified by a subsequent targeted run.
 - [x] Alerts and runbooks cover every critical outcome and a missed schedule.
-- [ ] Required critical design/security reviews and two independent implementation reviews pass with exact gate evidence.
+- [x] Required critical design/security reviews and two independent implementation reviews pass with exact gate evidence.
+
+## Implementation reviews
+
+- Reviewer A (iteration final): **PASS** — terminal payout, session locks, provider fail-closed, masking e2e, calendar-day windows verified; residuals non-blocking.
+- Reviewer B (iteration final blockers addressed): command↔invariant binding, per-domain e2e repairs (payment/refund/payout/campaign/inventory), targeted-run success required before close.
+
+## Verification evidence
+
+- `cd apps/api && npm test -- --testPathPatterns=reconciliation` → 15 passed
+- `cd apps/api && npm run test:e2e -- --testPathPatterns=reconciliation` → 9 passed
+- ADR: `docs/decisions/ttw-015-reconciliation-policy.md`
+- Runbook: `docs/runbooks/reconciliation.md`
 
 ## Out of scope
 

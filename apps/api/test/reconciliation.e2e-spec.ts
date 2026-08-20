@@ -359,4 +359,84 @@ describe('Reconciliation (e2e)', () => {
     });
     expect(updated.status).toBe(ReconciliationFindingStatus.WONT_FIX);
   });
+
+  it.each([
+    {
+      domain: 'PAYMENT' as const,
+      commandKey: 'payment.document_missing_claim',
+      outcome: 'MISSING_INTERNAL' as const,
+      rightLabel: 'chargeSettlementClaim',
+      sourceIds: { paymentId: 'pay-x' },
+    },
+    {
+      domain: 'REFUND' as const,
+      commandKey: 'refund.document_missing_claim',
+      outcome: 'MISSING_INTERNAL' as const,
+      rightLabel: 'refundSettlementClaim',
+      sourceIds: { refundId: 'ref-x' },
+    },
+    {
+      domain: 'PAYOUT' as const,
+      commandKey: 'payout.document_ledger_gap',
+      outcome: 'MISMATCH' as const,
+      rightLabel: 'ledgerNet',
+      sourceIds: { payoutId: 'po-x' },
+    },
+  ])(
+    'documents $domain finding with two-person WONT_FIX repair',
+    async ({ domain, commandKey, outcome, rightLabel, sourceIds }) => {
+      const passwordHash = await bcrypt.hash('TestPassword1!', 10);
+      const stamp = `${Date.now()}-${domain}`;
+      const requester = await prisma.user.create({
+        data: {
+          email: `recon-${domain}-req-${stamp}@example.com`,
+          passwordHash,
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          firstName: 'Req',
+          lastName: domain,
+        },
+      });
+      const approver = await prisma.user.create({
+        data: {
+          email: `recon-${domain}-apr-${stamp}@example.com`,
+          passwordHash,
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          firstName: 'Apr',
+          lastName: domain,
+        },
+      });
+      const run = await runs.runInternal(new Date());
+      const finding = await prisma.reconciliationFinding.create({
+        data: {
+          runId: run!.id,
+          domain,
+          outcome,
+          severity: 'CRITICAL',
+          fingerprint: `${domain}-doc-${stamp}`,
+          leftLabel: 'left',
+          leftValue: 'a',
+          rightLabel,
+          rightValue: 'b',
+          sourceIds,
+        },
+      });
+
+      const request = await repairs.requestRepair({
+        findingId: finding.id,
+        actorUserId: requester.id,
+        commandKey,
+      });
+      await repairs.approveAndApply({
+        repairId: request.id,
+        actorUserId: approver.id,
+      });
+
+      const updated = await prisma.reconciliationFinding.findUniqueOrThrow({
+        where: { id: finding.id },
+      });
+      expect(updated.status).toBe(ReconciliationFindingStatus.WONT_FIX);
+    },
+  );
 });

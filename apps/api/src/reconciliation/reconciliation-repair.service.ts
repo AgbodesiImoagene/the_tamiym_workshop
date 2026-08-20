@@ -9,6 +9,7 @@ import {
   AuditSource,
   ReconciliationDomain,
   ReconciliationFindingStatus,
+  ReconciliationOutcome,
   ReconciliationRepairStatus,
   ReconciliationRunStatus,
 } from '../generated/prisma/enums';
@@ -17,12 +18,35 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ReconciliationRunsService } from './reconciliation-runs.service';
 
-const COMMAND_BY_DOMAIN: Record<ReconciliationDomain, readonly string[]> = {
-  [ReconciliationDomain.PAYMENT]: ['payment.document_missing_claim'],
-  [ReconciliationDomain.REFUND]: ['refund.document_missing_claim'],
-  [ReconciliationDomain.PAYOUT]: ['payout.document_ledger_gap'],
-  [ReconciliationDomain.CAMPAIGN]: ['campaign.recompute_current_amount'],
-  [ReconciliationDomain.INVENTORY]: ['inventory.noop_document_drift'],
+const COMMAND_RULES: Record<
+  string,
+  {
+    domain: ReconciliationDomain;
+    outcomes?: ReconciliationOutcome[];
+    rightLabels?: string[];
+  }
+> = {
+  'payment.document_missing_claim': {
+    domain: ReconciliationDomain.PAYMENT,
+    outcomes: [ReconciliationOutcome.MISSING_INTERNAL],
+    rightLabels: ['chargeSettlementClaim'],
+  },
+  'refund.document_missing_claim': {
+    domain: ReconciliationDomain.REFUND,
+    outcomes: [ReconciliationOutcome.MISSING_INTERNAL],
+    rightLabels: ['refundSettlementClaim', 'expected'],
+  },
+  'payout.document_ledger_gap': {
+    domain: ReconciliationDomain.PAYOUT,
+  },
+  'campaign.recompute_current_amount': {
+    domain: ReconciliationDomain.CAMPAIGN,
+    outcomes: [ReconciliationOutcome.MISMATCH],
+    rightLabels: ['ledger PAYMENT_SETTLED+REFUND_APPLIED'],
+  },
+  'inventory.noop_document_drift': {
+    domain: ReconciliationDomain.INVENTORY,
+  },
 };
 
 @Injectable()
@@ -51,7 +75,7 @@ export class ReconciliationRepairService {
         'Finding is not repairable in current status',
       );
     }
-    this.assertCommandForDomain(finding.domain, params.commandKey);
+    this.assertCommandForFinding(finding, params.commandKey);
 
     const repair = await this.prisma.reconciliationRepairRequest.create({
       data: {
@@ -108,7 +132,7 @@ export class ReconciliationRepairService {
     if (!moneyOrStock) {
       throw new BadRequestException('Unsupported repair domain');
     }
-    this.assertCommandForDomain(repair.domain, repair.commandKey);
+    this.assertCommandForFinding(repair.finding, repair.commandKey);
 
     await this.prisma.reconciliationRepairRequest.update({
       where: { id: repair.id },
@@ -238,14 +262,39 @@ export class ReconciliationRepairService {
     }
   }
 
-  private assertCommandForDomain(
-    domain: ReconciliationDomain,
+  private assertCommandForFinding(
+    finding: {
+      domain: ReconciliationDomain;
+      outcome?: ReconciliationOutcome | string;
+      rightLabel?: string;
+    },
     commandKey: string,
   ) {
-    const allowed = COMMAND_BY_DOMAIN[domain] ?? [];
-    if (!allowed.includes(commandKey)) {
+    const rule = COMMAND_RULES[commandKey];
+    if (!rule) {
+      throw new BadRequestException(`Unknown repair command: ${commandKey}`);
+    }
+    if (rule.domain !== finding.domain) {
       throw new BadRequestException(
-        `Command ${commandKey} is not allowed for domain ${domain}`,
+        `Command ${commandKey} is not allowed for domain ${finding.domain}`,
+      );
+    }
+    if (
+      rule.outcomes &&
+      finding.outcome &&
+      !rule.outcomes.includes(finding.outcome as ReconciliationOutcome)
+    ) {
+      throw new BadRequestException(
+        `Command ${commandKey} is not allowed for outcome ${finding.outcome}`,
+      );
+    }
+    if (
+      rule.rightLabels &&
+      finding.rightLabel &&
+      !rule.rightLabels.includes(finding.rightLabel)
+    ) {
+      throw new BadRequestException(
+        `Command ${commandKey} is not allowed for finding rightLabel ${finding.rightLabel}`,
       );
     }
   }

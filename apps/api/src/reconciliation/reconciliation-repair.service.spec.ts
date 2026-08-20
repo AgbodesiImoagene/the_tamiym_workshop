@@ -81,6 +81,8 @@ describe('ReconciliationRepairService', () => {
       finding: {
         id: 'f1',
         domain: ReconciliationDomain.CAMPAIGN,
+        outcome: 'MISMATCH',
+        rightLabel: 'ledger PAYMENT_SETTLED+REFUND_APPLIED',
         sourceIds: { campaignId: 'c1' },
         leftValue: '10',
         rightValue: '12',
@@ -104,6 +106,8 @@ describe('ReconciliationRepairService', () => {
       finding: {
         id: 'f1',
         domain: ReconciliationDomain.CAMPAIGN,
+        outcome: 'MISMATCH',
+        rightLabel: 'ledger PAYMENT_SETTLED+REFUND_APPLIED',
         sourceIds: { campaignId: 'c1' },
         leftValue: '10',
         rightValue: '12',
@@ -142,6 +146,8 @@ describe('ReconciliationRepairService', () => {
       finding: {
         id: 'f1',
         domain: ReconciliationDomain.PAYMENT,
+        outcome: 'MISSING_INTERNAL',
+        rightLabel: 'chargeSettlementClaim',
         sourceIds: { paymentId: 'pay1' },
         leftValue: 'x',
         rightValue: 'y',
@@ -152,6 +158,31 @@ describe('ReconciliationRepairService', () => {
     await expect(
       service.approveAndApply({ repairId: 'rep1', actorUserId: 'admin-b' }),
     ).rejects.toThrow(/not allowed for domain/i);
+  });
+
+  it('rejects payment document command on order mismatch finding', async () => {
+    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+      id: 'rep1',
+      status: ReconciliationRepairStatus.REQUESTED,
+      requestedByUserId: 'admin-a',
+      domain: ReconciliationDomain.PAYMENT,
+      commandKey: 'payment.document_missing_claim',
+      findingId: 'f1',
+      finding: {
+        id: 'f1',
+        domain: ReconciliationDomain.PAYMENT,
+        outcome: 'MISMATCH',
+        rightLabel: 'order.status/paymentStatus',
+        sourceIds: { paymentId: 'pay1' },
+        leftValue: 'SUCCEEDED',
+        rightValue: 'DRAFT/PENDING',
+        fingerprint: 'fp1',
+      },
+    });
+
+    await expect(
+      service.approveAndApply({ repairId: 'rep1', actorUserId: 'admin-b' }),
+    ).rejects.toThrow(/not allowed for outcome/i);
   });
 
   it('marks WONT_FIX for payment.document_missing_claim', async () => {
@@ -165,6 +196,8 @@ describe('ReconciliationRepairService', () => {
       finding: {
         id: 'f1',
         domain: ReconciliationDomain.PAYMENT,
+        outcome: 'MISSING_INTERNAL',
+        rightLabel: 'chargeSettlementClaim',
         sourceIds: { paymentId: 'pay1' },
         leftValue: 'SUCCEEDED',
         rightValue: 'missing',
@@ -187,38 +220,58 @@ describe('ReconciliationRepairService', () => {
   });
 
   it.each([
-    ['refund.document_missing_claim', ReconciliationDomain.REFUND],
-    ['payout.document_ledger_gap', ReconciliationDomain.PAYOUT],
-    ['inventory.noop_document_drift', ReconciliationDomain.INVENTORY],
-  ] as const)('marks WONT_FIX for %s', async (commandKey, domain) => {
-    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
-      id: 'rep1',
-      status: ReconciliationRepairStatus.REQUESTED,
-      requestedByUserId: 'admin-a',
-      domain,
-      commandKey,
-      findingId: 'f1',
-      finding: {
-        id: 'f1',
+    [
+      'refund.document_missing_claim',
+      ReconciliationDomain.REFUND,
+      'MISSING_INTERNAL',
+      'refundSettlementClaim',
+    ],
+    [
+      'payout.document_ledger_gap',
+      ReconciliationDomain.PAYOUT,
+      'MISMATCH',
+      'ledgerNet',
+    ],
+    [
+      'inventory.noop_document_drift',
+      ReconciliationDomain.INVENTORY,
+      'MISMATCH',
+      'sum(movement.reservedDelta)',
+    ],
+  ] as const)(
+    'marks WONT_FIX for %s',
+    async (commandKey, domain, outcome, rightLabel) => {
+      prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+        id: 'rep1',
+        status: ReconciliationRepairStatus.REQUESTED,
+        requestedByUserId: 'admin-a',
         domain,
-        sourceIds: { refundId: 'r1', payoutId: 'p1', variantId: 'v1' },
-        leftValue: 'x',
-        rightValue: 'y',
-        fingerprint: 'fp1',
-      },
-    });
+        commandKey,
+        findingId: 'f1',
+        finding: {
+          id: 'f1',
+          domain,
+          outcome,
+          rightLabel,
+          sourceIds: { refundId: 'r1', payoutId: 'p1', variantId: 'v1' },
+          leftValue: 'x',
+          rightValue: 'y',
+          fingerprint: 'fp1',
+        },
+      });
 
-    await service.approveAndApply({
-      repairId: 'rep1',
-      actorUserId: 'admin-b',
-    });
+      await service.approveAndApply({
+        repairId: 'rep1',
+        actorUserId: 'admin-b',
+      });
 
-    expect(prisma.reconciliationFinding.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: ReconciliationFindingStatus.WONT_FIX,
+      expect(prisma.reconciliationFinding.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: ReconciliationFindingStatus.WONT_FIX,
+          }),
         }),
-      }),
-    );
-  });
+      );
+    },
+  );
 });
