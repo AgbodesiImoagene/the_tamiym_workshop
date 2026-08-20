@@ -13,6 +13,7 @@ import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
 import { ModerationStatus } from '../generated/prisma/enums';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { hashDesignShareToken } from './design-share.crypto';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -47,26 +48,37 @@ describe('DesignsService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let moderationService: jest.Mocked<ModerationService>;
   let s3: jest.Mocked<S3Service>;
+  let config: { get: jest.Mock };
 
   beforeEach(async () => {
-    const mockPrisma = {
-      design: {
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-      },
-      designView: {
-        upsert: jest.fn().mockResolvedValue({}),
-        createMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-      product: {
-        findUnique: jest.fn(),
-      },
-      productView: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
+    const mockPrisma: Record<string, unknown> = {};
+    mockPrisma.$transaction = jest.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) => fn(mockPrisma),
+    );
+    mockPrisma.design = {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+    mockPrisma.designShareLink = {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    };
+    mockPrisma.designView = {
+      upsert: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    mockPrisma.product = {
+      findUnique: jest.fn(),
+    };
+    mockPrisma.productView = {
+      findMany: jest.fn().mockResolvedValue([]),
     };
 
     const mockModeration = {
@@ -82,6 +94,16 @@ describe('DesignsService', () => {
       }),
     };
 
+    config = {
+      get: jest.fn((key: string) => {
+        if (key === 'S3_PUBLIC_URL') return 'https://cdn.example.com';
+        if (key === 'S3_BUCKET') return 'test-bucket';
+        if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN')
+          return 'https://app.example.com';
+        return undefined;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DesignsService,
@@ -94,13 +116,7 @@ describe('DesignsService', () => {
         },
         {
           provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'S3_PUBLIC_URL') return 'https://cdn.example.com';
-              if (key === 'S3_BUCKET') return 'test-bucket';
-              return undefined;
-            }),
-          },
+          useValue: config,
         },
       ],
     }).compile();
@@ -580,25 +596,112 @@ describe('DesignsService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // generateShareToken / findByShareToken
+  // createShareLink / findByShareToken
   // -------------------------------------------------------------------------
 
-  describe('generateShareToken', () => {
-    it('generates a token and returns shareUrl', async () => {
+  describe('createShareLink', () => {
+    it('creates a digested link and returns shareUrl from configured origin', async () => {
       (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
-      (prisma.design.update as jest.Mock).mockResolvedValue({
-        ...mockDesign,
-        shareToken: 'abc123def456',
+      (prisma.designShareLink.create as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() + 7 * 86400000),
+        policyVersion: 'design-share-policy/v1-interim-2026-08-20',
       });
+      (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
 
-      const result = await service.generateShareToken(
+      const result = await service.createShareLink('user-1', 'design-1', 7);
+
+      expect(result.shareToken.length).toBeGreaterThan(20);
+      expect(result.shareUrl).toContain(
+        'https://app.example.com/design/shared/',
+      );
+      expect(prisma.designShareLink.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tokenHash: hashDesignShareToken(result.shareToken),
+          }),
+        }),
+      );
+    });
+
+    it('lists share links without plaintext', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.designShareLink.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'link-1',
+          policyVersion: 'design-share-policy/v1-interim-2026-08-20',
+          expiresAt: new Date(),
+          revokedAt: null,
+          lastAccessedAt: null,
+          createdAt: new Date(),
+        },
+      ]);
+      const rows = await service.listShareLinks('user-1', 'design-1');
+      expect(rows[0].id).toBe('link-1');
+      expect(rows[0]).not.toHaveProperty('tokenHash');
+    });
+
+    it('idempotently revokes a share link', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.designShareLink.findFirst as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        revokedAt: null,
+      });
+      (prisma.designShareLink.update as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        revokedAt: new Date('2026-08-20T00:00:00Z'),
+      });
+      const result = await service.revokeShareLink(
         'user-1',
         'design-1',
-        'https://app.example.com',
+        'link-1',
       );
+      expect(result.revokedAt).toBeTruthy();
+    });
 
-      expect(result.shareToken).toBeDefined();
+    it('rejects invalid ttlDays', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      await expect(
+        service.createShareLink('user-1', 'design-1', 14),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('generateShareToken delegates to createShareLink', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.designShareLink.create as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() + 7 * 86400000),
+        policyVersion: 'design-share-policy/v1-interim-2026-08-20',
+      });
+      (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
+      const result = await service.generateShareToken('user-1', 'design-1');
       expect(result.shareUrl).toContain('/design/shared/');
+    });
+
+    it('returns existing revokedAt without updating again', async () => {
+      const revokedAt = new Date('2026-01-01T00:00:00Z');
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.designShareLink.findFirst as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        revokedAt,
+      });
+      const result = await service.revokeShareLink(
+        'user-1',
+        'design-1',
+        'link-1',
+      );
+      expect(result.revokedAt).toEqual(revokedAt);
+      expect(prisma.designShareLink.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-APPROVED designs', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        moderationStatus: ModerationStatus.PENDING,
+      });
+      await expect(
+        service.createShareLink('user-1', 'design-1', 7),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ForbiddenException for wrong owner', async () => {
@@ -607,47 +710,77 @@ describe('DesignsService', () => {
         userId: 'other',
       });
       await expect(
-        service.generateShareToken(
-          'user-1',
-          'design-1',
-          'https://app.example.com',
-        ),
+        service.createShareLink('user-1', 'design-1', 7),
       ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('findByShareToken', () => {
-    it('returns design for a valid non-expired token', async () => {
-      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
-        ...mockDesign,
-        shareToken: 'abc123',
-        shareTokenExpiresAt: null,
-        product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
-        views: [],
+    it('returns allowlisted fields for a valid link', async () => {
+      (prisma.designShareLink.findUnique as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+        design: {
+          ...mockDesign,
+          product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
+          views: [],
+        },
       });
+      (prisma.designShareLink.update as jest.Mock).mockResolvedValue({});
 
-      const result = await service.findByShareToken('abc123');
-      expect(result.shareToken).toBe('abc123');
+      const result = await service.findByShareToken(
+        'abcdefghijklmnopqrstuvwxyz0123456789',
+      );
+      expect(result.id).toBe('design-1');
+      expect(result).not.toHaveProperty('shareToken');
+      expect(result).not.toHaveProperty('moderationStatus');
+    });
+
+    it('throws NotFoundException for short tokens', async () => {
+      await expect(service.findByShareToken('short')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.designShareLink.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for revoked links', async () => {
+      (prisma.designShareLink.findUnique as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: new Date(),
+        design: {
+          ...mockDesign,
+          product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
+          views: [],
+        },
+      });
+      await expect(
+        service.findByShareToken('abcdefghijklmnopqrstuvwxyz0123456789'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException for unknown token', async () => {
-      (prisma.design.findUnique as jest.Mock).mockResolvedValue(null);
-      await expect(service.findByShareToken('unknown')).rejects.toThrow(
-        NotFoundException,
-      );
+      (prisma.designShareLink.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.findByShareToken('abcdefghijklmnopqrstuvwxyz0123456789'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException for expired token', async () => {
-      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
-        ...mockDesign,
-        shareToken: 'abc123',
-        shareTokenExpiresAt: new Date(Date.now() - 1000),
-        product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
-        views: [],
+      (prisma.designShareLink.findUnique as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() - 1000),
+        revokedAt: null,
+        design: {
+          ...mockDesign,
+          product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
+          views: [],
+        },
       });
-      await expect(service.findByShareToken('abc123')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.findByShareToken('abcdefghijklmnopqrstuvwxyz0123456789'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

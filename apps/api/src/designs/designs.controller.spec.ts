@@ -24,6 +24,9 @@ describe('DesignsController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      createShareLink: jest.fn(),
+      listShareLinks: jest.fn(),
+      revokeShareLink: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -108,6 +111,47 @@ describe('DesignsController', () => {
       await controller.remove(user, 'design-1');
 
       expect(designsService.remove).toHaveBeenCalledWith('user-1', 'design-1');
+    });
+  });
+
+  describe('share lifecycle', () => {
+    it('creates a share link', async () => {
+      designsService.createShareLink.mockResolvedValue({
+        id: 'link-1',
+        shareToken: 'tok',
+        shareUrl: 'https://app.example.com/design/shared/tok',
+      } as never);
+      const user = { id: 'user-1' } as never;
+      await controller.share(user, 'design-1', { ttlDays: 7 });
+      expect(designsService.createShareLink).toHaveBeenCalledWith(
+        'user-1',
+        'design-1',
+        7,
+      );
+    });
+
+    it('lists share links', async () => {
+      designsService.listShareLinks.mockResolvedValue([] as never);
+      const user = { id: 'user-1' } as never;
+      await controller.listShareLinks(user, 'design-1');
+      expect(designsService.listShareLinks).toHaveBeenCalledWith(
+        'user-1',
+        'design-1',
+      );
+    });
+
+    it('revokes a share link', async () => {
+      designsService.revokeShareLink.mockResolvedValue({
+        id: 'link-1',
+        revokedAt: new Date(),
+      } as never);
+      const user = { id: 'user-1' } as never;
+      await controller.revokeShareLink(user, 'design-1', 'link-1');
+      expect(designsService.revokeShareLink).toHaveBeenCalledWith(
+        'user-1',
+        'design-1',
+        'link-1',
+      );
     });
   });
 });

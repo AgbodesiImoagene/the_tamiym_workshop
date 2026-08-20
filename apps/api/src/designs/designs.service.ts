@@ -5,7 +5,6 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
@@ -18,6 +17,16 @@ import {
   ADMIN_NOTIF_DESIGN_MODERATION_UPDATED,
   ADMIN_NOTIF_DESIGN_SUBMITTED,
 } from '../admin-notifications/admin-notification-events';
+import {
+  DESIGN_SHARE_ALLOWED_TTL_DAYS,
+  DESIGN_SHARE_DEFAULT_TTL_DAYS,
+  DESIGN_SHARE_POLICY_VERSION,
+  DESIGN_SHARE_PUBLIC_ORIGIN_ENV,
+} from './design-share.constants';
+import {
+  hashDesignShareToken,
+  mintDesignShareToken,
+} from './design-share.crypto';
 
 type DesignDataViews = Record<
   string,
@@ -561,60 +570,188 @@ export class DesignsService {
   }
 
   /**
-   * Generate (or regenerate) a share token for a design. Returns the token and
-   * a full share URL. Tokens do not expire by default.
+   * Create a digested, expiring share link for an owned APPROVED design.
+   * Plaintext bearer is returned once; URL uses configured public origin.
    */
+  async createShareLink(
+    userId: string,
+    designId: string,
+    ttlDays: number = DESIGN_SHARE_DEFAULT_TTL_DAYS,
+  ): Promise<{
+    id: string;
+    shareToken: string;
+    shareUrl: string;
+    expiresAt: Date;
+    policyVersion: string;
+  }> {
+    const design = await this.findOne(userId, designId);
+    if (design.moderationStatus !== ModerationStatus.APPROVED) {
+      throw new BadRequestException(
+        'Only APPROVED designs can be shared publicly',
+      );
+    }
+    if (
+      !(DESIGN_SHARE_ALLOWED_TTL_DAYS as readonly number[]).includes(ttlDays)
+    ) {
+      throw new BadRequestException(
+        `ttlDays must be one of: ${DESIGN_SHARE_ALLOWED_TTL_DAYS.join(', ')}`,
+      );
+    }
+
+    const shareToken = mintDesignShareToken();
+    const tokenHash = hashDesignShareToken(shareToken);
+    const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+    const link = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.designShareLink.create({
+        data: {
+          designId,
+          tokenHash,
+          policyVersion: DESIGN_SHARE_POLICY_VERSION,
+          expiresAt,
+        },
+      });
+      // Clear any legacy plaintext Design.shareToken left from pre-TTW-026.
+      await tx.design.update({
+        where: { id: designId },
+        data: { shareToken: null, shareTokenExpiresAt: null },
+      });
+      return created;
+    });
+
+    return {
+      id: link.id,
+      shareToken,
+      shareUrl: `${this.resolveSharePublicOrigin()}/design/shared/${shareToken}`,
+      expiresAt: link.expiresAt,
+      policyVersion: link.policyVersion,
+    };
+  }
+
+  /** @deprecated Use createShareLink — kept name for call-site migration. */
   async generateShareToken(
     userId: string,
     id: string,
-    baseUrl: string,
+    _baseUrl?: string,
   ): Promise<{ shareToken: string; shareUrl: string }> {
-    await this.findOne(userId, id);
+    const created = await this.createShareLink(
+      userId,
+      id,
+      DESIGN_SHARE_DEFAULT_TTL_DAYS,
+    );
+    return { shareToken: created.shareToken, shareUrl: created.shareUrl };
+  }
 
-    const shareToken = randomBytes(9).toString('base64url').slice(0, 12);
-    await this.prisma.design.update({
-      where: { id },
-      data: { shareToken, shareTokenExpiresAt: null },
+  listShareLinks(userId: string, designId: string) {
+    return this.findOne(userId, designId).then(() =>
+      this.prisma.designShareLink.findMany({
+        where: { designId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          policyVersion: true,
+          expiresAt: true,
+          revokedAt: true,
+          lastAccessedAt: true,
+          createdAt: true,
+        },
+      }),
+    );
+  }
+
+  async revokeShareLink(
+    userId: string,
+    designId: string,
+    linkId: string,
+  ): Promise<{ id: string; revokedAt: Date }> {
+    await this.findOne(userId, designId);
+    const existing = await this.prisma.designShareLink.findFirst({
+      where: { id: linkId, designId },
     });
-
-    const shareUrl = `${baseUrl}/design/shared/${shareToken}`;
-    return { shareToken, shareUrl };
+    if (!existing) throw new NotFoundException('Share link not found');
+    if (existing.revokedAt) {
+      return { id: existing.id, revokedAt: existing.revokedAt };
+    }
+    const updated = await this.prisma.designShareLink.update({
+      where: { id: linkId },
+      data: { revokedAt: new Date() },
+    });
+    return { id: updated.id, revokedAt: updated.revokedAt! };
   }
 
   /**
-   * Find a design by its share token (public — no auth required). Returns only
-   * safe fields — moderationNotes and userId are excluded.
+   * Public share lookup by bearer token. Uniform NotFound for every deny path.
+   * Does not return the bearer, owner id, or moderation notes.
    */
   async findByShareToken(token: string) {
-    const design = await this.prisma.design.findUnique({
-      where: { shareToken: token },
+    if (!token || token.length < 16 || token.length > 128) {
+      throw new NotFoundException('Shared design not found');
+    }
+    const tokenHash = hashDesignShareToken(token);
+    const link = await this.prisma.designShareLink.findUnique({
+      where: { tokenHash },
       select: {
         id: true,
-        name: true,
-        designData: true,
-        thumbnailUrl: true,
-        moderationStatus: true,
-        shareToken: true,
-        shareTokenExpiresAt: true,
-        createdAt: true,
-        product: { select: { id: true, name: true, slug: true } },
-        views: {
+        expiresAt: true,
+        revokedAt: true,
+        design: {
           select: {
             id: true,
-            productViewId: true,
-            isUsed: true,
-            layerCount: true,
+            name: true,
+            designData: true,
+            thumbnailUrl: true,
+            moderationStatus: true,
+            createdAt: true,
+            product: { select: { id: true, name: true, slug: true } },
+            views: {
+              select: {
+                id: true,
+                productViewId: true,
+                isUsed: true,
+                layerCount: true,
+              },
+            },
           },
         },
       },
     });
 
-    if (!design) throw new NotFoundException('Shared design not found');
-
-    if (design.shareTokenExpiresAt && design.shareTokenExpiresAt < new Date()) {
-      throw new NotFoundException('Share link has expired');
+    const deny =
+      !link ||
+      !!link.revokedAt ||
+      link.expiresAt.getTime() <= Date.now() ||
+      link.design.moderationStatus !== ModerationStatus.APPROVED;
+    if (deny) {
+      throw new NotFoundException('Shared design not found');
     }
 
-    return design;
+    await this.prisma.designShareLink.update({
+      where: { id: link.id },
+      data: { lastAccessedAt: new Date() },
+    });
+
+    const { moderationStatus: _status, ...safe } = link.design;
+    void _status;
+    return safe;
+  }
+
+  private resolveSharePublicOrigin(): string {
+    const configured = this.config
+      .get<string>(DESIGN_SHARE_PUBLIC_ORIGIN_ENV)
+      ?.trim();
+    if (configured) {
+      try {
+        return new URL(configured).origin;
+      } catch {
+        throw new BadRequestException(
+          `${DESIGN_SHARE_PUBLIC_ORIGIN_ENV} must be a valid absolute origin URL`,
+        );
+      }
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException(
+        `${DESIGN_SHARE_PUBLIC_ORIGIN_ENV} must be configured in production`,
+      );
+    }
+    return 'http://localhost:3002';
   }
 }
