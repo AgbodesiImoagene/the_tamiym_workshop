@@ -7,17 +7,21 @@ terraform {
   }
 }
 
-# Destroy-friendly Spaces layout for temporary-validation (no prevent_destroy).
-# Production uses ../spaces_protected with lifecycle.prevent_destroy = true.
+# Production Spaces buckets — OpenTofu prevent_destroy is a literal (cannot be
+# a variable). temporary-validation uses ../spaces without this lifecycle.
 
 resource "digitalocean_spaces_bucket" "originals" {
   name          = "${var.name_prefix}-originals"
   region        = var.region
   acl           = "private"
-  force_destroy = var.force_destroy
+  force_destroy = false
 
   versioning {
     enabled = var.enable_versioning
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -25,10 +29,14 @@ resource "digitalocean_spaces_bucket" "quarantine" {
   name          = "${var.name_prefix}-quarantine"
   region        = var.region
   acl           = "private"
-  force_destroy = var.force_destroy
+  force_destroy = false
 
   versioning {
     enabled = var.enable_versioning
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -36,10 +44,14 @@ resource "digitalocean_spaces_bucket" "derived" {
   name          = "${var.name_prefix}-derived"
   region        = var.region
   acl           = "public-read"
-  force_destroy = var.force_destroy
+  force_destroy = false
 
   versioning {
     enabled = var.enable_versioning
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 
   dynamic "cors_rule" {

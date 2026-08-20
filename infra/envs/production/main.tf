@@ -85,19 +85,19 @@ module "postgres" {
   deletion_protection = true
   maintenance_day     = var.postgres_maintenance_day
   maintenance_hour    = var.postgres_maintenance_hour
-  # Trusted sources: Droplet tags from labeling + VPC CIDR (never 0.0.0.0/0).
-  firewall_rules = concat(
-    [for t in module.labeling.tag_list : { type = "tag", value = t }],
-    [{ type = "ip_addr", value = var.vpc_ip_range }]
-  )
+  # Trusted sources: VPC CIDR only at launch (never 0.0.0.0/0).
+  # Droplet-scoped tags/IDs are added in TTW-063 once the app Droplet exists —
+  # do not reuse shared labeling tags (they are account-wide and cross env).
+  firewall_rules = [
+    { type = "ip_addr", value = var.vpc_ip_range }
+  ]
 }
 
 module "spaces" {
-  source = "../../modules/spaces"
+  source = "../../modules/spaces_protected"
 
   name_prefix       = var.spaces_name_prefix
   region            = var.spaces_region
-  force_destroy     = false
   enable_versioning = true
   cors_allowed_origins = [
     "https://${var.web_hostname}",

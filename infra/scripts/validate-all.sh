@@ -44,6 +44,7 @@ validate_root "modules/firewall"
 validate_root "modules/reserved_ip"
 validate_root "modules/postgres"
 validate_root "modules/spaces"
+validate_root "modules/spaces_protected"
 
 # Environment compositions.
 validate_root "envs/production"

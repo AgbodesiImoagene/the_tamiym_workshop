@@ -1,21 +1,12 @@
 variable "name_prefix" {
-  description = "Globally unique prefix for bucket names (e.g. ttw-tmpval)."
+  description = "Globally unique prefix for bucket names (e.g. ttw-prod)."
   type        = string
 }
 
 variable "region" {
-  description = <<-EOT
-    Spaces region. Spaces is not available in lon1; use an EU Spaces region
-    (ams3 recommended near London primary, or fra1 for recovery alignment).
-  EOT
+  description = "Spaces region (ams3 near London primary)."
   type        = string
   default     = "ams3"
-}
-
-variable "force_destroy" {
-  description = "Allow destroy of non-empty buckets (true for temporary-validation)."
-  type        = bool
-  default     = false
 }
 
 variable "cors_allowed_origins" {

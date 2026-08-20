@@ -94,6 +94,14 @@ Provision the TTW-060-approved DigitalOcean data topology: smallest single-node 
 
 ## Implementation reviews
 
+### Iteration 1 — CHANGES_REQUIRED
+
+Valkey bind loopback broke Compose; DB firewall used shared labeling tags; Spaces lacked prevent_destroy.
+
+### Iteration 2 — PASS (data + security)
+
+Valkey binds 0.0.0.0 with network isolation docs; DB firewall VPC CIDR only; production uses spaces_protected with prevent_destroy=true.
+
 ### Review 1 — Infrastructure / data correctness
 
 - **Verdict:** Pending (parent)

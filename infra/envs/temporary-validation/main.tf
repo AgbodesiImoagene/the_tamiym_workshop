@@ -84,10 +84,9 @@ module "postgres" {
   deletion_protection = false
   maintenance_day     = var.postgres_maintenance_day
   maintenance_hour    = var.postgres_maintenance_hour
-  firewall_rules = concat(
-    [for t in module.labeling.tag_list : { type = "tag", value = t }],
-    [{ type = "ip_addr", value = var.vpc_ip_range }]
-  )
+  firewall_rules = [
+    { type = "ip_addr", value = var.vpc_ip_range }
+  ]
 }
 
 module "spaces" {

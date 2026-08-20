@@ -84,16 +84,17 @@ function checkDatabaseFirewallPublic(file, src) {
     const values = [...body.matchAll(/value\s*=\s*"([^"]+)"/g)].map((x) => x[1]);
     for (const v of values) {
       if (PUBLIC_CIDRS.has(v)) {
-        failures.push(
-          `${rel} database firewall rule#${i + 1}: must not allow public CIDR ${v}`
-        );
+        failures.push(`${rel} database firewall rule#${i + 1}: must not allow public CIDR ${v}`);
       }
     }
     i++;
   }
 
   // firewall_rules = [ { type = "ip_addr", value = "0.0.0.0/0" }, ... ]
-  if (/0\.0\.0\.0\/0|::\/0/.test(src) && /firewall_rules|digitalocean_database_firewall/.test(src)) {
+  if (
+    /0\.0\.0\.0\/0|::\/0/.test(src) &&
+    /firewall_rules|digitalocean_database_firewall/.test(src)
+  ) {
     // Already covered for rule blocks; also catch list literals near firewall_rules.
     const fwAssign = src.match(/firewall_rules\s*=\s*\[[\s\S]*?\]/);
     if (fwAssign && /0\.0\.0\.0\/0|::\/0/.test(fwAssign[0])) {
@@ -119,14 +120,10 @@ function checkSpacesPrivateAcls(file, src) {
       continue;
     }
     if (acl[1] === 'public-read') {
-      failures.push(
-        `${rel}: spaces bucket "${name}" must not use acl public-read (got ${acl[1]})`
-      );
+      failures.push(`${rel}: spaces bucket "${name}" must not use acl public-read (got ${acl[1]})`);
     }
     if (acl[1] !== 'private') {
-      failures.push(
-        `${rel}: spaces bucket "${name}" must use acl "private" (got ${acl[1]})`
-      );
+      failures.push(`${rel}: spaces bucket "${name}" must use acl "private" (got ${acl[1]})`);
     }
   }
 }
@@ -151,9 +148,7 @@ function checkEnvDeletionProtection() {
     }
     const flag = extractBoolAssign(blocks[0], 'deletion_protection');
     if (flag === null) {
-      failures.push(
-        `${path.relative(root, file)}: module "postgres" must set deletion_protection`
-      );
+      failures.push(`${path.relative(root, file)}: module "postgres" must set deletion_protection`);
     } else if (flag !== expected) {
       failures.push(
         `${path.relative(root, file)}: module "postgres" deletion_protection must be ${expected}`
