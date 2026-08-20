@@ -42,10 +42,12 @@ const CSRF_EXEMPT_PUBLIC_PATHS = [
   'auth/reset-password',
   'auth/verify-email',
   'auth/resend-verification',
+  // Paystack webhook (see WebhooksController) — signature-authenticated,
+  // never cookies. Exact path only: this must never broaden to match on a
+  // "webhooks" or "paystack" path *segment*, which would exempt unrelated
+  // routes that merely happen to share a segment name.
+  'webhooks/paystack',
 ];
-
-/** Provider webhook path segments (signature-authenticated, never cookies). */
-const CSRF_EXEMPT_PATH_SEGMENTS = ['webhooks', 'paystack'];
 
 /**
  * TTW-020 CSRF defense for cookie-authenticated mutations.
@@ -114,14 +116,8 @@ export class CsrfGuard implements CanActivate {
   private isCsrfExemptPath(request: Request): boolean {
     const path = this.normalizedPath(request);
     if (!path) return false;
-    if (
-      CSRF_EXEMPT_PUBLIC_PATHS.some((exempt) => path.endsWith(`/${exempt}`))
-    ) {
-      return true;
-    }
-    const segments = path.split('/').filter(Boolean);
-    return CSRF_EXEMPT_PATH_SEGMENTS.some((segment) =>
-      segments.includes(segment),
+    return CSRF_EXEMPT_PUBLIC_PATHS.some((exempt) =>
+      path.endsWith(`/${exempt}`),
     );
   }
 

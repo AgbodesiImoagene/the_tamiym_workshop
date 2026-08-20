@@ -285,6 +285,32 @@ describe('CsrfGuard', () => {
       expect(guard.canActivate(context)).toBe(true);
     });
 
+    it('does not exempt an unrelated route that merely shares the "webhooks" segment', () => {
+      // Guards against the pre-fix substring/segment match, which treated
+      // any path containing a "webhooks" or "paystack" segment as exempt.
+      const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/webhooks/some-other-provider',
+        isPublic: true,
+        cookies: { [names.access]: 'access-token' },
+        headers: { origin: 'http://evil.example.com' },
+      });
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
+    it('does not exempt an unrelated route that merely shares the "paystack" segment', () => {
+      const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/orders/paystack/refund',
+        isPublic: true,
+        cookies: { [names.access]: 'access-token' },
+        headers: { origin: 'http://evil.example.com' },
+      });
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
     it('falls back to originalUrl when express path is unavailable', () => {
       const request = {
         method: 'POST',
