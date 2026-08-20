@@ -88,7 +88,7 @@ async function main() {
       });
 
       console.log('Promoted existing user to ADMIN:');
-    console.log(updatedUser);
+      console.log(updatedUser);
 
       if (!passwordHash && !existingUser.passwordHash) {
         console.log(
