@@ -440,6 +440,7 @@ model User {
   payoutProfiles       UserPayoutProfile[]
   notificationOutboxes NotificationOutbox[]
   authTokens           AuthToken[]
+  authSessions         AuthSession[]
   oauthAccounts        UserOAuthAccount[]
 
   @@index([email])
@@ -463,7 +464,8 @@ model UserOAuthAccount {
   @@map("user_oauth_accounts")
 }
 
-/// Centralised auth tokens: refresh, password reset, email verification. Single cleanup job can delete where expiresAt < now().
+/// Centralised one-time auth tokens: password reset, email verification.
+/// Refresh credentials live in AuthSession (hashed) — TTW-023.
 model AuthToken {
   id        String    @id @default(cuid())
   userId    String
@@ -471,9 +473,8 @@ model AuthToken {
   token     String    @unique
   tokenType TokenType
 
-  /// Auth surface (CUSTOMER/ADMIN) this token authenticates (TTW-020). Only
-  /// meaningful for REFRESH tokens; null on legacy rows issued before the
-  /// surface-isolation cutover and on non-session tokens.
+  /// Legacy surface column from TTW-020 refresh rows. Null for RESET/VERIFY.
+  /// Refresh sessions moved to AuthSession; do not write REFRESH here.
   authSurface AuthSurface?
 
   expiresAt DateTime
@@ -486,6 +487,27 @@ model AuthToken {
   @@index([expiresAt])
   @@index([authSurface])
   @@map("auth_tokens")
+}
+
+/// Audience-bound, rotating refresh session (TTW-023). Refresh plaintext is
+/// never stored — only sha256(refreshToken). Access JWTs carry `sid`.
+model AuthSession {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authSurface      AuthSurface
+  refreshTokenHash String      @unique
+  /// Optional coarse device label from User-Agent (never a fingerprint).
+  deviceLabel      String?
+  createdAt        DateTime    @default(now())
+  lastSeenAt       DateTime    @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+
+  @@index([userId, authSurface])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
 }
 
 /// Shipping or billing address for a user. Used at checkout and snapshotted on Order.

@@ -12,6 +12,7 @@ import {
 } from '../auth-surface';
 import { surfaceCookieNames } from '../auth-cookies';
 import { AccountPolicyService } from '../account-policy.service';
+import { AuthSessionService } from '../auth-session.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -19,6 +20,8 @@ export interface JwtPayload {
   role: UserRole;
   /** Auth surface (TTW-020) this access token was issued for. */
   surface: AuthSurface;
+  /** AuthSession id — access JWTs are bound to a live hashed refresh session. */
+  sid: string;
 }
 
 /** Shape of the user attached to the request by JWT strategy (validate return value). */
@@ -32,6 +35,8 @@ export interface RequestUser {
   phone: string | null;
   /** Surface this request authenticated on (from the validated JWT). */
   surface: AuthSurface;
+  /** Live AuthSession id from the access JWT `sid` claim. */
+  sessionId: string;
 }
 
 /** True when `value` is one of the known auth surfaces (never trust a raw claim). */
@@ -69,6 +74,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     private prisma: PrismaService,
     private accountPolicy: AccountPolicyService,
+    private authSession: AuthSessionService,
   ) {
     super({
       passReqToCallback: true,
@@ -127,6 +133,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
+    if (typeof payload.sid !== 'string' || payload.sid.length === 0) {
+      throw new UnauthorizedException('User not found');
+    }
+    await this.authSession.assertAccessSession(
+      payload.sid,
+      user.id,
+      payload.surface,
+    );
+
     // Cookie-authenticated requests must additionally have a JWT surface
     // claim matching the surface implied by this request's Origin — this is
     // what stops a stolen/leaked admin cookie from authenticating on the
@@ -142,6 +157,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const { emailVerifiedAt: _verified, ...safeUser } = user;
     void _verified;
-    return { ...safeUser, surface: payload.surface };
+    return {
+      ...safeUser,
+      surface: payload.surface,
+      sessionId: payload.sid,
+    };
   }
 }

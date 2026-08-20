@@ -29,10 +29,13 @@ import {
   JOB_PASSWORD_RESET_EMAIL,
   VERIFICATION_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
-  REFRESH_TOKEN_TTL_MS,
 } from '../constants';
 import { ObservabilityService } from '../observability/observability.service';
 import { AccountPolicyService } from './account-policy.service';
+import {
+  AuthSessionService,
+  type SessionListItem,
+} from './auth-session.service';
 
 /** Normalized Google userinfo / id_token claims used to sign in or link accounts. */
 export type GoogleOAuthProfile = {
@@ -41,6 +44,10 @@ export type GoogleOAuthProfile = {
   emailVerified: boolean;
   firstName?: string | null;
   lastName?: string | null;
+};
+
+export type LoginSessionOptions = {
+  deviceLabel?: string | null;
 };
 
 @Injectable()
@@ -52,6 +59,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private accountPolicy: AccountPolicyService,
+    private authSession: AuthSessionService,
     @InjectQueue(MAIL_QUEUE_NAME) private mailQueue: Queue,
   ) {}
 
@@ -231,7 +239,9 @@ export class AuthService {
         data: { passwordHash },
       });
       await tx.authToken.delete({ where: { id: record.id } });
-      // Close all sessions after password recovery (TTW-023).
+      // Close all hashed sessions after password recovery (TTW-023).
+      await this.authSession.revokeAllForUser(record.userId, tx);
+      // Safety: clear any leftover legacy plaintext REFRESH rows.
       await tx.authToken.deleteMany({
         where: { userId: record.userId, tokenType: TokenType.REFRESH },
       });
@@ -243,7 +253,7 @@ export class AuthService {
           entityId: record.userId,
           actorUserId: record.userId,
           actorRole: record.user.role,
-          note: 'User reset password via recovery flow — all refresh tokens revoked',
+          note: 'User reset password via recovery flow — all sessions revoked',
         },
         tx,
       );
@@ -287,7 +297,7 @@ export class AuthService {
         where: { id: userId },
         data: { passwordHash },
       });
-      // Invalidate all existing refresh tokens so stolen sessions are closed
+      await this.authSession.revokeAllForUser(userId, tx);
       await tx.authToken.deleteMany({
         where: { userId, tokenType: TokenType.REFRESH },
       });
@@ -298,7 +308,7 @@ export class AuthService {
           entityType: 'User',
           entityId: userId,
           actorUserId: userId,
-          note: 'Authenticated user changed password — all refresh tokens revoked',
+          note: 'Authenticated user changed password — all sessions revoked',
         },
         tx,
       );
@@ -355,7 +365,11 @@ export class AuthService {
    * @param surface Auth surface this login is for (CUSTOMER or ADMIN)
    * @returns Access token, refresh token, and user data
    */
-  async login(loginDto: LoginDto, surface: AuthSurface) {
+  async login(
+    loginDto: LoginDto,
+    surface: AuthSurface,
+    opts: LoginSessionOptions = {},
+  ) {
     // Normalize email consistently with register/Google to prevent
     // case-sensitivity account-lookup mismatches.
     const email = loginDto.email.toLowerCase().trim();
@@ -404,13 +418,17 @@ export class AuthService {
       user,
       'User authenticated successfully',
       surface,
+      opts,
     );
   }
 
   /**
    * Sign in or register via Google OAuth (account linking by verified email).
    */
-  async loginWithGoogleProfile(profile: GoogleOAuthProfile) {
+  async loginWithGoogleProfile(
+    profile: GoogleOAuthProfile,
+    opts: LoginSessionOptions = {},
+  ) {
     const email = profile.email.toLowerCase().trim();
     if (!email || !profile.providerAccountId) {
       this.observability.recordAuthLogin({ outcome: 'failure' });
@@ -535,6 +553,7 @@ export class AuthService {
       user,
       'User authenticated via Google',
       AuthSurface.CUSTOMER,
+      opts,
     );
   }
 
@@ -550,42 +569,27 @@ export class AuthService {
     },
     auditNote: string,
     surface: AuthSurface,
+    opts: LoginSessionOptions = {},
   ) {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      surface,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = crypto.randomBytes(32).toString('hex');
-    const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-
     const loggedInAt = new Date();
+    let sessionId = '';
+    let refreshToken = '';
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
         data: { lastLoginAt: loggedInAt },
       });
-      // Revoke this user's refresh tokens issued for a different (or
-      // legacy/null pre-TTW-020) surface — a login on surface S must not
-      // leave a live session usable on another surface.
-      await tx.authToken.deleteMany({
-        where: {
-          userId: user.id,
-          tokenType: TokenType.REFRESH,
-          OR: [{ authSurface: null }, { authSurface: { not: surface } }],
-        },
+      // Named hashed session; createSession revokes other-surface sessions.
+      const created = await this.authSession.createSession(user.id, surface, {
+        deviceLabel: opts.deviceLabel,
+        tx,
       });
-      await tx.authToken.create({
-        data: {
-          userId: user.id,
-          token: refreshToken,
-          tokenType: TokenType.REFRESH,
-          authSurface: surface,
-          expiresAt: refreshExpiresAt,
-        },
+      sessionId = created.session.id;
+      refreshToken = created.refreshToken;
+      // Safety: clear leftover legacy plaintext REFRESH rows.
+      await tx.authToken.deleteMany({
+        where: { userId: user.id, tokenType: TokenType.REFRESH },
       });
       await this.audit.log(
         {
@@ -595,12 +599,25 @@ export class AuthService {
           entityId: user.id,
           actorUserId: user.id,
           actorRole: user.role,
-          after: { lastLoginAt: loggedInAt, authSurface: surface },
+          after: {
+            lastLoginAt: loggedInAt,
+            authSurface: surface,
+            sessionId,
+          },
           note: auditNote,
         },
         tx,
       );
     });
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      surface,
+      sid: sessionId,
+    };
+    const accessToken = this.jwtService.sign(payload);
     this.observability.recordAuthLogin({ outcome: 'success' });
 
     return {
@@ -623,112 +640,76 @@ export class AuthService {
    * token, scoped to `surface` (server-derived from request Origin — see
    * `resolveSurfaceFromOrigin`).
    *
-   * Rejects when the refresh token's role or stored `authSurface` does not
-   * match `surface`. A legacy (pre-TTW-020, `authSurface: null`) token may
-   * refresh — the rotated replacement is upgraded to the requested surface —
-   * but only if the user's role is permitted on that surface.
+   * Rejects when the session's stored `authSurface` or the user's role does
+   * not match `surface`.
    *
    * @throws UnauthorizedException if refresh token missing, invalid, expired, or surface-mismatched
    */
   async refresh(refreshToken: string, surface: AuthSurface) {
-    const record = await this.prisma.authToken.findFirst({
-      where: { token: refreshToken, tokenType: TokenType.REFRESH },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            role: true,
-            status: true,
-            emailVerifiedAt: true,
-          },
-        },
+    const session =
+      await this.authSession.requireLiveSessionByRefreshToken(refreshToken);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        status: true,
+        emailVerifiedAt: true,
       },
     });
 
-    if (!record) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
-    if (record.expiresAt < new Date()) {
-      await this.prisma.authToken.delete({ where: { id: record.id } });
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
-
-    const user = record.user;
-    if (user.status !== UserStatus.ACTIVE) {
-      await this.prisma.authToken.delete({ where: { id: record.id } });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      await this.authSession
+        .revokeOneForUser(session.userId, session.id)
+        .catch(() => undefined);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     if (this.accountPolicy.isPrivilegedRoleUnverified(user)) {
-      await this.prisma.authToken.delete({ where: { id: record.id } });
+      await this.authSession
+        .revokeOneForUser(session.userId, session.id)
+        .catch(() => undefined);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // A stored, non-null authSurface that disagrees with the requested
-    // surface is always rejected. A stored role that is not permitted on the
-    // requested surface is always rejected. (Legacy null-surface tokens for
-    // a role permitted on `surface` are allowed through and upgraded below.)
-    const surfaceMismatch =
-      record.authSurface !== null && record.authSurface !== surface;
-    if (surfaceMismatch || !isRoleAllowedForSurface(user.role, surface)) {
+    if (
+      session.authSurface !== surface ||
+      !isRoleAllowedForSurface(user.role, surface)
+    ) {
       this.observability.recordAuthLogin({ outcome: 'denied' });
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    const rotated = await this.authSession.rotateSession(session, surface);
 
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       surface,
+      sid: rotated.session.id,
     };
     const accessToken = this.jwtService.sign(payload);
 
-    // Rotate refresh token: delete old, create new (upgraded to `surface`)
-    const newRefreshToken = crypto.randomBytes(32).toString('hex');
-    const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.authToken.delete({ where: { id: record.id } });
-      // Revoke any other refresh tokens for this user that are scoped to a
-      // different (or legacy/null) surface — refreshing on surface S should
-      // not leave sibling sessions usable on another surface.
-      await tx.authToken.deleteMany({
-        where: {
-          userId: user.id,
-          tokenType: TokenType.REFRESH,
-          OR: [{ authSurface: null }, { authSurface: { not: surface } }],
-        },
-      });
-      await tx.authToken.create({
-        data: {
-          userId: user.id,
-          token: newRefreshToken,
-          tokenType: TokenType.REFRESH,
-          authSurface: surface,
-          expiresAt: refreshExpiresAt,
-        },
-      });
-      await this.audit.log(
-        {
-          eventName: 'auth.session.refreshed',
-          action: AuditAction.UPDATE,
-          entityType: 'User',
-          entityId: user.id,
-          actorUserId: user.id,
-          actorRole: user.role,
-          after: { authSurface: surface },
-          note: 'Refresh token rotated',
-        },
-        tx,
-      );
+    await this.audit.log({
+      eventName: 'auth.session.refreshed',
+      action: AuditAction.UPDATE,
+      entityType: 'User',
+      entityId: user.id,
+      actorUserId: user.id,
+      actorRole: user.role,
+      after: { authSurface: surface, sessionId: rotated.session.id },
+      note: 'Refresh token rotated',
     });
 
     return {
       access_token: accessToken,
-      refresh_token: newRefreshToken,
+      refresh_token: rotated.refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -742,50 +723,58 @@ export class AuthService {
   }
 
   /**
-   * Invalidate a refresh token (e.g. on logout), scoped to `surface`.
+   * Invalidate a refresh session (e.g. on logout), scoped to `surface`.
    *
    * No-op if the token is unknown, or if it belongs to a *different* surface:
    * a logout resolved for one surface must never revoke the other surface's
-   * session (TTW-020 — that would be a cross-surface forced logout). Legacy
-   * pre-cutover rows (`authSurface: null`) are revocable from either surface.
+   * session (TTW-020 — that would be a cross-surface forced logout).
    */
   async logout(
     refreshToken: string | undefined,
     surface: AuthSurface,
   ): Promise<void> {
     if (!refreshToken) return;
-    const record = await this.prisma.authToken.findFirst({
-      where: { token: refreshToken, tokenType: TokenType.REFRESH },
-      include: { user: { select: { id: true, role: true } } },
-    });
-    if (!record) {
-      return;
-    }
-    if (record.authSurface !== null && record.authSurface !== surface) {
-      return;
-    }
+    const revoked = await this.authSession.revokeByRefreshToken(
+      refreshToken,
+      surface,
+    );
+    if (!revoked) return;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.authToken.deleteMany({
-        where: {
-          token: refreshToken,
-          tokenType: TokenType.REFRESH,
-          OR: [{ authSurface: null }, { authSurface: surface }],
-        },
-      });
-      await this.audit.log(
-        {
-          eventName: 'auth.logout',
-          action: AuditAction.UPDATE,
-          entityType: 'User',
-          entityId: record.userId,
-          actorUserId: record.userId,
-          actorRole: record.user.role,
-          after: { authSurface: surface },
-          note: 'Refresh token invalidated on logout',
-        },
-        tx,
-      );
+    const user = await this.prisma.user.findUnique({
+      where: { id: revoked.userId },
+      select: { id: true, role: true },
     });
+    if (!user) return;
+
+    await this.audit.log({
+      eventName: 'auth.logout',
+      action: AuditAction.UPDATE,
+      entityType: 'User',
+      entityId: user.id,
+      actorUserId: user.id,
+      actorRole: user.role,
+      after: { authSurface: surface },
+      note: 'Session revoked on logout',
+    });
+  }
+
+  listSessions(
+    userId: string,
+    currentSessionId: string | undefined,
+  ): Promise<SessionListItem[]> {
+    return this.authSession.listForUser(userId, currentSessionId);
+  }
+
+  revokeSession(userId: string, sessionId: string): Promise<void> {
+    return this.authSession.revokeOneForUser(userId, sessionId);
+  }
+
+  revokeAllSessions(userId: string): Promise<number> {
+    return this.authSession.revokeAllForUser(userId);
+  }
+
+  /** Coarse device label from User-Agent for session metadata. */
+  deviceLabelFromUserAgent(userAgent: string | undefined): string | null {
+    return this.authSession.parseDeviceLabel(userAgent);
   }
 }

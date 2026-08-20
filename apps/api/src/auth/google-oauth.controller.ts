@@ -116,7 +116,13 @@ export class GoogleOAuthController {
 
     try {
       const profile = await this.googleOAuth.exchangeCodeForProfile(code);
-      const session = await this.authService.loginWithGoogleProfile(profile);
+      const session = await this.authService.loginWithGoogleProfile(profile, {
+        deviceLabel: this.authService.deviceLabelFromUserAgent(
+          Array.isArray(req.headers['user-agent'])
+            ? req.headers['user-agent'][0]
+            : req.headers['user-agent'],
+        ),
+      });
       // Google sign-in is CUSTOMER-surface only (TTW-020); AuthService
       // rejects ADMIN-role accounts before this point.
       setSurfaceAuthCookies(

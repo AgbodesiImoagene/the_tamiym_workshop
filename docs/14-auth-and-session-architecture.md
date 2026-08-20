@@ -70,9 +70,12 @@ Exempt:
 
 ## JWT / refresh
 
-Access JWT claims: `sub`, `email`, `role`, `surface`.
-`validate` rejects a token with a missing/unknown `surface`, and re-checks role×surface on every request — for bearer tokens as well as cookies — so a role change invalidates sessions minted on the wrong surface. Cookie requests must additionally match the Origin-derived surface.
-Refresh `AuthToken` rows store `authSurface`. Login/refresh for surface S revokes that user’s refresh tokens with a different or null surface.
+Access JWT claims: `sub`, `email`, `role`, `surface`, `sid` (AuthSession id).
+`validate` rejects a token with a missing/unknown `surface` or `sid`, re-checks role×surface on every request, and requires the named `AuthSession` to be live (not revoked/expired) with a matching surface. Cookie requests must additionally match the Origin-derived surface.
+
+Refresh credentials are stored only as `sha256` hashes on `AuthSession` rows (`auth_sessions`), never as plaintext. Login/refresh for surface S revokes this user’s live sessions on other surfaces. Password reset/change and admin role change revoke all live sessions. Clients may `GET /auth/sessions`, `DELETE /auth/sessions/:id`, and `DELETE /auth/sessions`.
+
+Legacy plaintext `AuthToken` REFRESH rows are deleted on the TTW-023 session cutover migration; remaining `AuthToken` rows are for email verification and password reset only.
 
 ## Migration
 

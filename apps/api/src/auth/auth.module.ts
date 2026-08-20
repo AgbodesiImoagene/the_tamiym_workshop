@@ -8,6 +8,7 @@ import { GoogleOAuthController } from './google-oauth.controller';
 import { GoogleOAuthService } from './google-oauth.service';
 import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { AccountPolicyService } from './account-policy.service';
+import { AuthSessionService } from './auth-session.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { RolesGuard } from './guards/roles/roles.guard';
@@ -44,6 +45,7 @@ import { StringValue } from 'ms';
   controllers: [AuthController, GoogleOAuthController],
   providers: [
     AuthService,
+    AuthSessionService,
     GoogleOAuthService,
     AuthTokenCleanupService,
     AccountPolicyService,
@@ -54,6 +56,7 @@ import { StringValue } from 'ms';
   ],
   exports: [
     AuthService,
+    AuthSessionService,
     AccountPolicyService,
     JwtAuthGuard,
     RolesGuard,

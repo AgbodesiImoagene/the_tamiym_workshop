@@ -110,6 +110,10 @@ export class AdminUsersService {
           tokenType: TokenType.REFRESH,
         },
       });
+      await tx.authSession.updateMany({
+        where: { userId: targetUserId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       return row;
     });
 

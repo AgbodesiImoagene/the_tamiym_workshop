@@ -7,12 +7,9 @@ import { JwtService } from '@nestjs/jwt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
-import {
-  TokenType,
-  UserRole,
-  UserStatus,
-} from '../src/generated/prisma/client';
+import { UserRole, UserStatus } from '../src/generated/prisma/client';
 import { AuthSurface } from '../src/generated/prisma/enums';
+import { hashRefreshToken } from '../src/auth/auth-session.crypto';
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
 const ADMIN_ORIGIN = 'http://localhost:3003';
@@ -147,10 +144,14 @@ describe('Auth surface isolation (e2e)', () => {
   }
 
   async function refreshTokenExists(token: string): Promise<boolean> {
-    const record = await prisma.authToken.findFirst({
-      where: { token, tokenType: TokenType.REFRESH },
+    const record = await prisma.authSession.findUnique({
+      where: { refreshTokenHash: hashRefreshToken(token) },
     });
-    return record !== null;
+    return (
+      record !== null &&
+      record.revokedAt === null &&
+      record.expiresAt > new Date()
+    );
   }
 
   describe('login surface enforcement', () => {
