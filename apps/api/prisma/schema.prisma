@@ -65,6 +65,14 @@ enum TokenType {
   EMAIL_VERIFICATION
 }
 
+/// Auth surface a session belongs to (TTW-020). Distinguishes admin sessions
+/// from customer/organizer sessions so credentials/cookies never cross boundaries.
+/// Nullable until legacy (pre-TTW-020) refresh tokens are revoked or expire.
+enum AuthSurface {
+  CUSTOMER
+  ADMIN
+}
+
 /// How a product image is used (thumbnail, gallery, or workshop template).
 enum ImageRole {
   THUMBNAIL
@@ -462,6 +470,12 @@ model AuthToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String    @unique
   tokenType TokenType
+
+  /// Auth surface (CUSTOMER/ADMIN) this token authenticates (TTW-020). Only
+  /// meaningful for REFRESH tokens; null on legacy rows issued before the
+  /// surface-isolation cutover and on non-session tokens.
+  authSurface AuthSurface?
+
   expiresAt DateTime
 
   createdAt DateTime @default(now())
@@ -470,6 +484,7 @@ model AuthToken {
   @@index([token])
   @@index([tokenType])
   @@index([expiresAt])
+  @@index([authSurface])
   @@map("auth_tokens")
 }
 
