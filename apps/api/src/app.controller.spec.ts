@@ -12,12 +12,15 @@ const redisState = {
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
-    connect: jest.fn().mockImplementation(async () => {
+    connect: jest.fn().mockImplementation(() => {
       if (redisState.connectShouldFail) {
-        throw new Error('redis down');
+        return Promise.reject(new Error('redis down'));
       }
+      return Promise.resolve();
     }),
-    ping: jest.fn().mockImplementation(async () => redisState.pingResult),
+    ping: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve(redisState.pingResult)),
     quit: jest.fn().mockResolvedValue('OK'),
     disconnect: jest.fn(),
   }));
