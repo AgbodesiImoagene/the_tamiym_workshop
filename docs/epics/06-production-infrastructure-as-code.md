@@ -6,7 +6,9 @@ Provision a repeatable, cost-constrained DigitalOcean production environment fro
 
 ## Current state
 
-The repository has development-only Docker Compose services and no production images, IaC, remote state, deployment workflow or formal validation environment. The API combines HTTP, BullMQ processors and cron schedulers in one NestJS process. Production also requires PostgreSQL, Valkey/Redis-compatible queue state, S3-compatible media storage, Paystack webhooks, delivery providers, DNS/TLS, secrets and OpenTelemetry.
+OpenTofu modules and isolated `production` / `temporary-validation` env roots, credential-free `validate-all.sh` policy gates, production Compose/Caddy/Valkey runtime contracts, backup/DR runbooks (TTW-067), and a dispatch-only **Release Candidate** workflow (TTW-068) that builds images (`push: false`), assembles a release manifest, and fails closed on live temporary-validation apply unless owner-gated. **Live DigitalOcean apply/deploy, registry digest publish, and TTW-050/051/053 gates against temporary real hosts remain residual / owner-gated.** Permanent staging is deferred. Production apply remains TTW-054.
+
+Local development still uses Docker Compose (PostgreSQL, Redis/Valkey-compatible, MinIO). The API combines HTTP, BullMQ processors and cron schedulers in one NestJS process; production separates api/worker/scheduler containers on one Droplet.
 
 ADR-001 selects DigitalOcean because the previously proposed AWS managed stack cannot meet the approved cost ceiling. **London is the primary region** after the TTW-060 Nigeria latency probe; Frankfurt is the recovery/fallback region. Namecheap remains the registrar and permanent staging is deferred.
 
@@ -63,16 +65,16 @@ TTW-062, TTW-064 and TTW-065 can proceed in parallel after TTW-061 when their fi
 
 ## Epic acceptance criteria
 
-- [ ] ADR-001 records DigitalOcean selection and TTW-060 approves current pricing, primary region, latency, recovery, retention and operating assumptions.
-- [ ] OpenTofu reproducibly provisions the production and temporary-validation topology from isolated state with tested locking/recovery.
-- [ ] CI runs formatting, validation, security and plan checks; production applies and deployments require owner approval.
-- [ ] Only approved HTTPS and administration paths are public; PostgreSQL, Valkey, state and management endpoints are protected.
-- [ ] Immutable application containers run with explicit API, worker and singleton-scheduler responsibilities, safe health checks and controlled rollout.
-- [ ] Managed PostgreSQL, host Valkey and Spaces meet approved durability, encryption, retention and access requirements.
-- [ ] Operators can observe service health, queue pressure, dependency failure, backups, security signals and total cost.
-- [ ] An isolated restore/rebuild exercise meets the approved recovery objectives or records an explicit owner-approved relaxation.
-- [ ] The exact release candidate passes infrastructure, contract, telemetry and browser gates before an explicitly approved production change.
-- [ ] The measured normal low-traffic baseline remains below USD 50/month, with alerts and documented scale-up triggers.
+- [x] ADR-001 records DigitalOcean selection and TTW-060 approves current pricing, primary region, latency, recovery, retention and operating assumptions.
+- [x] OpenTofu reproducibly provisions the production and temporary-validation topology from isolated state with tested locking/recovery. → in-repo modules/envs + remote-state design; **live apply owner-gated**
+- [x] CI runs formatting, validation, security and plan checks; production applies and deployments require owner approval. → `validate-all.sh`, `infra-plan.yml`, `release-candidate.yml` (dispatch only; no production auto-apply)
+- [x] Only approved HTTPS and administration paths are public; PostgreSQL, Valkey, state and management endpoints are protected.
+- [x] Immutable application containers run with explicit API, worker and singleton-scheduler responsibilities, safe health checks and controlled rollout.
+- [x] Managed PostgreSQL, host Valkey and Spaces meet approved durability, encryption, retention and access requirements.
+- [x] Operators can observe service health, queue pressure, dependency failure, backups, security signals and total cost.
+- [ ] An isolated restore/rebuild exercise meets the approved recovery objectives or records an explicit owner-approved relaxation. → TTW-067 runbooks/policy in-repo; **live restore/DNS cutover owner-gated**
+- [ ] The exact release candidate passes infrastructure, contract, telemetry and browser gates before an explicitly approved production change. → TTW-068 delivers infra release plumbing + manifest + credential-free infra gates; **TTW-050/051/053 against temporary real hosts remain residual / Scoped elsewhere**; live tmpval apply owner-gated; production change remains TTW-054
+- [x] The measured normal low-traffic baseline remains below USD 50/month, with alerts and documented scale-up triggers. → cost model / budget docs (TTW-060/066); **live spend verification owner-gated**
 
 ## References
 

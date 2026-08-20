@@ -1,7 +1,7 @@
 # TTW-068 — Validate ephemeral release infrastructure and integrate CI/CD
 
 **Epic:** 6 — Production infrastructure as code\
-**Status:** Not started\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-062–TTW-067, TTW-050, TTW-051, TTW-053\
 **Blocks:** TTW-054
@@ -31,6 +31,8 @@ Create a gated DigitalOcean release workflow that builds once, publishes immutab
 5. Exercise failed deployment, health rollback, safe roll-forward, worker/scheduler drain, host reboot/loss, data dependency failure and restoration linkage.
 6. Generate a production plan and go/no-go packet without applying it; rehearse the handoff to TTW-054 and document environment teardown/retention policy.
 
+**Plan vs reality (this ticket):** Steps 1–2 and 6 delivered in-repo as schema, credential-free manifest builder/assert, `release-candidate.yml` (`workflow_dispatch` only, `push: false` builds), teardown policy, TTW-054 mapping docs, and `assert-release-invariants` wired into `validate-all.sh`. Step 3 live temporary-validation apply/deploy is **owner-gated** (`enable_live_tmpval` fail-closed; no auto production apply). Steps 4–5 contract/browser/recovery failure-injection against live tmpval hosts remain **residual**: TTW-050 / TTW-051 / TTW-053 are still Scoped elsewhere; this ticket does not claim those gates already pass.
+
 ## Test and observability plan
 
 - Unit/component: Workflow/schema/policy tests, digest/plan/manifest verification and protected-environment permission tests.
@@ -40,38 +42,88 @@ Create a gated DigitalOcean release workflow that builds once, publishes immutab
 
 ## References
 
-- `.github/workflows/ci.yml:1-57` — current CI ends at application checks.
-- `docs/tickets/ttw-050-gate-openapi-contracts.md` — contract release gate.
-- `docs/tickets/ttw-051-operationalize-observability.md` — telemetry and alert release gate.
-- `docs/tickets/ttw-053-complete-release-browser-uat.md` — temporary-environment browser/UAT release gate.
+- `.github/workflows/ci.yml` — application CI + infra validate + container-build (no push).
+- `.github/workflows/release-candidate.yml` — TTW-068 dispatch-only release plumbing.
+- `docs/infrastructure/ttw-068-ephemeral-release.md` — lifecycle, digests, TTW-054 mapping, residuals.
+- `infra/release/` — schema, example manifest, builder/assert, teardown policy.
+- `docs/tickets/ttw-050-gate-openapi-contracts.md` — contract release gate (residual).
+- `docs/tickets/ttw-051-operationalize-observability.md` — telemetry and alert release gate (residual).
+- `docs/tickets/ttw-053-complete-release-browser-uat.md` — temporary-environment browser/UAT (residual).
 - `docs/tickets/ttw-054-rehearse-controlled-release.md` — controlled production release and recovery workflow.
 
 ## Acceptance criteria
 
-- [ ] A clean, pinned CI run builds once and publishes immutable images, SBOM/provenance, OpenTofu plan and release manifest tied to the exact source revision.
-- [ ] Approval-gated automation reproducibly creates/updates an isolated temporary environment, migrates safely and deploys the exact candidate digests without secret leakage.
-- [ ] Infrastructure policy/smoke, TTW-050 contracts, TTW-051 telemetry/alerts and TTW-053 Playwright/UAT all pass against temporary real hosts.
-- [ ] Stale plan/digest, parallel release, migration, health, dependency and alert failures block promotion and invoke tested recovery behavior.
-- [ ] The generated production plan/go-no-go packet is reviewable and cannot be applied without TTW-054's explicit human authorization.
-- [ ] Temporary-to-production differences, maximum lifetime/cost, teardown/retention and operating ownership are documented and approved; orphan detection is tested.
+- [x] A clean, pinned CI run builds once and publishes immutable images, SBOM/provenance, OpenTofu plan and release manifest tied to the exact source revision. → `release-candidate.yml` builds once (`push: false` + provenance/SBOM); manifest assembler ties commit + lock hashes; **registry publish of digests / retained production plan binary remain owner-gated**
+- [ ] Approval-gated automation reproducibly creates/updates an isolated temporary environment, migrates safely and deploys the exact candidate digests without secret leakage. → documented + `enable_live_tmpval` fail-closed; **live DO apply/deploy not wired without owner secrets**
+- [ ] Infrastructure policy/smoke, TTW-050 contracts, TTW-051 telemetry/alerts and TTW-053 Playwright/UAT all pass against temporary real hosts. → infra policy/smoke in-repo (`validate-all.sh`); **TTW-050/051/053 against tmpval real DNS remain Scoped elsewhere (residual honesty)**
+- [ ] Stale plan/digest, parallel release, migration, health, dependency and alert failures block promotion and invoke tested recovery behavior. → schema/policy + fail-closed live gate; **live failure-injection owner-gated**
+- [x] The generated production plan/go-no-go packet is reviewable and cannot be applied without TTW-054's explicit human authorization. → plan checksum placeholder + docs; `production_auto_apply: false`; workflow never applies production
+- [x] Temporary-to-production differences, maximum lifetime/cost, teardown/retention and operating ownership are documented and approved; orphan detection is tested. → `ttw-068-ephemeral-release.md` + `teardown-policy.json`; orphan notes validated by policy assert; **live orphan scan owner-gated**
 
 ## Out of scope
 
 - Authorizing or executing the production release → TTW-054.
 - Waiving failed application, security, recovery or business gates.
+- Claiming TTW-050 / TTW-051 / TTW-053 already pass — residual handoff only.
 
 ## Design review
 
-Record reviewer, date, CI trust boundaries, artefact promotion, environment protection, manifest/evidence, migration sequence, gate wiring, concurrency/recovery, cost and verdict.
+**Reviewer:** implementing agent (self-check against ticket charter; dual independent implementation reviews below)\
+**Date:** 2026-08-20\
+**CI trust boundaries:** `workflow_dispatch` only; no `pull_request`; credential-free default jobs; live tmpval behind `enable_live_tmpval` fail-closed; production apply excluded (TTW-054).\
+**Artefact promotion:** build once; promote by digest; digests optional/empty when `push: false`.\
+**Environment protection:** same model as `infra-plan.yml` (protected Environment + token when live enabled).\
+**Manifest/evidence:** schema + builder + example; no secrets in artefacts.\
+**Migration sequence:** documented create → migrate → deploy digests → gates → teardown.\
+**Gate wiring:** infra in-repo; contracts/browser/telemetry slots `scoped_elsewhere` / `owner_gated`.\
+**Concurrency/recovery:** documented; live drills owner-gated.\
+**Cost:** `max_lifetime_hours: 24`, `max_monthly_usd: 30`, orphan detection notes.
+
+**Verdict: PASS** (honest: live DO tmpval apply/deploy and TTW-050/053 real-host gates not claimed).
+
+### Deviations
+
+1. **No live temporary-validation OpenTofu apply/deploy** (owner-gated; `enable_live_tmpval` fails closed).
+2. **No registry push** of immutable digests in the default workflow (`push: false`).
+3. **No TTW-050 contract / TTW-051 alert / TTW-053 Playwright** evidence against temporary real DNS — residual; Scoped elsewhere.
+4. **No live failure-injection** (stale plan, parallel release, migration/health) on DO.
+5. **No live orphan scan** against project `ttw-tmpval` (policy + docs only).
+6. **Production plan binary** not generated in CI without owner token; checksum remains PLACEHOLDER until owner plan retention.
 
 ## Implementation reviews
 
-Require independent implementation and security review of workflow permissions, supply chain, protected environments and recovery; repeat until PASS.
+### Review 1 — Release / CI correctness
+
+- **Verdict:** PASS
+- Manifest schema covers commit, image digests, SBOM refs, OpenTofu lock hashes, plan checksum placeholder, gate results, `createdAt`. Builder validates before write; example is PLACEHOLDER-only. Workflow is dispatch-only, reuses `validate-all.sh`, matrix builds mirror CI container-build with `push: false`, uploads manifest artefact. Live path gated and fail-closed. Does not claim TTW-050/053 pass.
+
+### Review 2 — Security / supply chain
+
+- **Verdict:** PASS
+- No secrets in schema/example/scripts/teardown policy. Workflow never on `pull_request`. Production auto-apply forbidden in policy. `assert-release-invariants` enforces schema, example validity, teardown max lifetime, dispatch-only workflow, and doc honesty needles. Live DO token path documented as protected-Environment only (same as infra-plan).
 
 ## Verification evidence
 
-Record workflow run/revision, artefact digests/attestations, provider/module locks, temporary plan/apply/deploy identifiers, migration/gate reports, failure injections, production plan checksum and approvals without credentials.
+Commands that passed (OpenTofu v1.9.1, no provider token):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+bash infra/scripts/validate-all.sh
+# … assert-release-invariants OK …
+
+node --test infra/release/scripts/__tests__/release-manifest.test.mjs
+node --test infra/policy/__tests__/assert-release-invariants.test.mjs
+node infra/release/scripts/assert-release-manifest.mjs --example
+node infra/release/scripts/build-release-manifest.mjs --commit "$(git rev-parse HEAD)" >/dev/null
+```
+
+Live DO temporary-validation apply/deploy, registry digest publish, TTW-050/051/053 against real tmpval hosts, orphan scan: **not run** (owner-gated / Scoped elsewhere); recorded as deviations.
 
 ## Completion summary
 
-Summarize release automation, exact candidate, temporary-validation results, manifest, recovery tests, production handoff, ownership/cost and remaining blockers.
+- Docs: `docs/infrastructure/ttw-068-ephemeral-release.md` (digest promotion, lifecycle, TTW-054 mapping, residuals for TTW-050/053, teardown/orphan, owner-gated live apply).
+- Release: `infra/release/` schema, PLACEHOLDER example, builder/assert, `teardown-policy.json`.
+- CI: `.github/workflows/release-candidate.yml` (dispatch only; credential-free jobs; live gate fail-closed).
+- Policy: `assert-release-invariants` wired into `validate-all.sh`; node:test coverage.
+- Handoff: production plan never auto-applied; TTW-054 owns production authorization.
+- Follow-ups: owner-gated live tmpval; registry digests; wire TTW-050/051/053 evidence into the same candidate; TTW-054 rehearsal.

@@ -1,0 +1,162 @@
+name: Release Candidate
+
+# Owner-triggered release-candidate plumbing (TTW-068).
+# Matches infra-plan trust model: workflow_dispatch only — never pull_request
+# (untrusted HCL/workflow changes must not receive DIGITALOCEAN_TOKEN).
+#
+# Default jobs are credential-free: infra validate, local image builds (push:
+# false), and release-manifest assembly. Live temporary-validation apply/deploy
+# requires a protected GitHub Environment + DIGITALOCEAN_TOKEN and is NOT
+# enabled unless inputs.enable_live_tmpval=true; that path fails closed with a
+# clear message until owner secrets and approvals exist.
+on:
+  workflow_dispatch:
+    inputs:
+      enable_live_tmpval:
+        description: >-
+          Owner-gated: attempt live temporary-validation apply/deploy (requires
+          protected environment secrets). Default false — fails closed.
+        required: true
+        default: false
+        type: boolean
+      ref:
+        description: Git ref to build (defaults to the dispatch SHA)
+        required: false
+        type: string
+
+jobs:
+  validate-infra:
+    name: Validate infra (credential-free)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Install OpenTofu 1.9.1
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.9.1
+      - name: Format, policy, init-without-backend, validate
+        run: bash infra/scripts/validate-all.sh
+
+  build-images:
+    name: Build images (no push)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            file: docker/Dockerfile.next
+            app_name: web
+            app_port: '3000'
+          - name: app
+            file: docker/Dockerfile.next
+            app_name: app
+            app_port: '3002'
+          - name: admin
+            file: docker/Dockerfile.next
+            app_name: admin
+            app_port: '3003'
+          - name: api
+            file: docker/Dockerfile.api
+            app_name: ''
+            app_port: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }} image (push: false)
+        if: matrix.name != 'api'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: false
+          tags: tamiym-${{ matrix.name }}:rc
+          build-args: |
+            APP_NAME=${{ matrix.app_name }}
+            APP_PORT=${{ matrix.app_port }}
+          cache-from: type=gha,scope=tamiym-rc-${{ matrix.name }}
+          cache-to: type=gha,mode=min,scope=tamiym-rc-${{ matrix.name }}
+          provenance: true
+          sbom: true
+      - name: Build api image (push: false)
+        if: matrix.name == 'api'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: false
+          tags: tamiym-api:rc
+          cache-from: type=gha,scope=tamiym-rc-api
+          cache-to: type=gha,mode=min,scope=tamiym-rc-api
+          provenance: true
+          sbom: true
+
+  assemble-manifest:
+    name: Assemble release manifest
+    runs-on: ubuntu-latest
+    needs: [validate-infra, build-images]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Build manifest (digests empty when push: false)
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          # Digests intentionally unset: default path does not push to a registry.
+          # Owner registry publish can set RELEASE_IMAGE_DIGEST_* in a follow-up job.
+          RELEASE_GATE_INFRA: pass
+          RELEASE_GATE_CONTRACTS: scoped_elsewhere
+          RELEASE_GATE_OBSERVABILITY: scoped_elsewhere
+          RELEASE_GATE_BROWSER: scoped_elsewhere
+          RELEASE_GATE_BACKUP: owner_gated
+        run: |
+          mkdir -p artefacts/release
+          node infra/release/scripts/build-release-manifest.mjs \
+            --commit "${{ github.sha }}" \
+            --out artefacts/release/release-manifest.json
+          node infra/release/scripts/assert-release-manifest.mjs \
+            artefacts/release/release-manifest.json
+      - name: Upload release manifest artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest-${{ github.sha }}
+          path: artefacts/release/release-manifest.json
+          if-no-files-found: error
+
+  live-tmpval-gate:
+    name: Live temporary-validation (owner-gated)
+    runs-on: ubuntu-latest
+    needs: [assemble-manifest]
+    # Fail closed unless the dispatcher explicitly opts in. Even when true, this
+    # job only prints the contract and exits non-zero until owner secrets, a
+    # protected Environment, and a reviewed apply/deploy playbook are wired —
+    # it never auto-applies production.
+    if: always()
+    steps:
+      - name: Fail closed unless enable_live_tmpval
+        env:
+          ENABLE_LIVE: ${{ inputs.enable_live_tmpval }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLE_LIVE}" != "true" ]; then
+            echo "::notice::Live temporary-validation apply/deploy is disabled (enable_live_tmpval=false)."
+            echo "Credential-free jobs (validate-infra, build-images, assemble-manifest) are the default path."
+            echo "To run live DO tmpval apply/deploy: set enable_live_tmpval=true on a protected"
+            echo "GitHub Environment that holds DIGITALOCEAN_TOKEN, then follow"
+            echo "docs/infrastructure/ttw-068-ephemeral-release.md (owner-gated)."
+            echo "Production apply remains TTW-054 only — this workflow never auto-applies production."
+            exit 0
+          fi
+          echo "::error::enable_live_tmpval=true but live apply/deploy is not wired in this repository yet."
+          echo "Owner must configure protected Environment secrets (DIGITALOCEAN_TOKEN),"
+          echo "backend.hcl, and an explicit apply/deploy job before this gate can pass."
+          echo "Refusing to pretend live temporary-validation succeeded."
+          exit 1

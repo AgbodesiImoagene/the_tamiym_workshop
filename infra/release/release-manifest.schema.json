@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tamiym.local/schemas/release-manifest.schema.json",
+  "title": "Tamiym Workshop release manifest",
+  "description": "Immutable release candidate evidence for TTW-068 / TTW-054. No secrets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "commitSha",
+    "createdAt",
+    "images",
+    "sbomRefs",
+    "opentofu",
+    "gateResults"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "ticket": {
+      "type": "string",
+      "description": "Owning ticket id when known",
+      "pattern": "^TTW-[0-9]{3}$"
+    },
+    "commitSha": {
+      "type": "string",
+      "description": "Full git commit SHA of the built candidate",
+      "minLength": 7,
+      "maxLength": 64,
+      "pattern": "^[0-9a-fA-F]{7,64}$|^PLACEHOLDER(_[A-Z0-9_]+)?$"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when the manifest was assembled"
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "app", "admin", "api"],
+      "properties": {
+        "web": { "$ref": "#/$defs/imageRef" },
+        "app": { "$ref": "#/$defs/imageRef" },
+        "admin": { "$ref": "#/$defs/imageRef" },
+        "api": { "$ref": "#/$defs/imageRef" }
+      }
+    },
+    "sbomRefs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "app", "admin", "api"],
+      "properties": {
+        "web": { "$ref": "#/$defs/optionalRef" },
+        "app": { "$ref": "#/$defs/optionalRef" },
+        "admin": { "$ref": "#/$defs/optionalRef" },
+        "api": { "$ref": "#/$defs/optionalRef" }
+      }
+    },
+    "opentofu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lockfileHashes", "planChecksum"],
+      "properties": {
+        "lockfileHashes": {
+          "type": "object",
+          "description": "SHA-256 of committed .terraform.lock.hcl files (hex or PLACEHOLDER)",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "planChecksum": {
+          "type": "string",
+          "description": "Checksum of a retained plan artefact, or PLACEHOLDER when plan not yet produced",
+          "minLength": 1
+        }
+      }
+    },
+    "gateResults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["infraValidate", "contracts", "observability", "browserUat", "backupRecovery"],
+      "properties": {
+        "infraValidate": { "$ref": "#/$defs/gateStatus" },
+        "contracts": { "$ref": "#/$defs/gateStatus" },
+        "observability": { "$ref": "#/$defs/gateStatus" },
+        "browserUat": { "$ref": "#/$defs/gateStatus" },
+        "backupRecovery": { "$ref": "#/$defs/gateStatus" }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional non-secret operator notes"
+    }
+  },
+  "$defs": {
+    "imageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest"],
+      "properties": {
+        "digest": {
+          "type": "string",
+          "description": "Image digest (sha256:…) or empty when images were not pushed",
+          "pattern": "^(sha256:[a-fA-F0-9]{64})?$|^PLACEHOLDER(_[A-Z0-9_]+)?$"
+        },
+        "repository": {
+          "type": "string",
+          "description": "Optional registry repository reference without digest"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Optional mutable tag used only for local/CI naming; promotion uses digest"
+        }
+      }
+    },
+    "optionalRef": {
+      "type": "string",
+      "description": "URI/path/artefact id, empty string, or PLACEHOLDER",
+      "minLength": 0
+    },
+    "gateStatus": {
+      "type": "string",
+      "enum": ["pass", "fail", "pending", "not_run", "owner_gated", "scoped_elsewhere"]
+    }
+  }
+}
