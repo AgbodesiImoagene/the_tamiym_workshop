@@ -225,7 +225,11 @@ export default function AdminLoginPage() {
       }
     >
       {error ? (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4"
+        >
           <p className="text-sm text-red-700">{error}</p>
         </div>
       ) : null}
