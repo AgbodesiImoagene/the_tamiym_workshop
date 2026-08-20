@@ -1,5 +1,6 @@
 import { request } from '@playwright/test';
 import { test, expect, urls } from '../fixtures/test';
+import { originForSurface } from '../fixtures/api';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,12 +37,28 @@ test.describe('Session boundary negatives @smoke', () => {
 
   test('customer API token cannot list admin orders', async () => {
     // Reuse setup storage so we do not burn login rate limits during smoke.
+    // Origin must match the customer surface (TTW-020) or the request 401s
+    // on surface mismatch before the role check ever runs.
     const api = await request.newContext({
       baseURL: `${urls.api}/v1/`,
+      extraHTTPHeaders: { Origin: originForSurface('CUSTOMER') },
       storageState: path.join(authDir, 'customer.json'),
     });
     const res = await api.get('admin/orders');
     expect(res.status()).toBe(403);
+    await api.dispose();
+  });
+
+  test('admin surface cookie is rejected on the customer origin (TTW-020)', async () => {
+    // The admin storage state's access cookie is scoped to the ADMIN surface;
+    // presenting it against the customer Origin must not authenticate.
+    const api = await request.newContext({
+      baseURL: `${urls.api}/v1/`,
+      extraHTTPHeaders: { Origin: originForSurface('CUSTOMER') },
+      storageState: path.join(authDir, 'admin.json'),
+    });
+    const res = await api.get('auth/me');
+    expect(res.status()).toBe(401);
     await api.dispose();
   });
 });

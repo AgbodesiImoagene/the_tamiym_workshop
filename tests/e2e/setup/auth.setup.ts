@@ -2,7 +2,7 @@ import { test as setup, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApiContext, apiLogin } from '../fixtures/api';
+import { createApiContext, apiLogin, type AuthSurface } from '../fixtures/api';
 import { e2eUsers } from '../fixtures/identities';
 
 const authDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../.auth');
@@ -11,13 +11,17 @@ setup.beforeAll(() => {
   fs.mkdirSync(authDir, { recursive: true });
 });
 
+// ADMIN authenticates on the admin surface only; CUSTOMER/ORGANIZER share the
+// customer surface (TTW-020). The saved storage state's Origin-derived
+// surface must match, or later `auth/me` cookie reads will 401.
 async function saveRoleState(
   role: 'customer' | 'organiser' | 'admin',
   email: string,
   password: string
 ): Promise<void> {
-  const api = await createApiContext();
-  await apiLogin(api, email, password);
+  const surface: AuthSurface = role === 'admin' ? 'ADMIN' : 'CUSTOMER';
+  const api = await createApiContext(surface);
+  await apiLogin(api, email, password, surface);
   const me = await api.get('auth/me');
   expect(me.ok(), `auth/me for ${email}`).toBeTruthy();
   await api.storageState({ path: path.join(authDir, `${role}.json`) });
