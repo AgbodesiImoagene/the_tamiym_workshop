@@ -4,9 +4,7 @@ import { test, expect } from '../fixtures/test';
  * TTW-015 — reconciliation admin contract (Playwright foundation).
  */
 test.describe('Reconciliation admin @smoke', () => {
-  test('admin findings list returns masked comparison fields', async ({
-    page,
-  }) => {
+  test('admin findings list returns masked comparison fields', async ({ page }) => {
     await page.goto('about:blank');
     await page.route('**/admin/reconciliation/findings**', async (route) => {
       await route.fulfill({
@@ -28,9 +26,7 @@ test.describe('Reconciliation admin @smoke', () => {
     });
 
     const rows = await page.evaluate(async () => {
-      const res = await fetch(
-        'http://localhost/admin/reconciliation/findings',
-      );
+      const res = await fetch('http://localhost/admin/reconciliation/findings');
       return res.json();
     });
 

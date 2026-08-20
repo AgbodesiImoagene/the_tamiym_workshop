@@ -274,4 +274,72 @@ describe('ReconciliationRepairService', () => {
       );
     },
   );
+
+  it('requestRepair creates repair for open finding', async () => {
+    prisma.reconciliationFinding.findUnique.mockResolvedValue({
+      id: 'f1',
+      runId: 'r1',
+      domain: ReconciliationDomain.CAMPAIGN,
+      status: ReconciliationFindingStatus.OPEN,
+      outcome: 'MISMATCH',
+      rightLabel: 'ledger PAYMENT_SETTLED+REFUND_APPLIED',
+      leftValue: '10',
+      rightValue: '12',
+      sourceIds: { campaignId: 'c1' },
+    });
+    prisma.reconciliationRepairRequest.create.mockResolvedValue({
+      id: 'rep-new',
+    });
+
+    const repair = await service.requestRepair({
+      findingId: 'f1',
+      actorUserId: 'admin-a',
+      commandKey: 'campaign.recompute_current_amount',
+      payload: { note: 'fix' },
+    });
+    expect(repair.id).toBe('rep-new');
+    expect(prisma.reconciliationRepairRequest.create).toHaveBeenCalled();
+  });
+
+  it('requestRepair rejects unknown finding', async () => {
+    prisma.reconciliationFinding.findUnique.mockResolvedValue(null);
+    await expect(
+      service.requestRepair({
+        findingId: 'missing',
+        actorUserId: 'a',
+        commandKey: 'campaign.recompute_current_amount',
+      }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it('requestRepair rejects non-open finding', async () => {
+    prisma.reconciliationFinding.findUnique.mockResolvedValue({
+      id: 'f1',
+      status: ReconciliationFindingStatus.RESOLVED,
+      domain: ReconciliationDomain.CAMPAIGN,
+    });
+    await expect(
+      service.requestRepair({
+        findingId: 'f1',
+        actorUserId: 'a',
+        commandKey: 'campaign.recompute_current_amount',
+      }),
+    ).rejects.toThrow(/not repairable/i);
+  });
+
+  it('requestRepair rejects unknown command', async () => {
+    prisma.reconciliationFinding.findUnique.mockResolvedValue({
+      id: 'f1',
+      status: ReconciliationFindingStatus.OPEN,
+      domain: ReconciliationDomain.CAMPAIGN,
+      outcome: 'MISMATCH',
+    });
+    await expect(
+      service.requestRepair({
+        findingId: 'f1',
+        actorUserId: 'a',
+        commandKey: 'not.a.command',
+      }),
+    ).rejects.toThrow(/Unknown repair command/i);
+  });
 });

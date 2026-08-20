@@ -276,7 +276,7 @@ export class ReconciliationRepairService {
   private assertCommandForFinding(
     finding: {
       domain: ReconciliationDomain;
-      outcome?: ReconciliationOutcome | string;
+      outcome?: ReconciliationOutcome;
       rightLabel?: string;
     },
     commandKey: string,
@@ -293,7 +293,7 @@ export class ReconciliationRepairService {
     if (
       rule.outcomes &&
       finding.outcome &&
-      !rule.outcomes.includes(finding.outcome as ReconciliationOutcome)
+      !rule.outcomes.includes(finding.outcome)
     ) {
       throw new BadRequestException(
         `Command ${commandKey} is not allowed for outcome ${finding.outcome}`,
