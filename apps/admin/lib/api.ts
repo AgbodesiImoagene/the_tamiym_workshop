@@ -8,12 +8,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v
  * Admin-surface double-submit CSRF token (TTW-020).
  *
  * The API sets the token as a host-only cookie on its own origin *and*
- * returns it in the body of every session-issuing response (admin login,
- * refresh, `auth/me`). When the API is served from a different origin than
- * this app — the deployed topology — `document.cookie` cannot see that
- * cookie, so the body copy kept here in `sessionStorage` is the only value we
- * can echo back in `X-CSRF-Token`. The browser still attaches the cookie
- * itself, which is the other half of the double submit.
+ * returns it in the body of every session-issuing response (MFA confirm /
+ * challenge / recover, refresh, `auth/me`). When the API is served from a
+ * different origin than this app — the deployed topology — `document.cookie`
+ * cannot see that cookie, so the body copy kept here in `sessionStorage` is
+ * the only value we can echo back in `X-CSRF-Token`. The browser still
+ * attaches the cookie itself, which is the other half of the double submit.
  *
  * Storage key and cookie name must match `ADMIN_CSRF_COOKIE_NAME` in
  * apps/api/src/constants.ts.

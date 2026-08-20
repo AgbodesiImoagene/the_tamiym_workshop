@@ -10,6 +10,7 @@ export const requiredEnvVars = [
   'DATABASE_URL',
   'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
+  'MFA_TOTP_ENCRYPTION_KEY',
 ] as const;
 
 /** Required in production only — surface Origin allowlists (TTW-020). */
@@ -79,6 +80,24 @@ export function validateEnv(
       );
     }
   }
+
+  const mfaKeyRaw = config.MFA_TOTP_ENCRYPTION_KEY;
+  if (typeof mfaKeyRaw === 'string' && mfaKeyRaw.trim() !== '') {
+    let decoded: Buffer;
+    try {
+      decoded = Buffer.from(mfaKeyRaw.trim(), 'base64');
+    } catch {
+      throw new Error(
+        'Environment variable MFA_TOTP_ENCRYPTION_KEY must be valid base64',
+      );
+    }
+    if (decoded.length !== 32) {
+      throw new Error(
+        'Environment variable MFA_TOTP_ENCRYPTION_KEY must decode to exactly 32 bytes',
+      );
+    }
+  }
+
   if (process.env.NODE_ENV === 'production') {
     for (const key of requiredProductionEnvVars) {
       const value = config[key];

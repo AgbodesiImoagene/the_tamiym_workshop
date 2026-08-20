@@ -96,6 +96,10 @@ async function main() {
         );
       }
 
+      console.log(
+        'MFA: this admin must enroll TOTP on first login (POST /auth/admin/login → /auth/admin/mfa/enroll/*).',
+      );
+
       return;
     }
 
@@ -128,6 +132,9 @@ async function main() {
 
     console.log('Created new ADMIN user:');
     console.log(createdUser);
+    console.log(
+      'MFA: this admin must enroll TOTP on first login (POST /auth/admin/login → /auth/admin/mfa/enroll/*).',
+    );
   } finally {
     await closePrismaScriptContext(context);
   }

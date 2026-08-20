@@ -35,6 +35,10 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const CSRF_EXEMPT_PUBLIC_PATHS = [
   'auth/login',
   'auth/admin/login',
+  'auth/admin/mfa/enroll/start',
+  'auth/admin/mfa/enroll/confirm',
+  'auth/admin/mfa/challenge',
+  'auth/admin/mfa/recover',
   'auth/register',
   'auth/google',
   'auth/google/callback',

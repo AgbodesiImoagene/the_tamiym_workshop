@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { AdminMfaService } from '../auth/admin-mfa.service';
 import {
   AuditAction,
   AuditSource,
@@ -40,6 +41,7 @@ export class AdminUsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly adminMfa: AdminMfaService,
   ) {}
 
   async searchUsers(q?: string, take = 50): Promise<AdminUserListRow[]> {
@@ -133,5 +135,14 @@ export class AdminUsersService {
     });
 
     return updated;
+  }
+
+  /** Clear MFA for an ADMIN user and revoke their sessions (audited). */
+  async resetUserMfa(
+    actorUserId: string,
+    actorRole: UserRole,
+    targetUserId: string,
+  ): Promise<{ reset: true }> {
+    return this.adminMfa.resetMfaForUser(actorUserId, actorRole, targetUserId);
   }
 }

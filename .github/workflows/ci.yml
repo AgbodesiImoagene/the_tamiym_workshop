@@ -178,6 +178,7 @@ jobs:
       JWT_REFRESH_SECRET: test-refresh-secret-ttw003-not-for-prod
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
+      MFA_TOTP_ENCRYPTION_KEY: zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=
       PAYSTACK_SECRET_KEY: sk_test_mock
       PAYSTACK_PUBLIC_KEY: pk_test_mock
       REDIS_HOST: localhost
@@ -265,6 +266,7 @@ jobs:
       JWT_REFRESH_SECRET: test-refresh-secret-ttw003-not-for-prod
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
+      MFA_TOTP_ENCRYPTION_KEY: zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=
       PAYSTACK_SECRET_KEY: sk_test_mock
       PAYSTACK_PUBLIC_KEY: pk_test_mock
       REDIS_HOST: localhost

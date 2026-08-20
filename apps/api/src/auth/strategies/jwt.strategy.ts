@@ -13,6 +13,7 @@ import {
 import { surfaceCookieNames } from '../auth-cookies';
 import { AccountPolicyService } from '../account-policy.service';
 import { AuthSessionService } from '../auth-session.service';
+import { AdminMfaService } from '../admin-mfa.service';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -75,6 +76,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaService,
     private accountPolicy: AccountPolicyService,
     private authSession: AuthSessionService,
+    private adminMfa: AdminMfaService,
   ) {
     super({
       passReqToCallback: true,
@@ -141,6 +143,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       user.id,
       payload.surface,
     );
+
+    // TTW-023: ADMIN-surface access requires completed MFA enrollment.
+    // Blocks pre-cutover sessions that survived without TOTP.
+    if (payload.surface === AuthSurface.ADMIN) {
+      const mfaEnabled = await this.adminMfa.isEnabled(user.id);
+      if (!mfaEnabled) {
+        throw new UnauthorizedException('User not found');
+      }
+    }
 
     // Cookie-authenticated requests must additionally have a JWT surface
     // claim matching the surface implied by this request's Origin — this is

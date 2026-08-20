@@ -42,7 +42,7 @@ Legacy names `access_token` / `refresh_token` are cleared on every set/clear.
 The cookies above are **host-only on the API origin** (no shared `Domain`), so a frontend served from another origin cannot read even the non-httpOnly CSRF cookie via `document.cookie`. The token therefore travels two ways:
 
 1. **Cookie** — set by the API and attached automatically by the browser on credentialed requests. This half proves the caller is the same browser that holds the session.
-2. **Response body `csrf_token`** — returned by every session-issuing response: `POST /auth/register`, `POST /auth/login`, `POST /auth/admin/login`, `POST /auth/refresh`, and `GET /auth/me`. The frontend stores it in `sessionStorage` (`ttw_customer_csrf` in `apps/app`, `ttw_admin_csrf` in `apps/admin`) and echoes it in the `X-CSRF-Token` header on mutations. This half proves the request was made by our JS, not by a cross-site page.
+2. **Response body `csrf_token`** — returned by every session-issuing response: `POST /auth/register`, `POST /auth/login`, `POST /auth/admin/mfa/enroll/confirm`, `POST /auth/admin/mfa/challenge`, `POST /auth/admin/mfa/recover`, `POST /auth/refresh`, and `GET /auth/me`. (`POST /auth/admin/login` returns only an MFA challenge — no session cookies or CSRF.) The frontend stores it in `sessionStorage` (`ttw_customer_csrf` in `apps/app`, `ttw_admin_csrf` in `apps/admin`) and echoes it in the `X-CSRF-Token` header on mutations. This half proves the request was made by our JS, not by a cross-site page.
 
 `GET /auth/me` echoes the _existing_ cookie value when the browser already holds one and only mints a token when none is present, so opening a second tab (or landing back from the Google OAuth redirect) recovers the token without invalidating other tabs. Frontends read `sessionStorage` first and fall back to `document.cookie` for same-origin/local setups and API-driven tests.
 
@@ -56,7 +56,7 @@ Mutating methods (`POST`/`PUT`/`PATCH`/`DELETE`) that present a surface **access
 Exempt:
 
 - Non-mutating methods.
-- `@Public()` session-establishing paths, matched by path suffix: `auth/login`, `auth/admin/login`, `auth/register`, `auth/google`, `auth/google/callback`, `auth/forgot-password`, `auth/reset-password`, `auth/verify-email`, `auth/resend-verification`.
+- `@Public()` session-establishing paths, matched by path suffix: `auth/login`, `auth/admin/login`, `auth/admin/mfa/enroll/start`, `auth/admin/mfa/enroll/confirm`, `auth/admin/mfa/challenge`, `auth/admin/mfa/recover`, `auth/register`, `auth/google`, `auth/google/callback`, `auth/forgot-password`, `auth/reset-password`, `auth/verify-email`, `auth/resend-verification`.
 - Exact path `…/webhooks/paystack` — authenticated by Paystack signature.
 - Requests with **no** surface session cookie: `Authorization: Bearer` clients and body-only `POST /auth/refresh` (`{ "refresh_token": ... }`), neither of which a cross-site page can forge.
 
@@ -77,7 +77,21 @@ Refresh credentials are stored only as `sha256` hashes on `AuthSession` rows (`a
 
 Legacy plaintext `AuthToken` REFRESH rows are deleted on the TTW-023 session cutover migration; remaining `AuthToken` rows are for email verification and password reset only.
 
+## Admin MFA (TTW-023)
+
+ADMIN console login requires TOTP (or a single-use recovery code) before an `AuthSession` is issued. CUSTOMER/ORGANIZER flows are unchanged.
+
+1. `POST /auth/admin/login` verifies password only and returns `{ mfa: { status }, mfa_token }` — **no cookies**.
+   - `ENROLLMENT_REQUIRED` when MFA is not yet enabled; `CHALLENGE_REQUIRED` when it is.
+2. Enrollment: `POST /auth/admin/mfa/enroll/start` → otpauth URI + recovery codes (plaintext once); `POST /auth/admin/mfa/enroll/confirm` with TOTP → enable MFA and set admin session cookies.
+3. Challenge: `POST /auth/admin/mfa/challenge` (TOTP) or `POST /auth/admin/mfa/recover` (one recovery code) → set admin session cookies.
+4. TOTP secrets are AES-256-GCM encrypted with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64) and a `keyVersion` column for rotation. Recovery codes are stored as sha256 hashes only.
+5. Another admin may `POST /admin/users/:id/mfa/reset` (audited) to clear MFA and revoke sessions.
+
+`mfa_token` is a short-lived JWT (`purpose`: `mfa_enroll` | `mfa_challenge`, `surface`: ADMIN, TTL 5m), not a session.
+
 ## Migration
 
 1. TTW-020: additive `authSurface` on `auth_tokens` + surface-scoped cookies (complete).
-2. TTW-023: create `auth_sessions`, delete all `AuthToken` REFRESH rows (force re-login), issue hashed refresh + JWT `sid` only. Clear any leftover legacy cookie names on set/clear.
+2. TTW-023 slice 2: create `auth_sessions`, delete all `AuthToken` REFRESH rows (force re-login), issue hashed refresh + JWT `sid` only. Clear any leftover legacy cookie names on set/clear.
+3. TTW-023 slice 3: `admin_mfa_credentials` + `admin_mfa_recovery_codes`; admin login returns MFA challenge until enroll/challenge/recover completes.

@@ -24,7 +24,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { AuthService } from './auth.service';
+import { AuthService, isMfaChallengeResponse } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -32,6 +32,11 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import {
+  AdminMfaRecoverDto,
+  AdminMfaTokenDto,
+  AdminMfaTotpDto,
+} from './dto/admin-mfa.dto';
 import { Public } from './decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -203,17 +208,102 @@ export class AuthController {
   /**
    * Login with email and password (ADMIN surface — apps/admin only).
    * CUSTOMER/ORGANIZER-role credentials are rejected here (TTW-020).
+   *
+   * Successful password verification does **not** issue a session. Response is
+   * either `ENROLLMENT_REQUIRED` or `CHALLENGE_REQUIRED` with a short-lived
+   * `mfa_token` (TTW-023). Complete MFA via `/auth/admin/mfa/*` to receive cookies.
    */
   @Public()
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
-  @ApiOperation({ summary: 'Login with email and password (admin surface)' })
+  @ApiOperation({
+    summary:
+      'Admin password login — returns MFA enrollment/challenge token (no session)',
+  })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
     status: 200,
-    description: 'Successfully authenticated as an admin',
+    description:
+      'Password accepted; MFA enrollment or challenge required before session cookies',
+    schema: {
+      type: 'object',
+      properties: {
+        mfa: {
+          type: 'object',
+          properties: {
+            status: {
+              type: 'string',
+              enum: ['ENROLLMENT_REQUIRED', 'CHALLENGE_REQUIRED'],
+            },
+          },
+        },
+        mfa_token: {
+          type: 'string',
+          description: 'Short-lived JWT (5m); not a session',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials, or role not permitted on this surface',
+  })
+  async adminLogin(
+    @Body() loginDto: LoginDto,
+    @Headers('user-agent') userAgent: string | undefined,
+  ) {
+    void userAgent;
+    const result = await this.authService.login(loginDto, AuthSurface.ADMIN);
+    if (!isMfaChallengeResponse(result)) {
+      // Defensive: ADMIN login must never mint a session without MFA.
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return result;
+  }
+
+  @Public()
+  @Post('admin/mfa/enroll/start')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @ApiOperation({
+    summary: 'Start admin MFA enrollment (otpauth URI + recovery codes once)',
+  })
+  @ApiBody({ type: AdminMfaTokenDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Pending TOTP secret + recovery codes (plaintext once)',
+    schema: {
+      type: 'object',
+      properties: {
+        otpauth_uri: { type: 'string' },
+        secret: { type: 'string' },
+        recovery_codes: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async adminMfaEnrollStart(@Body() dto: AdminMfaTokenDto) {
+    return this.authService.adminMfaEnrollStart(dto.mfa_token);
+  }
+
+  @Public()
+  @Post('admin/mfa/enroll/confirm')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @ApiOperation({
+    summary: 'Confirm admin MFA enrollment with TOTP and issue session cookies',
+  })
+  @ApiBody({ type: AdminMfaTotpDto })
+  @ApiResponse({
+    status: 200,
+    description: 'MFA enabled; admin session cookies set',
     schema: {
       type: 'object',
       properties: {
@@ -233,30 +323,127 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Invalid credentials, or role not permitted on this surface',
-  })
-  async adminLogin(
-    @Body() loginDto: LoginDto,
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async adminMfaEnrollConfirm(
+    @Body() dto: AdminMfaTotpDto,
     @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(loginDto, AuthSurface.ADMIN, {
-      deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent),
-    });
-
+    const result = await this.authService.adminMfaEnrollConfirm(
+      dto.mfa_token,
+      dto.totp,
+      { deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent) },
+    );
     const csrfToken = setSurfaceAuthCookies(
       res,
       AuthSurface.ADMIN,
       result.access_token,
       result.refresh_token,
     );
+    return { user: result.user, csrf_token: csrfToken };
+  }
 
-    return {
-      user: result.user,
-      csrf_token: csrfToken,
-    };
+  @Public()
+  @Post('admin/mfa/challenge')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @ApiOperation({
+    summary: 'Complete admin MFA challenge with TOTP and issue session cookies',
+  })
+  @ApiBody({ type: AdminMfaTotpDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Admin session cookies set',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            firstName: { type: 'string', nullable: true },
+            lastName: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
+            role: { type: 'string', enum: [UserRole.ADMIN] },
+            status: { type: 'string', example: 'ACTIVE' },
+          },
+        },
+        csrf_token: CSRF_TOKEN_SCHEMA,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async adminMfaChallenge(
+    @Body() dto: AdminMfaTotpDto,
+    @Headers('user-agent') userAgent: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.adminMfaChallenge(
+      dto.mfa_token,
+      dto.totp,
+      { deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent) },
+    );
+    const csrfToken = setSurfaceAuthCookies(
+      res,
+      AuthSurface.ADMIN,
+      result.access_token,
+      result.refresh_token,
+    );
+    return { user: result.user, csrf_token: csrfToken };
+  }
+
+  @Public()
+  @Post('admin/mfa/recover')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @ApiOperation({
+    summary:
+      'Complete admin MFA with a single-use recovery code and issue session cookies',
+  })
+  @ApiBody({ type: AdminMfaRecoverDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Recovery code consumed; admin session cookies set',
+    schema: {
+      type: 'object',
+      properties: {
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            firstName: { type: 'string', nullable: true },
+            lastName: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
+            role: { type: 'string', enum: [UserRole.ADMIN] },
+            status: { type: 'string', example: 'ACTIVE' },
+          },
+        },
+        csrf_token: CSRF_TOKEN_SCHEMA,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async adminMfaRecover(
+    @Body() dto: AdminMfaRecoverDto,
+    @Headers('user-agent') userAgent: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.adminMfaRecover(
+      dto.mfa_token,
+      dto.recovery_code,
+      { deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent) },
+    );
+    const csrfToken = setSurfaceAuthCookies(
+      res,
+      AuthSurface.ADMIN,
+      result.access_token,
+      result.refresh_token,
+    );
+    return { user: result.user, csrf_token: csrfToken };
   }
 
   /**

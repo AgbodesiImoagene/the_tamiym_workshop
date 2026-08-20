@@ -2,10 +2,13 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -66,5 +69,29 @@ export class AdminUsersController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.adminUsers.setUserRole(user.id, user.role, id, dto.role);
+  }
+
+  @Post(':id/mfa/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Reset ADMIN MFA (clears TOTP + recovery codes and revokes sessions)',
+  })
+  @ApiParam({ name: 'id', description: 'Target ADMIN user id' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiResponse({
+    status: 200,
+    description: 'MFA reset',
+    schema: {
+      type: 'object',
+      properties: { reset: { type: 'boolean', example: true } },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async resetMfa(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.adminUsers.resetUserMfa(user.id, user.role, id);
   }
 }

@@ -36,9 +36,18 @@ import {
   closePrismaScriptContext,
   createPrismaScriptContext,
 } from './_prisma-script-client';
+import {
+  decodeMfaEncryptionKey,
+  encryptTotpSecret,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+  MFA_TOTP_KEY_VERSION,
+} from '../src/auth/admin-mfa.crypto';
 
 const FIXTURE_PREFIX = 'e2e-';
 const FIXTURE_PASSWORD = 'TestPassword1!';
+/** Deterministic admin TOTP secret for Playwright MFA challenge (TTW-023). */
+const E2E_ADMIN_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 
 const IDS = {
   users: {
@@ -315,6 +324,15 @@ async function clearFixtureData() {
     await prisma.userOAuthAccount.deleteMany({
       where: { userId: { startsWith: FIXTURE_PREFIX } },
     });
+    await prisma.adminMfaRecoveryCode.deleteMany({
+      where: { userId: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.adminMfaCredential.deleteMany({
+      where: { userId: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.authSession.deleteMany({
+      where: { userId: { startsWith: FIXTURE_PREFIX } },
+    });
     await prisma.user.deleteMany({
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
@@ -480,6 +498,29 @@ async function main() {
         },
       ],
     });
+
+    // Pre-enroll admin MFA so Playwright can challenge with a known TOTP secret.
+    const mfaKey = decodeMfaEncryptionKey(process.env.MFA_TOTP_ENCRYPTION_KEY);
+    const encryptedTotp = encryptTotpSecret(E2E_ADMIN_TOTP_SECRET, mfaKey);
+    const adminIds = [IDS.users.adminPrimary, IDS.users.adminApprover];
+    for (const userId of adminIds) {
+      await prisma.adminMfaCredential.create({
+        data: {
+          userId,
+          secretCiphertext: encryptedTotp.ciphertext,
+          secretNonce: encryptedTotp.nonce,
+          keyVersion: MFA_TOTP_KEY_VERSION,
+          enabledAt: daysAgo(7),
+        },
+      });
+      const recoveryCodes = generateRecoveryCodes(10);
+      await prisma.adminMfaRecoveryCode.createMany({
+        data: recoveryCodes.map((code) => ({
+          userId,
+          codeHash: hashRecoveryCode(code),
+        })),
+      });
+    }
 
     await prisma.userPayoutProfile.create({
       data: {
@@ -1543,6 +1584,9 @@ async function main() {
     console.log(`- Approver: approver.e2e@tamiym.test / ${FIXTURE_PASSWORD}`);
     console.log(`- Organizer: organizer.e2e@tamiym.test / ${FIXTURE_PASSWORD}`);
     console.log(`- Customer: customer.e2e@tamiym.test / ${FIXTURE_PASSWORD}`);
+    console.log(
+      `- Admin MFA TOTP secret (seed only): ${E2E_ADMIN_TOTP_SECRET}`,
+    );
     console.log('Fixtures:');
     console.log('- Products: classic-tee-e2e, campus-hoodie-e2e');
     console.log('- Campaigns: campus-outreach-drive-e2e, choir-fundraiser-e2e');

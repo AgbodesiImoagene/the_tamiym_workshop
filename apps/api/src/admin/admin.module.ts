@@ -22,6 +22,7 @@ import { FundraisingModule } from '../fundraising/fundraising.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MailModule } from '../mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { AdminNotificationsController } from './admin-notifications.controller';
 import { AdminEmailBroadcastService } from './admin-email-broadcast.service';
@@ -37,6 +38,7 @@ import { MediaModule } from '../media/media.module';
   imports: [
     PrismaModule,
     MailModule,
+    AuthModule,
     AdminNotificationsModule,
     DiscountsModule,
     BulkPricingModule,

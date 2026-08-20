@@ -36,6 +36,12 @@ import {
   AuthSessionService,
   type SessionListItem,
 } from './auth-session.service';
+import {
+  AdminMfaService,
+  MFA_TOKEN_PURPOSE_CHALLENGE,
+  MFA_TOKEN_PURPOSE_ENROLL,
+  type MfaChallengeResponse,
+} from './admin-mfa.service';
 
 /** Normalized Google userinfo / id_token claims used to sign in or link accounts. */
 export type GoogleOAuthProfile = {
@@ -50,6 +56,28 @@ export type LoginSessionOptions = {
   deviceLabel?: string | null;
 };
 
+export type LoginSessionResult = {
+  access_token: string;
+  refresh_token: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    role: UserRole;
+    status: UserStatus;
+  };
+};
+
+export type LoginResult = LoginSessionResult | MfaChallengeResponse;
+
+export function isMfaChallengeResponse(
+  result: LoginResult,
+): result is MfaChallengeResponse {
+  return 'mfa' in result && 'mfa_token' in result;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -60,6 +88,7 @@ export class AuthService {
     private configService: ConfigService,
     private accountPolicy: AccountPolicyService,
     private authSession: AuthSessionService,
+    private adminMfa: AdminMfaService,
     @InjectQueue(MAIL_QUEUE_NAME) private mailQueue: Queue,
   ) {}
 
@@ -363,13 +392,28 @@ export class AuthService {
    *
    * @param loginDto Login credentials
    * @param surface Auth surface this login is for (CUSTOMER or ADMIN)
-   * @returns Access token, refresh token, and user data
+   * @returns Session tokens on CUSTOMER; MFA challenge on ADMIN (never a session)
    */
+  async login(
+    loginDto: LoginDto,
+    surface: typeof AuthSurface.CUSTOMER,
+    opts?: LoginSessionOptions,
+  ): Promise<LoginSessionResult>;
+  async login(
+    loginDto: LoginDto,
+    surface: typeof AuthSurface.ADMIN,
+    opts?: LoginSessionOptions,
+  ): Promise<MfaChallengeResponse>;
+  async login(
+    loginDto: LoginDto,
+    surface: AuthSurface,
+    opts?: LoginSessionOptions,
+  ): Promise<LoginResult>;
   async login(
     loginDto: LoginDto,
     surface: AuthSurface,
     opts: LoginSessionOptions = {},
-  ) {
+  ): Promise<LoginResult> {
     // Normalize email consistently with register/Google to prevent
     // case-sensitivity account-lookup mismatches.
     const email = loginDto.email.toLowerCase().trim();
@@ -414,12 +458,89 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // TTW-023: ADMIN password auth never mints a session until MFA completes.
+    if (surface === AuthSurface.ADMIN) {
+      const enabled = await this.adminMfa.isEnabled(user.id);
+      this.observability.recordAuthLogin({ outcome: 'success' });
+      if (!enabled) {
+        return {
+          mfa: { status: 'ENROLLMENT_REQUIRED' },
+          mfa_token: this.adminMfa.signMfaToken(
+            user.id,
+            MFA_TOKEN_PURPOSE_ENROLL,
+          ),
+        };
+      }
+      return {
+        mfa: { status: 'CHALLENGE_REQUIRED' },
+        mfa_token: this.adminMfa.signMfaToken(
+          user.id,
+          MFA_TOKEN_PURPOSE_CHALLENGE,
+        ),
+      };
+    }
+
     return this.completeLoginSession(
       user,
       'User authenticated successfully',
       surface,
       opts,
     );
+  }
+
+  /**
+   * Issue an ADMIN AuthSession after MFA enroll/challenge/recover succeeds.
+   * Used only by MFA completion paths — never from password-only admin login.
+   */
+  async issueAdminSessionAfterMfa(
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+      role: UserRole;
+      status: UserStatus;
+    },
+    opts: LoginSessionOptions = {},
+  ): Promise<LoginSessionResult> {
+    return this.completeLoginSession(
+      user,
+      'Admin authenticated after MFA',
+      AuthSurface.ADMIN,
+      opts,
+    );
+  }
+
+  async adminMfaEnrollStart(mfaToken: string) {
+    return this.adminMfa.startEnrollment(mfaToken);
+  }
+
+  async adminMfaEnrollConfirm(
+    mfaToken: string,
+    totp: string,
+    opts: LoginSessionOptions = {},
+  ): Promise<LoginSessionResult> {
+    const user = await this.adminMfa.confirmEnrollment(mfaToken, totp);
+    return this.issueAdminSessionAfterMfa(user, opts);
+  }
+
+  async adminMfaChallenge(
+    mfaToken: string,
+    totp: string,
+    opts: LoginSessionOptions = {},
+  ): Promise<LoginSessionResult> {
+    const user = await this.adminMfa.challenge(mfaToken, totp);
+    return this.issueAdminSessionAfterMfa(user, opts);
+  }
+
+  async adminMfaRecover(
+    mfaToken: string,
+    recoveryCode: string,
+    opts: LoginSessionOptions = {},
+  ): Promise<LoginSessionResult> {
+    const user = await this.adminMfa.recover(mfaToken, recoveryCode);
+    return this.issueAdminSessionAfterMfa(user, opts);
   }
 
   /**
@@ -570,7 +691,7 @@ export class AuthService {
     auditNote: string,
     surface: AuthSurface,
     opts: LoginSessionOptions = {},
-  ) {
+  ): Promise<LoginSessionResult> {
     const loggedInAt = new Date();
     let sessionId = '';
     let refreshToken = '';

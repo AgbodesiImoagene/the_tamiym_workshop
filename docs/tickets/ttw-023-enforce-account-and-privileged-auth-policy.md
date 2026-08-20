@@ -106,6 +106,33 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Deferred (same ticket):** admin TOTP + recovery codes; Redis identity+IP throttles; Playwright MFA/session suites.
 
+### Slice 3 — admin TOTP + recovery (APPROVED)
+
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED
+
+**Product decisions:**
+
+1. MFA is ADMIN-only. CUSTOMER/ORGANIZER login and session issuance are unchanged.
+2. Password (and any future admin Google path) must not mint an ADMIN `AuthSession` until MFA completes.
+3. After successful ADMIN password verification:
+   - No enabled MFA → `{ mfa: { status: 'ENROLLMENT_REQUIRED' }, mfa_token }` (short-lived signed challenge JWT; no cookies/session).
+   - MFA enabled → `{ mfa: { status: 'CHALLENGE_REQUIRED' }, mfa_token }` similarly.
+4. Endpoints (ADMIN surface / Origin; CSRF-exempt like other session-establishing auth paths):
+   - `POST /auth/admin/mfa/enroll/start` — `mfa_token` (enroll) → otpauth URI + pending encrypted secret + recovery codes plaintext once
+   - `POST /auth/admin/mfa/enroll/confirm` — `mfa_token` + TOTP → enable MFA, issue AuthSession cookies
+   - `POST /auth/admin/mfa/challenge` — `mfa_token` + TOTP → issue AuthSession
+   - `POST /auth/admin/mfa/recover` — `mfa_token` + recovery code → consume code, issue AuthSession, audit
+5. TOTP secret encrypted AES-256-GCM with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64); `keyVersion` int on credential row for rotation. TOTP via `otpauth` (Jest-compatible official TOTP library).
+6. Ten recovery codes; store sha256 hashes only; single-use.
+7. Wrong TOTP/recovery → generic `401 Unauthorized` (no oracle).
+8. `POST /admin/users/:id/mfa/reset` for ADMIN actors (audited; clears MFA + revokes sessions).
+9. Env: require `MFA_TOTP_ENCRYPTION_KEY` in non-test modes; `.env.test.example` supplies a fixed test key.
+10. Prefer JWT `mfa_token` claims `{ sub, purpose: mfa_enroll|mfa_challenge, surface: ADMIN }`, TTL 5m, signed with `JWT_ACCESS_SECRET`.
+11. Redis throttles deferred (same ticket, later slice). Playwright MFA suites deferred.
+
+**Blast radius:** admin login response contract; new MFA tables; `AuthService` / `AdminMfaService`; CSRF exempt list; env validation; auth-surface e2e admin helpers; `create-admin-user` messaging; OpenAPI; `docs/14-auth-and-session-architecture.md`.
+
 ## Implementation reviews
 
 **Security (slice 1):** PASS — auth boundary uses generic 401; `EMAIL_NOT_VERIFIED` only on post-auth action gates. Residual (non-blocking): payment initiation not gated for legacy pending orders.
@@ -131,6 +158,15 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 - `pnpm coverage:diff` — 81.48% (≥80%).
 - MFA / Redis throttles / Playwright — still deferred.
 
+### Slice 3 (admin TOTP + recovery)
+
+- Migration: `20260820180000_ttw023_admin_mfa`
+- `pnpm --filter api exec tsc --noEmit` — pass.
+- Unit: `admin-mfa.crypto`, `admin-mfa.totp`, `admin-mfa.service`, `auth.service`, `auth.controller`, `env-validation`, `admin-users.service`, `csrf.guard` — 124 tests pass.
+- E2e: `auth-surface.e2e-spec.ts` — 32 tests pass (admin login → MFA enroll/confirm → cookies; `createAdminSession` completes MFA).
+- TOTP library: `otpauth` (official; Jest/CJS-compatible; replaces ESM-only `otplib` for this repo’s test runner).
+- Redis identity+IP throttles / Playwright MFA suites — deferred (same ticket).
+
 ## Completion summary
 
-Slice 1 (verified-email action policy) shipped. Slice 2 (hashed `AuthSession` wiring: JWT `sid`, list/revoke APIs, cleanup, tests) implemented on this branch. Remaining same-ticket work: admin TOTP + recovery, Redis identity+IP throttles, Playwright suites.
+Slice 1 (verified-email action policy) shipped. Slice 2 (hashed `AuthSession` wiring) shipped. Slice 3 (admin TOTP enrollment/challenge/recovery + audited MFA reset) implemented on this branch. Remaining same-ticket work: Redis identity+IP throttles, Playwright suites.
