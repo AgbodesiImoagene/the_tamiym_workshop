@@ -81,6 +81,9 @@ enum OrderStatus {
   FULFILLED
   DELIVERED
   CANCELLED
+  /// Provider-confirmed refunds cover some but not all of the captured value (TTW-013).
+  PARTIALLY_REFUNDED
+  /// Provider-confirmed refunds cover the full captured value (TTW-013).
   REFUNDED
 }
 
@@ -290,10 +293,18 @@ enum PayoutRunStatus {
   CANCELLED
 }
 
-/// Status of a refund against an order.
+/// Lifecycle of a provider refund attempt (TTW-013).
+/// Financial/campaign/ledger effects apply only on SUCCEEDED after provider confirmation.
 enum RefundStatus {
+  /// Reserved locally before/while calling the provider; counts toward the in-flight cap.
   INITIATED
+  /// Provider accepted the refund and is processing (refund.pending / refund.processing).
+  PROCESSING
+  /// Provider requires bank details (refund.needs-attention); still in-flight for the cap.
+  NEEDS_ATTENTION
+  /// Provider-confirmed success (refund.processed); settlement claim applied exactly once.
   SUCCEEDED
+  /// Provider-confirmed failure (refund.failed) or hard initiation rejection.
   FAILED
 }
 
@@ -1354,6 +1365,9 @@ model Payment {
   /// Exactly-once settlement claim for charge.success (TTW-010).
   settlementClaim ChargeSettlementClaim?
 
+  /// Refunds targeting this succeeded payment (TTW-013).
+  refunds Refund[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1382,27 +1396,61 @@ model ChargeSettlementClaim {
   @@map("charge_settlement_claims")
 }
 
-/// Refund against an order. Tracks provider, amount, reason, and status.
+/// Refund against an order. Tracks provider lifecycle; money moves only on SUCCEEDED (TTW-013).
 model Refund {
   id      String @id @default(cuid())
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  provider    PaymentProvider @default(PAYSTACK)
+  /// Succeeded payment this refund targets (captured value authority).
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  provider PaymentProvider @default(PAYSTACK)
+  /// Paystack refund id (numeric) once known; used for webhook matching and claim keys.
   providerRef String?
-  status      RefundStatus    @default(INITIATED)
+  /// Original charge/transaction reference used when creating the refund.
+  transactionReference String?
+  status               RefundStatus @default(INITIATED)
 
   currency CurrencyCode @default(NGN)
   amount   Decimal      @db.Decimal(10, 2)
 
   reason String?
 
+  /// Client/admin idempotency key so retries do not create a second in-flight refund.
+  idempotencyKey String? @unique
+
+  /// Exactly-once settlement claim for refund.processed (TTW-013).
+  settlementClaim RefundSettlementClaim?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([orderId])
+  @@index([paymentId])
   @@index([provider, providerRef])
+  @@index([transactionReference])
+  @@index([status])
   @@map("refunds")
+}
+
+/// Exactly-once claim that a provider refund reference has settled financial effects (TTW-013).
+/// Inserting this row is the settlement lock; duplicates become successful no-ops.
+model RefundSettlementClaim {
+  id          String          @id @default(cuid())
+  provider    PaymentProvider @default(PAYSTACK)
+  /// Business key, e.g. `refund.processed:{providerRef}`.
+  businessKey String
+  refundId    String          @unique
+  refund      Refund          @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderId     String
+
+  createdAt DateTime @default(now())
+
+  @@unique([provider, businessKey])
+  @@index([orderId])
+  @@map("refund_settlement_claims")
 }
 
 /**
@@ -1494,10 +1542,12 @@ model CampaignBalanceLedgerEntry {
 
   /// Exactly one PAYMENT_SETTLED row per order is enforced by a partial unique index in migrations (TTW-010).
   /// Exactly one PAYOUT_RESERVED / PAYOUT_SUCCEEDED / PAYOUT_FAILED (release) per payoutId (TTW-011).
+  /// Exactly one REFUND_APPLIED row per refundId is enforced by a partial unique index (TTW-013).
   @@index([campaignId])
   @@index([campaignId, availableAt])
   @@index([orderId])
   @@index([payoutId])
+  @@index([refundId])
   @@map("campaign_balance_ledger_entries")
 }
 

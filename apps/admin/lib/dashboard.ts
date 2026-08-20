@@ -59,6 +59,16 @@ export interface AdminOrderDetail extends AdminOrder {
       name: string;
     } | null;
   }>;
+  refunds?: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    reason?: string | null;
+    providerRef?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 export interface AdminCampaign {

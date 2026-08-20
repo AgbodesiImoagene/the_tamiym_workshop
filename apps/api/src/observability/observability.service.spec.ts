@@ -33,4 +33,14 @@ describe('ObservabilityService', () => {
       service.recordPaymentInitiation({ outcome: 'failure' }),
     ).not.toThrow();
   });
+
+  it('records refund settlement outcomes', () => {
+    const service = new ObservabilityService();
+    expect(() => service.recordRefundSettlement('initiated')).not.toThrow();
+    expect(() => service.recordRefundSettlement('settled')).not.toThrow();
+    expect(() => service.recordRefundSettlement('duplicate')).not.toThrow();
+    expect(() => service.recordRefundSettlement('failed')).not.toThrow();
+    expect(() => service.recordRefundSettlement('stale')).not.toThrow();
+    expect(() => service.recordRefundSettlement('unmatched')).not.toThrow();
+  });
 });

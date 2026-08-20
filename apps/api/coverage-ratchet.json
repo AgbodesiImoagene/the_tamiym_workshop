@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-012 diff-coverage fix.",
+  "notes": "Raised after TTW-013 refund lifecycle coverage.",
   "floors": {
-    "statements": 48.17,
-    "branches": 42.89,
-    "functions": 45.85,
-    "lines": 48.2
+    "statements": 48.82,
+    "branches": 43.22,
+    "functions": 46.56,
+    "lines": 48.86
   }
 }

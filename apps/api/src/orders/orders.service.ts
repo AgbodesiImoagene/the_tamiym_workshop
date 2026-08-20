@@ -606,6 +606,19 @@ export class OrdersService {
           },
         },
         shippingAddress: true,
+        refunds: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            status: true,
+            reason: true,
+            providerRef: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
     if (!order) {

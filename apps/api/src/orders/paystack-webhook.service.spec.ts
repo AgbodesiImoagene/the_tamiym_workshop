@@ -12,6 +12,7 @@ import * as crypto from 'node:crypto';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { RefundsService } from './refunds.service';
 
 describe('PaystackWebhookService', () => {
   let service: PaystackWebhookService;
@@ -110,6 +111,12 @@ describe('PaystackWebhookService', () => {
           useValue: mockNotificationOutboxDelivery,
         },
         { provide: AdminNotifyService, useValue: mockAdminNotify },
+        {
+          provide: RefundsService,
+          useValue: {
+            applyRefundWebhookEvent: jest.fn().mockResolvedValue(true),
+          },
+        },
       ],
     }).compile();
 
@@ -162,6 +169,7 @@ describe('PaystackWebhookService', () => {
         enqueueDelivery: jest.fn(),
       };
       const mockAdminNotify = { emit: jest.fn() };
+      const mockRefunds = { applyRefundWebhookEvent: jest.fn() };
       const svc = new PaystackWebhookService(
         prisma,
         config,
@@ -171,6 +179,7 @@ describe('PaystackWebhookService', () => {
         mockObservability as never,
         mockDelivery as never,
         mockAdminNotify as never,
+        mockRefunds as never,
       );
       expect(svc.verifySignature(rawBody, signature)).toBe(false);
     });
@@ -410,6 +419,7 @@ describe('PaystackWebhookService', () => {
         enqueueDelivery: jest.fn().mockResolvedValue(undefined),
       };
       const mockAdminNotify = { emit: jest.fn().mockResolvedValue(undefined) };
+      const mockRefunds = { applyRefundWebhookEvent: jest.fn() };
       const svc = new PaystackWebhookService(
         prisma,
         config,
@@ -419,6 +429,7 @@ describe('PaystackWebhookService', () => {
         observability as never,
         mockDelivery as never,
         mockAdminNotify as never,
+        mockRefunds as never,
       );
 
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
@@ -548,6 +559,40 @@ describe('PaystackWebhookService', () => {
       const result = await service.handleWebhook(rawBody, signature);
 
       expect(result).toBe(true);
+    });
+
+    it('should route refund.processed to RefundsService', async () => {
+      const body = JSON.stringify({
+        event: 'refund.processed',
+        data: { id: 991, status: 'processed' },
+      });
+      const signature = crypto
+        .createHmac('sha512', secret)
+        .update(body)
+        .digest('hex');
+      const refunds = {
+        applyRefundWebhookEvent: jest.fn().mockResolvedValue(true),
+      };
+      const svc = new PaystackWebhookService(
+        prisma,
+        config,
+        { updatePayoutStatusByReference: jest.fn() } as never,
+        {
+          getSettlementHoldDays: jest.fn(),
+          createPaymentSettled: jest.fn(),
+        } as never,
+        { log: jest.fn() } as never,
+        observability as never,
+        { enqueueDelivery: jest.fn() } as never,
+        { emit: jest.fn() } as never,
+        refunds as never,
+      );
+
+      const result = await svc.handleWebhook(body, signature);
+      expect(result).toBe(true);
+      expect(refunds.applyRefundWebhookEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'refund.processed' }),
+      );
     });
   });
 });
