@@ -57,7 +57,7 @@ Exempt:
 
 - Non-mutating methods.
 - `@Public()` session-establishing paths, matched by path suffix: `auth/login`, `auth/admin/login`, `auth/register`, `auth/google`, `auth/google/callback`, `auth/forgot-password`, `auth/reset-password`, `auth/verify-email`, `auth/resend-verification`.
-- Provider webhook paths (`webhooks`, `paystack`) — authenticated by signature.
+- Exact path `…/webhooks/paystack` — authenticated by Paystack signature.
 - Requests with **no** surface session cookie: `Authorization: Bearer` clients and body-only `POST /auth/refresh` (`{ "refresh_token": ... }`), neither of which a cross-site page can forge.
 
 `POST /auth/refresh` and `POST /auth/logout` are `@Public()` (they authenticate the refresh token themselves) but are **not** on the exemption list: presenting a session cookie to them is CSRF-checked exactly like an authenticated mutation.
