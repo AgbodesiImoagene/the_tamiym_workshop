@@ -1,6 +1,9 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   GoneException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -73,6 +76,103 @@ describe('PrivacyService', () => {
       status: UserStatus.ACTIVE,
     });
   }
+
+  it('lists and gets owned requests', async () => {
+    prisma.privacyRequest.findMany.mockResolvedValue([{ id: 'r1' }]);
+    await expect(service.listForUser('u1')).resolves.toEqual([{ id: 'r1' }]);
+    prisma.privacyRequest.findFirst.mockResolvedValue({
+      id: 'r1',
+      actions: [],
+    });
+    await expect(service.getForUser('u1', 'r1')).resolves.toMatchObject({
+      id: 'r1',
+    });
+    prisma.privacyRequest.findFirst.mockResolvedValue(null);
+    await expect(service.getForUser('u1', 'missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('creates an export package', async () => {
+    await stubActivePassword();
+    const expires = new Date(Date.now() + 60_000);
+    prisma.privacyRequest.create.mockResolvedValue({
+      id: 'exp-new',
+      type: PrivacyRequestType.EXPORT,
+      status: PrivacyRequestStatus.COMPLETED,
+      policyVersion: 'privacy-policy/v1-interim-2026-08-20',
+      exportExpiresAt: expires,
+    });
+    prisma.privacyRequestAction.create.mockResolvedValue({});
+    audit.log.mockResolvedValue({});
+    const result = await service.requestExport('u1', 'TestPassword1!');
+    expect(result.downloadPath).toContain('exp-new');
+    expect(audit.log).toHaveBeenCalled();
+  });
+
+  it('cancels an unexpired export download', async () => {
+    prisma.privacyRequest.findFirst.mockResolvedValue({
+      id: 'exp-3',
+      userId: 'u1',
+      type: PrivacyRequestType.EXPORT,
+      status: PrivacyRequestStatus.COMPLETED,
+      exportExpiresAt: new Date(Date.now() + 60_000),
+    });
+    prisma.privacyRequest.update.mockResolvedValue({
+      id: 'exp-3',
+      status: PrivacyRequestStatus.CANCELLED,
+    });
+    await expect(service.cancel('u1', 'exp-3')).resolves.toMatchObject({
+      status: PrivacyRequestStatus.CANCELLED,
+    });
+  });
+
+  it('rejects cancelling erasure requests', async () => {
+    prisma.privacyRequest.findFirst.mockResolvedValue({
+      id: 'er1',
+      type: PrivacyRequestType.ERASURE,
+      status: PrivacyRequestStatus.IN_PROGRESS,
+    });
+    await expect(service.cancel('u1', 'er1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('rejects a second completed erasure', async () => {
+    await stubActivePassword();
+    prisma.order.count.mockResolvedValue(0);
+    prisma.campaign.count.mockResolvedValue(0);
+    prisma.payout.count.mockResolvedValue(0);
+    prisma.privacyRequest.findFirst.mockResolvedValue({
+      id: 'done',
+      status: PrivacyRequestStatus.COMPLETED,
+      legalHoldUntil: null,
+    });
+    await expect(
+      service.requestErasure('u1', 'TestPassword1!'),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns an active legal hold without re-running executors', async () => {
+    await stubActivePassword();
+    prisma.order.count.mockResolvedValue(0);
+    prisma.campaign.count.mockResolvedValue(0);
+    prisma.payout.count.mockResolvedValue(0);
+    prisma.privacyRequest.findFirst
+      .mockResolvedValueOnce({
+        id: 'held',
+        status: PrivacyRequestStatus.HELD,
+        legalHoldUntil: new Date(Date.now() + 86_400_000),
+      })
+      .mockResolvedValueOnce({
+        id: 'held',
+        status: PrivacyRequestStatus.HELD,
+        actions: [],
+      });
+    const result = await service.requestErasure('u1', 'TestPassword1!');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(result.id).toBe('held');
+  });
 
   it('rejects export without a valid password', async () => {
     await stubActivePassword();
