@@ -1,4 +1,4 @@
-import { apiClient } from './api';
+import { apiClient, csrfHeaders } from './api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
@@ -173,6 +173,7 @@ export async function uploadAdminProductImage(
     method: 'POST',
     body: form,
     credentials: 'include',
+    headers: csrfHeaders(),
   });
 
   if (!res.ok) {

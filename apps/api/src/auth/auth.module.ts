@@ -10,6 +10,7 @@ import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { RolesGuard } from './guards/roles/roles.guard';
+import { CsrfGuard } from './guards/csrf/csrf.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MailModule } from '../mail/mail.module';
 import { StringValue } from 'ms';
@@ -47,7 +48,8 @@ import { StringValue } from 'ms';
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
+    CsrfGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard],
 })
 export class AuthModule {}

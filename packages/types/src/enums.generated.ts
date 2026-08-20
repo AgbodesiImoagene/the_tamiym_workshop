@@ -39,6 +39,12 @@ export enum TokenType {
   EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
 }
 
+// Nullable until legacy (pre-TTW-020) refresh tokens are revoked or expire.
+export enum AuthSurface {
+  CUSTOMER = 'CUSTOMER',
+  ADMIN = 'ADMIN',
+}
+
 // How a product image is used (thumbnail, gallery, or workshop template).
 export enum ImageRole {
   THUMBNAIL = 'THUMBNAIL',

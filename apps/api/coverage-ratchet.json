@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-015 reconciliation unit coverage expansion.",
+  "notes": "Raised after the TTW-020 Reviewer A must-fix follow-ups (extracted + unit-tested env-validation, CSRF exact-path exemption, surfacesWithSessionCookies empty-string fix) added coverage.",
   "floors": {
-    "statements": 54.06,
-    "branches": 47.02,
-    "functions": 52.96,
-    "lines": 54.39
+    "statements": 56.09,
+    "branches": 48.99,
+    "functions": 55.24,
+    "lines": 56.44
   }
 }

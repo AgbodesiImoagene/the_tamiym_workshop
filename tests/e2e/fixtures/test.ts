@@ -68,9 +68,10 @@ type Fixtures = {
 };
 
 /**
- * Extended test with isolated role contexts.
- * Note: until TTW-020, admin and customer share cookie *names* on the API host;
- * fixtures still use separate browser contexts and storage states.
+ * Extended test with isolated role contexts. Since TTW-020 each surface has
+ * its own cookie names on the API host, and the saved storage states carry
+ * surface-scoped cookies — so a context must always be used against the
+ * matching surface's Origin.
  */
 export const test = base.extend<Fixtures>({
   api: async ({}, use) => {

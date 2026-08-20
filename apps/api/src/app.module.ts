@@ -19,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt/jwt.guard';
+import { CsrfGuard } from './auth/guards/csrf/csrf.guard';
 import { UsersModule } from './users/users.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { DesignsModule } from './designs/designs.module';
@@ -31,43 +32,7 @@ import { HttpMetricsInterceptor } from './observability/http-metrics.interceptor
 import { RequestContextInterceptor } from './request-context/request-context.interceptor';
 import { RequestContextMiddleware } from './request-context/request-context.middleware';
 import { getRequestContext } from './request-context/request-context.store';
-
-const requiredEnvVars = [
-  'DATABASE_URL',
-  'JWT_ACCESS_SECRET',
-  'JWT_REFRESH_SECRET',
-] as const;
-const forbiddenPlaceholders = new Set([
-  'secret',
-  'your-access-secret-key-change-in-production',
-  'your-refresh-secret-key-change-in-production',
-]);
-
-function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
-  if (process.env.NODE_ENV === 'test') {
-    return config;
-  }
-  for (const key of requiredEnvVars) {
-    const value = config[key];
-    if (
-      value === undefined ||
-      value === null ||
-      (typeof value !== 'string' &&
-        typeof value !== 'number' &&
-        typeof value !== 'boolean') ||
-      String(value).trim() === ''
-    ) {
-      throw new Error(`Missing required environment variable: ${key}`);
-    }
-    const normalized = `${value}`.trim().toLowerCase();
-    if (forbiddenPlaceholders.has(normalized)) {
-      throw new Error(
-        `Environment variable ${key} must be set to a secure value, not a placeholder`,
-      );
-    }
-  }
-  return config;
-}
+import { validateEnv } from './config/env-validation';
 
 @Module({
   imports: [
@@ -171,6 +136,13 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    // TTW-020: runs after JwtAuthGuard (which already rejects surface
+    // mismatches on cookie-authenticated requests); enforces Origin
+    // allowlist + double-submit CSRF token on cookie-authenticated mutations.
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     {
       provide: APP_INTERCEPTOR,

@@ -6,7 +6,8 @@ import * as crypto from 'node:crypto';
 import { Public } from './decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { GoogleOAuthService } from './google-oauth.service';
-import { authCookieBaseOptions, setAuthTokenCookies } from './auth-cookies';
+import { authCookieBaseOptions, setSurfaceAuthCookies } from './auth-cookies';
+import { AuthSurface } from '../generated/prisma/enums';
 import {
   GOOGLE_OAUTH_NEXT_COOKIE_NAME,
   GOOGLE_OAUTH_STATE_COOKIE_NAME,
@@ -116,7 +117,14 @@ export class GoogleOAuthController {
     try {
       const profile = await this.googleOAuth.exchangeCodeForProfile(code);
       const session = await this.authService.loginWithGoogleProfile(profile);
-      setAuthTokenCookies(res, session.access_token, session.refresh_token);
+      // Google sign-in is CUSTOMER-surface only (TTW-020); AuthService
+      // rejects ADMIN-role accounts before this point.
+      setSurfaceAuthCookies(
+        res,
+        AuthSurface.CUSTOMER,
+        session.access_token,
+        session.refresh_token,
+      );
       const redirectTo = this.resolvePostLoginRedirect(nextCookie);
       return res.redirect(302, redirectTo);
     } catch (err) {

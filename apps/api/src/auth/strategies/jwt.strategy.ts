@@ -5,12 +5,19 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole, UserStatus } from '../../generated/prisma/client';
-import { ACCESS_TOKEN_COOKIE_NAME } from '../../constants';
+import { AuthSurface } from '../../generated/prisma/enums';
+import {
+  isRoleAllowedForSurface,
+  resolveSurfaceFromOrigin,
+} from '../auth-surface';
+import { surfaceCookieNames } from '../auth-cookies';
 
 export interface JwtPayload {
   sub: string; // user id
   email: string;
   role: UserRole;
+  /** Auth surface (TTW-020) this access token was issued for. */
+  surface: AuthSurface;
 }
 
 /** Shape of the user attached to the request by JWT strategy (validate return value). */
@@ -22,6 +29,37 @@ export interface RequestUser {
   firstName: string;
   lastName: string;
   phone: string | null;
+  /** Surface this request authenticated on (from the validated JWT). */
+  surface: AuthSurface;
+}
+
+/** True when `value` is one of the known auth surfaces (never trust a raw claim). */
+function isKnownSurface(value: unknown): value is AuthSurface {
+  return (
+    typeof value === 'string' &&
+    (Object.values(AuthSurface) as string[]).includes(value)
+  );
+}
+
+/** True when the request carries an explicit `Authorization: Bearer` header. */
+function hasBearerAuthorizationHeader(request: Request): boolean {
+  const header = request.headers?.authorization;
+  return typeof header === 'string' && /^Bearer\s+\S+/i.test(header);
+}
+
+/**
+ * Cookie-based JWT extractor: only reads the access cookie belonging to the
+ * surface implied by the request's Origin/Referer. A customer-surface cookie
+ * is never read on an admin-origin request, and vice versa — this is the
+ * server-side enforcement point that prevents cross-surface cookie reuse at
+ * extraction time (defense in depth alongside the `validate` surface check).
+ */
+function extractAccessTokenFromSurfaceCookie(request: Request): string | null {
+  const surface = resolveSurfaceFromOrigin(request);
+  if (!surface) return null;
+  const names = surfaceCookieNames(surface);
+  const token = request?.cookies?.[names.access] as string | undefined;
+  return token ?? null;
 }
 
 @Injectable()
@@ -31,14 +69,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaService,
   ) {
     super({
+      passReqToCallback: true,
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (request: Request): string | null => {
-          const token = request?.cookies?.[ACCESS_TOKEN_COOKIE_NAME] as
-            | string
-            | undefined;
-          return token ?? null;
-        },
+        extractAccessTokenFromSurfaceCookie,
       ]),
       ignoreExpiration: false,
       secretOrKey: (() => {
@@ -53,7 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<RequestUser> {
+  async validate(req: Request, payload: JwtPayload): Promise<RequestUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
@@ -71,6 +105,34 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found');
     }
 
-    return user;
+    // Every access token must name the surface it was minted for, and the
+    // account's *current* role must still be permitted on that surface. This
+    // is enforced for bearer tokens too: without it, a session minted on the
+    // customer surface would keep working after the account was promoted to
+    // ADMIN, and an admin-surface bearer token would be usable by an account
+    // that has since been demoted (TTW-020 review fix).
+    if (!isKnownSurface(payload.surface)) {
+      throw new UnauthorizedException('Session surface missing');
+    }
+    if (!isRoleAllowedForSurface(user.role, payload.surface)) {
+      throw new UnauthorizedException(
+        'Role is not permitted on this session surface',
+      );
+    }
+
+    // Cookie-authenticated requests must additionally have a JWT surface
+    // claim matching the surface implied by this request's Origin — this is
+    // what stops a stolen/leaked admin cookie from authenticating on the
+    // customer origin (or vice versa) even if it were somehow presented
+    // there. Bearer callers have no ambient cookie jar and no Origin, so the
+    // role×surface check above is their surface gate.
+    if (!hasBearerAuthorizationHeader(req)) {
+      const requestSurface = resolveSurfaceFromOrigin(req);
+      if (!requestSurface || payload.surface !== requestSurface) {
+        throw new UnauthorizedException('Session surface mismatch');
+      }
+    }
+
+    return { ...user, surface: payload.surface };
   }
 }
