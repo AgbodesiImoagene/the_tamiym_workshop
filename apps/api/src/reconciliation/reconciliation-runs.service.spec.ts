@@ -153,3 +153,91 @@ describe('PaystackReconciliationClient fail-closed', () => {
     expect(result.errorSummary).toMatch(/PAYSTACK_SECRET_KEY/);
   });
 });
+
+describe('checkAgainstProvider matching', () => {
+  it('flags amount mismatch and provider-only success as MISSING_INTERNAL', async () => {
+    const now = new Date('2026-08-20T12:00:00.000Z');
+    const from = new Date('2026-08-13T00:00:00.000Z');
+    const prisma = {
+      payment: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            {
+              id: 'pay1',
+              orderId: 'o1',
+              amount: 10,
+              currency: 'NGN',
+              providerRef: 'ref_local',
+              createdAt: now,
+            },
+          ])
+          .mockResolvedValue([]),
+      },
+      refund: { findMany: jest.fn().mockResolvedValue([]) },
+      payout: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new ReconciliationRunsService(
+      prisma as never,
+      {
+        startSpan: (_n: string, _a: unknown, fn: () => unknown) => fn(),
+      } as never,
+      {} as never,
+    );
+    const result = await (
+      service as unknown as {
+        checkAgainstProvider: (
+          cutoff: Date,
+          snapshot: {
+            transactions: Array<{
+              reference: string;
+              status: string;
+              amountKobo: number;
+              currency: string;
+            }>;
+            refunds: [];
+            transfers: [];
+          },
+          from: Date,
+        ) => Promise<{
+          findings: Array<{ outcome: string; leftValue: string }>;
+        }>;
+      }
+    ).checkAgainstProvider(
+      now,
+      {
+        transactions: [
+          {
+            reference: 'ref_local',
+            status: 'success',
+            amountKobo: 999,
+            currency: 'NGN',
+          },
+          {
+            reference: 'ref_provider_only',
+            status: 'success',
+            amountKobo: 100,
+            currency: 'NGN',
+          },
+        ],
+        refunds: [],
+        transfers: [],
+      },
+      from,
+    );
+    expect(
+      result.findings.some(
+        (f) =>
+          f.outcome === ReconciliationOutcome.MISMATCH &&
+          f.leftValue.includes('1000'),
+      ),
+    ).toBe(true);
+    expect(
+      result.findings.some(
+        (f) =>
+          f.outcome === ReconciliationOutcome.MISSING_INTERNAL &&
+          f.leftValue === 'ref_provider_only',
+      ),
+    ).toBe(true);
+  });
+});

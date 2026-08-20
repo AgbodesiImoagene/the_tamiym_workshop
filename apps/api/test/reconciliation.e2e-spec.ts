@@ -5,6 +5,8 @@ import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReconciliationRunsService } from '../src/reconciliation/reconciliation-runs.service';
 import { ReconciliationRepairService } from '../src/reconciliation/reconciliation-repair.service';
+import { AdminReconciliationController } from '../src/admin/admin-reconciliation.controller';
+import { AuditService } from '../src/audit/audit.service';
 import {
   CampaignStatus,
   LedgerEntryType,
@@ -278,9 +280,6 @@ describe('Reconciliation (e2e)', () => {
       },
     });
 
-    const { AdminReconciliationController } =
-      await import('../src/admin/admin-reconciliation.controller');
-    const { AuditService } = await import('../src/audit/audit.service');
     const controller = new AdminReconciliationController(
       prisma,
       runs,
@@ -296,7 +295,9 @@ describe('Reconciliation (e2e)', () => {
     );
     expect(listed.items.length).toBeGreaterThan(0);
     expect(listed).toHaveProperty('nextCursor');
-    const masked = listed.items.find((i) => i.id === finding!.id);
+    const masked = listed.items.find(
+      (i: { id: string }) => i.id === finding!.id,
+    );
     expect(masked).toBeTruthy();
     expect(masked).not.toHaveProperty('evidence');
     expect(JSON.stringify(masked)).not.toContain('sk_live_should_not_leak');

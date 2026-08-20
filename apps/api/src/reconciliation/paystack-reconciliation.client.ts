@@ -53,12 +53,17 @@ export class PaystackReconciliationClient {
       params,
       (row: Record<string, unknown>): PaystackListedTransaction | null => {
         if (typeof row.reference !== 'string' || row.id == null) return null;
+        const amountKobo = Number(row.amount);
+        if (!Number.isFinite(amountKobo)) return null;
+        if (typeof row.currency !== 'string' || row.currency.length === 0) {
+          return null;
+        }
         return {
           id: Number(row.id),
           reference: row.reference,
           status: typeof row.status === 'string' ? row.status : '',
-          amountKobo: Number(row.amount ?? 0),
-          currency: typeof row.currency === 'string' ? row.currency : 'NGN',
+          amountKobo,
+          currency: row.currency,
         };
       },
     );
@@ -73,6 +78,11 @@ export class PaystackReconciliationClient {
       params,
       (row: Record<string, unknown>): PaystackListedRefund | null => {
         if (row.id == null) return null;
+        const amountKobo = Number(row.amount);
+        if (!Number.isFinite(amountKobo)) return null;
+        if (typeof row.currency !== 'string' || row.currency.length === 0) {
+          return null;
+        }
         const txn = row.transaction;
         const transactionReference =
           typeof txn === 'object' && txn != null && 'reference' in txn
@@ -83,8 +93,8 @@ export class PaystackReconciliationClient {
         return {
           id: Number(row.id),
           status: typeof row.status === 'string' ? row.status : '',
-          amountKobo: Number(row.amount ?? 0),
-          currency: typeof row.currency === 'string' ? row.currency : 'NGN',
+          amountKobo,
+          currency: row.currency,
           transactionReference: transactionReference || null,
         };
       },
@@ -100,12 +110,17 @@ export class PaystackReconciliationClient {
       params,
       (row: Record<string, unknown>): PaystackListedTransfer | null => {
         if (typeof row.reference !== 'string' || row.id == null) return null;
+        const amountKobo = Number(row.amount);
+        if (!Number.isFinite(amountKobo)) return null;
+        if (typeof row.currency !== 'string' || row.currency.length === 0) {
+          return null;
+        }
         return {
           id: Number(row.id),
           reference: row.reference,
           status: typeof row.status === 'string' ? row.status : '',
-          amountKobo: Number(row.amount ?? 0),
-          currency: typeof row.currency === 'string' ? row.currency : 'NGN',
+          amountKobo,
+          currency: row.currency,
         };
       },
     );

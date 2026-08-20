@@ -82,11 +82,17 @@ export class ReconciliationRunsService {
               });
             }
 
-            const fromAt = new Date(
+            const toDay = cutoffAt.toISOString().slice(0, 10);
+            const fromDay = new Date(
               cutoffAt.getTime() - 7 * 24 * 60 * 60 * 1000,
-            );
-            const fromIso = fromAt.toISOString();
-            const toIso = cutoffAt.toISOString();
+            )
+              .toISOString()
+              .slice(0, 10);
+            // Align local comparisons to the same calendar-day window Paystack receives.
+            const fromAt = new Date(`${fromDay}T00:00:00.000Z`);
+            const toAtExclusive = new Date(`${toDay}T23:59:59.999Z`);
+            const fromIso = fromDay;
+            const toIso = toDay;
 
             const [txns, refunds, transfers] = await Promise.all([
               this.paystack.listTransactions({ fromIso, toIso }),
@@ -101,7 +107,7 @@ export class ReconciliationRunsService {
               return this.executeRun({
                 kind: ReconciliationRunKind.PROVIDER,
                 windowKey,
-                cutoffAt,
+                cutoffAt: toAtExclusive,
                 providerComplete: false,
                 providerErrorSummary:
                   incomplete.errorSummary ?? 'Provider pagination incomplete',
@@ -116,7 +122,7 @@ export class ReconciliationRunsService {
             return this.executeRun({
               kind: ReconciliationRunKind.PROVIDER,
               windowKey,
-              cutoffAt,
+              cutoffAt: toAtExclusive,
               providerComplete: true,
               includeProviderChecks: true,
               providerWindowFrom: fromAt,
@@ -132,6 +138,8 @@ export class ReconciliationRunsService {
                 transactions: txns.items.length,
                 refunds: refunds.items.length,
                 transfers: transfers.items.length,
+                fromDay,
+                toDay,
               },
             });
           },
@@ -630,8 +638,8 @@ export class ReconciliationRunsService {
 
         const inFlight =
           payout.status === PayoutStatus.INITIATED ||
-          payout.status === PayoutStatus.PROCESSING ||
-          payout.status === PayoutStatus.QUEUED;
+          payout.status === PayoutStatus.PROCESSING;
+        // QUEUED is approved-but-not-yet-reserved; reserve is created at execution.
         // Missing internal reserve is never provider grace — flag HIGH immediately.
         if (inFlight && Math.abs(netAmount + amount) > 0.0001) {
           findings.push({

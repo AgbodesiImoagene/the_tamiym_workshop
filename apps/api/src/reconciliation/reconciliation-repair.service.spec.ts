@@ -160,4 +160,40 @@ describe('ReconciliationRepairService', () => {
       }),
     );
   });
+
+  it.each([
+    ['refund.document_missing_claim', ReconciliationDomain.REFUND],
+    ['payout.document_ledger_gap', ReconciliationDomain.PAYOUT],
+    ['inventory.noop_document_drift', ReconciliationDomain.INVENTORY],
+  ] as const)('marks WONT_FIX for %s', async (commandKey, domain) => {
+    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+      id: 'rep1',
+      status: ReconciliationRepairStatus.REQUESTED,
+      requestedByUserId: 'admin-a',
+      domain,
+      commandKey,
+      findingId: 'f1',
+      finding: {
+        id: 'f1',
+        domain,
+        sourceIds: { refundId: 'r1', payoutId: 'p1', variantId: 'v1' },
+        leftValue: 'x',
+        rightValue: 'y',
+        fingerprint: 'fp1',
+      },
+    });
+
+    await service.approveAndApply({
+      repairId: 'rep1',
+      actorUserId: 'admin-b',
+    });
+
+    expect(prisma.reconciliationFinding.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: ReconciliationFindingStatus.WONT_FIX,
+        }),
+      }),
+    );
+  });
 });
