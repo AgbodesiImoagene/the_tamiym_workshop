@@ -7,14 +7,14 @@ Pinned CLI: **OpenTofu 1.9.1** (`.opentofu-version`).
 
 ## Layout
 
-| Path                         | Role                                                         |
-| ---------------------------- | ------------------------------------------------------------ |
-| `modules/`                   | Reusable modules (no env-specific values)                    |
-| `envs/production/`           | Production composition + isolated remote state               |
-| `envs/temporary-validation/` | Disposable validation composition + isolated state           |
-| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof |
-| `policy/`                    | Format/lint/secret-scan policy helpers                       |
-| `scripts/validate-all.sh`    | Credential-free fmt + init + validate                        |
+| Path                         | Role                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `modules/`                   | Reusable modules (`labeling`, `digitalocean_project`, `vpc`, `firewall`, `reserved_ip`) |
+| `envs/production/`           | Production composition + isolated remote state                                          |
+| `envs/temporary-validation/` | Disposable validation composition + isolated state                                      |
+| `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                            |
+| `policy/`                    | deny-secrets + network-invariant policy helpers                                         |
+| `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                          |
 
 ## Environments
 
@@ -67,4 +67,7 @@ CI trust model, and drift plan.
 
 - [TTW-060 state backend](../docs/infrastructure/ttw-060-opentofu-state-backend.md)
 - [TTW-061 IaC foundation](../docs/infrastructure/ttw-061-iac-foundation.md)
+- [TTW-062 network / edge](../docs/infrastructure/ttw-062-network-edge.md)
+- [TTW-062 Namecheap DNS](../docs/infrastructure/ttw-062-namecheap-dns.md)
 - [TTW-061 ticket](../docs/tickets/ttw-061-establish-iac-foundation.md)
+- [TTW-062 ticket](../docs/tickets/ttw-062-provision-network-dns-edge.md)
