@@ -77,17 +77,17 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 See [the epic contract](../epics/06-production-infrastructure-as-code.md) and [provider decision brief](../18-production-infrastructure-options.md).
 
-| Ticket                                                            | Priority | Risk     | State       | Outcome                                                                    |
-| ----------------------------------------------------------------- | -------- | -------- | ----------- | -------------------------------------------------------------------------- |
-| [TTW-060](ttw-060-select-production-platform.md)                  | P0       | High     | In progress | Finalize DigitalOcean architecture, cost model and ADR evidence            |
-| [TTW-061](ttw-061-establish-iac-foundation.md)                    | P0       | High     | Scoped      | Establish OpenTofu state, provider controls and reviewed plan/apply        |
-| [TTW-062](ttw-062-provision-network-dns-edge.md)                  | P1       | High     | Scoped      | Provision private networking, DNS, TLS, ingress and edge controls          |
-| [TTW-063](ttw-063-deploy-production-runtime.md)                   | P1       | High     | Scoped      | Build immutable images and deploy public, API, worker and scheduler roles  |
-| [TTW-064](ttw-064-provision-managed-data-services.md)             | P0       | Critical | Scoped      | Provision recoverable PostgreSQL, queue storage and private object storage |
-| [TTW-065](ttw-065-enforce-infrastructure-security.md)             | P0       | High     | Scoped      | Enforce workload identity, secrets, encryption and break-glass controls    |
-| [TTW-066](ttw-066-operationalize-infrastructure-observability.md) | P1       | High     | Scoped      | Route infrastructure telemetry, alerts and cost controls                   |
-| [TTW-067](ttw-067-prove-backup-disaster-recovery.md)              | P1       | Critical | Scoped      | Automate backups and prove recovery objectives through exercises           |
-| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Scoped      | Validate ephemeral release infrastructure and integrate CI/CD              |
+| Ticket                                                            | Priority | Risk     | State    | Outcome                                                                    |
+| ----------------------------------------------------------------- | -------- | -------- | -------- | -------------------------------------------------------------------------- |
+| [TTW-060](ttw-060-select-production-platform.md)                  | P0       | High     | Complete | Finalize DigitalOcean architecture, cost model and ADR evidence            |
+| [TTW-061](ttw-061-establish-iac-foundation.md)                    | P0       | High     | Scoped   | Establish OpenTofu state, provider controls and reviewed plan/apply        |
+| [TTW-062](ttw-062-provision-network-dns-edge.md)                  | P1       | High     | Scoped   | Provision private networking, DNS, TLS, ingress and edge controls          |
+| [TTW-063](ttw-063-deploy-production-runtime.md)                   | P1       | High     | Scoped   | Build immutable images and deploy public, API, worker and scheduler roles  |
+| [TTW-064](ttw-064-provision-managed-data-services.md)             | P0       | Critical | Scoped   | Provision recoverable PostgreSQL, queue storage and private object storage |
+| [TTW-065](ttw-065-enforce-infrastructure-security.md)             | P0       | High     | Scoped   | Enforce workload identity, secrets, encryption and break-glass controls    |
+| [TTW-066](ttw-066-operationalize-infrastructure-observability.md) | P1       | High     | Scoped   | Route infrastructure telemetry, alerts and cost controls                   |
+| [TTW-067](ttw-067-prove-backup-disaster-recovery.md)              | P1       | Critical | Scoped   | Automate backups and prove recovery objectives through exercises           |
+| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Scoped   | Validate ephemeral release infrastructure and integrate CI/CD              |
 
 ## Epic 7 — Organic discovery: SEO, AEO and GEO
 

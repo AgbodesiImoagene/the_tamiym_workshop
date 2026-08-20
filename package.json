@@ -23,7 +23,10 @@
     "prepare": "pnpm exec husky || true",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:seed": "pnpm --filter api db:seed",
-    "db:generate": "pnpm --filter api exec prisma generate"
+    "db:generate": "pnpm --filter api exec prisma generate",
+    "infra:cost-model": "node scripts/infrastructure/cost-model.mjs",
+    "infra:budget-check": "node scripts/infrastructure/check-resource-budget.mjs",
+    "infra:cost-model:test": "node --test scripts/infrastructure/__tests__/cost-model.test.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

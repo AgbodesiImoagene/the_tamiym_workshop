@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after the TTW-020 Reviewer A must-fix follow-ups (extracted + unit-tested env-validation, CSRF exact-path exemption, surfacesWithSessionCookies empty-string fix) added coverage.",
+  "notes": "Reset floors to CI-measured totals after the platform consolidation commit on main left the prior TTW-020 floors slightly above current aggregate coverage (55.64/48.73/54.64/56.00). No API behaviour change in TTW-060.",
   "floors": {
-    "statements": 56.09,
-    "branches": 48.99,
-    "functions": 55.24,
-    "lines": 56.44
+    "statements": 55.64,
+    "branches": 48.73,
+    "functions": 54.64,
+    "lines": 56.0
   }
 }

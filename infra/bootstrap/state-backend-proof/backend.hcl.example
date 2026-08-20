@@ -1,0 +1,5 @@
+# Local MinIO / disposable Spaces backend config — copy to backend.hcl (gitignored).
+# Never commit backend.hcl. Never reuse these placeholders against DigitalOcean Spaces.
+endpoint   = "http://127.0.0.1:19000"
+access_key = "CHANGE_ME_LOCAL_ONLY"
+secret_key = "CHANGE_ME_LOCAL_ONLY"
