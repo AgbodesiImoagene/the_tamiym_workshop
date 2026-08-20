@@ -7,6 +7,7 @@ import {
   PaymentStatus,
   PayoutStatus,
   ReconciliationDomain,
+  ReconciliationFindingStatus,
   ReconciliationOutcome,
   ReconciliationRunKind,
   ReconciliationRunStatus,
@@ -15,12 +16,17 @@ import {
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { ObservabilityService } from '../observability/observability.service';
+import { PaystackReconciliationClient } from './paystack-reconciliation.client';
 import {
   FindingDraft,
   fingerprintFinding,
   lagosDayIso,
   windowKeyFor,
 } from './reconciliation.util';
+
+const PAGE_SIZE = 200;
+/** ADR: 24h provider grace for in-flight settlement. */
+const GRACE_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ReconciliationRunsService {
@@ -29,6 +35,7 @@ export class ReconciliationRunsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly observability: ObservabilityService,
+    private readonly paystack: PaystackReconciliationClient,
   ) {}
 
   async runInternal(cutoffAt = new Date()) {
@@ -38,23 +45,16 @@ export class ReconciliationRunsService {
       async () => {
         const day = lagosDayIso(cutoffAt);
         const windowKey = windowKeyFor('internal', day);
-        const locked = await this.tryAdvisoryLock(`recon:${windowKey}`);
-        if (!locked) {
-          this.logger.warn(
-            `Skipping internal recon; lock held for ${windowKey}`,
-          );
-          return null;
-        }
-        try {
-          return await this.executeRun({
-            kind: ReconciliationRunKind.INTERNAL,
-            windowKey,
-            cutoffAt,
-            providerComplete: true,
-          });
-        } finally {
-          await this.releaseAdvisoryLock(`recon:${windowKey}`);
-        }
+        return this.prisma.withSessionAdvisoryLock(
+          `recon:${windowKey}`,
+          async () =>
+            this.executeRun({
+              kind: ReconciliationRunKind.INTERNAL,
+              windowKey,
+              cutoffAt,
+              providerComplete: true,
+            }),
+        );
       },
     );
   }
@@ -69,27 +69,71 @@ export class ReconciliationRunsService {
       async () => {
         const day = lagosDayIso(cutoffAt);
         const windowKey = windowKeyFor('provider', day);
-        const locked = await this.tryAdvisoryLock(`recon:${windowKey}`);
-        if (!locked) {
-          this.logger.warn(
-            `Skipping provider recon; lock held for ${windowKey}`,
-          );
-          return null;
-        }
-        try {
-          // Provider pages are fetched via lightweight verify stubs; incomplete
-          // if the caller signals pagination failure (fail closed).
-          const providerComplete = opts?.forceIncomplete !== true;
-          return await this.executeRun({
-            kind: ReconciliationRunKind.PROVIDER,
-            windowKey,
-            cutoffAt,
-            providerComplete,
-            includeProviderChecks: true,
-          });
-        } finally {
-          await this.releaseAdvisoryLock(`recon:${windowKey}`);
-        }
+        return this.prisma.withSessionAdvisoryLock(
+          `recon:${windowKey}`,
+          async () => {
+            if (opts?.forceIncomplete === true) {
+              return this.executeRun({
+                kind: ReconciliationRunKind.PROVIDER,
+                windowKey,
+                cutoffAt,
+                providerComplete: false,
+                providerErrorSummary: 'Provider pagination incomplete (forced)',
+              });
+            }
+
+            const fromIso = new Date(
+              cutoffAt.getTime() - 7 * 24 * 60 * 60 * 1000,
+            ).toISOString();
+            const toIso = cutoffAt.toISOString();
+
+            const [txns, refunds, transfers] = await Promise.all([
+              this.paystack.listTransactions({ fromIso, toIso }),
+              this.paystack.listRefunds({ fromIso, toIso }),
+              this.paystack.listTransfers({ fromIso, toIso }),
+            ]);
+
+            const incomplete = [txns, refunds, transfers].find(
+              (r) => !r.complete,
+            );
+            if (incomplete) {
+              return this.executeRun({
+                kind: ReconciliationRunKind.PROVIDER,
+                windowKey,
+                cutoffAt,
+                providerComplete: false,
+                providerErrorSummary:
+                  incomplete.errorSummary ?? 'Provider pagination incomplete',
+                cursor: {
+                  transactionsPages: txns.pagesFetched,
+                  refundsPages: refunds.pagesFetched,
+                  transfersPages: transfers.pagesFetched,
+                },
+              });
+            }
+
+            return this.executeRun({
+              kind: ReconciliationRunKind.PROVIDER,
+              windowKey,
+              cutoffAt,
+              providerComplete: true,
+              includeProviderChecks: true,
+              providerSnapshot: {
+                transactions: txns.items,
+                refunds: refunds.items,
+                transfers: transfers.items,
+              },
+              cursor: {
+                transactionsPages: txns.pagesFetched,
+                refundsPages: refunds.pagesFetched,
+                transfersPages: transfers.pagesFetched,
+                transactions: txns.items.length,
+                refunds: refunds.items.length,
+                transfers: transfers.items.length,
+              },
+            });
+          },
+        );
       },
     );
   }
@@ -120,6 +164,28 @@ export class ReconciliationRunsService {
     providerComplete: boolean;
     includeProviderChecks?: boolean;
     domainFilter?: ReconciliationDomain;
+    providerErrorSummary?: string;
+    providerSnapshot?: {
+      transactions: Array<{
+        reference: string;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+      refunds: Array<{
+        id: number;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+      transfers: Array<{
+        reference: string;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+    };
+    cursor?: Record<string, unknown>;
   }) {
     const run = await this.prisma.reconciliationRun.upsert({
       where: {
@@ -131,6 +197,9 @@ export class ReconciliationRunsService {
         cutoffAt: params.cutoffAt,
         status: ReconciliationRunStatus.RUNNING,
         startedAt: new Date(),
+        cursor: (params.cursor ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
       },
       update: {
         status: ReconciliationRunStatus.RUNNING,
@@ -139,6 +208,9 @@ export class ReconciliationRunsService {
         errorSummary: null,
         recordsChecked: 0,
         findingsOpen: 0,
+        cursor: (params.cursor ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
       },
     });
 
@@ -149,7 +221,8 @@ export class ReconciliationRunsService {
           data: {
             status: ReconciliationRunStatus.INCOMPLETE,
             finishedAt: new Date(),
-            errorSummary: 'Provider pagination incomplete',
+            errorSummary:
+              params.providerErrorSummary ?? 'Provider pagination incomplete',
           },
         });
         return this.prisma.reconciliationRun.findUniqueOrThrow({
@@ -195,18 +268,29 @@ export class ReconciliationRunsService {
         }
       }
 
-      if (params.includeProviderChecks) {
-        const r = await this.checkProviderPresence(params.cutoffAt);
+      if (params.includeProviderChecks && params.providerSnapshot) {
+        const r = await this.checkAgainstProvider(
+          params.cutoffAt,
+          params.providerSnapshot,
+        );
         drafts.push(...r.findings);
         recordsChecked += r.checked;
       }
 
       for (const draft of drafts) {
-        await this.upsertOpenFinding(run.id, draft);
+        await this.upsertActiveFinding(run.id, draft);
       }
 
       const openCount = await this.prisma.reconciliationFinding.count({
-        where: { runId: run.id, status: 'OPEN' },
+        where: {
+          runId: run.id,
+          status: {
+            in: [
+              ReconciliationFindingStatus.OPEN,
+              ReconciliationFindingStatus.ACKNOWLEDGED,
+            ],
+          },
+        },
       });
 
       return this.prisma.reconciliationRun.update({
@@ -232,9 +316,17 @@ export class ReconciliationRunsService {
     }
   }
 
-  private async upsertOpenFinding(runId: string, draft: FindingDraft) {
+  private async upsertActiveFinding(runId: string, draft: FindingDraft) {
     const existing = await this.prisma.reconciliationFinding.findFirst({
-      where: { fingerprint: draft.fingerprint, status: 'OPEN' },
+      where: {
+        fingerprint: draft.fingerprint,
+        status: {
+          in: [
+            ReconciliationFindingStatus.OPEN,
+            ReconciliationFindingStatus.ACKNOWLEDGED,
+          ],
+        },
+      },
     });
     if (existing) {
       await this.prisma.reconciliationFinding.update({
@@ -270,348 +362,731 @@ export class ReconciliationRunsService {
     });
   }
 
+  private async paginateIds<T extends { id: string }>(
+    fetchPage: (cursorId: string | undefined) => Promise<T[]>,
+    onRow: (row: T) => Promise<void> | void,
+  ): Promise<number> {
+    let cursorId: string | undefined;
+    let checked = 0;
+    for (;;) {
+      const batch = await fetchPage(cursorId);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        await onRow(row);
+      }
+      checked += batch.length;
+      cursorId = batch[batch.length - 1]?.id;
+      if (batch.length < PAGE_SIZE) break;
+    }
+    return checked;
+  }
+
+  private withinGrace(createdAt: Date, now: Date): boolean {
+    return now.getTime() - createdAt.getTime() < GRACE_MS;
+  }
+
   private async checkPayments(cutoffAt: Date) {
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        status: PaymentStatus.SUCCEEDED,
-        createdAt: { lte: cutoffAt },
-      },
-      select: {
-        id: true,
-        orderId: true,
-        amount: true,
-        currency: true,
-        settlementClaim: { select: { id: true } },
-        order: { select: { id: true, status: true, paymentStatus: true } },
-      },
-      take: 500,
-    });
     const findings: FindingDraft[] = [];
-    for (const payment of payments) {
-      if (!payment.settlementClaim) {
-        findings.push({
-          domain: ReconciliationDomain.PAYMENT,
-          outcome: ReconciliationOutcome.MISSING_INTERNAL,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+    const settledOrderStatuses: OrderStatus[] = [
+      OrderStatus.PAID,
+      OrderStatus.PROCESSING,
+      OrderStatus.FULFILLED,
+      OrderStatus.DELIVERED,
+      OrderStatus.PARTIALLY_REFUNDED,
+      OrderStatus.REFUNDED,
+    ];
+
+    const checked = await this.paginateIds(
+      (cursorId) =>
+        this.prisma.payment.findMany({
+          where: {
+            status: PaymentStatus.SUCCEEDED,
+            createdAt: { lte: cutoffAt },
+          },
+          select: {
+            id: true,
+            orderId: true,
+            amount: true,
+            currency: true,
+            settlementClaim: { select: { id: true } },
+            order: { select: { id: true, status: true, paymentStatus: true } },
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      (payment) => {
+        if (!payment.settlementClaim) {
+          findings.push({
             domain: ReconciliationDomain.PAYMENT,
             outcome: ReconciliationOutcome.MISSING_INTERNAL,
-            entityKey: `payment:${payment.id}:claim`,
-          }),
-          leftLabel: 'payment.status',
-          leftValue: PaymentStatus.SUCCEEDED,
-          rightLabel: 'chargeSettlementClaim',
-          rightValue: 'missing',
-          currency: payment.currency,
-          sourceIds: { paymentId: payment.id, orderId: payment.orderId },
-        });
-      }
-      const settledOrderStatuses: OrderStatus[] = [
-        OrderStatus.PAID,
-        OrderStatus.PROCESSING,
-        OrderStatus.FULFILLED,
-        OrderStatus.DELIVERED,
-        OrderStatus.PARTIALLY_REFUNDED,
-        OrderStatus.REFUNDED,
-      ];
-      if (
-        payment.order.paymentStatus !== PaymentStatus.SUCCEEDED ||
-        !settledOrderStatuses.includes(payment.order.status)
-      ) {
-        findings.push({
-          domain: ReconciliationDomain.PAYMENT,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYMENT,
+              outcome: ReconciliationOutcome.MISSING_INTERNAL,
+              entityKey: `payment:${payment.id}:claim`,
+            }),
+            leftLabel: 'payment.status',
+            leftValue: PaymentStatus.SUCCEEDED,
+            rightLabel: 'chargeSettlementClaim',
+            rightValue: 'missing',
+            currency: payment.currency,
+            sourceIds: { paymentId: payment.id, orderId: payment.orderId },
+          });
+        }
+        if (
+          payment.order.paymentStatus !== PaymentStatus.SUCCEEDED ||
+          !settledOrderStatuses.includes(payment.order.status)
+        ) {
+          findings.push({
             domain: ReconciliationDomain.PAYMENT,
             outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `payment:${payment.id}:order`,
-          }),
-          leftLabel: 'payment.status',
-          leftValue: PaymentStatus.SUCCEEDED,
-          rightLabel: 'order.status/paymentStatus',
-          rightValue: `${payment.order.status}/${payment.order.paymentStatus}`,
-          currency: payment.currency,
-          sourceIds: { paymentId: payment.id, orderId: payment.orderId },
-        });
-      }
-    }
-    return { findings, checked: payments.length };
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYMENT,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `payment:${payment.id}:order`,
+            }),
+            leftLabel: 'payment.status',
+            leftValue: PaymentStatus.SUCCEEDED,
+            rightLabel: 'order.status/paymentStatus',
+            rightValue: `${payment.order.status}/${payment.order.paymentStatus}`,
+            currency: payment.currency,
+            sourceIds: { paymentId: payment.id, orderId: payment.orderId },
+          });
+        }
+      },
+    );
+    return { findings, checked };
   }
 
   private async checkRefunds(cutoffAt: Date) {
-    const refunds = await this.prisma.refund.findMany({
-      where: {
-        status: RefundStatus.SUCCEEDED,
-        createdAt: { lte: cutoffAt },
-      },
-      select: {
-        id: true,
-        orderId: true,
-        amount: true,
-        currency: true,
-        settlementClaim: { select: { id: true } },
-      },
-      take: 500,
-    });
     const findings: FindingDraft[] = [];
-    for (const refund of refunds) {
-      if (!refund.settlementClaim) {
-        findings.push({
-          domain: ReconciliationDomain.REFUND,
-          outcome: ReconciliationOutcome.MISSING_INTERNAL,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+    const checked = await this.paginateIds(
+      (cursorId) =>
+        this.prisma.refund.findMany({
+          where: {
+            status: RefundStatus.SUCCEEDED,
+            createdAt: { lte: cutoffAt },
+          },
+          select: {
+            id: true,
+            orderId: true,
+            amount: true,
+            currency: true,
+            settlementClaim: { select: { id: true } },
+            order: { select: { campaignId: true } },
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      async (refund) => {
+        if (!refund.settlementClaim) {
+          findings.push({
             domain: ReconciliationDomain.REFUND,
             outcome: ReconciliationOutcome.MISSING_INTERNAL,
-            entityKey: `refund:${refund.id}:claim`,
-          }),
-          leftLabel: 'refund.status',
-          leftValue: RefundStatus.SUCCEEDED,
-          rightLabel: 'refundSettlementClaim',
-          rightValue: 'missing',
-          currency: refund.currency,
-          sourceIds: { refundId: refund.id, orderId: refund.orderId },
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: ReconciliationOutcome.MISSING_INTERNAL,
+              entityKey: `refund:${refund.id}:claim`,
+            }),
+            leftLabel: 'refund.status',
+            leftValue: RefundStatus.SUCCEEDED,
+            rightLabel: 'refundSettlementClaim',
+            rightValue: 'missing',
+            currency: refund.currency,
+            sourceIds: { refundId: refund.id, orderId: refund.orderId },
+          });
+        }
+        const ledger = await this.prisma.campaignBalanceLedgerEntry.count({
+          where: {
+            refundId: refund.id,
+            entryType: LedgerEntryType.REFUND_APPLIED,
+          },
         });
-      }
-      const ledger = await this.prisma.campaignBalanceLedgerEntry.count({
-        where: {
-          refundId: refund.id,
-          entryType: LedgerEntryType.REFUND_APPLIED,
-        },
-      });
-      // Campaign refunds should have a ledger row; non-campaign may have zero.
-      if (ledger > 1) {
-        findings.push({
-          domain: ReconciliationDomain.REFUND,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+        if (ledger > 1) {
+          findings.push({
             domain: ReconciliationDomain.REFUND,
             outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `refund:${refund.id}:ledger`,
-          }),
-          leftLabel: 'REFUND_APPLIED.count',
-          leftValue: String(ledger),
-          rightLabel: 'expected',
-          rightValue: '<=1',
-          currency: refund.currency,
-          sourceIds: { refundId: refund.id },
-        });
-      }
-    }
-    return { findings, checked: refunds.length };
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `refund:${refund.id}:ledger`,
+            }),
+            leftLabel: 'REFUND_APPLIED.count',
+            leftValue: String(ledger),
+            rightLabel: 'expected',
+            rightValue: '<=1',
+            currency: refund.currency,
+            sourceIds: { refundId: refund.id },
+          });
+        }
+        if (refund.order.campaignId && ledger === 0) {
+          findings.push({
+            domain: ReconciliationDomain.REFUND,
+            outcome: ReconciliationOutcome.MISSING_INTERNAL,
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: ReconciliationOutcome.MISSING_INTERNAL,
+              entityKey: `refund:${refund.id}:ledgerMissing`,
+            }),
+            leftLabel: 'REFUND_APPLIED.count',
+            leftValue: '0',
+            rightLabel: 'expected',
+            rightValue: '1',
+            currency: refund.currency,
+            sourceIds: {
+              refundId: refund.id,
+              campaignId: refund.order.campaignId,
+            },
+          });
+        }
+      },
+    );
+    return { findings, checked };
   }
 
   private async checkPayouts(cutoffAt: Date) {
-    const payouts = await this.prisma.payout.findMany({
-      where: { createdAt: { lte: cutoffAt } },
-      select: { id: true, status: true, amount: true, currency: true },
-      take: 500,
-    });
     const findings: FindingDraft[] = [];
-    for (const payout of payouts) {
-      const net = await this.prisma.campaignBalanceLedgerEntry.aggregate({
-        where: { payoutId: payout.id },
-        _sum: { amount: true },
-      });
-      const netAmount = Number(net._sum.amount ?? 0);
-      if (
-        payout.status === PayoutStatus.SUCCEEDED &&
-        Math.abs(netAmount) > 0.0001
-      ) {
-        findings.push({
-          domain: ReconciliationDomain.PAYOUT,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.HIGH,
-          fingerprint: fingerprintFinding({
-            domain: ReconciliationDomain.PAYOUT,
-            outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `payout:${payout.id}:net`,
-          }),
-          leftLabel: 'payout.status',
-          leftValue: payout.status,
-          rightLabel: 'ledgerNet',
-          rightValue: String(netAmount),
-          currency: payout.currency,
-          sourceIds: { payoutId: payout.id },
+    const now = cutoffAt;
+    const checked = await this.paginateIds(
+      (cursorId) =>
+        this.prisma.payout.findMany({
+          where: { createdAt: { lte: cutoffAt } },
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            currency: true,
+            createdAt: true,
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      async (payout) => {
+        const net = await this.prisma.campaignBalanceLedgerEntry.aggregate({
+          where: { payoutId: payout.id },
+          _sum: { amount: true },
         });
-      }
-      if (
-        (payout.status === PayoutStatus.INITIATED ||
+        const netAmount = Number(net._sum.amount ?? 0);
+        const amount = Number(payout.amount);
+        // SUCCEEDED: reserve (-amount) + succeeded(0) → expected net ≈ -amount
+        if (payout.status === PayoutStatus.SUCCEEDED) {
+          const expected = -amount;
+          if (Math.abs(netAmount - expected) > 0.0001) {
+            findings.push({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: ReconciliationOutcome.MISMATCH,
+              severity: ReconciliationSeverity.HIGH,
+              fingerprint: fingerprintFinding({
+                domain: ReconciliationDomain.PAYOUT,
+                outcome: ReconciliationOutcome.MISMATCH,
+                entityKey: `payout:${payout.id}:net`,
+              }),
+              leftLabel: 'expectedLedgerNet',
+              leftValue: String(expected),
+              rightLabel: 'ledgerNet',
+              rightValue: String(netAmount),
+              currency: payout.currency,
+              sourceIds: { payoutId: payout.id },
+            });
+          }
+        }
+
+        const inFlight =
+          payout.status === PayoutStatus.INITIATED ||
           payout.status === PayoutStatus.PROCESSING ||
-          payout.status === PayoutStatus.QUEUED) &&
-        netAmount === 0
-      ) {
-        findings.push({
-          domain: ReconciliationDomain.PAYOUT,
-          outcome: ReconciliationOutcome.MISSING_INTERNAL,
-          severity: ReconciliationSeverity.HIGH,
-          fingerprint: fingerprintFinding({
+          payout.status === PayoutStatus.QUEUED;
+        if (inFlight && Math.abs(netAmount + amount) > 0.0001) {
+          // Expected reserve of -amount while in flight
+          const grace = this.withinGrace(payout.createdAt, now);
+          findings.push({
             domain: ReconciliationDomain.PAYOUT,
-            outcome: ReconciliationOutcome.MISSING_INTERNAL,
-            entityKey: `payout:${payout.id}:reserve`,
-          }),
-          leftLabel: 'payout.status',
-          leftValue: payout.status,
-          rightLabel: 'ledgerNet',
-          rightValue: '0',
-          currency: payout.currency,
-          sourceIds: { payoutId: payout.id },
-        });
-      }
-    }
-    return { findings, checked: payouts.length };
+            outcome: grace
+              ? ReconciliationOutcome.PENDING_GRACE
+              : ReconciliationOutcome.MISSING_INTERNAL,
+            severity: grace
+              ? ReconciliationSeverity.LOW
+              : ReconciliationSeverity.HIGH,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: grace
+                ? ReconciliationOutcome.PENDING_GRACE
+                : ReconciliationOutcome.MISSING_INTERNAL,
+              entityKey: `payout:${payout.id}:reserve`,
+            }),
+            leftLabel: 'payout.status',
+            leftValue: payout.status,
+            rightLabel: 'ledgerNet',
+            rightValue: String(netAmount),
+            currency: payout.currency,
+            sourceIds: { payoutId: payout.id },
+          });
+        }
+      },
+    );
+    return { findings, checked };
   }
 
   private async checkCampaigns(cutoffAt: Date) {
-    const campaigns = await this.prisma.campaign.findMany({
-      select: { id: true, currentAmount: true },
-      take: 200,
-    });
     const findings: FindingDraft[] = [];
-    for (const campaign of campaigns) {
-      const settled = await this.prisma.campaignBalanceLedgerEntry.aggregate({
-        where: {
-          campaignId: campaign.id,
-          entryType: {
-            in: [
-              LedgerEntryType.PAYMENT_SETTLED,
-              LedgerEntryType.REFUND_APPLIED,
-            ],
+    const checked = await this.paginateIds(
+      (cursorId) =>
+        this.prisma.campaign.findMany({
+          select: { id: true, currentAmount: true },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      async (campaign) => {
+        const settled = await this.prisma.campaignBalanceLedgerEntry.aggregate({
+          where: {
+            campaignId: campaign.id,
+            entryType: {
+              in: [
+                LedgerEntryType.PAYMENT_SETTLED,
+                LedgerEntryType.REFUND_APPLIED,
+              ],
+            },
+            createdAt: { lte: cutoffAt },
           },
-          createdAt: { lte: cutoffAt },
-        },
-        _sum: { amount: true },
-      });
-      const ledgerNet = Number(settled._sum.amount ?? 0);
-      const display = Number(campaign.currentAmount);
-      if (Math.abs(ledgerNet - display) > 0.01) {
-        findings.push({
-          domain: ReconciliationDomain.CAMPAIGN,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+          _sum: { amount: true },
+        });
+        const ledgerNet = Number(settled._sum.amount ?? 0);
+        const display = Number(campaign.currentAmount);
+        if (Math.abs(ledgerNet - display) > 0.01) {
+          findings.push({
             domain: ReconciliationDomain.CAMPAIGN,
             outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `campaign:${campaign.id}:currentAmount`,
-          }),
-          leftLabel: 'campaign.currentAmount',
-          leftValue: String(display),
-          rightLabel: 'ledger PAYMENT_SETTLED+REFUND_APPLIED',
-          rightValue: String(ledgerNet),
-          sourceIds: { campaignId: campaign.id },
-        });
-      }
-    }
-    return { findings, checked: campaigns.length };
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.CAMPAIGN,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `campaign:${campaign.id}:currentAmount`,
+            }),
+            leftLabel: 'campaign.currentAmount',
+            leftValue: String(display),
+            rightLabel: 'ledger PAYMENT_SETTLED+REFUND_APPLIED',
+            rightValue: String(ledgerNet),
+            sourceIds: { campaignId: campaign.id },
+          });
+        }
+      },
+    );
+    return { findings, checked };
   }
 
   private async checkInventory() {
-    const items = await this.prisma.inventoryItem.findMany({
-      where: { trackInventory: true },
-      select: { variantId: true, stockOnHand: true, reserved: true },
-      take: 500,
-    });
     const findings: FindingDraft[] = [];
-    for (const item of items) {
-      const movements = await this.prisma.inventoryMovement.findMany({
-        where: { variantId: item.variantId },
-        select: { reservedDelta: true, stockOnHandDelta: true, kind: true },
+    let checked = 0;
+    let cursorId: string | undefined;
+    for (;;) {
+      const batch = await this.prisma.inventoryItem.findMany({
+        where: { trackInventory: true },
+        select: { variantId: true, stockOnHand: true, reserved: true },
+        orderBy: { variantId: 'asc' },
+        take: PAGE_SIZE,
+        ...(cursorId ? { skip: 1, cursor: { variantId: cursorId } } : {}),
       });
-      if (movements.length === 0) continue;
-      const reservedDelta = movements.reduce((s, m) => s + m.reservedDelta, 0);
-      const stockDelta = movements.reduce((s, m) => s + m.stockOnHandDelta, 0);
-      // Movement-only truth for reserved after reserve/release/consume should match counter
-      // for variants that have a full movement history starting from 0. Compare deltas to
-      // counters when CONSUME/RELEASE/RESERVE are present.
-      const hasReserve = movements.some(
-        (m) => m.kind === InventoryMovementKind.RESERVE,
-      );
-      if (!hasReserve) continue;
-      if (reservedDelta !== item.reserved) {
-        findings.push({
-          domain: ReconciliationDomain.INVENTORY,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+      if (batch.length === 0) break;
+      for (const item of batch) {
+        const movements = await this.prisma.inventoryMovement.findMany({
+          where: { variantId: item.variantId },
+          select: {
+            reservedDelta: true,
+            stockOnHandDelta: true,
+            kind: true,
+          },
+        });
+        if (movements.length === 0) continue;
+        const reservedDelta = movements.reduce(
+          (s, m) => s + m.reservedDelta,
+          0,
+        );
+        const stockDelta = movements.reduce(
+          (s, m) => s + m.stockOnHandDelta,
+          0,
+        );
+        const hasReserve = movements.some(
+          (m) => m.kind === InventoryMovementKind.RESERVE,
+        );
+        if (hasReserve && reservedDelta !== item.reserved) {
+          findings.push({
             domain: ReconciliationDomain.INVENTORY,
             outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `variant:${item.variantId}:reserved`,
-          }),
-          leftLabel: 'inventory.reserved',
-          leftValue: String(item.reserved),
-          rightLabel: 'sum(movement.reservedDelta)',
-          rightValue: String(reservedDelta),
-          unit: 'units',
-          sourceIds: { variantId: item.variantId },
-        });
-      }
-      // stockOnHand absolute cannot be derived from deltas alone without opening balance;
-      // flag only negative counters.
-      if (item.stockOnHand < 0 || item.reserved < 0) {
-        findings.push({
-          domain: ReconciliationDomain.INVENTORY,
-          outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.CRITICAL,
-          fingerprint: fingerprintFinding({
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.INVENTORY,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `variant:${item.variantId}:reserved`,
+            }),
+            leftLabel: 'inventory.reserved',
+            leftValue: String(item.reserved),
+            rightLabel: 'sum(movement.reservedDelta)',
+            rightValue: String(reservedDelta),
+            unit: 'units',
+            sourceIds: { variantId: item.variantId },
+          });
+        }
+        // When consume/release history exists, stock counter must stay
+        // non-negative and available (on-hand - reserved) must be >= 0.
+        if (item.stockOnHand < 0 || item.reserved < 0) {
+          findings.push({
             domain: ReconciliationDomain.INVENTORY,
             outcome: ReconciliationOutcome.MISMATCH,
-            entityKey: `variant:${item.variantId}:negative`,
-          }),
-          leftLabel: 'stockOnHand/reserved',
-          leftValue: `${item.stockOnHand}/${item.reserved}`,
-          rightLabel: 'expected',
-          rightValue: '>=0',
-          unit: 'units',
-          sourceIds: { variantId: item.variantId },
-          evidence: { stockDelta },
-        });
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.INVENTORY,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `variant:${item.variantId}:negative`,
+            }),
+            leftLabel: 'stockOnHand/reserved',
+            leftValue: `${item.stockOnHand}/${item.reserved}`,
+            rightLabel: 'expected',
+            rightValue: '>=0',
+            unit: 'units',
+            sourceIds: { variantId: item.variantId },
+            evidence: { stockDelta },
+          });
+        } else if (item.stockOnHand < item.reserved) {
+          findings.push({
+            domain: ReconciliationDomain.INVENTORY,
+            outcome: ReconciliationOutcome.MISMATCH,
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.INVENTORY,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `variant:${item.variantId}:available`,
+            }),
+            leftLabel: 'available',
+            leftValue: String(item.stockOnHand - item.reserved),
+            rightLabel: 'expected',
+            rightValue: '>=0',
+            unit: 'units',
+            sourceIds: { variantId: item.variantId },
+          });
+        }
       }
+      checked += batch.length;
+      cursorId = batch[batch.length - 1]?.variantId;
+      if (batch.length < PAGE_SIZE) break;
     }
-    return { findings, checked: items.length };
+    return { findings, checked };
   }
 
-  private async checkProviderPresence(cutoffAt: Date) {
-    // Lightweight provider check: succeeded payments without providerRef are
-    // UNVERIFIABLE externally. Full Paystack pagination is fail-closed via
-    // runProvider({ forceIncomplete: true }) when pages cannot be fetched.
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        status: PaymentStatus.SUCCEEDED,
-        createdAt: { lte: cutoffAt },
-        providerRef: null,
+  private async checkAgainstProvider(
+    cutoffAt: Date,
+    snapshot: {
+      transactions: Array<{
+        reference: string;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+      refunds: Array<{
+        id: number;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+      transfers: Array<{
+        reference: string;
+        status: string;
+        amountKobo: number;
+        currency: string;
+      }>;
+    },
+  ) {
+    const findings: FindingDraft[] = [];
+    let checked = 0;
+    const txnByRef = new Map(
+      snapshot.transactions.map((t) => [t.reference, t]),
+    );
+    const refundById = new Map(snapshot.refunds.map((r) => [String(r.id), r]));
+    const transferByRef = new Map(
+      snapshot.transfers.map((t) => [t.reference, t]),
+    );
+
+    checked += await this.paginateIds(
+      (cursorId) =>
+        this.prisma.payment.findMany({
+          where: {
+            status: PaymentStatus.SUCCEEDED,
+            createdAt: { lte: cutoffAt },
+          },
+          select: {
+            id: true,
+            orderId: true,
+            amount: true,
+            currency: true,
+            providerRef: true,
+            createdAt: true,
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      (payment) => {
+        if (!payment.providerRef) {
+          findings.push({
+            domain: ReconciliationDomain.PAYMENT,
+            outcome: ReconciliationOutcome.UNVERIFIABLE,
+            severity: ReconciliationSeverity.HIGH,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYMENT,
+              outcome: ReconciliationOutcome.UNVERIFIABLE,
+              entityKey: `payment:${payment.id}:providerRef`,
+            }),
+            leftLabel: 'payment.providerRef',
+            leftValue: 'null',
+            rightLabel: 'provider',
+            rightValue: 'unverifiable',
+            currency: payment.currency,
+            sourceIds: { paymentId: payment.id, orderId: payment.orderId },
+          });
+          return;
+        }
+        const remote = txnByRef.get(payment.providerRef);
+        if (!remote) {
+          const grace = this.withinGrace(payment.createdAt, cutoffAt);
+          findings.push({
+            domain: ReconciliationDomain.PAYMENT,
+            outcome: grace
+              ? ReconciliationOutcome.PENDING_GRACE
+              : ReconciliationOutcome.MISSING_PROVIDER,
+            severity: grace
+              ? ReconciliationSeverity.LOW
+              : ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYMENT,
+              outcome: grace
+                ? ReconciliationOutcome.PENDING_GRACE
+                : ReconciliationOutcome.MISSING_PROVIDER,
+              entityKey: `payment:${payment.id}:provider`,
+            }),
+            leftLabel: 'payment.providerRef',
+            leftValue: payment.providerRef,
+            rightLabel: 'paystack.transaction',
+            rightValue: 'missing',
+            currency: payment.currency,
+            sourceIds: { paymentId: payment.id },
+          });
+          return;
+        }
+        const localKobo = Math.round(Number(payment.amount) * 100);
+        if (
+          remote.status !== 'success' ||
+          remote.amountKobo !== localKobo ||
+          remote.currency !== payment.currency
+        ) {
+          findings.push({
+            domain: ReconciliationDomain.PAYMENT,
+            outcome: ReconciliationOutcome.MISMATCH,
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYMENT,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `payment:${payment.id}:providerAmount`,
+            }),
+            leftLabel: 'local',
+            leftValue: `${payment.currency}:${localKobo}:SUCCEEDED`,
+            rightLabel: 'paystack',
+            rightValue: `${remote.currency}:${remote.amountKobo}:${remote.status}`,
+            currency: payment.currency,
+            sourceIds: { paymentId: payment.id },
+          });
+        }
       },
-      select: { id: true, orderId: true, currency: true },
-      take: 100,
-    });
-    const findings: FindingDraft[] = payments.map((payment) => ({
-      domain: ReconciliationDomain.PAYMENT,
-      outcome: ReconciliationOutcome.UNVERIFIABLE,
-      severity: ReconciliationSeverity.HIGH,
-      fingerprint: fingerprintFinding({
-        domain: ReconciliationDomain.PAYMENT,
-        outcome: ReconciliationOutcome.UNVERIFIABLE,
-        entityKey: `payment:${payment.id}:providerRef`,
-      }),
-      leftLabel: 'payment.providerRef',
-      leftValue: 'null',
-      rightLabel: 'provider',
-      rightValue: 'unverifiable',
-      currency: payment.currency,
-      sourceIds: { paymentId: payment.id, orderId: payment.orderId },
-    }));
-    return { findings, checked: payments.length };
-  }
+    );
 
-  private async tryAdvisoryLock(key: string): Promise<boolean> {
-    const rows = await this.prisma.$queryRaw<Array<{ locked: boolean }>>`
-      SELECT pg_try_advisory_lock(hashtext(${key})) AS locked
-    `;
-    return Boolean(rows[0]?.locked);
-  }
+    checked += await this.paginateIds(
+      (cursorId) =>
+        this.prisma.refund.findMany({
+          where: {
+            status: RefundStatus.SUCCEEDED,
+            createdAt: { lte: cutoffAt },
+          },
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            providerRef: true,
+            createdAt: true,
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      (refund) => {
+        if (!refund.providerRef) {
+          findings.push({
+            domain: ReconciliationDomain.REFUND,
+            outcome: ReconciliationOutcome.UNVERIFIABLE,
+            severity: ReconciliationSeverity.HIGH,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: ReconciliationOutcome.UNVERIFIABLE,
+              entityKey: `refund:${refund.id}:providerRef`,
+            }),
+            leftLabel: 'refund.providerRef',
+            leftValue: 'null',
+            rightLabel: 'provider',
+            rightValue: 'unverifiable',
+            currency: refund.currency,
+            sourceIds: { refundId: refund.id },
+          });
+          return;
+        }
+        const remote = refundById.get(refund.providerRef);
+        if (!remote) {
+          const grace = this.withinGrace(refund.createdAt, cutoffAt);
+          findings.push({
+            domain: ReconciliationDomain.REFUND,
+            outcome: grace
+              ? ReconciliationOutcome.PENDING_GRACE
+              : ReconciliationOutcome.MISSING_PROVIDER,
+            severity: grace
+              ? ReconciliationSeverity.LOW
+              : ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: grace
+                ? ReconciliationOutcome.PENDING_GRACE
+                : ReconciliationOutcome.MISSING_PROVIDER,
+              entityKey: `refund:${refund.id}:provider`,
+            }),
+            leftLabel: 'refund.providerRef',
+            leftValue: refund.providerRef,
+            rightLabel: 'paystack.refund',
+            rightValue: 'missing',
+            currency: refund.currency,
+            sourceIds: { refundId: refund.id },
+          });
+          return;
+        }
+        const localKobo = Math.round(Number(refund.amount) * 100);
+        const okStatus = ['processed', 'success'].includes(remote.status);
+        if (
+          !okStatus ||
+          remote.amountKobo !== localKobo ||
+          remote.currency !== refund.currency
+        ) {
+          findings.push({
+            domain: ReconciliationDomain.REFUND,
+            outcome: ReconciliationOutcome.MISMATCH,
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.REFUND,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `refund:${refund.id}:providerAmount`,
+            }),
+            leftLabel: 'local',
+            leftValue: `${refund.currency}:${localKobo}:SUCCEEDED`,
+            rightLabel: 'paystack',
+            rightValue: `${remote.currency}:${remote.amountKobo}:${remote.status}`,
+            currency: refund.currency,
+            sourceIds: { refundId: refund.id },
+          });
+        }
+      },
+    );
 
-  private async releaseAdvisoryLock(key: string): Promise<void> {
-    await this.prisma.$queryRaw`SELECT pg_advisory_unlock(hashtext(${key}))`;
+    checked += await this.paginateIds(
+      (cursorId) =>
+        this.prisma.payout.findMany({
+          where: {
+            status: PayoutStatus.SUCCEEDED,
+            createdAt: { lte: cutoffAt },
+          },
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            providerRef: true,
+            createdAt: true,
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      (payout) => {
+        if (!payout.providerRef) {
+          findings.push({
+            domain: ReconciliationDomain.PAYOUT,
+            outcome: ReconciliationOutcome.UNVERIFIABLE,
+            severity: ReconciliationSeverity.HIGH,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: ReconciliationOutcome.UNVERIFIABLE,
+              entityKey: `payout:${payout.id}:providerRef`,
+            }),
+            leftLabel: 'payout.providerRef',
+            leftValue: 'null',
+            rightLabel: 'provider',
+            rightValue: 'unverifiable',
+            currency: payout.currency,
+            sourceIds: { payoutId: payout.id },
+          });
+          return;
+        }
+        const remote = transferByRef.get(payout.providerRef);
+        if (!remote) {
+          const grace = this.withinGrace(payout.createdAt, cutoffAt);
+          findings.push({
+            domain: ReconciliationDomain.PAYOUT,
+            outcome: grace
+              ? ReconciliationOutcome.PENDING_GRACE
+              : ReconciliationOutcome.MISSING_PROVIDER,
+            severity: grace
+              ? ReconciliationSeverity.LOW
+              : ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: grace
+                ? ReconciliationOutcome.PENDING_GRACE
+                : ReconciliationOutcome.MISSING_PROVIDER,
+              entityKey: `payout:${payout.id}:provider`,
+            }),
+            leftLabel: 'payout.providerRef',
+            leftValue: payout.providerRef,
+            rightLabel: 'paystack.transfer',
+            rightValue: 'missing',
+            currency: payout.currency,
+            sourceIds: { payoutId: payout.id },
+          });
+          return;
+        }
+        const localKobo = Math.round(Number(payout.amount) * 100);
+        if (
+          remote.status !== 'success' ||
+          remote.amountKobo !== localKobo ||
+          remote.currency !== payout.currency
+        ) {
+          findings.push({
+            domain: ReconciliationDomain.PAYOUT,
+            outcome: ReconciliationOutcome.MISMATCH,
+            severity: ReconciliationSeverity.CRITICAL,
+            fingerprint: fingerprintFinding({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: ReconciliationOutcome.MISMATCH,
+              entityKey: `payout:${payout.id}:providerAmount`,
+            }),
+            leftLabel: 'local',
+            leftValue: `${payout.currency}:${localKobo}:SUCCEEDED`,
+            rightLabel: 'paystack',
+            rightValue: `${remote.currency}:${remote.amountKobo}:${remote.status}`,
+            currency: payout.currency,
+            sourceIds: { payoutId: payout.id },
+          });
+        }
+      },
+    );
+
+    return { findings, checked };
   }
 }

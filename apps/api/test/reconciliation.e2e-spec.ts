@@ -141,4 +141,80 @@ describe('Reconciliation (e2e)', () => {
     expect(run).toBeTruthy();
     expect(run!.status).toBe(ReconciliationRunStatus.INCOMPLETE);
   });
+
+  it('marks provider run incomplete when Paystack fetch fails closed', async () => {
+    const run = await runs.runProvider(new Date());
+    expect(run).toBeTruthy();
+    expect(run!.status).toBe(ReconciliationRunStatus.INCOMPLETE);
+    expect(run!.errorSummary).toBeTruthy();
+  });
+
+  it('does not flag a SUCCEEDED payout with correct ledger net -amount', async () => {
+    const passwordHash = await bcrypt.hash('TestPassword1!', 10);
+    const stamp = Date.now();
+    const organizer = await prisma.user.create({
+      data: {
+        email: `recon-payout-org-${stamp}@example.com`,
+        passwordHash,
+        role: UserRole.ORGANIZER,
+        status: UserStatus.ACTIVE,
+        firstName: 'Pay',
+        lastName: 'Out',
+      },
+    });
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizerId: organizer.id,
+        title: 'Payout Camp',
+        slug: `recon-payout-${stamp}`,
+        status: CampaignStatus.ACTIVE,
+        currentAmount: 0,
+      },
+    });
+    const payout = await prisma.payout.create({
+      data: {
+        campaignId: campaign.id,
+        recipientUserId: organizer.id,
+        status: 'SUCCEEDED',
+        amount: 5000,
+        currency: 'NGN',
+        providerRef: `trf_recon_${stamp}`,
+      },
+    });
+    await prisma.campaignBalanceLedgerEntry.createMany({
+      data: [
+        {
+          campaignId: campaign.id,
+          payoutId: payout.id,
+          entryType: LedgerEntryType.PAYOUT_RESERVED,
+          amount: -5000,
+          currency: 'NGN',
+          availableAt: new Date(),
+        },
+        {
+          campaignId: campaign.id,
+          payoutId: payout.id,
+          entryType: LedgerEntryType.PAYOUT_SUCCEEDED,
+          amount: 0,
+          currency: 'NGN',
+          availableAt: new Date(),
+        },
+      ],
+    });
+
+    const run = await runs.runInternal(new Date());
+    expect(run!.status).toBe(ReconciliationRunStatus.COMPLETED);
+
+    const payoutFindings = await prisma.reconciliationFinding.findMany({
+      where: {
+        domain: 'PAYOUT',
+        status: ReconciliationFindingStatus.OPEN,
+      },
+    });
+    const hit = payoutFindings.find((f) => {
+      const ids = f.sourceIds as { payoutId?: string } | null;
+      return ids?.payoutId === payout.id;
+    });
+    expect(hit).toBeUndefined();
+  });
 });

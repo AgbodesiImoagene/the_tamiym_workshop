@@ -20,7 +20,7 @@ describe('ReconciliationRepairService', () => {
       update: jest.Mock;
     };
     campaignBalanceLedgerEntry: { aggregate: jest.Mock };
-    campaign: { update: jest.Mock };
+    campaign: { update: jest.Mock; findUniqueOrThrow: jest.Mock };
   };
   let runs: { runTargeted: jest.Mock };
 
@@ -35,6 +35,7 @@ describe('ReconciliationRepairService', () => {
           leftValue: '10',
           rightValue: '12',
           sourceIds: { campaignId: 'c1' },
+          fingerprint: 'fp1',
         }),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -46,7 +47,12 @@ describe('ReconciliationRepairService', () => {
       campaignBalanceLedgerEntry: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 12 } }),
       },
-      campaign: { update: jest.fn().mockResolvedValue({}) },
+      campaign: {
+        update: jest.fn().mockResolvedValue({}),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ id: 'c1', currentAmount: 12 }),
+      },
     };
     runs = { runTargeted: jest.fn().mockResolvedValue({}) };
 
@@ -76,6 +82,7 @@ describe('ReconciliationRepairService', () => {
         sourceIds: { campaignId: 'c1' },
         leftValue: '10',
         rightValue: '12',
+        fingerprint: 'fp1',
       },
     });
 
@@ -84,7 +91,7 @@ describe('ReconciliationRepairService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it('applies campaign recompute with second admin', async () => {
+  it('applies campaign recompute with second admin after verification', async () => {
     prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
       id: 'rep1',
       status: ReconciliationRepairStatus.REQUESTED,
@@ -98,6 +105,7 @@ describe('ReconciliationRepairService', () => {
         sourceIds: { campaignId: 'c1' },
         leftValue: '10',
         rightValue: '12',
+        fingerprint: 'fp1',
       },
     });
 
@@ -111,5 +119,13 @@ describe('ReconciliationRepairService', () => {
       data: { currentAmount: 12 },
     });
     expect(runs.runTargeted).toHaveBeenCalledWith('f1');
+    expect(prisma.reconciliationFinding.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'f1' },
+        data: expect.objectContaining({
+          status: ReconciliationFindingStatus.RESOLVED,
+        }),
+      }),
+    );
   });
 });

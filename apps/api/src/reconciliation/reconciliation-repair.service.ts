@@ -109,22 +109,9 @@ export class ReconciliationRepairService {
 
     try {
       const after = await this.applyCommand(repair.commandKey, repair.finding);
-      const applied = await this.prisma.reconciliationRepairRequest.update({
-        where: { id: repair.id },
-        data: {
-          status: ReconciliationRepairStatus.APPLIED,
-          afterEvidence: after as Prisma.InputJsonValue,
-        },
-      });
-
-      await this.prisma.reconciliationFinding.update({
-        where: { id: repair.findingId },
-        data: {
-          status: ReconciliationFindingStatus.RESOLVED,
-          resolvedByUserId: params.actorUserId,
-          resolvedAt: new Date(),
-        },
-      });
+      const isDocumentOnly =
+        repair.commandKey.includes('document') ||
+        repair.commandKey.includes('noop');
 
       await this.audit.log({
         eventName: 'admin.reconciliation.repair.applied',
@@ -136,8 +123,81 @@ export class ReconciliationRepairService {
         after,
       });
 
+      // Targeted verification run (reporting); close finding only when verified.
       await this.runs.runTargeted(repair.findingId);
-      return applied;
+
+      if (isDocumentOnly) {
+        await this.prisma.reconciliationFinding.update({
+          where: { id: repair.findingId },
+          data: {
+            status: ReconciliationFindingStatus.WONT_FIX,
+            resolvedByUserId: params.actorUserId,
+            resolvedAt: new Date(),
+          },
+        });
+      } else if (repair.commandKey === 'campaign.recompute_current_amount') {
+        const sourceIds = (repair.finding.sourceIds ?? {}) as Record<
+          string,
+          string
+        >;
+        const campaignId = sourceIds.campaignId;
+        if (!campaignId) {
+          throw new BadRequestException('campaignId required for verification');
+        }
+        const campaign = await this.prisma.campaign.findUniqueOrThrow({
+          where: { id: campaignId },
+        });
+        const ledger = await this.prisma.campaignBalanceLedgerEntry.aggregate({
+          where: {
+            campaignId,
+            entryType: { in: ['PAYMENT_SETTLED', 'REFUND_APPLIED'] },
+          },
+          _sum: { amount: true },
+        });
+        const ok =
+          Math.abs(
+            Number(campaign.currentAmount) - Number(ledger._sum.amount ?? 0),
+          ) <= 0.01;
+        if (!ok) {
+          await this.prisma.reconciliationRepairRequest.update({
+            where: { id: repair.id },
+            data: {
+              status: ReconciliationRepairStatus.FAILED,
+              errorSummary:
+                'Targeted verification: currentAmount still mismatched',
+              afterEvidence: after as Prisma.InputJsonValue,
+            },
+          });
+          throw new BadRequestException(
+            'Repair verification failed: campaign amount still mismatched',
+          );
+        }
+        await this.prisma.reconciliationFinding.update({
+          where: { id: repair.findingId },
+          data: {
+            status: ReconciliationFindingStatus.RESOLVED,
+            resolvedByUserId: params.actorUserId,
+            resolvedAt: new Date(),
+          },
+        });
+      } else {
+        await this.prisma.reconciliationFinding.update({
+          where: { id: repair.findingId },
+          data: {
+            status: ReconciliationFindingStatus.RESOLVED,
+            resolvedByUserId: params.actorUserId,
+            resolvedAt: new Date(),
+          },
+        });
+      }
+
+      return this.prisma.reconciliationRepairRequest.update({
+        where: { id: repair.id },
+        data: {
+          status: ReconciliationRepairStatus.APPLIED,
+          afterEvidence: after as Prisma.InputJsonValue,
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'repair failed';
       await this.prisma.reconciliationRepairRequest.update({

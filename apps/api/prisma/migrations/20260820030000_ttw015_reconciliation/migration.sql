@@ -1,4 +1,16 @@
 -- TTW-015: durable reconciliation runs, findings, and two-person repair requests.
+-- Additive only: does not alter existing financial tables.
+-- Rollback (manual):
+--   DROP TABLE IF EXISTS "reconciliation_repair_requests";
+--   DROP TABLE IF EXISTS "reconciliation_findings";
+--   DROP TABLE IF EXISTS "reconciliation_runs";
+--   DROP TYPE IF EXISTS "ReconciliationRepairStatus";
+--   DROP TYPE IF EXISTS "ReconciliationSeverity";
+--   DROP TYPE IF EXISTS "ReconciliationFindingStatus";
+--   DROP TYPE IF EXISTS "ReconciliationOutcome";
+--   DROP TYPE IF EXISTS "ReconciliationDomain";
+--   DROP TYPE IF EXISTS "ReconciliationRunStatus";
+--   DROP TYPE IF EXISTS "ReconciliationRunKind";
 
 CREATE TYPE "ReconciliationRunKind" AS ENUM ('INTERNAL', 'PROVIDER', 'TARGETED');
 CREATE TYPE "ReconciliationRunStatus" AS ENUM ('RUNNING', 'COMPLETED', 'INCOMPLETE', 'FAILED');
