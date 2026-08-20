@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "ticket": "TTW-066",
+  "cost": {
+    "warning_usd_lte": 50,
+    "hard_escalation_before_overrun": true,
+    "pools": ["production", "temporary-validation", "recovery"],
+    "notes": "Warning fires at or below the USD 50 envelope threshold documentation; owner configures live DO billing alerts."
+  },
+  "alerts": [
+    {
+      "id": "proxy_tls_or_upstream",
+      "severity": "page",
+      "signal": "Caddy TLS failure, 5xx spike, or upstream unreachable",
+      "runbook_relpath": "infra/runtime/observability/runbooks/proxy_tls_or_upstream.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "container_unhealthy",
+      "severity": "page",
+      "signal": "Compose healthcheck failing for api/web/app/admin/worker/scheduler/valkey/proxy",
+      "runbook_relpath": "infra/runtime/observability/runbooks/container_unhealthy.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "host_disk",
+      "severity": "page",
+      "signal": "Droplet disk utilization >= 85% or inode pressure",
+      "runbook_relpath": "infra/runtime/observability/runbooks/host_disk.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "host_saturation",
+      "severity": "ticket",
+      "signal": "Sustained CPU >= 90% or memory pressure / OOM risk on Droplet",
+      "runbook_relpath": "infra/runtime/observability/runbooks/host_saturation.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "droplet_down",
+      "severity": "page",
+      "signal": "DigitalOcean Droplet unreachable or agent heartbeat lost",
+      "runbook_relpath": "infra/runtime/observability/runbooks/droplet_down.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "postgres_down",
+      "severity": "page",
+      "signal": "Managed PostgreSQL unavailable or connection failures from api ready probe",
+      "runbook_relpath": "infra/runtime/observability/runbooks/postgres_down.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "valkey_pressure",
+      "severity": "page",
+      "signal": "Valkey maxmemory pressure, connection errors, or noeviction write failures",
+      "runbook_relpath": "infra/runtime/observability/runbooks/valkey_pressure.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "queue_backlog",
+      "severity": "ticket",
+      "signal": "BullMQ queue depth or failed-job rate above threshold",
+      "runbook_relpath": "infra/runtime/observability/runbooks/queue_backlog.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "spaces_errors",
+      "severity": "ticket",
+      "signal": "Elevated S3/Spaces 4xx/5xx or upload/download failure rate",
+      "runbook_relpath": "infra/runtime/observability/runbooks/spaces_errors.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "webhook_failures",
+      "severity": "ticket",
+      "signal": "Paystack webhook verify/settle failure spike or processing lag",
+      "runbook_relpath": "infra/runtime/observability/runbooks/webhook_failures.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "deploy_unhealthy",
+      "severity": "page",
+      "signal": "Post-deploy readiness failure or revision rollback candidate",
+      "runbook_relpath": "infra/runtime/observability/runbooks/deploy_unhealthy.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "backup_stale",
+      "severity": "page",
+      "signal": "Managed PG backup / PITR window older than approved RPO (TTW-067)",
+      "runbook_relpath": "infra/runtime/observability/runbooks/backup_stale.md",
+      "owner_role": "OWNER_PLACEHOLDER_PLATFORM"
+    },
+    {
+      "id": "security_finding",
+      "severity": "page",
+      "signal": "High/critical infra security finding, break-glass use, or public exposure drift",
+      "runbook_relpath": "infra/runtime/observability/runbooks/security_finding.md",
+      "owner_role": "OWNER_PLACEHOLDER_SECURITY"
+    },
+    {
+      "id": "cost_warning",
+      "severity": "ticket",
+      "signal": "Projected monthly DigitalOcean spend approaching USD 50 warning threshold",
+      "runbook_relpath": "infra/runtime/observability/runbooks/cost_warning.md",
+      "owner_role": "OWNER_PLACEHOLDER_COST"
+    }
+  ]
+}

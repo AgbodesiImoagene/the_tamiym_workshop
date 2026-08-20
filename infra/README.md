@@ -14,11 +14,12 @@ Pinned CLI: **OpenTofu 1.9.1** (`.opentofu-version`).
 | `runtime/edge/`              | Caddyfile for TLS + reverse proxy                                                  |
 | `runtime/valkey/`            | Host-local Valkey conf + Compose snippet                                           |
 | `runtime/secrets/`           | Root-owned host secrets pattern + PLACEHOLDER `.env.example` (TTW-065)             |
+| `runtime/observability/`     | Prod OTel collector, alert catalog, runbooks, dashboard inventory (TTW-066)        |
 | `runtime/cloud-init/`        | Droplet hardening sketch (SSH, unattended-upgrades, fail2ban)                      |
 | `envs/production/`           | Production composition + isolated remote state                                     |
 | `envs/temporary-validation/` | Disposable validation composition + isolated state                                 |
 | `bootstrap/`                 | Manual Spaces state-bucket bootstrap runbook + TTW-060 proof                       |
-| `policy/`                    | deny-secrets + network/data/security invariant policy helpers                      |
+| `policy/`                    | deny-secrets + network/data/security/runtime/observability invariant helpers       |
 | `scripts/validate-all.sh`    | Credential-free fmt + policy + init + validate                                     |
 
 ## Environments
@@ -78,8 +79,10 @@ CI trust model, and drift plan.
 - [TTW-063 production runtime](../docs/infrastructure/ttw-063-production-runtime.md)
 - [TTW-064 data services](../docs/infrastructure/ttw-064-data-services.md)
 - [TTW-065 identity / secrets](../docs/infrastructure/ttw-065-identity-secrets.md)
+- [TTW-066 observability / cost](../docs/infrastructure/ttw-066-observability-cost.md)
 - [TTW-061 ticket](../docs/tickets/ttw-061-establish-iac-foundation.md)
 - [TTW-062 ticket](../docs/tickets/ttw-062-provision-network-dns-edge.md)
 - [TTW-063 ticket](../docs/tickets/ttw-063-deploy-production-runtime.md)
 - [TTW-064 ticket](../docs/tickets/ttw-064-provision-managed-data-services.md)
 - [TTW-065 ticket](../docs/tickets/ttw-065-enforce-infrastructure-security.md)
+- [TTW-066 ticket](../docs/tickets/ttw-066-operationalize-infrastructure-observability.md)

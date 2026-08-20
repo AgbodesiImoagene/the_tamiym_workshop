@@ -1,0 +1,139 @@
+# Production-shaped OpenTelemetry Collector (TTW-066).
+# Deploy beside the app stack only when a managed OTLP destination is configured.
+# Do NOT run permanent Prometheus/Grafana/Jaeger on the 4GiB production Droplet.
+#
+# Secrets and endpoints come from the environment (host secrets file / Compose).
+# Never hardcode DIGITALOCEAN_TOKEN, API keys, or destination credentials here.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+
+  # Standard resource attributes: env, service, container.role, revision.
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: ${env:OTEL_DEPLOYMENT_ENVIRONMENT}
+        action: upsert
+      - key: service.version
+        from_attribute: service.version
+        action: upsert
+      - key: container.role
+        from_attribute: container.role
+        action: upsert
+
+  attributes/redaction:
+    actions:
+      # Strip secret-bearing attribute keys before export.
+      - key: password
+        action: delete
+      - key: secret
+        action: delete
+      - key: token
+        action: delete
+      - key: authorization
+        action: delete
+      - key: cookie
+        action: delete
+      - key: set-cookie
+        action: delete
+      - key: jwt
+        action: delete
+      - key: access_token
+        action: delete
+      - key: refresh_token
+        action: delete
+      - key: api_key
+        action: delete
+      - key: paystack_secret
+        action: delete
+      - key: database_url
+        action: delete
+      - key: connection_string
+        action: delete
+      - key: DIGITALOCEAN_TOKEN
+        action: delete
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
+
+  filter/drop_sensitive_logs:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'IsMatch(body, "(?i)(bearer\\s+[a-z0-9._\\-]+|dop_v1_[A-Za-z0-9_]+)")'
+
+  probabilistic_sampler:
+    sampling_percentage: 10
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+exporters:
+  # Managed / cost-bounded OTLP destination (Honeycomb, Grafana Cloud, Axiom, etc.).
+  # Endpoint and optional auth headers are env-injected — never committed.
+  otlphttp/managed:
+    endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
+    headers:
+      Authorization: ${env:OTEL_EXPORTER_OTLP_AUTH_HEADER}
+    compression: gzip
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 256
+
+  # Local debug only when explicitly enabled (dev/tmpval). Leave unused in prod pipelines.
+  debug:
+    verbosity: basic
+
+service:
+  telemetry:
+    metrics:
+      level: basic
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - resource
+        - attributes/redaction
+        - probabilistic_sampler
+        - batch
+      exporters: [otlphttp/managed]
+    metrics:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - resource
+        - attributes/redaction
+        - batch
+      exporters: [otlphttp/managed]
+    logs:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - resource
+        - attributes/redaction
+        - filter/drop_sensitive_logs
+        - batch
+      exporters: [otlphttp/managed]
