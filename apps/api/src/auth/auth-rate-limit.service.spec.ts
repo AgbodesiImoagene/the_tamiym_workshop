@@ -8,7 +8,7 @@ const redisMock = {
   connect: jest.fn().mockResolvedValue(undefined),
   quit: jest.fn().mockResolvedValue('OK'),
   disconnect: jest.fn(),
-  status: 'ready',
+  status: 'wait',
 };
 
 jest.mock('ioredis', () => {

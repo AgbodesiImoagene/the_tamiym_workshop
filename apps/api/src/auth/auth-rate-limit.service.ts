@@ -23,6 +23,7 @@ import {
 @Injectable()
 export class AuthRateLimitService implements OnModuleDestroy {
   private readonly redis: Redis;
+  private connectPromise: Promise<void> | null = null;
 
   constructor(
     config: ConfigService,
@@ -76,6 +77,7 @@ export class AuthRateLimitService implements OnModuleDestroy {
     let idCount: number;
     let ipCount: number;
     try {
+      await this.ensureConnected();
       [idCount, ipCount] = await Promise.all([
         this.incrWithTtl(idKey, config.ttlMs),
         this.incrWithTtl(ipKey, config.ttlMs),
@@ -111,10 +113,22 @@ export class AuthRateLimitService implements OnModuleDestroy {
     });
   }
 
-  private async incrWithTtl(key: string, ttlMs: number): Promise<number> {
-    if (this.redis.status !== 'ready') {
-      await this.redis.connect();
+  private async ensureConnected(): Promise<void> {
+    if (this.redis.status === 'ready') {
+      return;
     }
+    if (!this.connectPromise) {
+      this.connectPromise = this.redis
+        .connect()
+        .then(() => undefined)
+        .finally(() => {
+          this.connectPromise = null;
+        });
+    }
+    await this.connectPromise;
+  }
+
+  private async incrWithTtl(key: string, ttlMs: number): Promise<number> {
     // Atomic INCR + PEXPIRE so a crashed/failed expire cannot leave a
     // permanent counter (TTW-023 review).
     const result = await this.redis.eval(
