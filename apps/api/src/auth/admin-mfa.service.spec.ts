@@ -142,6 +142,38 @@ describe('AdminMfaService', () => {
     );
   });
 
+  it('challenge accepts a valid TOTP', async () => {
+    const enrollToken = service.signMfaToken(userId, MFA_TOKEN_PURPOSE_ENROLL);
+    prisma.adminMfaCredential.findUnique.mockResolvedValue(null);
+    const started = await service.startEnrollment(enrollToken);
+    const pending = prisma.adminMfaCredential.upsert.mock.calls[0][0];
+    prisma.adminMfaCredential.findUnique.mockResolvedValue({
+      userId,
+      enabledAt: null,
+      pendingSecretCiphertext: pending.create.pendingSecretCiphertext,
+      pendingNonce: pending.create.pendingNonce,
+      pendingKeyVersion: pending.create.pendingKeyVersion,
+    });
+    await service.confirmEnrollment(
+      enrollToken,
+      generateTotpCode(started.secret),
+    );
+    prisma.adminMfaCredential.findUnique.mockResolvedValue({
+      userId,
+      enabledAt: new Date(),
+      secretCiphertext: pending.create.pendingSecretCiphertext,
+      secretNonce: pending.create.pendingNonce,
+    });
+
+    const challengeToken = service.signMfaToken(
+      userId,
+      MFA_TOKEN_PURPOSE_CHALLENGE,
+    );
+    await expect(
+      service.challenge(challengeToken, generateTotpCode(started.secret)),
+    ).resolves.toMatchObject({ id: userId });
+  });
+
   it('challenge rejects wrong TOTP with generic 401', async () => {
     const enrollToken = service.signMfaToken(userId, MFA_TOKEN_PURPOSE_ENROLL);
     prisma.adminMfaCredential.findUnique.mockResolvedValue(null);
@@ -202,6 +234,31 @@ describe('AdminMfaService', () => {
     const enrollToken = service.signMfaToken(userId, MFA_TOKEN_PURPOSE_ENROLL);
     await expect(service.challenge(enrollToken, '123456')).rejects.toThrow(
       UnauthorizedException,
+    );
+  });
+
+  it('resetMfaForUser deletes credential/codes, revokes sessions, audits', async () => {
+    await expect(
+      service.resetMfaForUser('actor-1', UserRole.ADMIN, userId),
+    ).resolves.toEqual({ reset: true });
+
+    expect(prisma.adminMfaRecoveryCode.deleteMany).toHaveBeenCalledWith({
+      where: { userId },
+    });
+    expect(prisma.adminMfaCredential.deleteMany).toHaveBeenCalledWith({
+      where: { userId },
+    });
+    expect(prisma.authSession.updateMany).toHaveBeenCalledWith({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'admin.user.mfa_reset',
+        actorUserId: 'actor-1',
+        entityId: userId,
+      }),
+      prisma,
     );
   });
 

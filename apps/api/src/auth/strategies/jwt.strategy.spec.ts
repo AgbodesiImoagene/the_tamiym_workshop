@@ -8,6 +8,7 @@ import { AuthSurface } from '../../generated/prisma/enums';
 import { surfaceCookieNames } from '../auth-cookies';
 import { AccountPolicyService } from '../account-policy.service';
 import { AuthSessionService } from '../auth-session.service';
+import { AdminMfaService } from '../admin-mfa.service';
 
 const mockDbUser = {
   id: 'user-1',
@@ -26,11 +27,15 @@ describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let prisma: { user: { findUnique: jest.Mock } };
   let authSession: { assertAccessSession: jest.Mock };
+  let adminMfa: { isEnabled: jest.Mock };
 
   beforeEach(async () => {
     prisma = { user: { findUnique: jest.fn() } };
     authSession = {
       assertAccessSession: jest.fn().mockResolvedValue(undefined),
+    };
+    adminMfa = {
+      isEnabled: jest.fn().mockResolvedValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -44,6 +49,7 @@ describe('JwtStrategy', () => {
         },
         { provide: PrismaService, useValue: prisma },
         { provide: AuthSessionService, useValue: authSession },
+        { provide: AdminMfaService, useValue: adminMfa },
         AccountPolicyService,
       ],
     }).compile();
@@ -240,6 +246,26 @@ describe('JwtStrategy', () => {
     );
 
     expect(result.surface).toBe(AuthSurface.ADMIN);
+    expect(adminMfa.isEnabled).toHaveBeenCalledWith('user-1');
+  });
+
+  it('rejects ADMIN-surface JWT when MFA is not enabled', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+    });
+    adminMfa.isEnabled.mockResolvedValue(false);
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    await expect(
+      strategy.validate(
+        req,
+        payload({
+          role: UserRole.ADMIN,
+          surface: AuthSurface.ADMIN,
+        }),
+      ),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it('rejects unverified ADMIN JWT with generic Unauthorized', async () => {

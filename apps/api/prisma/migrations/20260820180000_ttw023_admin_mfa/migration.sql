@@ -41,3 +41,9 @@ ALTER TABLE "admin_mfa_credentials" ADD CONSTRAINT "admin_mfa_credentials_userId
 
 -- AddForeignKey
 ALTER TABLE "admin_mfa_recovery_codes" ADD CONSTRAINT "admin_mfa_recovery_codes_userId_fkey" FOREIGN KEY ("userId") REFERENCES "admin_mfa_credentials"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Force ADMIN re-login through MFA: revoke any live admin-surface sessions
+-- issued before this cutover (TTW-023 security review).
+UPDATE "auth_sessions"
+SET "revokedAt" = CURRENT_TIMESTAMP
+WHERE "authSurface" = 'ADMIN' AND "revokedAt" IS NULL;

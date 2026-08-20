@@ -17,11 +17,18 @@ setup.beforeAll(() => {
 async function saveRoleState(
   role: 'customer' | 'organiser' | 'admin',
   email: string,
-  password: string
+  password: string,
+  totpSecret?: string
 ): Promise<void> {
   const surface: AuthSurface = role === 'admin' ? 'ADMIN' : 'CUSTOMER';
   const api = await createApiContext(surface);
-  const { csrfToken } = await apiLogin(api, email, password, surface);
+  const { csrfToken } = await apiLogin(
+    api,
+    email,
+    password,
+    surface,
+    totpSecret
+  );
   const me = await api.get('auth/me');
   expect(me.ok(), `auth/me for ${email}`).toBeTruthy();
   // A frontend that never saw the login response recovers the token here, so
@@ -40,5 +47,10 @@ setup('authenticate organiser @smoke', async () => {
 });
 
 setup('authenticate admin @smoke', async () => {
-  await saveRoleState('admin', e2eUsers.admin.email, e2eUsers.admin.password);
+  await saveRoleState(
+    'admin',
+    e2eUsers.admin.email,
+    e2eUsers.admin.password,
+    e2eUsers.admin.totpSecret
+  );
 });

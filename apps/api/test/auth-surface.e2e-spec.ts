@@ -237,6 +237,111 @@ describe('Auth surface isolation (e2e)', () => {
         cookieValue(confirmRes, ADMIN_CSRF_COOKIE),
       );
     });
+
+    it('POST /auth/admin/mfa/challenge issues session after enroll', async () => {
+      const { email, password } = await createUser(UserRole.ADMIN);
+
+      const loginEnroll = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      const enrollRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/start')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ mfa_token: loginEnroll.body.mfa_token })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/confirm')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginEnroll.body.mfa_token,
+          totp: generateTotpCode(enrollRes.body.secret),
+        })
+        .expect(200);
+
+      const loginChallenge = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      expect(loginChallenge.body.mfa.status).toBe('CHALLENGE_REQUIRED');
+      expect(cookieValue(loginChallenge, ADMIN_ACCESS_COOKIE)).toBeFalsy();
+
+      const challengeRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/challenge')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginChallenge.body.mfa_token,
+          totp: generateTotpCode(enrollRes.body.secret),
+        })
+        .expect(200);
+
+      expect(cookieValue(challengeRes, ADMIN_ACCESS_COOKIE)).toBeTruthy();
+      expect(challengeRes.body.csrf_token).toEqual(expect.any(String));
+    });
+
+    it('POST /auth/admin/mfa/recover consumes a code once then denies replay', async () => {
+      const { email, password } = await createUser(UserRole.ADMIN);
+
+      const loginEnroll = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      const enrollRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/start')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ mfa_token: loginEnroll.body.mfa_token })
+        .expect(200);
+
+      const recoveryCode = enrollRes.body.recovery_codes[0] as string;
+
+      await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/confirm')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginEnroll.body.mfa_token,
+          totp: generateTotpCode(enrollRes.body.secret),
+        })
+        .expect(200);
+
+      const loginChallenge = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      const recoverRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/recover')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginChallenge.body.mfa_token,
+          recovery_code: recoveryCode,
+        })
+        .expect(200);
+
+      expect(cookieValue(recoverRes, ADMIN_ACCESS_COOKIE)).toBeTruthy();
+
+      const loginAgain = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/recover')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginAgain.body.mfa_token,
+          recovery_code: recoveryCode,
+        })
+        .expect(401);
+    });
   });
 
   describe('CSRF token transport', () => {

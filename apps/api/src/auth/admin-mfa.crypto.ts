@@ -108,8 +108,11 @@ export function normalizeRecoveryCode(code: string): string {
 export function generateRecoveryCodes(count = 10): string[] {
   const codes: string[] = [];
   for (let i = 0; i < count; i += 1) {
-    const raw = randomBytes(4).toString('hex').toUpperCase();
-    codes.push(`${raw.slice(0, 4)}-${raw.slice(4)}`);
+    // 128 bits of entropy (16 random bytes → 32 hex chars as XXXX-… groups).
+    const raw = randomBytes(16).toString('hex').toUpperCase();
+    codes.push(
+      `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20, 24)}-${raw.slice(24, 28)}-${raw.slice(28, 32)}`,
+    );
   }
   return codes;
 }

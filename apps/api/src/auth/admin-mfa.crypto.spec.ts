@@ -34,10 +34,13 @@ describe('admin-mfa.crypto', () => {
     expect(normalizeRecoveryCode('ab cd')).toBe('ABCD');
   });
 
-  it('mints unique recovery codes', () => {
+  it('mints unique high-entropy recovery codes', () => {
     const codes = generateRecoveryCodes(10);
     expect(codes).toHaveLength(10);
     expect(new Set(codes).size).toBe(10);
+    for (const code of codes) {
+      expect(code.replace(/-/g, '')).toHaveLength(32);
+    }
   });
 });
 
