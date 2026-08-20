@@ -10,13 +10,12 @@ import type {
   PricingLineItemInput,
   PricingLineItemOutput,
   PricingBreakdown,
-  QuoteResult,
   ShippingBreakdown,
   QuoteMode,
 } from './pricing.types';
 import type { QuoteRequestDto } from './dto/quote-request.dto';
 import { roundToMinor, roundToDisplayGranularity } from './currency-rounding';
-import { PRICING_POLICY_VERSION } from './pricing-policy';
+import { PRICING_POLICY_VERSION, type QuoteResult } from './pricing-policy';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
 import { CampaignStatus } from '../generated/prisma/enums';

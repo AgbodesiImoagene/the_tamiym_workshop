@@ -4,6 +4,8 @@
 --   DROP FUNCTION IF EXISTS enforce_discount_lock_pct_fixed_compat();
 --   DROP TABLE IF EXISTS discount_active_locks;
 --   ALTER TABLE bulk_pricing DROP CONSTRAINT IF EXISTS bulk_pricing_quantity_no_overlap;
+--   ALTER TABLE bulk_pricing DROP COLUMN IF EXISTS "quantityRange";
+--   ALTER TABLE bulk_pricing DROP COLUMN IF EXISTS "variantKey";
 --   ALTER TABLE orders DROP COLUMN IF EXISTS "vatAmount";
 --   ALTER TABLE orders DROP COLUMN IF EXISTS "roundingAdjustment";
 --   ALTER TABLE orders DROP COLUMN IF EXISTS "vatRateSnapshot";
@@ -43,13 +45,26 @@ BEGIN
 END $$;
 
 ALTER TABLE "bulk_pricing" DROP CONSTRAINT IF EXISTS bulk_pricing_quantity_no_overlap;
+
+-- STORED generated columns keep EXCLUDE expressions IMMUTABLE (COALESCE/casts inline are not).
+ALTER TABLE "bulk_pricing" DROP COLUMN IF EXISTS "variantKey";
+ALTER TABLE "bulk_pricing" DROP COLUMN IF EXISTS "quantityRange";
+ALTER TABLE "bulk_pricing"
+  ADD COLUMN "variantKey" TEXT
+  GENERATED ALWAYS AS (COALESCE("variantId", '')) STORED;
+ALTER TABLE "bulk_pricing"
+  ADD COLUMN "quantityRange" int4range
+  GENERATED ALWAYS AS (
+    int4range("minQuantity", COALESCE("maxQuantity", 2147483647), '[]')
+  ) STORED;
+
 ALTER TABLE "bulk_pricing"
   ADD CONSTRAINT bulk_pricing_quantity_no_overlap
   EXCLUDE USING gist (
     "productId" WITH =,
-    (COALESCE("variantId", '')) WITH =,
-    (currency::text) WITH =,
-    int4range("minQuantity", COALESCE("maxQuantity", 2147483647), '[]') WITH &&
+    "variantKey" WITH =,
+    currency WITH =,
+    "quantityRange" WITH &&
   );
 
 -- Active discount exclusivity locks (app maintains; DB enforces uniqueness + PCT/FIXED)
