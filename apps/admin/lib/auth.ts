@@ -25,10 +25,11 @@ export interface AuthResponse {
 
 export const authApi = {
   /**
-   * Login with email and password
+   * Login with email and password (admin surface — TTW-020).
+   * Non-ADMIN credentials are rejected by the API.
    */
   login: async (data: LoginRequest): Promise<AuthResponse> => {
-    return apiClient.post<AuthResponse>('/auth/login', data);
+    return apiClient.post<AuthResponse>('/auth/admin/login', data);
   },
 
   /**

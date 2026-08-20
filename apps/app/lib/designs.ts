@@ -1,4 +1,4 @@
-import { apiClient } from './api';
+import { apiClient, csrfHeaders } from './api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,6 +188,7 @@ export async function uploadThumbnail(
     method: 'POST',
     body: formData,
     credentials: 'include',
+    headers: csrfHeaders(),
   });
 
   if (!response.ok) {
@@ -209,6 +210,7 @@ export async function uploadDesignAsset(
     method: 'POST',
     body: formData,
     credentials: 'include',
+    headers: csrfHeaders(),
   });
 
   if (!response.ok) {
