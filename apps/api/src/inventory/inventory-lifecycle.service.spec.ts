@@ -37,32 +37,36 @@ describe('InventoryLifecycleService', () => {
     };
   });
 
-  it('reserves with conditional update and writes RESERVE movement', async () => {
+  it('inserts RESERVE movement before conditional counter update', async () => {
     await service.reserveOrderItems(
       'ord-1',
       [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
       tx as never,
     );
 
-    expect(tx.$executeRaw).toHaveBeenCalled();
     expect(tx.inventoryMovement.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           kind: InventoryMovementKind.RESERVE,
           effectKey: 'inventory.reserve:orderItem:oi-1',
           reservedDelta: 2,
-          stockOnHandDelta: 0,
         }),
       }),
     );
+    expect(tx.$executeRaw).toHaveBeenCalled();
     expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
       'reserve',
       'applied',
     );
   });
 
-  it('is idempotent when reserve effectKey already exists', async () => {
-    tx.inventoryMovement.findUnique.mockResolvedValue({ id: 'm1' });
+  it('is idempotent when reserve effectKey already exists (no counter mutation)', async () => {
+    tx.inventoryMovement.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
     await service.reserveOrderItems(
       'ord-1',
       [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
@@ -75,7 +79,7 @@ describe('InventoryLifecycleService', () => {
     );
   });
 
-  it('rejects concurrent insufficient reserve', async () => {
+  it('rejects concurrent insufficient reserve and rolls back via throw', async () => {
     tx.$executeRaw.mockResolvedValue(0);
     await expect(
       service.reserveOrderItems(
@@ -93,28 +97,34 @@ describe('InventoryLifecycleService', () => {
       [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
       tx as never,
     );
+    expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
     expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('releases reserved stock and skips when already consumed', async () => {
-    tx.inventoryMovement.findUnique.mockImplementation(
-      ({ where }: { where: { effectKey: string } }) => {
-        if (where.effectKey.includes('consume')) {
-          return Promise.resolve({ id: 'consume' });
-        }
-        return Promise.resolve(null);
-      },
-    );
+    tx.inventoryMovement.findUnique.mockResolvedValue({ id: 'consume' });
     await service.releaseOrderItems(
       'ord-1',
       [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
       tx as never,
     );
+    expect(tx.inventoryMovement.create).not.toHaveBeenCalled();
     expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
       'release',
       'duplicate',
     );
+  });
+
+  it('throws when release counter update cannot apply', async () => {
+    tx.$executeRaw.mockResolvedValue(0);
+    await expect(
+      service.releaseOrderItems(
+        'ord-1',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        tx as never,
+      ),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('consumes reserved stock into stockOnHand', async () => {
@@ -124,7 +134,6 @@ describe('InventoryLifecycleService', () => {
       tx as never,
       { reason: 'charge_success' },
     );
-    expect(tx.$executeRaw).toHaveBeenCalled();
     expect(tx.inventoryMovement.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -135,17 +144,11 @@ describe('InventoryLifecycleService', () => {
         }),
       }),
     );
+    expect(tx.$executeRaw).toHaveBeenCalled();
   });
 
   it('refuses consume after release', async () => {
-    tx.inventoryMovement.findUnique.mockImplementation(
-      ({ where }: { where: { effectKey: string } }) => {
-        if (where.effectKey.includes('release')) {
-          return Promise.resolve({ id: 'release' });
-        }
-        return Promise.resolve(null);
-      },
-    );
+    tx.inventoryMovement.findUnique.mockResolvedValue({ id: 'release' });
     await expect(
       service.consumeOrderItems(
         'ord-1',
@@ -153,23 +156,6 @@ describe('InventoryLifecycleService', () => {
         tx as never,
       ),
     ).rejects.toThrow(ConflictException);
-  });
-
-  it('treats duplicate movement create as success', async () => {
-    tx.inventoryMovement.create.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Unique', {
-        code: 'P2002',
-        clientVersion: 'test',
-      }),
-    );
-    await service.reserveOrderItems(
-      'ord-1',
-      [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
-      tx as never,
-    );
-    expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
-      'reserve',
-      'duplicate',
-    );
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 });

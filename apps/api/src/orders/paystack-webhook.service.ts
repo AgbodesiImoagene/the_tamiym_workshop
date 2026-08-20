@@ -154,6 +154,30 @@ export class PaystackWebhookService {
             'denied',
           );
           this.observability.recordChargeSettlement('rejected');
+          // Free reserved stock so expired+INITIATED payments cannot leak inventory (TTW-014).
+          // Money still requires a manual refund; do not settle the charge.
+          await this.prisma.$transaction(async (tx) => {
+            await tx.order.updateMany({
+              where: {
+                id: order.id,
+                status: OrderStatus.PENDING_PAYMENT,
+              },
+              data: {
+                status: OrderStatus.CANCELLED,
+                cancelledAt: new Date(),
+              },
+            });
+            await this.inventoryLifecycle.releaseOrderItems(
+              order.id,
+              order.items.map((i) => ({
+                id: i.id,
+                variantId: i.variantId,
+                quantity: i.quantity,
+              })),
+              tx,
+              { reason: 'charge_success_expired_reject' },
+            );
+          });
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {

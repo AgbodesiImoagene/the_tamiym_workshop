@@ -289,4 +289,115 @@ describe('Inventory lifecycle (e2e)', () => {
     expect(reservedDelta).toBe(0); // +qty then -qty
     expect(stockDelta).toBe(-qty);
   });
+
+  it('releases inventory when charge.success hits an expired pending order', async () => {
+    const suffix = `expired-${Date.now()}`;
+    const { order, variant, qty } = await createReservedPendingOrder(suffix, 2);
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    const providerRef = `psk_exp_${suffix}`;
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: PaymentProvider.PAYSTACK,
+        providerRef,
+        status: PaymentStatus.INITIATED,
+        currency: 'NGN',
+        amount: Number(order.totalAmount),
+        idempotencyKey: providerRef,
+      },
+    });
+
+    await webhooks.processChargeSuccess({
+      event: 'charge.success',
+      data: {
+        reference: providerRef,
+        status: 'success',
+        amount: Number(order.totalAmount) * 100,
+        currency: 'NGN',
+      },
+    });
+
+    const cancelled = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    expect(cancelled.status).toBe(OrderStatus.CANCELLED);
+
+    const inv = await prisma.inventoryItem.findUniqueOrThrow({
+      where: { variantId: variant.id },
+    });
+    expect(inv.reserved).toBe(0);
+    expect(inv.stockOnHand).toBe(10);
+
+    expect(
+      await prisma.inventoryMovement.count({
+        where: { orderId: order.id, kind: InventoryMovementKind.RELEASE },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.inventoryMovement.count({
+        where: { orderId: order.id, kind: InventoryMovementKind.CONSUME },
+      }),
+    ).toBe(0);
+    expect(qty).toBe(2);
+  });
+
+  it('settles vs unpaid cancel: exactly one of consume or release wins', async () => {
+    const suffix = `race-${Date.now()}`;
+    const { order, variant, qty } = await createReservedPendingOrder(suffix, 1);
+    const providerRef = `psk_race_${suffix}`;
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: PaymentProvider.PAYSTACK,
+        providerRef,
+        status: PaymentStatus.INITIATED,
+        currency: 'NGN',
+        amount: Number(order.totalAmount),
+        idempotencyKey: providerRef,
+      },
+    });
+
+    const event = {
+      event: 'charge.success',
+      data: {
+        reference: providerRef,
+        status: 'success',
+        amount: Number(order.totalAmount) * 100,
+        currency: 'NGN',
+      },
+    };
+
+    const results = await Promise.allSettled([
+      webhooks.processChargeSuccess(event),
+      orders.updateOrderStatus(order.id, OrderStatus.CANCELLED),
+    ]);
+    expect(results.some((r) => r.status === 'fulfilled')).toBe(true);
+
+    const final = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    const consumes = await prisma.inventoryMovement.count({
+      where: { orderId: order.id, kind: InventoryMovementKind.CONSUME },
+    });
+    const releases = await prisma.inventoryMovement.count({
+      where: { orderId: order.id, kind: InventoryMovementKind.RELEASE },
+    });
+    const inv = await prisma.inventoryItem.findUniqueOrThrow({
+      where: { variantId: variant.id },
+    });
+
+    expect(inv.reserved).toBe(0);
+    expect(consumes + releases).toBe(1);
+    if (final.status === OrderStatus.PAID) {
+      expect(consumes).toBe(1);
+      expect(inv.stockOnHand).toBe(10 - qty);
+    } else {
+      expect(final.status).toBe(OrderStatus.CANCELLED);
+      expect(releases).toBe(1);
+      expect(inv.stockOnHand).toBe(10);
+    }
+  });
 });
