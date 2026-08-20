@@ -88,6 +88,16 @@ ADMIN console login requires TOTP (or a single-use recovery code) before an `Aut
 4. TOTP secrets are AES-256-GCM encrypted with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64) and a `keyVersion` column for rotation. Recovery codes are stored as sha256 hashes only.
 5. Another admin may `POST /admin/users/:id/mfa/reset` (audited) to clear MFA and revoke sessions.
 
+## Auth abuse throttles (TTW-023)
+
+Auth/recovery/MFA routes use Redis-backed `AuthRateLimitGuard` (not in-memory Nest Throttler):
+
+- Keys: `ttw:auth:rl:id:{bucket}:{normalizedEmail|user:<id>}` and `ttw:auth:rl:ip:{bucket}:{req.ip}`.
+- Deny when **either** counter exceeds the bucket limit. Client IP comes from Express with `trust proxy = 1` (first hop only).
+- Redis failures fail-closed with generic `503` (same copy as `429` limits).
+- Metric: `auth_throttle_total{surface,bucket,outcome}` — never labels email or IP.
+- Global Nest `ThrottlerModule` also uses Redis storage (`@nest-lab/throttler-storage-redis`) for non-auth IP limits.
+
 `mfa_token` is a short-lived JWT (`purpose`: `mfa_enroll` | `mfa_challenge`, `surface`: ADMIN, TTL 5m), not a session.
 
 ## Migration

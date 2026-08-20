@@ -45,6 +45,14 @@ export class ObservabilityService {
     description: 'Authentication attempts grouped by outcome.',
   });
 
+  private readonly authThrottles = this.meter.createCounter(
+    'auth_throttle_total',
+    {
+      description:
+        'Auth rate-limit decisions grouped by surface, bucket, and outcome.',
+    },
+  );
+
   private readonly paymentInitiations = this.meter.createCounter(
     'payment_initiation_total',
     {
@@ -175,6 +183,18 @@ export class ObservabilityService {
 
   recordAuthLogin(metric: OutcomeMetric): void {
     this.authLogins.add(1, { outcome: metric.outcome });
+  }
+
+  recordAuthThrottle(metric: {
+    surface: 'CUSTOMER' | 'ADMIN';
+    bucket: string;
+    outcome: 'allowed' | 'limited' | 'unavailable';
+  }): void {
+    this.authThrottles.add(1, {
+      surface: metric.surface,
+      bucket: metric.bucket,
+      outcome: metric.outcome,
+    });
   }
 
   recordPaymentInitiation(metric: {

@@ -58,9 +58,46 @@ export const GOOGLE_OAUTH_STATE_COOKIE_NAME = 'google_oauth_state';
 export const GOOGLE_OAUTH_NEXT_COOKIE_NAME = 'google_oauth_next';
 export const GOOGLE_OAUTH_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
-/** Rate limiting (e.g. resend verification, forgot password) */
+/** Rate limiting (legacy Nest Throttler defaults for non-auth routes). */
 export const THROTTLE_LIMIT = 3;
 export const THROTTLE_TTL_MS = 60_000; // 1 minute
+
+/**
+ * Redis-backed auth abuse buckets (TTW-023). Deny if either the identity or
+ * IP counter for the bucket exceeds its limit within the TTL window.
+ */
+export const AUTH_RATE_LIMIT_MESSAGE =
+  'Too many requests. Try again later.' as const;
+
+export const AUTH_RATE_LIMIT_BUCKETS = {
+  customer_auth: {
+    identityLimit: 5,
+    ipLimit: 40,
+    ttlMs: 60_000,
+  },
+  admin_login: {
+    identityLimit: 5,
+    ipLimit: 40,
+    ttlMs: 60_000,
+  },
+  admin_mfa: {
+    identityLimit: 5,
+    ipLimit: 30,
+    ttlMs: 5 * 60_000,
+  },
+  admin_recovery: {
+    identityLimit: 3,
+    ipLimit: 20,
+    ttlMs: 15 * 60_000,
+  },
+  password_reset: {
+    identityLimit: 5,
+    ipLimit: 40,
+    ttlMs: 60_000,
+  },
+} as const;
+
+export type AuthRateLimitBucket = keyof typeof AUTH_RATE_LIMIT_BUCKETS;
 
 /** Pending order expiry: release reserved inventory after this many minutes if unpaid. */
 export const ORDER_PENDING_EXPIRY_MINUTES = 30;

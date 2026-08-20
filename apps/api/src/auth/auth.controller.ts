@@ -23,7 +23,6 @@ import {
   ApiCookieAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService, isMfaChallengeResponse } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -38,12 +37,13 @@ import {
   AdminMfaTotpDto,
 } from './dto/admin-mfa.dto';
 import { Public } from './decorators/public.decorator';
+import { AuthRateLimit } from './decorators/auth-rate-limit.decorator';
+import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { RequestUser } from './strategies/jwt.strategy';
 import { UserRole } from '../generated/prisma/client';
 import { AuthSurface } from '../generated/prisma/enums';
-import { THROTTLE_LIMIT, THROTTLE_TTL_MS } from '../constants';
 import {
   setSurfaceAuthCookies,
   clearSurfaceAuthCookies,
@@ -84,8 +84,8 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('customer_auth')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
@@ -151,8 +151,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('customer_auth')
   @ApiOperation({ summary: 'Login with email and password (customer surface)' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -216,8 +216,8 @@ export class AuthController {
   @Public()
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('admin_login')
   @ApiOperation({
     summary:
       'Admin password login — returns MFA enrollment/challenge token (no session)',
@@ -266,8 +266,8 @@ export class AuthController {
   @Public()
   @Post('admin/mfa/enroll/start')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('admin_mfa')
   @ApiOperation({
     summary: 'Start admin MFA enrollment (otpauth URI + recovery codes once)',
   })
@@ -295,8 +295,8 @@ export class AuthController {
   @Public()
   @Post('admin/mfa/enroll/confirm')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('admin_mfa')
   @ApiOperation({
     summary: 'Confirm admin MFA enrollment with TOTP and issue session cookies',
   })
@@ -346,8 +346,8 @@ export class AuthController {
   @Public()
   @Post('admin/mfa/challenge')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('admin_mfa')
   @ApiOperation({
     summary: 'Complete admin MFA challenge with TOTP and issue session cookies',
   })
@@ -397,8 +397,8 @@ export class AuthController {
   @Public()
   @Post('admin/mfa/recover')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('admin_recovery')
   @ApiOperation({
     summary:
       'Complete admin MFA with a single-use recovery code and issue session cookies',
@@ -475,8 +475,8 @@ export class AuthController {
   @Public()
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('customer_auth')
   @ApiOperation({ summary: 'Resend verification email' })
   @ApiBody({ type: ResendVerificationDto })
   @ApiResponse({
@@ -503,8 +503,8 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: THROTTLE_LIMIT, ttl: THROTTLE_TTL_MS } })
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('customer_auth')
   @ApiOperation({ summary: 'Request password reset email' })
   @ApiBody({ type: ForgotPasswordDto })
   @ApiResponse({
@@ -531,6 +531,8 @@ export class AuthController {
   @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('password_reset')
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiBody({ type: ResetPasswordDto })
   @ApiResponse({
