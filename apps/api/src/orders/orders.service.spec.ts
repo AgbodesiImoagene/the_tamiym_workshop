@@ -15,7 +15,10 @@ import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-d
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
-import { AccountPolicyService } from '../auth/account-policy.service';
+import {
+  AccountPolicyService,
+  ACCOUNT_POLICY_CODE,
+} from '../auth/account-policy.service';
 
 const mockAddress = {
   id: 'addr-1',
@@ -250,12 +253,21 @@ describe('OrdersService', () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         emailVerifiedAt: null,
       });
-      await expect(
-        service.create('user-1', {
+      try {
+        await service.create('user-1', {
           shippingAddressId: 'addr-1',
           items: [{ variantId: 'var-1', quantity: 1 }],
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+        fail('expected ForbiddenException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ForbiddenException);
+        const body = (err as ForbiddenException).getResponse() as Record<
+          string,
+          unknown
+        >;
+        expect(body.code).toBe(ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED);
+        expect(body.action).toBe('CREATE_ORDER');
+      }
       expect(pricingService.quoteStandard).not.toHaveBeenCalled();
     });
 
@@ -263,12 +275,21 @@ describe('OrdersService', () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         emailVerifiedAt: null,
       });
-      await expect(
-        service.createCampaignOrder('camp-1', 'user-1', {
+      try {
+        await service.createCampaignOrder('camp-1', 'user-1', {
           shippingAddressId: 'addr-1',
           items: [{ variantId: 'var-1', quantity: 1 }],
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+        fail('expected ForbiddenException');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ForbiddenException);
+        const body = (err as ForbiddenException).getResponse() as Record<
+          string,
+          unknown
+        >;
+        expect(body.code).toBe(ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED);
+        expect(body.action).toBe('CREATE_ORDER');
+      }
     });
 
     it('rejects order create when the user record is missing', async () => {

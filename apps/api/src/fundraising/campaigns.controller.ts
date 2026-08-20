@@ -196,7 +196,11 @@ export class CampaignsController {
     description: 'Invalid input or insufficient stock',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before ordering',
+  })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   async createCampaignOrder(
     @CurrentUser() user: RequestUser,

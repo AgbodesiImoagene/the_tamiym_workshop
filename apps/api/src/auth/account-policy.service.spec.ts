@@ -64,37 +64,17 @@ describe('AccountPolicyService', () => {
     });
   });
 
-  describe('assertVerifiedForPrivilegedRole', () => {
-    it('allows unverified customers', () => {
-      expect(() =>
-        service.assertVerifiedForPrivilegedRole({
-          role: UserRole.CUSTOMER,
-          emailVerifiedAt: null,
-        }),
-      ).not.toThrow();
-    });
-
-    it('rejects unverified admins and organisers', () => {
-      expect(() =>
-        service.assertVerifiedForPrivilegedRole({
-          role: UserRole.ADMIN,
-          emailVerifiedAt: null,
-        }),
-      ).toThrow(ForbiddenException);
-      expect(() =>
-        service.assertVerifiedForPrivilegedRole({
-          role: UserRole.ORGANIZER,
-          emailVerifiedAt: null,
-        }),
-      ).toThrow(ForbiddenException);
-    });
-  });
-
   describe('isPrivilegedRoleUnverified', () => {
     it('is true only for unverified organiser/admin', () => {
       expect(
         service.isPrivilegedRoleUnverified({
           role: UserRole.ADMIN,
+          emailVerifiedAt: null,
+        }),
+      ).toBe(true);
+      expect(
+        service.isPrivilegedRoleUnverified({
+          role: UserRole.ORGANIZER,
           emailVerifiedAt: null,
         }),
       ).toBe(true);

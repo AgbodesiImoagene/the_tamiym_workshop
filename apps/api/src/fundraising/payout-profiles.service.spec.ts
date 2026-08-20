@@ -1,7 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
-import { AccountPolicyService } from '../auth/account-policy.service';
+import {
+  ACCOUNT_POLICY_CODE,
+  AccountPolicyService,
+} from '../auth/account-policy.service';
 import { PayoutProfilesService } from './payout-profiles.service';
 
 describe('PayoutProfilesService verification gate', () => {
@@ -44,23 +47,48 @@ describe('PayoutProfilesService verification gate', () => {
 
   it('rejects create when email is unverified', async () => {
     prisma.user.findUnique.mockResolvedValue({ emailVerifiedAt: null });
-    await expect(
-      service.create('user-1', {
+    try {
+      await service.create('user-1', {
         bankCode: '058',
         accountName: 'Test',
         accountNumber: '0123456789',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+      fail('expected ForbiddenException');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ForbiddenException);
+      const body = (err as ForbiddenException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.code).toBe(ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED);
+      expect(body.action).toBe('MUTATE_PAYOUT_PROFILE');
+    }
     expect(prisma.userPayoutProfile.create).not.toHaveBeenCalled();
   });
 
   it('rejects update and remove when email is unverified', async () => {
     prisma.user.findUnique.mockResolvedValue({ emailVerifiedAt: null });
-    await expect(
-      service.update('user-1', 'p1', { label: 'x' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(service.remove('user-1', 'p1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    try {
+      await service.update('user-1', 'p1', { label: 'x' });
+      fail('expected ForbiddenException');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ForbiddenException);
+      const body = (err as ForbiddenException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.code).toBe(ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED);
+    }
+    try {
+      await service.remove('user-1', 'p1');
+      fail('expected ForbiddenException');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ForbiddenException);
+      const body = (err as ForbiddenException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.code).toBe(ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED);
+    }
   });
 });

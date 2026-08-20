@@ -67,22 +67,6 @@ export class AccountPolicyService {
     );
   }
 
-  assertVerifiedForPrivilegedRole(user: {
-    role: UserRole;
-    emailVerifiedAt: Date | null | undefined;
-  }): void {
-    if (!this.isPrivilegedRoleUnverified(user)) {
-      return;
-    }
-    throw new ForbiddenException({
-      statusCode: 403,
-      code: ACCOUNT_POLICY_CODE.EMAIL_NOT_VERIFIED,
-      message:
-        'Verify your email before accessing organiser or admin features.',
-      action: 'PRIVILEGED_ACCESS',
-    });
-  }
-
   private messageForAction(action: VerifiedEmailAction): string {
     switch (action) {
       case 'CREATE_ORDER':
