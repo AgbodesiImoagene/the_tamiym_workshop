@@ -12,7 +12,9 @@ import { MAIL_QUEUE_NAME } from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
 import { AccountPolicyService } from './account-policy.service';
 import { AuthSessionService } from './auth-session.service';
+import { AdminMfaService } from './admin-mfa.service';
 import { AuthSurface } from '../generated/prisma/enums';
+import { isMfaChallengeResponse } from './auth.service';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -49,6 +51,14 @@ describe('AuthService', () => {
     revokeOneForUser: jest.Mock;
     listForUser: jest.Mock;
     parseDeviceLabel: jest.Mock;
+  };
+  let adminMfa: {
+    isEnabled: jest.Mock;
+    signMfaToken: jest.Mock;
+    startEnrollment: jest.Mock;
+    confirmEnrollment: jest.Mock;
+    challenge: jest.Mock;
+    recover: jest.Mock;
   };
 
   const liveSession = {
@@ -113,6 +123,14 @@ describe('AuthService', () => {
       listForUser: jest.fn().mockResolvedValue([]),
       parseDeviceLabel: jest.fn((ua?: string) => ua?.slice(0, 120) ?? null),
     };
+    adminMfa = {
+      isEnabled: jest.fn().mockResolvedValue(false),
+      signMfaToken: jest.fn().mockReturnValue('mfa-jwt'),
+      startEnrollment: jest.fn(),
+      confirmEnrollment: jest.fn(),
+      challenge: jest.fn(),
+      recover: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -133,6 +151,7 @@ describe('AuthService', () => {
           useValue: { add: jest.fn() },
         },
         { provide: AuthSessionService, useValue: authSession },
+        { provide: AdminMfaService, useValue: adminMfa },
         AccountPolicyService,
       ],
     }).compile();
@@ -204,7 +223,7 @@ describe('AuthService', () => {
     });
   });
 
-  it('signs the JWT payload with the requested surface and sid', async () => {
+  it('ADMIN password login returns MFA enrollment challenge without a session', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       email: 'admin@example.com',
@@ -216,6 +235,49 @@ describe('AuthService', () => {
       status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
+    adminMfa.isEnabled.mockResolvedValue(false);
+
+    const result = await service.login(
+      { email: 'admin@example.com', password: 'password123' },
+      AuthSurface.ADMIN,
+    );
+
+    expect(isMfaChallengeResponse(result)).toBe(true);
+    if (isMfaChallengeResponse(result)) {
+      expect(result.mfa.status).toBe('ENROLLMENT_REQUIRED');
+      expect(result.mfa_token).toBe('mfa-jwt');
+    }
+    expect(authSession.createSession).not.toHaveBeenCalled();
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('ADMIN password login returns MFA challenge when already enrolled', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      passwordHash: await bcrypt.hash('password123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
+    });
+    adminMfa.isEnabled.mockResolvedValue(true);
+
+    const result = await service.login(
+      { email: 'admin@example.com', password: 'password123' },
+      AuthSurface.ADMIN,
+    );
+
+    expect(isMfaChallengeResponse(result)).toBe(true);
+    if (isMfaChallengeResponse(result)) {
+      expect(result.mfa.status).toBe('CHALLENGE_REQUIRED');
+    }
+    expect(authSession.createSession).not.toHaveBeenCalled();
+  });
+
+  it('signs the JWT payload with the requested surface and sid after MFA session issue', async () => {
     authSession.createSession.mockResolvedValue({
       session: { ...liveSession, authSurface: AuthSurface.ADMIN },
       refreshToken: 'admin-refresh',
@@ -223,10 +285,15 @@ describe('AuthService', () => {
     prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
 
-    await service.login(
-      { email: 'admin@example.com', password: 'password123' },
-      AuthSurface.ADMIN,
-    );
+    await service.issueAdminSessionAfterMfa({
+      id: 'user-1',
+      email: 'admin@example.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+    });
 
     expect(jwtService.sign).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -640,5 +707,43 @@ describe('AuthService', () => {
       'user-1',
       expect.anything(),
     );
+  });
+
+  describe('admin MFA wrappers', () => {
+    const adminUser = {
+      id: 'admin-1',
+      email: 'admin@example.com',
+      firstName: 'A',
+      lastName: 'B',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+    };
+
+    it('delegates enroll/challenge/recover and issues a session', async () => {
+      adminMfa.startEnrollment.mockResolvedValue({ secret: 'S' });
+      adminMfa.confirmEnrollment.mockResolvedValue(adminUser);
+      adminMfa.challenge.mockResolvedValue(adminUser);
+      adminMfa.recover.mockResolvedValue(adminUser);
+      authSession.createSession.mockResolvedValue({
+        session: liveSession,
+        refreshToken: 'refresh-plain',
+      });
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.update.mockResolvedValue({});
+
+      await expect(service.adminMfaEnrollStart('tok')).resolves.toEqual({
+        secret: 'S',
+      });
+      await expect(
+        service.adminMfaEnrollConfirm('tok', '123456'),
+      ).resolves.toMatchObject({ refresh_token: 'refresh-plain' });
+      await expect(
+        service.adminMfaChallenge('tok', '123456'),
+      ).resolves.toMatchObject({ refresh_token: 'refresh-plain' });
+      await expect(
+        service.adminMfaRecover('tok', 'AAAA-BBBB'),
+      ).resolves.toMatchObject({ refresh_token: 'refresh-plain' });
+    });
   });
 });

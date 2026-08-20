@@ -236,6 +236,9 @@ importers:
       openai:
         specifier: ^7.5.0
         version: 7.5.0(@aws-sdk/credential-provider-node@3.972.80)(@smithy/hash-node@4.2.8)(@smithy/signature-v4@5.7.2)(ws@8.21.3)(zod@4.3.6)
+      otpauth:
+        specifier: ^9.5.1
+        version: 9.5.1
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -2044,6 +2047,10 @@ packages:
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
+
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
+    engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -6948,6 +6955,9 @@ packages:
     resolution: {integrity: sha512-D2FR03Vir7FIu45XBY20mTb+/ZSWB00sjU9jdQXt83gDrI4Ztz5Fs7/yy74g2N5SVQY4xY1qDr4rNddwYRVX0g==}
     engines: {node: '>=0.10.0'}
 
+  otpauth@9.5.1:
+    resolution: {integrity: sha512-fJmDAHc8wImfqqqOXIlBvT1dEKrZK0Cmb2VEgScpNTolCz0PHh6ExUZGv4sLtOsWNaHCQlD+rRqaPgnoxFoZjQ==}
+
   outvariant@1.4.3:
     resolution: {integrity: sha512-+Sl2UErvtsoajRDKCE5/dBz4DIvHXQQnAxtQTF04OJxY0+DyZXSo5P5Bb7XYWOh81syohlYL24hbDwxedPUJCA==}
 
@@ -10244,6 +10254,8 @@ snapshots:
       '@noble/hashes': 1.8.0
 
   '@noble/hashes@1.8.0': {}
+
+  '@noble/hashes@2.2.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -16179,6 +16191,10 @@ snapshots:
       strip-ansi: 7.1.2
 
   os-tmpdir@1.0.2: {}
+
+  otpauth@9.5.1:
+    dependencies:
+      '@noble/hashes': 2.2.0
 
   outvariant@1.4.3: {}
 

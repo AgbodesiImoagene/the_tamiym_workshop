@@ -17,6 +17,7 @@ describe('env-validation', () => {
     DATABASE_URL: 'postgres://localhost:5432/db',
     JWT_ACCESS_SECRET: 'a-real-access-secret',
     JWT_REFRESH_SECRET: 'a-real-refresh-secret',
+    MFA_TOTP_ENCRYPTION_KEY: 'zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=',
   };
 
   afterEach(() => {
@@ -101,6 +102,25 @@ describe('env-validation', () => {
 
       it('does not require the production-only Origin allowlist vars', () => {
         expect(validateEnv(validBaseConfig)).toEqual(validBaseConfig);
+      });
+
+      it('throws when MFA_TOTP_ENCRYPTION_KEY is missing', () => {
+        expect(() =>
+          validateEnv(omit(validBaseConfig, 'MFA_TOTP_ENCRYPTION_KEY')),
+        ).toThrow(
+          'Missing required environment variable: MFA_TOTP_ENCRYPTION_KEY',
+        );
+      });
+
+      it('throws when MFA_TOTP_ENCRYPTION_KEY is not 32 decoded bytes', () => {
+        expect(() =>
+          validateEnv({
+            ...validBaseConfig,
+            MFA_TOTP_ENCRYPTION_KEY: 'dG9vLXNob3J0',
+          }),
+        ).toThrow(
+          'Environment variable MFA_TOTP_ENCRYPTION_KEY must decode to exactly 32 bytes',
+        );
       });
     });
 

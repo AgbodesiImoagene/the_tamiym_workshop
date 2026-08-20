@@ -9,6 +9,7 @@ import { GoogleOAuthService } from './google-oauth.service';
 import { AuthTokenCleanupService } from './auth-token-cleanup.service';
 import { AccountPolicyService } from './account-policy.service';
 import { AuthSessionService } from './auth-session.service';
+import { AdminMfaService } from './admin-mfa.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt/jwt.guard';
 import { RolesGuard } from './guards/roles/roles.guard';
@@ -46,6 +47,7 @@ import { StringValue } from 'ms';
   providers: [
     AuthService,
     AuthSessionService,
+    AdminMfaService,
     GoogleOAuthService,
     AuthTokenCleanupService,
     AccountPolicyService,
@@ -57,6 +59,7 @@ import { StringValue } from 'ms';
   exports: [
     AuthService,
     AuthSessionService,
+    AdminMfaService,
     AccountPolicyService,
     JwtAuthGuard,
     RolesGuard,

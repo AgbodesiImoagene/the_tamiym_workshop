@@ -88,13 +88,17 @@ async function main() {
       });
 
       console.log('Promoted existing user to ADMIN:');
-      console.log(updatedUser);
+    console.log(updatedUser);
 
       if (!passwordHash && !existingUser.passwordHash) {
         console.log(
           'No password is set for this account. Re-run with --password if you want password-based admin login.',
         );
       }
+
+      console.log(
+        'MFA: this admin must enroll TOTP on first login (POST /auth/admin/login → /auth/admin/mfa/enroll/*).',
+      );
 
       return;
     }
@@ -128,6 +132,9 @@ async function main() {
 
     console.log('Created new ADMIN user:');
     console.log(createdUser);
+    console.log(
+      'MFA: this admin must enroll TOTP on first login (POST /auth/admin/login → /auth/admin/mfa/enroll/*).',
+    );
   } finally {
     await closePrismaScriptContext(context);
   }

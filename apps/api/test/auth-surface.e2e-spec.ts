@@ -6,10 +6,11 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { AuthService } from '../src/auth/auth.service';
+import { AuthService, isMfaChallengeResponse } from '../src/auth/auth.service';
 import { UserRole, UserStatus } from '../src/generated/prisma/client';
 import { AuthSurface } from '../src/generated/prisma/enums';
 import { hashRefreshToken } from '../src/auth/auth-session.crypto';
+import { generateTotpCode } from '../src/auth/admin-mfa.totp';
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
 const ADMIN_ORIGIN = 'http://localhost:3003';
@@ -123,7 +124,7 @@ describe('Auth surface isolation (e2e)', () => {
     };
   }
 
-  /** Mint an ADMIN session without going through the throttled HTTP login route. */
+  /** Mint an ADMIN session (password → MFA enroll/confirm → session). */
   async function createAdminSession(): Promise<{
     id: string;
     email: string;
@@ -131,9 +132,20 @@ describe('Auth surface isolation (e2e)', () => {
     refreshToken: string;
   }> {
     const { id, email, password } = await createUser(UserRole.ADMIN);
-    const session = await authService.login(
+    const challenge = await authService.login(
       { email, password },
       AuthSurface.ADMIN,
+    );
+    if (!isMfaChallengeResponse(challenge)) {
+      throw new Error('expected MFA enrollment challenge for new admin');
+    }
+    const enrollment = await authService.adminMfaEnrollStart(
+      challenge.mfa_token,
+    );
+    const totp = generateTotpCode(enrollment.secret);
+    const session = await authService.adminMfaEnrollConfirm(
+      challenge.mfa_token,
+      totp,
     );
     return {
       id,
@@ -175,7 +187,7 @@ describe('Auth surface isolation (e2e)', () => {
         .expect(401);
     });
 
-    it('POST /auth/admin/login succeeds for ADMIN and sets admin-scoped cookies only', async () => {
+    it('POST /auth/admin/login returns MFA enrollment challenge without cookies', async () => {
       const { email, password } = await createUser(UserRole.ADMIN);
 
       const res = await request(app.getHttpServer())
@@ -184,14 +196,46 @@ describe('Auth surface isolation (e2e)', () => {
         .send({ email, password })
         .expect(200);
 
-      expect(cookieValue(res, ADMIN_ACCESS_COOKIE)).toBeTruthy();
-      expect(cookieValue(res, ADMIN_CSRF_COOKIE)).toBeTruthy();
+      expect(res.body.mfa.status).toBe('ENROLLMENT_REQUIRED');
+      expect(typeof res.body.mfa_token).toBe('string');
+      expect(cookieValue(res, ADMIN_ACCESS_COOKIE)).toBeFalsy();
       expect(cookieValue(res, CUSTOMER_ACCESS_COOKIE)).toBeFalsy();
-      // Legacy shared cookie names are always cleared, never set.
-      expect(cookieValue(res, 'access_token')).toBe('');
-      // The CSRF token is also returned in the body: a cross-origin SPA
-      // cannot read the host-only CSRF cookie (TTW-020).
-      expect(res.body.csrf_token).toBe(cookieValue(res, ADMIN_CSRF_COOKIE));
+    });
+
+    it('POST /auth/admin/mfa enroll confirm issues admin-scoped cookies only', async () => {
+      const { email, password } = await createUser(UserRole.ADMIN);
+
+      const loginRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/login')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ email, password })
+        .expect(200);
+
+      const enrollRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/start')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({ mfa_token: loginRes.body.mfa_token })
+        .expect(200);
+
+      expect(enrollRes.body.otpauth_uri).toMatch(/^otpauth:\/\//);
+      expect(enrollRes.body.recovery_codes).toHaveLength(10);
+
+      const confirmRes = await request(app.getHttpServer())
+        .post('/v1/auth/admin/mfa/enroll/confirm')
+        .set('Origin', ADMIN_ORIGIN)
+        .send({
+          mfa_token: loginRes.body.mfa_token,
+          totp: generateTotpCode(enrollRes.body.secret),
+        })
+        .expect(200);
+
+      expect(cookieValue(confirmRes, ADMIN_ACCESS_COOKIE)).toBeTruthy();
+      expect(cookieValue(confirmRes, ADMIN_CSRF_COOKIE)).toBeTruthy();
+      expect(cookieValue(confirmRes, CUSTOMER_ACCESS_COOKIE)).toBeFalsy();
+      expect(cookieValue(confirmRes, 'access_token')).toBe('');
+      expect(confirmRes.body.csrf_token).toBe(
+        cookieValue(confirmRes, ADMIN_CSRF_COOKIE),
+      );
     });
   });
 
@@ -246,15 +290,22 @@ describe('Auth surface isolation (e2e)', () => {
     });
 
     it('a CSRF token taken from the login body is accepted on a mutation', async () => {
-      const { email, password } = await createUser(UserRole.ADMIN);
-      const loginRes = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
+      const session = await createAdminSession();
+      const meRes = await request(app.getHttpServer())
+        .get('/v1/auth/me')
         .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
+        .set(
+          'Cookie',
+          buildCookieHeader({
+            [ADMIN_ACCESS_COOKIE]: session.accessToken,
+          }),
+        )
         .expect(200);
 
-      const accessToken = cookieValue(loginRes, ADMIN_ACCESS_COOKIE) as string;
-      const bodyCsrfToken = loginRes.body.csrf_token as string;
+      const bodyCsrfToken = meRes.body.csrf_token as string;
+      const { password } = await prisma.user
+        .findUniqueOrThrow({ where: { id: session.id } })
+        .then(() => ({ password: 'TestPassword1!' }));
 
       await request(app.getHttpServer())
         .post('/v1/auth/change-password')
@@ -262,7 +313,7 @@ describe('Auth surface isolation (e2e)', () => {
         .set(
           'Cookie',
           buildCookieHeader({
-            [ADMIN_ACCESS_COOKIE]: accessToken,
+            [ADMIN_ACCESS_COOKIE]: session.accessToken,
             [ADMIN_CSRF_COOKIE]: bodyCsrfToken,
           }),
         )

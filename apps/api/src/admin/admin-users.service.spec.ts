@@ -33,7 +33,13 @@ describe('AdminUsersService', () => {
       ),
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
-    service = new AdminUsersService(prisma as never, audit as never);
+    service = new AdminUsersService(
+      prisma as never,
+      audit as never,
+      {
+        resetMfaForUser: jest.fn().mockResolvedValue({ reset: true }),
+      } as never,
+    );
   });
 
   it('setUserRole throws when user missing', async () => {
@@ -121,6 +127,25 @@ describe('AdminUsersService', () => {
         before: { role: UserRole.CUSTOMER },
         after: { role: UserRole.ADMIN },
       }),
+    );
+  });
+
+  it('resetUserMfa delegates to AdminMfaService', async () => {
+    const adminMfa = {
+      resetMfaForUser: jest.fn().mockResolvedValue({ reset: true }),
+    };
+    const svc = new AdminUsersService(
+      prisma as never,
+      audit as never,
+      adminMfa as never,
+    );
+    await expect(
+      svc.resetUserMfa('actor', UserRole.ADMIN, 'target'),
+    ).resolves.toEqual({ reset: true });
+    expect(adminMfa.resetMfaForUser).toHaveBeenCalledWith(
+      'actor',
+      UserRole.ADMIN,
+      'target',
     );
   });
 });

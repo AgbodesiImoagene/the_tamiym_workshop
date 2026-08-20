@@ -70,6 +70,10 @@ describe('AuthController', () => {
       listSessions: jest.fn(),
       revokeSession: jest.fn(),
       revokeAllSessions: jest.fn(),
+      adminMfaEnrollStart: jest.fn(),
+      adminMfaEnrollConfirm: jest.fn(),
+      adminMfaChallenge: jest.fn(),
+      adminMfaRecover: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -201,39 +205,24 @@ describe('AuthController', () => {
   });
 
   describe('adminLogin', () => {
-    it('logs in on the ADMIN surface and sets admin cookies', async () => {
+    it('returns MFA challenge without setting cookies', async () => {
       const loginDto = { email: 'admin@example.com', password: 'password123' };
       authService.login.mockResolvedValue({
-        user: mockAdminUser,
-        access_token: 'admin-access',
-        refresh_token: 'admin-refresh',
+        mfa: { status: 'ENROLLMENT_REQUIRED' },
+        mfa_token: 'mfa-jwt',
       });
 
-      const result = await controller.adminLogin(
-        loginDto as any,
-        undefined,
-        mockRes as unknown as Response,
-      );
+      const result = await controller.adminLogin(loginDto as any, undefined);
 
       expect(authService.login).toHaveBeenCalledWith(
         loginDto,
         AuthSurface.ADMIN,
-        { deviceLabel: null },
       );
-      expect(result.user).toEqual(mockAdminUser);
-      expect(result.csrf_token).toBe(
-        cookieValue(mockRes, surfaceCookieNames(AuthSurface.ADMIN).csrf),
-      );
-      expect(mockRes.cookie).toHaveBeenCalledWith(
-        surfaceCookieNames(AuthSurface.ADMIN).access,
-        'admin-access',
-        expect.anything(),
-      );
-      expect(mockRes.cookie).toHaveBeenCalledWith(
-        surfaceCookieNames(AuthSurface.ADMIN).refresh,
-        'admin-refresh',
-        expect.anything(),
-      );
+      expect(result).toEqual({
+        mfa: { status: 'ENROLLMENT_REQUIRED' },
+        mfa_token: 'mfa-jwt',
+      });
+      expect(mockRes.cookie).not.toHaveBeenCalled();
     });
 
     it('propagates UnauthorizedException for a role denied on the ADMIN surface', async () => {
@@ -246,11 +235,7 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.adminLogin(
-          loginDto as any,
-          undefined,
-          mockRes as unknown as Response,
-        ),
+        controller.adminLogin(loginDto as any, undefined),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -552,6 +537,56 @@ describe('AuthController', () => {
         message: 'All sessions revoked',
         revoked: 3,
       });
+    });
+  });
+
+  describe('admin MFA', () => {
+    const sessionResult = {
+      access_token: 'admin-access',
+      refresh_token: 'admin-refresh',
+      user: mockAdminUser,
+    };
+
+    it('starts enrollment', async () => {
+      authService.adminMfaEnrollStart.mockResolvedValue({
+        otpauth_uri: 'otpauth://totp/x',
+        secret: 'SECRET',
+        recovery_codes: ['AAAA-BBBB'],
+      });
+      const result = await controller.adminMfaEnrollStart({
+        mfa_token: 'tok',
+      } as any);
+      expect(authService.adminMfaEnrollStart).toHaveBeenCalledWith('tok');
+      expect(result.secret).toBe('SECRET');
+    });
+
+    it('confirms enrollment and sets cookies', async () => {
+      authService.adminMfaEnrollConfirm.mockResolvedValue(sessionResult);
+      const result = await controller.adminMfaEnrollConfirm(
+        { mfa_token: 'tok', totp: '123456' } as any,
+        undefined,
+        mockRes as unknown as Response,
+      );
+      expect(authService.adminMfaEnrollConfirm).toHaveBeenCalled();
+      expect(result.user).toEqual(mockAdminUser);
+      expect(result.csrf_token).toBeTruthy();
+    });
+
+    it('completes challenge and recover paths', async () => {
+      authService.adminMfaChallenge.mockResolvedValue(sessionResult);
+      authService.adminMfaRecover.mockResolvedValue(sessionResult);
+      await controller.adminMfaChallenge(
+        { mfa_token: 'tok', totp: '123456' } as any,
+        undefined,
+        mockRes as unknown as Response,
+      );
+      await controller.adminMfaRecover(
+        { mfa_token: 'tok', recovery_code: 'AAAA-BBBB' } as any,
+        undefined,
+        mockRes as unknown as Response,
+      );
+      expect(authService.adminMfaChallenge).toHaveBeenCalled();
+      expect(authService.adminMfaRecover).toHaveBeenCalled();
     });
   });
 });

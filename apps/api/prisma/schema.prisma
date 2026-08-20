@@ -442,6 +442,7 @@ model User {
   authTokens           AuthToken[]
   authSessions         AuthSession[]
   oauthAccounts        UserOAuthAccount[]
+  adminMfaCredential   AdminMfaCredential?
 
   @@index([email])
   @@index([role])
@@ -508,6 +509,48 @@ model AuthSession {
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("auth_sessions")
+}
+
+/// ADMIN-only TOTP credential (TTW-023). Secrets are AES-256-GCM ciphertext;
+/// plaintext never persisted. `enabledAt` null means enrollment incomplete.
+model AdminMfaCredential {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Active TOTP secret (base64 AES-GCM ciphertext). Null until enrollment confirms.
+  secretCiphertext String?
+  /// 12-byte nonce for `secretCiphertext` (base64).
+  secretNonce      String?
+  /// Encryption key version used for the active secret (rotation support).
+  keyVersion       Int     @default(1)
+  enabledAt        DateTime?
+
+  /// Pending enrollment secret (base64 AES-GCM ciphertext) before confirm.
+  pendingSecretCiphertext String?
+  pendingNonce            String?
+  pendingKeyVersion       Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recoveryCodes AdminMfaRecoveryCode[]
+
+  @@map("admin_mfa_credentials")
+}
+
+/// One-time ADMIN MFA recovery codes. Only sha256(code) is stored.
+model AdminMfaRecoveryCode {
+  id     String @id @default(cuid())
+  userId String
+
+  credential AdminMfaCredential @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("admin_mfa_recovery_codes")
 }
 
 /// Shipping or billing address for a user. Used at checkout and snapshotted on Order.
