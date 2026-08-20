@@ -1,14 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
+
+const redisState = {
+  pingResult: 'PONG' as string,
+  connectShouldFail: false,
+};
+
+jest.mock('ioredis', () => {
+  return jest.fn().mockImplementation(() => ({
+    connect: jest.fn().mockImplementation(async () => {
+      if (redisState.connectShouldFail) {
+        throw new Error('redis down');
+      }
+    }),
+    ping: jest.fn().mockImplementation(async () => redisState.pingResult),
+    quit: jest.fn().mockResolvedValue('OK'),
+    disconnect: jest.fn(),
+  }));
+});
 
 describe('AppController', () => {
   let appController: AppController;
   let mockPrisma: { $queryRaw: jest.Mock };
 
   beforeEach(async () => {
+    redisState.pingResult = 'PONG';
+    redisState.connectShouldFail = false;
     mockPrisma = {
       $queryRaw: jest.fn().mockResolvedValue(undefined),
     };
@@ -17,7 +38,7 @@ describe('AppController', () => {
       get: jest.fn((key: string, fallback?: string | number) => {
         const map: Record<string, string | number> = {
           REDIS_HOST: '127.0.0.1',
-          REDIS_PORT: 1,
+          REDIS_PORT: 6379,
           REDIS_DB: 0,
         };
         return map[key] ?? fallback;
@@ -42,6 +63,7 @@ describe('AppController', () => {
       expect(result).toMatchObject({
         status: 'ok',
         database: 'connected',
+        redis: 'connected',
       });
       expect(result).toHaveProperty('timestamp');
       expect(result).toHaveProperty('uptime');
@@ -56,10 +78,26 @@ describe('AppController', () => {
   });
 
   describe('getReady', () => {
-    it('throws when redis is unreachable', async () => {
-      await expect(appController.getReady()).rejects.toMatchObject({
-        status: 503,
+    it('returns ok when database and redis are connected', async () => {
+      await expect(appController.getReady()).resolves.toMatchObject({
+        status: 'ok',
+        database: 'connected',
+        redis: 'connected',
       });
+    });
+
+    it('throws when redis is unreachable', async () => {
+      redisState.connectShouldFail = true;
+      await expect(appController.getReady()).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('throws when database is unreachable', async () => {
+      mockPrisma.$queryRaw.mockRejectedValueOnce(new Error('db down'));
+      await expect(appController.getReady()).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
     });
   });
 });

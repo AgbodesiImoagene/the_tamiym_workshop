@@ -81,7 +81,11 @@ if (mustExist('infra/runtime/compose/docker-compose.prod.yml')) {
     }
   }
 
-  if (!/API_ROLE:\s*api/.test(compose) || !/API_ROLE:\s*worker/.test(compose) || !/API_ROLE:\s*scheduler/.test(compose)) {
+  if (
+    !/API_ROLE:\s*api/.test(compose) ||
+    !/API_ROLE:\s*worker/.test(compose) ||
+    !/API_ROLE:\s*scheduler/.test(compose)
+  ) {
     failures.push('compose must set API_ROLE for api, worker, and scheduler');
   }
 
