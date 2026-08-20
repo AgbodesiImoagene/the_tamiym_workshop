@@ -37,6 +37,26 @@ export interface AuthResponse {
   csrf_token?: string;
 }
 
+/** Password-only admin login response before MFA completes (TTW-023). */
+export type AdminMfaStatus = 'ENROLLMENT_REQUIRED' | 'CHALLENGE_REQUIRED';
+
+export interface AdminMfaChallengeResponse {
+  mfa: { status: AdminMfaStatus };
+  mfa_token: string;
+}
+
+export interface AdminMfaEnrollmentStart {
+  otpauth_uri: string;
+  secret: string;
+  recovery_codes: string[];
+}
+
+function isMfaChallengeResponse(
+  value: AuthResponse | AdminMfaChallengeResponse
+): value is AdminMfaChallengeResponse {
+  return typeof value === 'object' && value !== null && 'mfa' in value && 'mfa_token' in value;
+}
+
 /** Full-page redirect to API Google OAuth start for existing admin accounts only. */
 export function getAdminGoogleSignInUrl(next = '/admin'): string {
   const q = new URLSearchParams({ next });
@@ -54,11 +74,53 @@ export const GOOGLE_SIGN_IN_ERROR_MESSAGES: Record<string, string> = {
 
 export const authApi = {
   /**
-   * Login with email and password (admin surface — TTW-020).
-   * Non-ADMIN credentials are rejected by the API.
+   * Password step for admin login (TTW-023). Never issues a session; returns
+   * an MFA challenge/enrollment token that must be completed next.
    */
-  login: async (data: LoginRequest): Promise<AuthResponse> => {
-    const response = await apiClient.post<AuthResponse>('/auth/admin/login', data);
+  login: async (data: LoginRequest): Promise<AdminMfaChallengeResponse> => {
+    const response = await apiClient.post<AuthResponse | AdminMfaChallengeResponse>(
+      '/auth/admin/login',
+      data
+    );
+    if (!isMfaChallengeResponse(response)) {
+      throw new Error('Admin login did not return an MFA challenge');
+    }
+    return response;
+  },
+
+  /** Start TOTP enrollment; returns otpauth URI + recovery codes once. */
+  mfaEnrollStart: async (mfaToken: string): Promise<AdminMfaEnrollmentStart> => {
+    return apiClient.post<AdminMfaEnrollmentStart>('/auth/admin/mfa/enroll/start', {
+      mfa_token: mfaToken,
+    });
+  },
+
+  /** Confirm enrollment with TOTP and receive an admin session. */
+  mfaEnrollConfirm: async (mfaToken: string, totp: string): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/admin/mfa/enroll/confirm', {
+      mfa_token: mfaToken,
+      totp,
+    });
+    setCsrfToken(response.csrf_token);
+    return response;
+  },
+
+  /** Complete MFA challenge with TOTP and receive an admin session. */
+  mfaChallenge: async (mfaToken: string, totp: string): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/admin/mfa/challenge', {
+      mfa_token: mfaToken,
+      totp,
+    });
+    setCsrfToken(response.csrf_token);
+    return response;
+  },
+
+  /** Complete MFA with a single-use recovery code and receive an admin session. */
+  mfaRecover: async (mfaToken: string, recoveryCode: string): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/admin/mfa/recover', {
+      mfa_token: mfaToken,
+      recovery_code: recoveryCode,
+    });
     setCsrfToken(response.csrf_token);
     return response;
   },

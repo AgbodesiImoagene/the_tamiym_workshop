@@ -239,44 +239,39 @@ describe('Auth surface isolation (e2e)', () => {
     });
 
     it('POST /auth/admin/mfa/challenge issues session after enroll', async () => {
+      // Enroll + mint challenge token via service; only the challenge route
+      // is exercised over HTTP (shared IP throttle is 3/min on admin login).
       const { email, password } = await createUser(UserRole.ADMIN);
+      const enrollChallenge = await authService.login(
+        { email, password },
+        AuthSurface.ADMIN,
+      );
+      if (!isMfaChallengeResponse(enrollChallenge)) {
+        throw new Error('expected MFA enrollment challenge');
+      }
+      const enrollment = await authService.adminMfaEnrollStart(
+        enrollChallenge.mfa_token,
+      );
+      await authService.adminMfaEnrollConfirm(
+        enrollChallenge.mfa_token,
+        generateTotpCode(enrollment.secret),
+      );
 
-      const loginEnroll = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
-        .expect(200);
-
-      const enrollRes = await request(app.getHttpServer())
-        .post('/v1/auth/admin/mfa/enroll/start')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ mfa_token: loginEnroll.body.mfa_token })
-        .expect(200);
-
-      await request(app.getHttpServer())
-        .post('/v1/auth/admin/mfa/enroll/confirm')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({
-          mfa_token: loginEnroll.body.mfa_token,
-          totp: generateTotpCode(enrollRes.body.secret),
-        })
-        .expect(200);
-
-      const loginChallenge = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
-        .expect(200);
-
-      expect(loginChallenge.body.mfa.status).toBe('CHALLENGE_REQUIRED');
-      expect(cookieValue(loginChallenge, ADMIN_ACCESS_COOKIE)).toBeFalsy();
+      const loginChallenge = await authService.login(
+        { email, password },
+        AuthSurface.ADMIN,
+      );
+      if (!isMfaChallengeResponse(loginChallenge)) {
+        throw new Error('expected MFA challenge');
+      }
+      expect(loginChallenge.mfa.status).toBe('CHALLENGE_REQUIRED');
 
       const challengeRes = await request(app.getHttpServer())
         .post('/v1/auth/admin/mfa/challenge')
         .set('Origin', ADMIN_ORIGIN)
         .send({
-          mfa_token: loginChallenge.body.mfa_token,
-          totp: generateTotpCode(enrollRes.body.secret),
+          mfa_token: loginChallenge.mfa_token,
+          totp: generateTotpCode(enrollment.secret),
         })
         .expect(200);
 
@@ -286,58 +281,54 @@ describe('Auth surface isolation (e2e)', () => {
 
     it('POST /auth/admin/mfa/recover consumes a code once then denies replay', async () => {
       const { email, password } = await createUser(UserRole.ADMIN);
+      const enrollChallenge = await authService.login(
+        { email, password },
+        AuthSurface.ADMIN,
+      );
+      if (!isMfaChallengeResponse(enrollChallenge)) {
+        throw new Error('expected MFA enrollment challenge');
+      }
+      const enrollment = await authService.adminMfaEnrollStart(
+        enrollChallenge.mfa_token,
+      );
+      const recoveryCode = enrollment.recovery_codes[0];
+      await authService.adminMfaEnrollConfirm(
+        enrollChallenge.mfa_token,
+        generateTotpCode(enrollment.secret),
+      );
 
-      const loginEnroll = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
-        .expect(200);
-
-      const enrollRes = await request(app.getHttpServer())
-        .post('/v1/auth/admin/mfa/enroll/start')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ mfa_token: loginEnroll.body.mfa_token })
-        .expect(200);
-
-      const recoveryCode = enrollRes.body.recovery_codes[0] as string;
-
-      await request(app.getHttpServer())
-        .post('/v1/auth/admin/mfa/enroll/confirm')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({
-          mfa_token: loginEnroll.body.mfa_token,
-          totp: generateTotpCode(enrollRes.body.secret),
-        })
-        .expect(200);
-
-      const loginChallenge = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
-        .expect(200);
+      const loginChallenge = await authService.login(
+        { email, password },
+        AuthSurface.ADMIN,
+      );
+      if (!isMfaChallengeResponse(loginChallenge)) {
+        throw new Error('expected MFA challenge');
+      }
 
       const recoverRes = await request(app.getHttpServer())
         .post('/v1/auth/admin/mfa/recover')
         .set('Origin', ADMIN_ORIGIN)
         .send({
-          mfa_token: loginChallenge.body.mfa_token,
+          mfa_token: loginChallenge.mfa_token,
           recovery_code: recoveryCode,
         })
         .expect(200);
 
       expect(cookieValue(recoverRes, ADMIN_ACCESS_COOKIE)).toBeTruthy();
 
-      const loginAgain = await request(app.getHttpServer())
-        .post('/v1/auth/admin/login')
-        .set('Origin', ADMIN_ORIGIN)
-        .send({ email, password })
-        .expect(200);
+      const again = await authService.login(
+        { email, password },
+        AuthSurface.ADMIN,
+      );
+      if (!isMfaChallengeResponse(again)) {
+        throw new Error('expected MFA challenge after recover');
+      }
 
       await request(app.getHttpServer())
         .post('/v1/auth/admin/mfa/recover')
         .set('Origin', ADMIN_ORIGIN)
         .send({
-          mfa_token: loginAgain.body.mfa_token,
+          mfa_token: again.mfa_token,
           recovery_code: recoveryCode,
         })
         .expect(401);

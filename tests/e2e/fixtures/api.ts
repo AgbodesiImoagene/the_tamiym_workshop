@@ -126,7 +126,5 @@ export async function apiLogin(
     return { csrfToken: challengeBody.csrf_token };
   }
 
-  throw new Error(
-    `API login for ${email} returned unexpected MFA status: ${body.mfa.status}`
-  );
+  throw new Error(`API login for ${email} returned unexpected MFA status: ${body.mfa.status}`);
 }
