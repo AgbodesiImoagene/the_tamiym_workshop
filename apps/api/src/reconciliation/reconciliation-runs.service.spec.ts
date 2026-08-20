@@ -130,7 +130,7 @@ describe('ReconciliationRunsService payout checks', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           outcome: ReconciliationOutcome.MISMATCH,
-          severity: ReconciliationSeverity.HIGH,
+          severity: ReconciliationSeverity.CRITICAL,
           leftValue: '-5000',
           rightValue: '0',
         }),

@@ -181,9 +181,19 @@ export class PaystackReconciliationClient {
       }
 
       pagesFetched += 1;
+      let skippedMalformed = 0;
       for (const row of body.data) {
         const mapped = mapRow(row);
         if (mapped) items.push(mapped);
+        else skippedMalformed += 1;
+      }
+      if (skippedMalformed > 0) {
+        return {
+          complete: false,
+          items,
+          pagesFetched,
+          errorSummary: `Paystack ${path} returned ${skippedMalformed} malformed row(s) on page ${page}`,
+        };
       }
 
       const pageCount = body.meta?.pageCount ?? page;

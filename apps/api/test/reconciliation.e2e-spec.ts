@@ -217,4 +217,90 @@ describe('Reconciliation (e2e)', () => {
     });
     expect(hit).toBeUndefined();
   });
+
+  it('masks findings and pages with nextCursor', async () => {
+    const passwordHash = await bcrypt.hash('TestPassword1!', 10);
+    const stamp = Date.now();
+    const admin = await prisma.user.create({
+      data: {
+        email: `recon-mask-${stamp}@example.com`,
+        passwordHash,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        firstName: 'Mask',
+        lastName: 'Admin',
+      },
+    });
+    const organizer = await prisma.user.create({
+      data: {
+        email: `recon-mask-org-${stamp}@example.com`,
+        passwordHash,
+        role: UserRole.ORGANIZER,
+        status: UserStatus.ACTIVE,
+        firstName: 'Org',
+        lastName: 'Mask',
+      },
+    });
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizerId: organizer.id,
+        title: 'Mask Camp',
+        slug: `recon-mask-${stamp}`,
+        status: CampaignStatus.ACTIVE,
+        currentAmount: 99,
+      },
+    });
+    await prisma.campaignBalanceLedgerEntry.create({
+      data: {
+        campaignId: campaign.id,
+        entryType: LedgerEntryType.PAYMENT_SETTLED,
+        amount: 1,
+        currency: 'NGN',
+        availableAt: new Date(),
+      },
+    });
+    await runs.runInternal(new Date());
+    const findings = await prisma.reconciliationFinding.findMany({
+      where: { domain: 'CAMPAIGN', status: ReconciliationFindingStatus.OPEN },
+    });
+    const finding = findings.find((f) => {
+      const ids = f.sourceIds as { campaignId?: string } | null;
+      return ids?.campaignId === campaign.id;
+    });
+    expect(finding).toBeTruthy();
+    await prisma.reconciliationFinding.update({
+      where: { id: finding!.id },
+      data: {
+        evidence: {
+          rawSecret: 'sk_live_should_not_leak',
+          email: 'customer@example.com',
+        },
+      },
+    });
+
+    const { AdminReconciliationController } =
+      await import('../src/admin/admin-reconciliation.controller');
+    const { AuditService } = await import('../src/audit/audit.service');
+    const controller = new AdminReconciliationController(
+      prisma,
+      runs,
+      repairs,
+      app.get(AuditService),
+    );
+    const listed = await controller.listFindings(
+      ReconciliationFindingStatus.OPEN,
+      undefined,
+      undefined,
+      undefined,
+      '50',
+    );
+    expect(listed.items.length).toBeGreaterThan(0);
+    expect(listed).toHaveProperty('nextCursor');
+    const masked = listed.items.find((i) => i.id === finding!.id);
+    expect(masked).toBeTruthy();
+    expect(masked).not.toHaveProperty('evidence');
+    expect(JSON.stringify(masked)).not.toContain('sk_live_should_not_leak');
+    expect(JSON.stringify(masked)).not.toContain('customer@example.com');
+    void admin;
+  });
 });

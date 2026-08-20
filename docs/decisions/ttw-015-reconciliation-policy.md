@@ -1,32 +1,39 @@
 # ADR: Money and inventory reconciliation (TTW-015)
 
-**Status:** Accepted (agent + backlog owner default for autonomous delivery; supersedes empty-policy gate)  
+**Status:** Accepted (agent + backlog owner default for autonomous delivery)  
 **Date:** 2026-08-20  
 **Ticket:** TTW-015
 
+## Reconciliation matrix
+
+| Domain                           | Left                               | Right                                                   | Tolerance                    | Severity outside grace         |
+| -------------------------------- | ---------------------------------- | ------------------------------------------------------- | ---------------------------- | ------------------------------ |
+| Payment                          | SUCCEEDED payment                  | settlement claim + order paid-like status               | exact                        | CRITICAL                       |
+| Payment↔Paystack                 | local SUCCEEDED in window          | Paystack transaction by reference                       | amount/currency/status exact | CRITICAL / PENDING_GRACE (24h) |
+| Refund                           | SUCCEEDED refund                   | settlement claim; campaign ⇒ exactly one REFUND_APPLIED | exact                        | CRITICAL                       |
+| Refund↔Paystack                  | local SUCCEEDED in window          | Paystack refund by id                                   | amount/currency/status exact | CRITICAL / PENDING_GRACE       |
+| Payout SUCCEEDED                 | ledger net                         | `-amount`                                               | 0.0001                       | CRITICAL                       |
+| Payout FAILED/REVERSED/CANCELLED | ledger net                         | `0`                                                     | 0.0001                       | CRITICAL                       |
+| Payout in-flight                 | ledger net                         | `-amount` reserve                                       | 0.0001                       | HIGH (no grace)                |
+| Payout↔Paystack                  | local SUCCEEDED in window          | Paystack transfer by reference                          | amount/currency/status exact | CRITICAL / PENDING_GRACE       |
+| Campaign                         | `currentAmount`                    | sum(PAYMENT_SETTLED+REFUND_APPLIED)                     | 0.01                         | CRITICAL                       |
+| Inventory                        | `reserved`                         | sum(movement.reservedDelta) when RESERVE history exists | exact                        | CRITICAL                       |
+| Inventory                        | available (`stockOnHand-reserved`) | ≥ 0                                                     | exact                        | CRITICAL                       |
+
+**Cutoff:** internal uses run `cutoffAt`; provider compares the same 7-day `[cutoffAt-7d, cutoffAt]` window used for Paystack list APIs (bidirectional).  
+**Access:** ADMIN role only; responses mask evidence to entity ids.  
+**SLO:** P0 = open CRITICAL unacknowledged > 4h; missed schedule = expected window missing COMPLETED after 02:00 / 04:00 Lagos.  
+**Retention:** 400 days.
+
 ## Decisions
 
-1. **Zero tolerance** for currency and unit discrepancies once outside the provider grace window.
-2. **Schedules (Africa/Lagos):**
-   - Internal: nightly `15 01 * * *` with `timeZone: Africa/Lagos`
-   - Provider: daily `30 03 * * *` with `timeZone: Africa/Lagos` (after Paystack reporting lag)
-3. **Grace window:** 24 hours for provider `PENDING_GRACE` on recent transfers/charges still settling.
-4. **Severity:** currency/unit mismatch or missing settlement effect = `CRITICAL`; lag inside grace = `LOW` (`PENDING_GRACE`); incomplete provider pages = run `INCOMPLETE` (not reconciled).
-5. **Ownership:** finance/ops on-call via existing admin notification channel; P0 = any open CRITICAL finding older than 4 hours without acknowledgement (hourly monitor cron).
-6. **Repair authority:** money or stock repairs require two distinct admins (requester ≠ approver). Acknowledgements need one admin.
-7. **External authority:** Paystack transaction/refund/transfer list APIs for provider runs (paginated, fail-closed). Bank statements are out of scope.
-8. **Retention:** runs/findings retained 400 days (daily purge cron); evidence stores hashes + ids only (no raw secrets/PII). Admin list/detail endpoints return masked projections.
-9. **Concurrency:** session-pinned PostgreSQL advisory locks (`withSessionAdvisoryLock`) so acquire/release share one backend connection.
-10. **Succeeded payout ledger expectation:** net ledger amount ≈ `-payout.amount` (reserve + zero succeeded audit entry).
-
-## Domains checked
-
-Payment, refund, payout, campaign display vs ledger, inventory movement vs counters (reserved + available).
+1. Zero tolerance outside the 24h provider grace window.
+2. Schedules Africa/Lagos: internal `15 1 * * *`, provider `30 3 * * *`.
+3. Repair: two distinct admins; mutating campaign repair verifies before RESOLVED; document\_\* → WONT_FIX.
+4. Session-pinned advisory locks via `withSessionAdvisoryLock`.
+5. Incomplete/malformed Paystack pages ⇒ run `INCOMPLETE` (never COMPLETED).
+6. Absolute `stockOnHand` vs opening balance is out of scope without an opening-balance movement kind; reserved + available checks cover TTW-014 counters.
 
 ## Rollback
 
-Drop additive tables/types only (see migration header). No existing financial tables are altered.
-
-## Non-goals
-
-Automatic repairs from cron. Exactly-once source effects remain TTW-010–014.
+See migration header (drop additive tables/types only).

@@ -82,9 +82,10 @@ export class ReconciliationRunsService {
               });
             }
 
-            const fromIso = new Date(
+            const fromAt = new Date(
               cutoffAt.getTime() - 7 * 24 * 60 * 60 * 1000,
-            ).toISOString();
+            );
+            const fromIso = fromAt.toISOString();
             const toIso = cutoffAt.toISOString();
 
             const [txns, refunds, transfers] = await Promise.all([
@@ -118,6 +119,7 @@ export class ReconciliationRunsService {
               cutoffAt,
               providerComplete: true,
               includeProviderChecks: true,
+              providerWindowFrom: fromAt,
               providerSnapshot: {
                 transactions: txns.items,
                 refunds: refunds.items,
@@ -165,6 +167,7 @@ export class ReconciliationRunsService {
     includeProviderChecks?: boolean;
     domainFilter?: ReconciliationDomain;
     providerErrorSummary?: string;
+    providerWindowFrom?: Date;
     providerSnapshot?: {
       transactions: Array<{
         reference: string;
@@ -272,6 +275,8 @@ export class ReconciliationRunsService {
         const r = await this.checkAgainstProvider(
           params.cutoffAt,
           params.providerSnapshot,
+          params.providerWindowFrom ??
+            new Date(params.cutoffAt.getTime() - 7 * 24 * 60 * 60 * 1000),
         );
         drafts.push(...r.findings);
         recordsChecked += r.checked;
@@ -552,7 +557,6 @@ export class ReconciliationRunsService {
 
   private async checkPayouts(cutoffAt: Date) {
     const findings: FindingDraft[] = [];
-    const now = cutoffAt;
     const checked = await this.paginateIds(
       (cursorId) =>
         this.prisma.payout.findMany({
@@ -582,7 +586,7 @@ export class ReconciliationRunsService {
             findings.push({
               domain: ReconciliationDomain.PAYOUT,
               outcome: ReconciliationOutcome.MISMATCH,
-              severity: ReconciliationSeverity.HIGH,
+              severity: ReconciliationSeverity.CRITICAL,
               fingerprint: fingerprintFinding({
                 domain: ReconciliationDomain.PAYOUT,
                 outcome: ReconciliationOutcome.MISMATCH,
@@ -598,26 +602,45 @@ export class ReconciliationRunsService {
           }
         }
 
+        // Terminal release states: reserve must be fully released (net ≈ 0).
+        if (
+          payout.status === PayoutStatus.FAILED ||
+          payout.status === PayoutStatus.REVERSED ||
+          payout.status === PayoutStatus.CANCELLED
+        ) {
+          if (Math.abs(netAmount) > 0.0001) {
+            findings.push({
+              domain: ReconciliationDomain.PAYOUT,
+              outcome: ReconciliationOutcome.MISMATCH,
+              severity: ReconciliationSeverity.CRITICAL,
+              fingerprint: fingerprintFinding({
+                domain: ReconciliationDomain.PAYOUT,
+                outcome: ReconciliationOutcome.MISMATCH,
+                entityKey: `payout:${payout.id}:released`,
+              }),
+              leftLabel: 'expectedLedgerNet',
+              leftValue: '0',
+              rightLabel: 'ledgerNet',
+              rightValue: String(netAmount),
+              currency: payout.currency,
+              sourceIds: { payoutId: payout.id },
+            });
+          }
+        }
+
         const inFlight =
           payout.status === PayoutStatus.INITIATED ||
           payout.status === PayoutStatus.PROCESSING ||
           payout.status === PayoutStatus.QUEUED;
+        // Missing internal reserve is never provider grace — flag HIGH immediately.
         if (inFlight && Math.abs(netAmount + amount) > 0.0001) {
-          // Expected reserve of -amount while in flight
-          const grace = this.withinGrace(payout.createdAt, now);
           findings.push({
             domain: ReconciliationDomain.PAYOUT,
-            outcome: grace
-              ? ReconciliationOutcome.PENDING_GRACE
-              : ReconciliationOutcome.MISSING_INTERNAL,
-            severity: grace
-              ? ReconciliationSeverity.LOW
-              : ReconciliationSeverity.HIGH,
+            outcome: ReconciliationOutcome.MISSING_INTERNAL,
+            severity: ReconciliationSeverity.HIGH,
             fingerprint: fingerprintFinding({
               domain: ReconciliationDomain.PAYOUT,
-              outcome: grace
-                ? ReconciliationOutcome.PENDING_GRACE
-                : ReconciliationOutcome.MISSING_INTERNAL,
+              outcome: ReconciliationOutcome.MISSING_INTERNAL,
               entityKey: `payout:${payout.id}:reserve`,
             }),
             leftLabel: 'payout.status',
@@ -801,6 +824,7 @@ export class ReconciliationRunsService {
         currency: string;
       }>;
     },
+    windowFrom: Date,
   ) {
     const findings: FindingDraft[] = [];
     let checked = 0;
@@ -811,13 +835,16 @@ export class ReconciliationRunsService {
     const transferByRef = new Map(
       snapshot.transfers.map((t) => [t.reference, t]),
     );
+    const localPaymentRefs = new Set<string>();
+    const localRefundRefs = new Set<string>();
+    const localTransferRefs = new Set<string>();
 
     checked += await this.paginateIds(
       (cursorId) =>
         this.prisma.payment.findMany({
           where: {
             status: PaymentStatus.SUCCEEDED,
-            createdAt: { lte: cutoffAt },
+            createdAt: { gte: windowFrom, lte: cutoffAt },
           },
           select: {
             id: true,
@@ -832,6 +859,7 @@ export class ReconciliationRunsService {
           ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
         }),
       (payment) => {
+        if (payment.providerRef) localPaymentRefs.add(payment.providerRef);
         if (!payment.providerRef) {
           findings.push({
             domain: ReconciliationDomain.PAYMENT,
@@ -909,7 +937,7 @@ export class ReconciliationRunsService {
         this.prisma.refund.findMany({
           where: {
             status: RefundStatus.SUCCEEDED,
-            createdAt: { lte: cutoffAt },
+            createdAt: { gte: windowFrom, lte: cutoffAt },
           },
           select: {
             id: true,
@@ -923,6 +951,7 @@ export class ReconciliationRunsService {
           ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
         }),
       (refund) => {
+        if (refund.providerRef) localRefundRefs.add(refund.providerRef);
         if (!refund.providerRef) {
           findings.push({
             domain: ReconciliationDomain.REFUND,
@@ -1001,7 +1030,7 @@ export class ReconciliationRunsService {
         this.prisma.payout.findMany({
           where: {
             status: PayoutStatus.SUCCEEDED,
-            createdAt: { lte: cutoffAt },
+            createdAt: { gte: windowFrom, lte: cutoffAt },
           },
           select: {
             id: true,
@@ -1015,6 +1044,7 @@ export class ReconciliationRunsService {
           ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
         }),
       (payout) => {
+        if (payout.providerRef) localTransferRefs.add(payout.providerRef);
         if (!payout.providerRef) {
           findings.push({
             domain: ReconciliationDomain.PAYOUT,
@@ -1086,6 +1116,73 @@ export class ReconciliationRunsService {
         }
       },
     );
+
+    for (const remote of snapshot.transactions) {
+      if (remote.status !== 'success') continue;
+      checked += 1;
+      if (!localPaymentRefs.has(remote.reference)) {
+        findings.push({
+          domain: ReconciliationDomain.PAYMENT,
+          outcome: ReconciliationOutcome.MISSING_INTERNAL,
+          severity: ReconciliationSeverity.CRITICAL,
+          fingerprint: fingerprintFinding({
+            domain: ReconciliationDomain.PAYMENT,
+            outcome: ReconciliationOutcome.MISSING_INTERNAL,
+            entityKey: `providerTxn:${remote.reference}`,
+          }),
+          leftLabel: 'paystack.transaction',
+          leftValue: remote.reference,
+          rightLabel: 'local.payment',
+          rightValue: 'missing',
+          currency: remote.currency,
+          sourceIds: { providerRef: remote.reference },
+        });
+      }
+    }
+    for (const remote of snapshot.refunds) {
+      if (!['processed', 'success'].includes(remote.status)) continue;
+      checked += 1;
+      if (!localRefundRefs.has(String(remote.id))) {
+        findings.push({
+          domain: ReconciliationDomain.REFUND,
+          outcome: ReconciliationOutcome.MISSING_INTERNAL,
+          severity: ReconciliationSeverity.CRITICAL,
+          fingerprint: fingerprintFinding({
+            domain: ReconciliationDomain.REFUND,
+            outcome: ReconciliationOutcome.MISSING_INTERNAL,
+            entityKey: `providerRefund:${remote.id}`,
+          }),
+          leftLabel: 'paystack.refund',
+          leftValue: String(remote.id),
+          rightLabel: 'local.refund',
+          rightValue: 'missing',
+          currency: remote.currency,
+          sourceIds: { providerRef: String(remote.id) },
+        });
+      }
+    }
+    for (const remote of snapshot.transfers) {
+      if (remote.status !== 'success') continue;
+      checked += 1;
+      if (!localTransferRefs.has(remote.reference)) {
+        findings.push({
+          domain: ReconciliationDomain.PAYOUT,
+          outcome: ReconciliationOutcome.MISSING_INTERNAL,
+          severity: ReconciliationSeverity.CRITICAL,
+          fingerprint: fingerprintFinding({
+            domain: ReconciliationDomain.PAYOUT,
+            outcome: ReconciliationOutcome.MISSING_INTERNAL,
+            entityKey: `providerTransfer:${remote.reference}`,
+          }),
+          leftLabel: 'paystack.transfer',
+          leftValue: remote.reference,
+          rightLabel: 'local.payout',
+          rightValue: 'missing',
+          currency: remote.currency,
+          sourceIds: { providerRef: remote.reference },
+        });
+      }
+    }
 
     return { findings, checked };
   }

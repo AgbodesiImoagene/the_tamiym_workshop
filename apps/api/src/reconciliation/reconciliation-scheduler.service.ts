@@ -123,12 +123,12 @@ export class ReconciliationSchedulerService {
               kind_windowKey: { kind: 'INTERNAL', windowKey: internalKey },
             },
           });
-          if (!internal) {
+          if (!internal || internal.status !== 'COMPLETED') {
             await this.adminNotify.emit(ADMIN_NOTIF_RECONCILIATION_RUN, {
               kind: 'INTERNAL',
-              runId: 'missing',
-              status: 'MISSED_SCHEDULE',
-              findingsOpen: 0,
+              runId: internal?.id ?? 'missing',
+              status: internal?.status ?? 'MISSED_SCHEDULE',
+              findingsOpen: internal?.findingsOpen ?? 0,
               windowKey: internalKey,
             });
           }
@@ -141,12 +141,12 @@ export class ReconciliationSchedulerService {
               kind_windowKey: { kind: 'PROVIDER', windowKey: providerKey },
             },
           });
-          if (!provider) {
+          if (!provider || provider.status !== 'COMPLETED') {
             await this.adminNotify.emit(ADMIN_NOTIF_RECONCILIATION_RUN, {
               kind: 'PROVIDER',
-              runId: 'missing',
-              status: 'MISSED_SCHEDULE',
-              findingsOpen: 0,
+              runId: provider?.id ?? 'missing',
+              status: provider?.status ?? 'MISSED_SCHEDULE',
+              findingsOpen: provider?.findingsOpen ?? 0,
               windowKey: providerKey,
             });
           }

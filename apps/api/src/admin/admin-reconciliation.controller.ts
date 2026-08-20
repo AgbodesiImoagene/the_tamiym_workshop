@@ -97,14 +97,18 @@ export class AdminReconciliationController {
   async listRuns(
     @Query('kind') kind?: ReconciliationRunKind,
     @Query('status') status?: ReconciliationRunStatus,
+    @Query('cursor') cursor?: string,
+    @Query('take') takeRaw?: string,
   ) {
+    const take = Math.min(Math.max(Number(takeRaw) || 50, 1), 100);
     const rows = await this.prisma.reconciliationRun.findMany({
       where: {
         ...(kind ? { kind } : {}),
         ...(status ? { status } : {}),
       },
-      orderBy: { startedAt: 'desc' },
-      take: 100,
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
         id: true,
         kind: true,
@@ -119,7 +123,12 @@ export class AdminReconciliationController {
         createdAt: true,
       },
     });
-    return rows;
+    const hasMore = rows.length > take;
+    const items = hasMore ? rows.slice(0, take) : rows;
+    return {
+      items,
+      nextCursor: hasMore ? items[items.length - 1]?.id : null,
+    };
   }
 
   @Get('runs/:id')
@@ -188,17 +197,26 @@ export class AdminReconciliationController {
     @Query('status') status?: ReconciliationFindingStatus,
     @Query('runId') runId?: string,
     @Query('severity') severity?: ReconciliationSeverity,
+    @Query('cursor') cursor?: string,
+    @Query('take') takeRaw?: string,
   ) {
+    const take = Math.min(Math.max(Number(takeRaw) || 50, 1), 200);
     const rows = await this.prisma.reconciliationFinding.findMany({
       where: {
         ...(status ? { status } : {}),
         ...(runId ? { runId } : {}),
         ...(severity ? { severity } : {}),
       },
-      orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
-      take: 200,
+      orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    return rows.map(maskFinding);
+    const hasMore = rows.length > take;
+    const page = hasMore ? rows.slice(0, take) : rows;
+    return {
+      items: page.map(maskFinding),
+      nextCursor: hasMore ? page[page.length - 1]?.id : null,
+    };
   }
 
   @Get('findings/export')
@@ -206,11 +224,6 @@ export class AdminReconciliationController {
   async exportFindings(
     @Query('status') status?: ReconciliationFindingStatus,
   ): Promise<StreamableFile> {
-    const rows = await this.prisma.reconciliationFinding.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: 1000,
-    });
     const header = [
       'id',
       'domain',
@@ -224,26 +237,38 @@ export class AdminReconciliationController {
       'rightValue',
       'currency',
     ];
-    const lines = [
-      header.join(','),
-      ...rows.map((r) =>
-        [
-          r.id,
-          r.domain,
-          r.outcome,
-          r.severity,
-          r.status,
-          r.fingerprint,
-          r.leftLabel,
-          r.leftValue,
-          r.rightLabel,
-          r.rightValue,
-          r.currency ?? '',
-        ]
-          .map((c) => escapeCsvCell(String(c)))
-          .join(','),
-      ),
-    ];
+    const lines = [header.join(',')];
+    let cursor: string | undefined;
+    for (;;) {
+      const rows = await this.prisma.reconciliationFinding.findMany({
+        where: status ? { status } : undefined,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 500,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (rows.length === 0) break;
+      for (const r of rows) {
+        lines.push(
+          [
+            r.id,
+            r.domain,
+            r.outcome,
+            r.severity,
+            r.status,
+            r.fingerprint,
+            r.leftLabel,
+            r.leftValue,
+            r.rightLabel,
+            r.rightValue,
+            r.currency ?? '',
+          ]
+            .map((c) => escapeCsvCell(String(c)))
+            .join(','),
+        );
+      }
+      cursor = rows[rows.length - 1]?.id;
+      if (rows.length < 500) break;
+    }
     const buf = Buffer.from(lines.join('\n'), 'utf8');
     return new StreamableFile(buf, {
       type: 'text/csv; charset=utf-8',
