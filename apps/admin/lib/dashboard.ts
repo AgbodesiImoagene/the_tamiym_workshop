@@ -204,7 +204,7 @@ export async function createAdminRefund(
   id: string,
   amount: number,
   reason?: string,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ) {
   // Callers should pass a page-session-stable key so transient retries reuse
   // the same reservation without collapsing distinct partial refunds.

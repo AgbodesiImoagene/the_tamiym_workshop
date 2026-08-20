@@ -65,10 +65,7 @@ export class PaystackSimulator {
    * Simulate refund create. Same transaction+amount returns the same refund id
    * (mirrors admin idempotency / TTW-013 single provider refund).
    */
-  createRefund(
-    transactionReference: string,
-    amountMajor: number,
-  ): SimulatedRefundResult {
+  createRefund(transactionReference: string, amountMajor: number): SimulatedRefundResult {
     this.refundCreateCalls += 1;
     const key = `${transactionReference}:${amountMajor}`;
     const existing = this.refunds.get(key);

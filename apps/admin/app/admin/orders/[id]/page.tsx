@@ -33,9 +33,7 @@ export default function AdminOrderDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState(OrderStatus.PROCESSING);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
-  const [refundIdempotencyKey] = useState(
-    () => `admin-refund:${orderId}:${crypto.randomUUID()}`,
-  );
+  const [refundIdempotencyKey] = useState(() => `admin-refund:${orderId}:${crypto.randomUUID()}`);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +65,7 @@ export default function AdminOrderDetailPage() {
       setMessage(
         status === 'SUCCEEDED'
           ? 'Refund confirmed by provider.'
-          : `Refund ${status.toLowerCase().replaceAll('_', ' ')}. Money settles when Paystack confirms.`,
+          : `Refund ${status.toLowerCase().replaceAll('_', ' ')}. Money settles when Paystack confirms.`
       );
       setError(null);
       setRefundAmount('');
@@ -217,7 +215,10 @@ export default function AdminOrderDetailPage() {
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-tamiym-blue">
-                        {formatAdminCurrency(Number(refund.amount), refund.currency || order.currency)}
+                        {formatAdminCurrency(
+                          Number(refund.amount),
+                          refund.currency || order.currency
+                        )}
                       </p>
                     </div>
                   ))

@@ -31,7 +31,7 @@ test.describe('Refund lifecycle @smoke', () => {
         amount: 1_000_000,
         transaction_reference: 'txn_settle',
       },
-      { duplicate: true },
+      { duplicate: true }
     );
     expect(a.event).toBe('refund.processed');
     expect(b.event).toBe('refund.processed');

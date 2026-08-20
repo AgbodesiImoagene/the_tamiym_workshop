@@ -1,7 +1,7 @@
 # TTW-013 — Correct the refund lifecycle
 
 **Epic:** 1 — Financial and inventory integrity  
-**Status:** In review  
+**Status:** Complete  
 **Risk:** Critical  
 **Blocked by:** TTW-003, TTW-010  
 **Blocks:** TTW-015, TTW-033, TTW-041
@@ -39,7 +39,7 @@ Model initiated, processing, succeeded and failed provider states; record an ide
 - [x] Migration/API/UI represent pending, partial and full outcomes accurately.
 - [x] Provider-confirmed idempotent settlement and cumulative caps are DB-backed.
 - [x] Reconciliation hooks, notifications, integration and Playwright tests pass.
-- [ ] Critical design, security and two independent implementation reviews pass.
+- [x] Critical design, security and two independent implementation reviews pass.
 
 ## Out of scope
 
@@ -91,7 +91,7 @@ ALTER TABLE "refunds" DROP COLUMN IF EXISTS "transactionReference";
 | --------- | ----------------------- | ------- | ---------------------------------------------------------------------------- |
 | 1         | independent agents (×2) | FAIL    | Cap race, out-of-order throw, amount validation, stuck INITIATED retry, lint |
 | 2         | independent agent       | FAIL    | Stale sweep releases the cap on ambiguous provider outcomes (see below)      |
-| 3         | pending                 | —       | Cap-safe NEEDS_ATTENTION escalate; driving clear only; FAILED webhook match  |
+| 3         | independent agents (×2) | PASS    | Cap-safe NEEDS_ATTENTION escalate; driving clear only; FAILED webhook match  |
 
 ### Iteration 2 findings (blocking)
 
@@ -156,4 +156,4 @@ ALTER TABLE "refunds" DROP COLUMN IF EXISTS "transactionReference";
 
 ## Completion summary
 
-Pending merge after review PASS.
+Provider-confirmed refund lifecycle with cumulative caps, exactly-once settlement, and cap-safe ambiguous-state handling. Next: TTW-014.
