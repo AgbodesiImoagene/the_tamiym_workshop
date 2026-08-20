@@ -124,6 +124,22 @@ export class ModerationDecisionService {
       reasonCodes?: ModerationReasonCode[] | string[];
     },
   ) {
+    return this.prisma.$transaction((tx) =>
+      this.recordAiDecisionInTx(tx, input),
+    );
+  }
+
+  async recordAiDecisionInTx(
+    tx: Tx,
+    input: Omit<
+      RecordDecisionInput,
+      'actorKind' | 'reasonCodes' | 'modelVersion'
+    > & {
+      notes?: string | null;
+      maxScore?: number | null;
+      reasonCodes?: ModerationReasonCode[] | string[];
+    },
+  ) {
     const reasonCodes =
       input.reasonCodes ??
       aiReasonCodesForOutcome(input.outcome, input.notes ?? null);
@@ -133,7 +149,7 @@ export class ModerationDecisionService {
         ? { maxScore: input.maxScore }
         : {}),
     };
-    return this.recordDecision({
+    return this.recordDecisionInTx(tx, {
       ...input,
       actorKind: ModerationActorKind.AI,
       reasonCodes,
@@ -154,12 +170,27 @@ export class ModerationDecisionService {
       reasonCodes?: ModerationReasonCode[] | string[];
     },
   ) {
+    return this.prisma.$transaction((tx) =>
+      this.recordAdminDecisionInTx(tx, input),
+    );
+  }
+
+  async recordAdminDecisionInTx(
+    tx: Tx,
+    input: Omit<
+      RecordDecisionInput,
+      'actorKind' | 'reasonCodes' | 'modelVersion'
+    > & {
+      notes?: string | null;
+      reasonCodes?: ModerationReasonCode[] | string[];
+    },
+  ) {
     const reasonCodes =
       input.reasonCodes ?? adminReasonCodesForOutcome(input.outcome);
     const internalEvidence: Prisma.InputJsonValue = {
       notes: input.notes ?? null,
     };
-    return this.recordDecision({
+    return this.recordDecisionInTx(tx, {
       ...input,
       actorKind: ModerationActorKind.ADMIN,
       reasonCodes,
@@ -385,6 +416,10 @@ export class ModerationDecisionService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM moderation_appeals WHERE id = ${appealId} FOR UPDATE
+      `;
+
       const appeal = await tx.moderationAppeal.findUnique({
         where: { id: appealId },
         include: { decision: true },
@@ -452,17 +487,29 @@ export class ModerationDecisionService {
         withdrawPendingAppeals: false,
       });
 
-      const updated = await tx.moderationAppeal.update({
-        where: { id: appealId },
+      const appealStatus =
+        input.resolution === 'UPHELD'
+          ? ModerationAppealStatus.UPHELD
+          : ModerationAppealStatus.OVERTURNED;
+
+      const claim = await tx.moderationAppeal.updateMany({
+        where: {
+          id: appealId,
+          status: ModerationAppealStatus.PENDING,
+        },
         data: {
-          status:
-            input.resolution === 'UPHELD'
-              ? ModerationAppealStatus.UPHELD
-              : ModerationAppealStatus.OVERTURNED,
+          status: appealStatus,
           resolutionDecisionId: resolutionDecision.id,
           reviewedByUserId: adminUserId,
           reviewedAt: new Date(),
         },
+      });
+      if (claim.count !== 1) {
+        throw new ConflictException('Appeal already resolved');
+      }
+
+      const updated = await tx.moderationAppeal.findUniqueOrThrow({
+        where: { id: appealId },
         include: { decision: true },
       });
 

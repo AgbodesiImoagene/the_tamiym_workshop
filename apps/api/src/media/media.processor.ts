@@ -124,30 +124,30 @@ export class MediaProcessor extends WorkerHost {
               };
 
           if (moderationResult.status === ModerationStatus.REJECTED) {
-            await this.prisma.mediaAsset.update({
-              where: { id: assetId },
-              data: {
-                moderationStatus: ModerationStatus.REJECTED,
-                moderationNotes: moderationResult.notes,
-                status: MediaAssetStatus.FAILED,
-                errorMessage: 'Asset rejected by content moderation',
-              },
-            });
-            await this.moderationDecisions.recordAiDecision({
-              subjectType: ModerationSubjectType.MEDIA,
-              subjectId: assetId,
-              outcome: ModerationStatus.REJECTED,
-              notes: moderationResult.notes,
-              maxScore: moderationResult.maxScore,
-              revisionHash: hashRevision({
-                originalKey,
-                bytes: buffer.length,
-              }),
-              reasonCodes: aiReasonCodesForOutcome(
-                ModerationStatus.REJECTED,
-                moderationResult.notes,
-              ),
-              withdrawPendingAppeals: true,
+            await this.prisma.$transaction(async (tx) => {
+              await this.moderationDecisions.recordAiDecisionInTx(tx, {
+                subjectType: ModerationSubjectType.MEDIA,
+                subjectId: assetId,
+                outcome: ModerationStatus.REJECTED,
+                notes: moderationResult.notes,
+                maxScore: moderationResult.maxScore,
+                revisionHash: hashRevision({
+                  originalKey,
+                  bytes: buffer.length,
+                }),
+                reasonCodes: aiReasonCodesForOutcome(
+                  ModerationStatus.REJECTED,
+                  moderationResult.notes,
+                ),
+                withdrawPendingAppeals: true,
+              });
+              await tx.mediaAsset.update({
+                where: { id: assetId },
+                data: {
+                  status: MediaAssetStatus.FAILED,
+                  errorMessage: 'Asset rejected by content moderation',
+                },
+              });
             });
             this.logger.warn(
               `Asset ${assetId} auto-rejected by AI moderation: ${moderationResult.notes}`,
@@ -163,8 +163,6 @@ export class MediaProcessor extends WorkerHost {
               originalWidth: identified.width,
               originalHeight: identified.height,
               scanStatus,
-              moderationStatus: moderationResult.status,
-              moderationNotes: moderationResult.notes,
             },
           });
           await this.prisma.mediaDerivative.upsert({
@@ -229,31 +227,31 @@ export class MediaProcessor extends WorkerHost {
             thumbBuffer,
           );
 
-          await this.prisma.mediaAsset.update({
-            where: { id: assetId },
-            data: {
-              status: MediaAssetStatus.READY,
-              scanStatus,
-              moderationStatus: moderationResult.status,
-              moderationNotes: moderationResult.notes,
-              errorMessage: null,
-            },
-          });
-          await this.moderationDecisions.recordAiDecision({
-            subjectType: ModerationSubjectType.MEDIA,
-            subjectId: assetId,
-            outcome: moderationResult.status,
-            notes: moderationResult.notes,
-            maxScore: moderationResult.maxScore,
-            revisionHash: hashRevision({
-              originalKey,
-              bytes: buffer.length,
-            }),
-            reasonCodes: aiReasonCodesForOutcome(
-              moderationResult.status,
-              moderationResult.notes,
-            ),
-            withdrawPendingAppeals: true,
+          await this.prisma.$transaction(async (tx) => {
+            await tx.mediaAsset.update({
+              where: { id: assetId },
+              data: {
+                status: MediaAssetStatus.READY,
+                scanStatus,
+                errorMessage: null,
+              },
+            });
+            await this.moderationDecisions.recordAiDecisionInTx(tx, {
+              subjectType: ModerationSubjectType.MEDIA,
+              subjectId: assetId,
+              outcome: moderationResult.status,
+              notes: moderationResult.notes,
+              maxScore: moderationResult.maxScore,
+              revisionHash: hashRevision({
+                originalKey,
+                bytes: buffer.length,
+              }),
+              reasonCodes: aiReasonCodesForOutcome(
+                moderationResult.status,
+                moderationResult.notes,
+              ),
+              withdrawPendingAppeals: true,
+            });
           });
           this.observability.recordQueueJob({
             queue: MEDIA_QUEUE,

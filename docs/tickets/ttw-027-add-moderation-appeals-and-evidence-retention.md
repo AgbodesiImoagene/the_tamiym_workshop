@@ -124,6 +124,10 @@ Allow an authenticated owner to appeal an eligible latest decision once within t
 
 Pending. Require independent implementation and security/privacy review, including evidence authorization, internal-note disclosure and projection consistency.
 
+### Remediation (dual-review CHANGES_REQUIRED) — 2026-08-20
+
+Addressed concurrent appeal resolve races (`FOR UPDATE` + conditional `updateMany`), sanitized `customerExplanation` overrides that look like internal scores/notes, stripped `moderationNotes` from owner/organizer design and campaign APIs (admin paths retain notes), and made design create/update/duplicate, campaign submit/activate/reject, and media AI decision+projection writers share one transaction so `applyProjection` is the sole moderation field writer.
+
 ## Verification evidence
 
 - `pnpm --filter api lint` — 0 errors (pre-existing warnings only)

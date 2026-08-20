@@ -77,8 +77,12 @@ describe('CampaignsService', () => {
 
   beforeEach(async () => {
     const mockPrisma = {
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(mockPrisma),
+      ),
       campaign: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
@@ -105,7 +109,9 @@ describe('CampaignsService', () => {
     };
     const mockModerationDecisions = {
       recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAiDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
       recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAdminDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -158,7 +164,13 @@ describe('CampaignsService', () => {
           status: CampaignStatus.DRAFT,
         }),
       });
-      expect(result).toEqual(mockCampaign);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'camp-1',
+          title: 'School Fundraiser',
+        }),
+      );
+      expect(result).not.toHaveProperty('moderationNotes');
     });
 
     it('throws ConflictException when slug exists', async () => {
@@ -174,9 +186,11 @@ describe('CampaignsService', () => {
   // -------------------------------------------------------------------------
 
   describe('findOne', () => {
-    it('returns campaign when organizer owns it', async () => {
+    it('returns campaign when organizer owns it without moderationNotes', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
-      expect(await service.findOne('user-1', 'camp-1')).toEqual(mockCampaign);
+      const result = await service.findOne('user-1', 'camp-1');
+      expect(result).not.toHaveProperty('moderationNotes');
+      expect(result.id).toBe('camp-1');
     });
 
     it('throws NotFoundException when campaign not found', async () => {
@@ -292,6 +306,9 @@ describe('CampaignsService', () => {
       (prisma.campaign.update as jest.Mock).mockResolvedValue(
         mockReviewCampaign,
       );
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockReviewCampaign,
+      );
       (moderationService.moderateText as jest.Mock).mockResolvedValue(
         APPROVED_RESULT,
       );
@@ -305,6 +322,7 @@ describe('CampaignsService', () => {
         }),
       );
       expect(result.status).toBe(CampaignStatus.REVIEW);
+      expect(result).not.toHaveProperty('moderationNotes');
     });
 
     it('stays in REVIEW with FLAGGED moderation when AI flags content', async () => {
@@ -316,6 +334,10 @@ describe('CampaignsService', () => {
         ...mockReviewCampaign,
         moderationStatus: ModerationStatus.FLAGGED,
       });
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockReviewCampaign,
+        moderationStatus: ModerationStatus.FLAGGED,
+      });
       (moderationService.moderateText as jest.Mock).mockResolvedValue(
         FLAGGED_RESULT,
       );
@@ -324,10 +346,7 @@ describe('CampaignsService', () => {
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            status: CampaignStatus.REVIEW,
-            moderationStatus: ModerationStatus.FLAGGED,
-          }),
+          data: { status: CampaignStatus.REVIEW },
         }),
       );
     });
@@ -341,6 +360,10 @@ describe('CampaignsService', () => {
         ...mockCampaign,
         moderationStatus: ModerationStatus.REJECTED,
       });
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        moderationStatus: ModerationStatus.REJECTED,
+      });
       (moderationService.moderateText as jest.Mock).mockResolvedValue(
         REJECTED_RESULT,
       );
@@ -349,10 +372,7 @@ describe('CampaignsService', () => {
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            status: CampaignStatus.DRAFT,
-            moderationStatus: ModerationStatus.REJECTED,
-          }),
+          data: { status: CampaignStatus.DRAFT },
         }),
       );
     });
@@ -401,12 +421,16 @@ describe('CampaignsService', () => {
         ...mockReviewCampaign,
         status: CampaignStatus.ACTIVE,
       });
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockReviewCampaign,
+        status: CampaignStatus.ACTIVE,
+      });
 
       const result = await service.activateForAdmin('camp-1', 'admin-1');
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: CampaignStatus.ACTIVE }),
+          data: { status: CampaignStatus.ACTIVE },
         }),
       );
       expect(result.status).toBe(CampaignStatus.ACTIVE);
@@ -456,6 +480,11 @@ describe('CampaignsService', () => {
         moderationStatus: ModerationStatus.REJECTED,
         rejectionReason: 'Misleading content',
       });
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        moderationStatus: ModerationStatus.REJECTED,
+        rejectionReason: 'Misleading content',
+      });
 
       await service.rejectForAdmin(
         'camp-1',
@@ -466,11 +495,7 @@ describe('CampaignsService', () => {
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            status: CampaignStatus.DRAFT,
-            moderationStatus: ModerationStatus.REJECTED,
-            rejectionReason: 'Misleading content',
-          }),
+          data: { status: CampaignStatus.DRAFT },
         }),
       );
     });

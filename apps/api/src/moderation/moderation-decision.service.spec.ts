@@ -28,6 +28,7 @@ describe('ModerationDecisionService', () => {
     prisma.$transaction = jest.fn(
       async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
     );
+    prisma.$queryRaw = jest.fn().mockResolvedValue([{ id: 'appeal-1' }]);
     prisma.moderationDecision = {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -36,6 +37,7 @@ describe('ModerationDecisionService', () => {
     prisma.moderationAppeal = {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
@@ -71,6 +73,83 @@ describe('ModerationDecisionService', () => {
     const copy = customerExplanationForOutcome(ModerationStatus.REJECTED);
     expect(copy.toLowerCase()).not.toContain('score');
     expect(copy.toLowerCase()).not.toContain('harassment');
+  });
+
+  it('customerExplanationForOutcome rejects score-like overrides', () => {
+    const template = customerExplanationForOutcome(ModerationStatus.REJECTED);
+    expect(
+      customerExplanationForOutcome(
+        ModerationStatus.REJECTED,
+        'Categories above threshold: hate: 0.9',
+      ),
+    ).toBe(template);
+    expect(
+      customerExplanationForOutcome(
+        ModerationStatus.REJECTED,
+        'maxScore=0.95 harassment flagged',
+      ),
+    ).toBe(template);
+    expect(
+      customerExplanationForOutcome(
+        ModerationStatus.REJECTED,
+        'category: violence',
+      ),
+    ).toBe(template);
+    expect(
+      customerExplanationForOutcome(
+        ModerationStatus.REJECTED,
+        'Please revise the wording and resubmit.',
+      ),
+    ).toBe('Please revise the wording and resubmit.');
+  });
+
+  it('recordDecision withdraws PENDING appeals for the subject', async () => {
+    (
+      prisma.moderationAppeal as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([{ id: 'appeal-pending' }]);
+    (
+      prisma.moderationAppeal as { updateMany: jest.Mock }
+    ).updateMany.mockResolvedValue({ count: 1 });
+    (
+      prisma.moderationDecision as { create: jest.Mock }
+    ).create.mockResolvedValue({
+      id: 'dec-2',
+      outcome: ModerationStatus.APPROVED,
+    });
+    (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+
+    await service.recordDecision({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: 'design-1',
+      outcome: ModerationStatus.APPROVED,
+      actorKind: ModerationActorKind.AI,
+      reasonCodes: [MODERATION_REASON.AI_APPROVE],
+      withdrawPendingAppeals: true,
+    });
+
+    expect(
+      (prisma.moderationAppeal as { findMany: jest.Mock }).findMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: ModerationAppealStatus.PENDING,
+          decision: {
+            subjectType: ModerationSubjectType.DESIGN,
+            subjectId: 'design-1',
+          },
+        }),
+      }),
+    );
+    expect(
+      (prisma.moderationAppeal as { updateMany: jest.Mock }).updateMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: ['appeal-pending'] } },
+        data: expect.objectContaining({
+          status: ModerationAppealStatus.WITHDRAWN,
+        }),
+      }),
+    );
   });
 
   it('recordDecision inserts immutable row and updates design projection', async () => {
@@ -277,13 +356,16 @@ describe('ModerationDecisionService', () => {
       outcome: ModerationStatus.APPROVED,
     });
     (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
-    (prisma.moderationAppeal as { update: jest.Mock }).update.mockResolvedValue(
-      {
-        id: 'appeal-1',
-        status: ModerationAppealStatus.OVERTURNED,
-        decision: {},
-      },
-    );
+    (
+      prisma.moderationAppeal as { updateMany: jest.Mock }
+    ).updateMany.mockResolvedValue({ count: 1 });
+    (
+      prisma.moderationAppeal as { findUniqueOrThrow: jest.Mock }
+    ).findUniqueOrThrow.mockResolvedValue({
+      id: 'appeal-1',
+      status: ModerationAppealStatus.OVERTURNED,
+      decision: {},
+    });
 
     const result = await service.resolveAppeal('admin-2', 'appeal-1', {
       resolution: 'OVERTURNED',
@@ -301,7 +383,131 @@ describe('ModerationDecisionService', () => {
         }),
       }),
     );
+    expect(
+      (prisma.moderationAppeal as { updateMany: jest.Mock }).updateMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'appeal-1',
+          status: ModerationAppealStatus.PENDING,
+        },
+        data: expect.objectContaining({
+          status: ModerationAppealStatus.OVERTURNED,
+        }),
+      }),
+    );
     expect(result.resolutionDecision.id).toBe('dec-2');
+  });
+
+  it('resolveAppeal UPHELD appends decision with challenged outcome', async () => {
+    (
+      prisma.moderationAppeal as { findUnique: jest.Mock }
+    ).findUnique.mockResolvedValue({
+      id: 'appeal-1',
+      status: ModerationAppealStatus.PENDING,
+      decision: {
+        id: 'dec-1',
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: 'design-1',
+        outcome: ModerationStatus.FLAGGED,
+        actorKind: ModerationActorKind.AI,
+        actorUserId: null,
+        revisionHash: 'abc',
+      },
+    });
+    (
+      prisma.moderationAppeal as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([]);
+    (
+      prisma.moderationDecision as { create: jest.Mock }
+    ).create.mockResolvedValue({
+      id: 'dec-2',
+      outcome: ModerationStatus.FLAGGED,
+    });
+    (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+    (
+      prisma.moderationAppeal as { updateMany: jest.Mock }
+    ).updateMany.mockResolvedValue({ count: 1 });
+    (
+      prisma.moderationAppeal as { findUniqueOrThrow: jest.Mock }
+    ).findUniqueOrThrow.mockResolvedValue({
+      id: 'appeal-1',
+      status: ModerationAppealStatus.UPHELD,
+      decision: {},
+    });
+
+    const result = await service.resolveAppeal('admin-2', 'appeal-1', {
+      resolution: 'UPHELD',
+    });
+
+    expect(
+      (prisma.moderationDecision as { create: jest.Mock }).create,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: ModerationStatus.FLAGGED,
+          reasonCodes: [MODERATION_REASON.APPEAL_UPHELD],
+        }),
+      }),
+    );
+    expect(result.appeal.status).toBe(ModerationAppealStatus.UPHELD);
+  });
+
+  it('resolveAppeal fails when appeal is no longer PENDING (concurrent resolve)', async () => {
+    (
+      prisma.moderationAppeal as { findUnique: jest.Mock }
+    ).findUnique.mockResolvedValue({
+      id: 'appeal-1',
+      status: ModerationAppealStatus.UPHELD,
+      decision: {
+        id: 'dec-1',
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: 'design-1',
+        outcome: ModerationStatus.REJECTED,
+        actorKind: ModerationActorKind.AI,
+        actorUserId: null,
+        revisionHash: null,
+      },
+    });
+
+    await expect(
+      service.resolveAppeal('admin-2', 'appeal-1', { resolution: 'UPHELD' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('resolveAppeal throws ConflictException when conditional claim loses race', async () => {
+    (
+      prisma.moderationAppeal as { findUnique: jest.Mock }
+    ).findUnique.mockResolvedValue({
+      id: 'appeal-1',
+      status: ModerationAppealStatus.PENDING,
+      decision: {
+        id: 'dec-1',
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: 'design-1',
+        outcome: ModerationStatus.REJECTED,
+        actorKind: ModerationActorKind.AI,
+        actorUserId: null,
+        revisionHash: null,
+      },
+    });
+    (
+      prisma.moderationAppeal as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([]);
+    (
+      prisma.moderationDecision as { create: jest.Mock }
+    ).create.mockResolvedValue({
+      id: 'dec-2',
+      outcome: ModerationStatus.REJECTED,
+    });
+    (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+    (
+      prisma.moderationAppeal as { updateMany: jest.Mock }
+    ).updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.resolveAppeal('admin-2', 'appeal-1', { resolution: 'UPHELD' }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('getAppealForOwner never selects internalEvidence', async () => {

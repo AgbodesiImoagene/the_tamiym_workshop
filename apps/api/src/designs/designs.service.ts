@@ -10,16 +10,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
+  ModerationActorKind,
+  ModerationStatus,
+  ModerationSubjectType,
+} from '../generated/prisma/enums';
+import {
   aiReasonCodesForOutcome,
   hashRevision,
+  MODERATION_REASON,
 } from '../moderation/moderation.constants';
 import { S3Service } from '../storage/s3.service';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
-import {
-  ModerationStatus,
-  ModerationSubjectType,
-} from '../generated/prisma/enums';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import {
   ADMIN_NOTIF_DESIGN_MODERATION_UPDATED,
@@ -255,6 +257,17 @@ export class DesignsService {
   }
 
   /**
+   * Owner/customer API view: keep moderationStatus, never expose moderationNotes.
+   */
+  private toOwnerDesign<T extends { moderationNotes?: string | null }>(
+    design: T,
+  ): Omit<T, 'moderationNotes'> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- strip internal notes
+    const { moderationNotes, ...rest } = design;
+    return rest;
+  }
+
+  /**
    * Create a design for the current user. Runs AI moderation immediately;
    * result is stored but does not block the save.
    */
@@ -277,33 +290,41 @@ export class DesignsService {
     const { moderationStatus, moderationNotes, maxScore } =
       await this.moderateDesign(dto.designData, dto.thumbnailUrl);
 
-    const created = await this.prisma.design.create({
-      data: {
-        userId,
-        productId: dto.productId,
-        name: dto.name,
-        designData: dto.designData as object,
-        thumbnailUrl: dto.thumbnailUrl,
-        moderationStatus,
-        moderationNotes,
-      },
-      include: {
-        product: { select: { id: true, name: true, slug: true } },
-      },
-    });
+    const productInclude = {
+      product: { select: { id: true, name: true, slug: true } },
+    } as const;
 
-    await this.moderationDecisions.recordAiDecision({
-      subjectType: ModerationSubjectType.DESIGN,
-      subjectId: created.id,
-      outcome: moderationStatus,
-      notes: moderationNotes,
-      maxScore,
-      revisionHash: hashRevision({
-        designData: dto.designData,
-        thumbnailUrl: dto.thumbnailUrl ?? null,
-      }),
-      reasonCodes: aiReasonCodesForOutcome(moderationStatus, moderationNotes),
-      withdrawPendingAppeals: false,
+    const created = await this.prisma.$transaction(async (tx) => {
+      const design = await tx.design.create({
+        data: {
+          userId,
+          productId: dto.productId,
+          name: dto.name,
+          designData: dto.designData as object,
+          thumbnailUrl: dto.thumbnailUrl,
+          moderationStatus,
+        },
+        include: productInclude,
+      });
+
+      await this.moderationDecisions.recordAiDecisionInTx(tx, {
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: design.id,
+        outcome: moderationStatus,
+        notes: moderationNotes,
+        maxScore,
+        revisionHash: hashRevision({
+          designData: dto.designData,
+          thumbnailUrl: dto.thumbnailUrl ?? null,
+        }),
+        reasonCodes: aiReasonCodesForOutcome(moderationStatus, moderationNotes),
+        withdrawPendingAppeals: false,
+      });
+
+      return tx.design.findUniqueOrThrow({
+        where: { id: design.id },
+        include: productInclude,
+      });
     });
 
     await this.upsertDesignViews(created.id, dto.designData);
@@ -316,20 +337,21 @@ export class DesignsService {
       moderationStatus: created.moderationStatus,
     });
 
-    return created;
+    return this.toOwnerDesign(created);
   }
 
   /**
    * List designs for the current user (customer).
    */
   async findAll(userId: string) {
-    return this.prisma.design.findMany({
+    const designs = await this.prisma.design.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
         product: { select: { id: true, name: true, slug: true } },
       },
     });
+    return designs.map((d) => this.toOwnerDesign(d));
   }
 
   /**
@@ -348,7 +370,7 @@ export class DesignsService {
     if (design.userId !== userId) {
       throw new ForbiddenException('Access denied');
     }
-    return design;
+    return this.toOwnerDesign(design);
   }
 
   /**
@@ -395,11 +417,9 @@ export class DesignsService {
     const contentChanged =
       dto.designData !== undefined || dto.thumbnailUrl !== undefined;
 
-    let moderationUpdate: {
-      moderationStatus?: ModerationStatus;
-      moderationNotes?: string;
-      maxScore?: number;
-    } = {};
+    const productInclude = {
+      product: { select: { id: true, name: true, slug: true } },
+    } as const;
 
     if (contentChanged) {
       const newData = (dto.designData ?? existing.designData) as Record<
@@ -412,56 +432,63 @@ export class DesignsService {
           : existing.thumbnailUrl;
       const { moderationStatus, moderationNotes, maxScore } =
         await this.moderateDesign(newData, newThumb);
-      moderationUpdate = { moderationStatus, moderationNotes, maxScore };
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await tx.design.update({
+          where: { id },
+          data: {
+            ...(dto.name && { name: dto.name }),
+            ...(dto.designData !== undefined && {
+              designData: dto.designData as object,
+            }),
+            ...(dto.thumbnailUrl !== undefined && {
+              thumbnailUrl: dto.thumbnailUrl,
+            }),
+          },
+        });
+
+        await this.moderationDecisions.recordAiDecisionInTx(tx, {
+          subjectType: ModerationSubjectType.DESIGN,
+          subjectId: id,
+          outcome: moderationStatus,
+          notes: moderationNotes,
+          maxScore,
+          revisionHash: hashRevision({
+            designData: dto.designData ?? existing.designData,
+            thumbnailUrl:
+              dto.thumbnailUrl !== undefined
+                ? dto.thumbnailUrl
+                : existing.thumbnailUrl,
+          }),
+          reasonCodes: aiReasonCodesForOutcome(
+            moderationStatus,
+            moderationNotes,
+          ),
+          withdrawPendingAppeals: true,
+        });
+
+        return tx.design.findUniqueOrThrow({
+          where: { id },
+          include: productInclude,
+        });
+      });
+
+      if (dto.designData !== undefined) {
+        await this.upsertDesignViews(id, dto.designData);
+      }
+
+      return this.toOwnerDesign(updated);
     }
 
     const updated = await this.prisma.design.update({
       where: { id },
       data: {
         ...(dto.name && { name: dto.name }),
-        ...(dto.designData !== undefined && {
-          designData: dto.designData as object,
-        }),
-        ...(dto.thumbnailUrl !== undefined && {
-          thumbnailUrl: dto.thumbnailUrl,
-        }),
-        ...(moderationUpdate.moderationStatus !== undefined && {
-          moderationStatus: moderationUpdate.moderationStatus,
-          moderationNotes: moderationUpdate.moderationNotes,
-        }),
       },
-      include: {
-        product: { select: { id: true, name: true, slug: true } },
-      },
+      include: productInclude,
     });
 
-    if (contentChanged && moderationUpdate.moderationStatus !== undefined) {
-      await this.moderationDecisions.recordAiDecision({
-        subjectType: ModerationSubjectType.DESIGN,
-        subjectId: id,
-        outcome: moderationUpdate.moderationStatus,
-        notes: moderationUpdate.moderationNotes,
-        maxScore: moderationUpdate.maxScore,
-        revisionHash: hashRevision({
-          designData: dto.designData ?? existing.designData,
-          thumbnailUrl:
-            dto.thumbnailUrl !== undefined
-              ? dto.thumbnailUrl
-              : existing.thumbnailUrl,
-        }),
-        reasonCodes: aiReasonCodesForOutcome(
-          moderationUpdate.moderationStatus,
-          moderationUpdate.moderationNotes,
-        ),
-        withdrawPendingAppeals: true,
-      });
-    }
-
-    if (dto.designData !== undefined) {
-      await this.upsertDesignViews(id, dto.designData);
-    }
-
-    return updated;
+    return this.toOwnerDesign(updated);
   }
 
   /**
@@ -600,33 +627,58 @@ export class DesignsService {
     if (original.userId !== userId)
       throw new ForbiddenException('Access denied');
 
-    const cloned = await this.prisma.design.create({
-      data: {
-        userId,
-        productId: original.productId,
-        name: `Copy of ${original.name}`,
-        designData: original.designData as object,
-        thumbnailUrl: original.thumbnailUrl,
-        moderationStatus: ModerationStatus.PENDING,
-        moderationNotes: 'Duplicated from design ' + id,
-      },
-      include: {
-        product: { select: { id: true, name: true, slug: true } },
-      },
+    const productInclude = {
+      product: { select: { id: true, name: true, slug: true } },
+    } as const;
+
+    const cloned = await this.prisma.$transaction(async (tx) => {
+      const design = await tx.design.create({
+        data: {
+          userId,
+          productId: original.productId,
+          name: `Copy of ${original.name}`,
+          designData: original.designData as object,
+          thumbnailUrl: original.thumbnailUrl,
+          moderationStatus: ModerationStatus.PENDING,
+        },
+        include: productInclude,
+      });
+
+      await this.moderationDecisions.recordDecisionInTx(tx, {
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: design.id,
+        outcome: ModerationStatus.PENDING,
+        actorKind: ModerationActorKind.SYSTEM,
+        reasonCodes: [MODERATION_REASON.SYSTEM_RESUBMIT],
+        revisionHash: hashRevision({
+          designData: original.designData,
+          thumbnailUrl: original.thumbnailUrl,
+          duplicatedFrom: id,
+        }),
+        internalEvidence: {
+          notes: `Duplicated from design ${id}`,
+        },
+        withdrawPendingAppeals: false,
+      });
+
+      if (original.views.length > 0) {
+        await tx.designView.createMany({
+          data: original.views.map((v) => ({
+            designId: design.id,
+            productViewId: v.productViewId,
+            isUsed: v.isUsed,
+            layerCount: v.layerCount,
+          })),
+        });
+      }
+
+      return tx.design.findUniqueOrThrow({
+        where: { id: design.id },
+        include: productInclude,
+      });
     });
 
-    if (original.views.length > 0) {
-      await this.prisma.designView.createMany({
-        data: original.views.map((v) => ({
-          designId: cloned.id,
-          productViewId: v.productViewId,
-          isUsed: v.isUsed,
-          layerCount: v.layerCount,
-        })),
-      });
-    }
-
-    return cloned;
+    return this.toOwnerDesign(cloned);
   }
 
   /**

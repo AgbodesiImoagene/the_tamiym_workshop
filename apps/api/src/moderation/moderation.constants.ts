@@ -42,15 +42,60 @@ const CUSTOMER_EXPLANATION: Record<ModerationStatus, string> = {
     'Your content is awaiting moderation review. No action is required yet.',
 };
 
+/** Max length for a customerExplanation override before falling back to template. */
+export const CUSTOMER_EXPLANATION_OVERRIDE_MAX_CHARS = 500;
+
+/** Raw OpenAI moderation category names that must never reach customers. */
+const INTERNAL_CATEGORY_MARKERS = [
+  'harassment',
+  'hate',
+  'self-harm',
+  'sexual',
+  'violence',
+  'illicit',
+] as const;
+
+/**
+ * True when an override is safe to show customers (no scores, taxonomy, or notes).
+ */
+export function isSafeCustomerExplanationOverride(text: string): boolean {
+  if (text.length > CUSTOMER_EXPLANATION_OVERRIDE_MAX_CHARS) {
+    return false;
+  }
+  const lower = text.toLowerCase();
+  // Decimal model scores (e.g. 0.9, 0.450)
+  if (/\b\d+\.\d+\b/.test(text)) {
+    return false;
+  }
+  if (lower.includes('category:')) {
+    return false;
+  }
+  if (lower.includes('categories above')) {
+    return false;
+  }
+  if (lower.includes('maxscore')) {
+    return false;
+  }
+  for (const marker of INTERNAL_CATEGORY_MARKERS) {
+    if (lower.includes(marker)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Customer-safe explanation for an outcome. Never includes AI scores or internal notes.
+ * Score-like / taxonomy overrides are rejected and the template is used instead.
  */
 export function customerExplanationForOutcome(
   outcome: ModerationStatus,
   override?: string | null,
 ): string {
   const trimmed = override?.trim();
-  if (trimmed) return trimmed;
+  if (trimmed && isSafeCustomerExplanationOverride(trimmed)) {
+    return trimmed;
+  }
   return CUSTOMER_EXPLANATION[outcome];
 }
 
