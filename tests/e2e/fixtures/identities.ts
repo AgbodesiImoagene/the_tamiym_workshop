@@ -41,6 +41,7 @@ export const e2eUsers = {
     password: E2E_PASSWORD,
     role: 'ADMIN' as const,
     totpSecret: E2E_ADMIN_TOTP_SECRET,
+    recoveryCodes: E2E_ADMIN_RECOVERY_CODES,
   },
   organiser: {
     email: 'organizer.e2e@tamiym.test',

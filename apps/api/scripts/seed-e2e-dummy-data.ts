@@ -537,10 +537,10 @@ async function main() {
           enabledAt: daysAgo(7),
         },
       });
-      const recoveryCodes =
-        userId === IDS.users.adminPrimary
-          ? [...E2E_ADMIN_RECOVERY_CODES, ...generateRecoveryCodes(7)]
-          : generateRecoveryCodes(10);
+      const recoveryCodes = [
+        ...E2E_ADMIN_RECOVERY_CODES,
+        ...generateRecoveryCodes(7),
+      ];
       await prisma.adminMfaRecoveryCode.createMany({
         data: recoveryCodes.map((code) => ({
           userId,

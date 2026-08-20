@@ -63,6 +63,11 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
     await expect(page).toHaveURL(/\/auth\/login/);
 
+    await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
+    await page.getByRole('button', { name: /Use recovery code/i }).click();
+    await expect(page.getByText('Enter a recovery code')).toBeVisible();
+    await page.getByRole('button', { name: /Use authenticator code instead/i }).click();
+
     await page.getByPlaceholder('123456').fill(generateTotpCode(e2eUsers.admin.totpSecret));
     await page.getByRole('button', { name: /Verify and sign in/i }).click();
 
@@ -72,43 +77,42 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await context.close();
   });
 
-  test('recovery field shows accessible empty-state validation', async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: urls.admin });
-    const page = await context.newPage();
-
-    await page.goto('/auth/login');
-    await fillAdminPasswordStep(page, e2eUsers.admin.email, e2eUsers.admin.password);
-    await expect(page.getByText('Two-factor authentication')).toBeVisible({
-      timeout: 15_000,
-    });
-
-    await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    await page.getByRole('button', { name: /Use recovery code/i }).click();
-    await expect(page.getByText('Enter a recovery code')).toBeVisible();
-
-    await context.close();
-  });
-
   test('recovery code completes admin console login', async ({ browser }, testInfo) => {
+    // Use approver to keep primary admin under the Redis admin_login identity budget
+    // (setup + challenge + enroll-reset already consume primary slots).
     const recoveryCode =
-      e2eUsers.admin.recoveryCodes[
-        Math.min(testInfo.retry, e2eUsers.admin.recoveryCodes.length - 1)
+      e2eUsers.adminApprover.recoveryCodes[
+        Math.min(testInfo.retry, e2eUsers.adminApprover.recoveryCodes.length - 1)
       ]!;
 
     const context = await browser.newContext({ baseURL: urls.admin });
     const page = await context.newPage();
 
     await page.goto('/auth/login');
-    await fillAdminPasswordStep(page, e2eUsers.admin.email, e2eUsers.admin.password);
+    await fillAdminPasswordStep(
+      page,
+      e2eUsers.adminApprover.email,
+      e2eUsers.adminApprover.password
+    );
     await expect(page.getByText('Two-factor authentication')).toBeVisible({
       timeout: 15_000,
     });
 
     await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    const recoveryField = page.getByPlaceholder('XXXX-XXXX-...');
+    const recoveryField = page.locator('input[name="recovery_code"]');
     await expect(recoveryField).toBeVisible();
-    await recoveryField.click();
-    await recoveryField.fill(recoveryCode);
+    // Controlled RHF input: set the native value property then dispatch input/change
+    // so React Hook Form picks up the update (Playwright fill() stays empty here).
+    await recoveryField.evaluate((el, value) => {
+      const input = el as HTMLInputElement;
+      const descriptor = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      );
+      descriptor?.set?.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, recoveryCode);
     await expect(recoveryField).toHaveValue(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
