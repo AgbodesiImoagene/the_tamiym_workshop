@@ -116,6 +116,21 @@ export class ObservabilityService {
     },
   );
 
+  private readonly mediaVirusScans = this.meter.createCounter(
+    'media_virus_scan_total',
+    {
+      description:
+        'Media malware scan outcomes (clean, infected, failed, unavailable).',
+    },
+  );
+
+  private readonly mediaFetchDenied = this.meter.createCounter(
+    'media_fetch_denied_total',
+    {
+      description: 'Remote media fetch denials grouped by reason.',
+    },
+  );
+
   getCurrentTraceId(): string | undefined {
     return trace.getActiveSpan()?.spanContext().traceId;
   }
@@ -233,5 +248,15 @@ export class ObservabilityService {
 
     this.queueJobs.add(1, attributes);
     this.queueJobDuration.record(params.durationMs, attributes);
+  }
+
+  recordMediaVirusScan(metric: {
+    outcome: 'clean' | 'infected' | 'failed' | 'unavailable';
+  }): void {
+    this.mediaVirusScans.add(1, { outcome: metric.outcome });
+  }
+
+  recordMediaFetchDenied(metric: { reason: string }): void {
+    this.mediaFetchDenied.add(1, { reason: metric.reason });
   }
 }

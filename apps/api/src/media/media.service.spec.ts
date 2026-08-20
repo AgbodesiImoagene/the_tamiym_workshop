@@ -83,6 +83,18 @@ describe('MediaService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('should reject URLs with userinfo', async () => {
+    await expect(
+      service.createAssetFromUrl('https://user:pass@example.com/a.png'),
+    ).rejects.toThrow(/userinfo/);
+  });
+
+  it('should reject blocked hosts at create time', async () => {
+    await expect(
+      service.createAssetFromUrl('https://127.0.0.1/a.png'),
+    ).rejects.toThrow(/disallowed host/);
+  });
+
   it('should upload originals and enqueue upload assets', async () => {
     (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({
       id: 'asset-2',

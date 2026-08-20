@@ -20,6 +20,7 @@ import {
   MEDIA_QUEUE,
   MEDIA_SUPPORTED_MIME_TYPES,
 } from './media.constants';
+import { isBlockedHostname } from './safe-remote-fetch';
 
 type UploadFile = {
   buffer: Buffer;
@@ -49,6 +50,8 @@ export class MediaService {
       select: {
         id: true,
         status: true,
+        scanStatus: true,
+        errorMessage: true,
         moderationStatus: true,
         moderationNotes: true,
         originalMime: true,
@@ -244,24 +247,13 @@ export class MediaService {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       throw new BadRequestException('Unsupported URL protocol');
     }
+    if (parsed.username || parsed.password) {
+      throw new BadRequestException('URL must not include userinfo');
+    }
 
-    // SSRF guard: reject private/loopback/link-local hostnames
-    const host = parsed.hostname.toLowerCase();
-    const ssrfPatterns = [
-      /^localhost$/,
-      /^127\.\d+\.\d+\.\d+$/,
-      /^0\.0\.0\.0$/,
-      /^::1$/,
-      /^10\.\d+\.\d+\.\d+$/,
-      /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/,
-      /^192\.168\.\d+\.\d+$/,
-      /^169\.254\.\d+\.\d+$/, // link-local
-      /^fd[0-9a-f]{2}:/i, // IPv6 ULA
-      /^fe80:/i, // IPv6 link-local
-      /^metadata\.google\.internal$/,
-      /^169\.254\.169\.254$/, // AWS/GCP IMDS
-    ];
-    if (ssrfPatterns.some((re) => re.test(host))) {
+    // Cheap SSRF guard: reject private/loopback/link-local/metadata hostnames
+    // and IP literals. Full DNS pin + redirect validation happens at fetch time.
+    if (isBlockedHostname(parsed.hostname)) {
       throw new BadRequestException('URL points to a disallowed host');
     }
 
