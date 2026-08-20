@@ -35,7 +35,7 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | ------------------------------------------------------------------- | -------- | ---- | -------- | ------------------------------------------------------------------------------ |
 | [TTW-020](ttw-020-isolate-admin-customer-sessions.md)               | P0       | High | Complete | Enforce admin/customer session isolation and a deliberate CSRF model           |
 | [TTW-021](ttw-021-secure-media-ingestion.md)                        | P0       | High | Complete | Add real malware scanning and redirect/DNS-safe remote ingestion               |
-| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Scoped   | Remediate critical/high production dependency advisories and add audit policy  |
+| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Complete | Remediate critical/high production dependency advisories and add audit policy  |
 | [TTW-023](ttw-023-enforce-account-and-privileged-auth-policy.md)    | P1       | High | Scoped   | Enforce verification, rate-limit, revocable-session and privileged-auth policy |
 | [TTW-024](ttw-024-enforce-pricing-discount-and-tax-policy.md)       | P0       | High | Scoped   | Enforce reproducible price, discount, VAT and rounding policy                  |
 | [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Scoped   | Implement auditable export, retention, deletion and anonymisation workflows    |

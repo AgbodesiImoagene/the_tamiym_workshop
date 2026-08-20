@@ -1,0 +1,39 @@
+name: Dependency Audit (scheduled)
+
+on:
+  schedule:
+    # Mondays 09:00 UTC — owned by engineering (security/on-call).
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit-full:
+    name: Full dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Production audit (critical/high must be zero)
+        run: pnpm audit:prod
+      - name: Full-graph audit report (informational)
+        run: |
+          pnpm audit --json > audit-full.json || true
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: |
+            audit-full.json
+          if-no-files-found: warn
+      - name: Fail job loudly for on-call
+        if: failure()
+        run: |
+          echo "::error::Production dependency audit failed. Owner: engineering on-call. Open a TTW security ticket if not already covered."
+          exit 1

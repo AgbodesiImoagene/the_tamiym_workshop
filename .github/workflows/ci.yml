@@ -60,6 +60,32 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+  audit-prod:
+    name: Production Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies (block critical/high)
+        run: pnpm audit:prod
+      - name: Retain production audit JSON
+        if: always()
+        run: |
+          pnpm audit --prod --json > audit-prod.json || true
+      - name: Upload production audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-prod
+          path: audit-prod.json
+          if-no-files-found: warn
+
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest

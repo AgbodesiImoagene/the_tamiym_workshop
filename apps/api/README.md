@@ -95,7 +95,7 @@ pnpm test:coverage
 
 ## Email (transactional)
 
-- **Auth:** registration verification and password reset are queued on the `mail` BullMQ queue and sent via `@nestjs-modules/mailer` (Handlebars templates under `src/mail/templates/`).
+- **Auth:** registration verification and password reset are queued on the `mail` BullMQ queue and sent via nodemailer + Handlebars templates under `src/mail/templates/`.
 - **Orders:** when `ORDER_PLACE_NOTIFICATION_EMAIL` is set, a row is written to `notification_outbox` and a job is queued; a cron every two minutes also requeues any stranded `PENDING` rows.
 - **Payments:** after Paystack `charge.success`, a `PaymentConfirmed` outbox row is created for the customer email and queued the same way.
 - **Order lifecycle (customer):** when an admin updates an order to `PROCESSING`, `FULFILLED`, `DELIVERED`, or `CANCELLED`, the buyer gets the matching transactional email (same outbox + queue).
