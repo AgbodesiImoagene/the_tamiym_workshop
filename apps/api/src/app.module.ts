@@ -44,6 +44,7 @@ import { RequestContextMiddleware } from './request-context/request-context.midd
 import { getRequestContext } from './request-context/request-context.store';
 import { validateEnv } from './config/env-validation';
 import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
+import { PrivacyModule } from './privacy/privacy.module';
 
 @Module({
   imports: [
@@ -158,6 +159,7 @@ import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
     MediaModule,
     OrdersModule,
     PayoutsModule,
+    PrivacyModule,
     ProductsModule,
     ShippingModule,
     ObservabilityModule,

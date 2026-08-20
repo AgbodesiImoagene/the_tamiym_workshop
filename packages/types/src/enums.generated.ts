@@ -27,6 +27,22 @@ export enum UserStatus {
   DELETED = 'DELETED',
 }
 
+// TTW-025 data-subject request kinds.
+export enum PrivacyRequestType {
+  EXPORT = 'EXPORT',
+  ERASURE = 'ERASURE',
+}
+
+// TTW-025 privacy request lifecycle.
+export enum PrivacyRequestStatus {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  HELD = 'HELD',
+}
+
 // External identity provider linked to a user (e.g. Google OAuth).
 export enum OAuthProvider {
   GOOGLE = 'GOOGLE',
