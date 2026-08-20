@@ -14,6 +14,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { MailModule } from '../mail/mail.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AdminNotificationsModule } from '../admin-notifications/admin-notificat
     PayoutsModule,
     MailModule,
     AdminNotificationsModule,
+    InventoryModule,
   ],
   controllers: [OrdersController, WebhooksController],
   providers: [

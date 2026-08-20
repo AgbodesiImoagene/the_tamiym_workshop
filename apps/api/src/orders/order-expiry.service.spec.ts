@@ -5,6 +5,7 @@ import { OrderStatus } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 describe('OrderExpiryService', () => {
   let service: OrderExpiryService;
@@ -16,6 +17,7 @@ describe('OrderExpiryService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
       },
+      payment: { findFirst: jest.fn().mockResolvedValue(null) },
       inventoryItem: {
         findUnique: jest.fn().mockResolvedValue({
           variantId: 'var-1',
@@ -26,7 +28,10 @@ describe('OrderExpiryService', () => {
       },
       $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
-          order: { update: jest.fn().mockResolvedValue({}) },
+          order: {
+            update: jest.fn().mockResolvedValue({}),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
               variantId: 'var-1',
@@ -65,6 +70,12 @@ describe('OrderExpiryService', () => {
             failStaleInitiatedRefunds: jest.fn().mockResolvedValue(0),
           },
         },
+        {
+          provide: InventoryLifecycleService,
+          useValue: {
+            releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -87,7 +98,9 @@ describe('OrderExpiryService', () => {
         },
         select: {
           id: true,
-          items: { select: { variantId: true, quantity: true } },
+          items: {
+            select: { id: true, variantId: true, quantity: true },
+          },
         },
       });
     });

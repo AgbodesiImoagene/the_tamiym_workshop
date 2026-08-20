@@ -270,6 +270,13 @@ export enum RefundStatus {
   FAILED = 'FAILED',
 }
 
+// Auditable inventory counter effect (TTW-014). Each tracked order line follows reserve→release or reserve→consume exactly once.
+export enum InventoryMovementKind {
+  RESERVE = 'RESERVE',
+  RELEASE = 'RELEASE',
+  CONSUME = 'CONSUME',
+}
+
 // Type of layer in a workshop template (base, mask, outline, etc.).
 export enum TemplateLayerType {
   BASE = 'BASE',

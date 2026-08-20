@@ -18,6 +18,7 @@ Implemented in `apps/api`:
   - payout and payout-run outcomes
   - webhook events
   - charge settlement outcomes (`charge_settlement_total`: settled / duplicate / rejected)
+  - inventory lifecycle outcomes (`inventory_movement_total`: kind=reserve|release|consume, outcome=applied|duplicate|rejected)
   - payout transfer webhook outcomes (`payout_transfer_event_total`: applied / duplicate / stale)
   - queue-job outcomes and duration
 

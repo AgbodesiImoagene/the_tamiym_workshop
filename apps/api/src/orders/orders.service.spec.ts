@@ -14,6 +14,7 @@ import { OrderStatus } from '../generated/prisma/enums';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 const mockAddress = {
   id: 'addr-1',
@@ -128,7 +129,12 @@ describe('OrdersService', () => {
       },
       $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
-          order: { create: jest.fn().mockResolvedValue(mockOrder) },
+          order: {
+            create: jest.fn().mockResolvedValue({
+              ...mockOrder,
+              items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+            }),
+          },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
               trackInventory: true,
@@ -180,6 +186,14 @@ describe('OrdersService', () => {
           provide: InventoryLowStockNotifier,
           useValue: mockInventoryLowStock,
         },
+        {
+          provide: InventoryLifecycleService,
+          useValue: {
+            reserveOrderItems: jest.fn().mockResolvedValue(undefined),
+            releaseOrderItems: jest.fn().mockResolvedValue(undefined),
+            consumeOrderItems: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -216,7 +230,7 @@ describe('OrdersService', () => {
         }),
       );
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw BadRequestException when stock is insufficient', async () => {
@@ -251,7 +265,7 @@ describe('OrdersService', () => {
       const result = await service.create('user-1', dto);
 
       expect(prisma.$transaction).toHaveBeenCalled();
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw NotFoundException when address not found', async () => {
@@ -337,7 +351,7 @@ describe('OrdersService', () => {
 
       const result = await service.findOne('user-1', 'order-1');
 
-      expect(result).toEqual(mockOrder);
+      expect(result.id).toBe(mockOrder.id);
     });
 
     it('should throw NotFoundException when order not found', async () => {

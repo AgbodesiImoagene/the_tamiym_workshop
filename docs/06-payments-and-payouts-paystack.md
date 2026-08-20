@@ -18,7 +18,16 @@
 - Webhook confirms:
   - Mark payment `SUCCEEDED`
   - Transition order to `PAID`
+  - TTW-014: consume reserved inventory for tracked lines in the same settlement transaction (`InventoryMovement` effect keys `inventory.consume:orderItem:{id}`)
   - Emit `PaymentConfirmed` domain event
+
+## Inventory lifecycle (TTW-014)
+
+- Order create reserves stock with effect key `inventory.reserve:orderItem:{id}` after line rows exist.
+- Unpaid cancel/expiry releases with `inventory.release:orderItem:{id}` (guarded counters; no-op if already released or consumed).
+- Payment settlement consumes (`reserved` and `stockOnHand` decrement together). Refunds do not restock (→ TTW-041).
+- Policy ADR: `docs/decisions/ttw-014-inventory-consumption-policy.md`.
+- Metrics: `inventory_movement_total{kind,outcome}`.
 
 ## Refunds (admin-triggered, policy-driven)
 

@@ -31,6 +31,7 @@ import {
   ADMIN_NOTIF_ORDER_STATUS_CHANGED,
 } from '../admin-notifications/admin-notification-events';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 
 @Injectable()
 export class OrdersService {
@@ -42,6 +43,7 @@ export class OrdersService {
     private notificationOutboxDelivery: NotificationOutboxDeliveryService,
     private adminNotify: AdminNotifyService,
     private inventoryLowStockNotifier: InventoryLowStockNotifier,
+    private inventoryLifecycle: InventoryLifecycleService,
   ) {}
 
   /**
@@ -97,14 +99,7 @@ export class OrdersService {
     );
 
     const order = await this.prisma.$transaction(async (tx) => {
-      await this.reserveInventory(
-        quote.items.map((i) => ({
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })),
-        tx,
-      );
-      return tx.order.create({
+      const created = await tx.order.create({
         data: {
           userId,
           shippingAddressId: dto.shippingAddressId,
@@ -147,6 +142,16 @@ export class OrdersService {
         },
         include: this.orderInclude(),
       });
+      await this.inventoryLifecycle.reserveOrderItems(
+        created.id,
+        created.items.map((i) => ({
+          id: i.id,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
+        tx,
+      );
+      return created;
     });
 
     const orderNotificationRecipient = this.config.get<string>(
@@ -249,13 +254,6 @@ export class OrdersService {
     );
 
     const order = await this.prisma.$transaction(async (tx) => {
-      await this.reserveInventory(
-        quote.items.map((i) => ({
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })),
-        tx,
-      );
       const created = await tx.order.create({
         data: {
           userId,
@@ -300,6 +298,15 @@ export class OrdersService {
         },
         include: this.orderInclude(),
       });
+      await this.inventoryLifecycle.reserveOrderItems(
+        created.id,
+        created.items.map((i) => ({
+          id: i.id,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
+        tx,
+      );
       if (
         quote.discountAmount > 0 &&
         quote.appliedDiscountId != null &&
@@ -432,36 +439,6 @@ export class OrdersService {
       throw new BadRequestException(
         'Shipping destination could not be resolved for this address',
       );
-    }
-  }
-
-  /**
-   * Reserve inventory using conditional update to avoid race conditions.
-   * Only updates rows where (stock_on_hand - reserved) >= quantity.
-   */
-  private async reserveInventory(
-    lines: Array<{ variantId: string; quantity: number }>,
-    tx: Prisma.TransactionClient,
-  ): Promise<void> {
-    for (const { variantId, quantity } of lines) {
-      const inv = await tx.inventoryItem.findUnique({
-        where: { variantId },
-      });
-      if (!inv?.trackInventory) continue;
-      const affected = await (
-        tx as unknown as {
-          $executeRaw: (
-            query: ReturnType<typeof Prisma.sql>,
-          ) => Promise<number>;
-        }
-      ).$executeRaw(
-        Prisma.sql`UPDATE inventory_items SET reserved = reserved + ${quantity} WHERE variant_id = ${variantId} AND track_inventory = true AND (stock_on_hand - reserved) >= ${quantity}`,
-      );
-      if (affected === 0) {
-        throw new ConflictException(
-          `Insufficient stock for variant ${variantId} (concurrent reservation)`,
-        );
-      }
     }
   }
 
@@ -641,14 +618,14 @@ export class OrdersService {
   };
 
   /**
-   * Update order status (admin). Enforces allowed state transitions; CANCELLED from PENDING_PAYMENT releases inventory.
+   * Update order status (admin). Enforces allowed state transitions; CANCELLED from PENDING_PAYMENT releases inventory (TTW-014).
    * Writes an audit log entry for the status change.
    */
   async updateOrderStatus(id: string, status: string, actorUserId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
-        items: { select: { variantId: true, quantity: true } },
+        items: { select: { id: true, variantId: true, quantity: true } },
         user: { select: { id: true, email: true, firstName: true } },
       },
     });
@@ -671,23 +648,33 @@ export class OrdersService {
       newStatus === OrderStatus.CANCELLED
     ) {
       updated = await this.prisma.$transaction(async (tx) => {
-        for (const item of order.items) {
-          const inv = await tx.inventoryItem.findUnique({
-            where: { variantId: item.variantId },
-          });
-          if (inv?.trackInventory) {
-            await tx.inventoryItem.update({
-              where: { variantId: item.variantId },
-              data: { reserved: { decrement: item.quantity } },
-            });
-          }
-        }
-        return tx.order.update({
-          where: { id },
+        const cancelled = await tx.order.updateMany({
+          where: {
+            id,
+            status: OrderStatus.PENDING_PAYMENT,
+          },
           data: {
             status: newStatus,
             cancelledAt: new Date(),
           },
+        });
+        if (cancelled.count !== 1) {
+          throw new ConflictException(
+            'Order is no longer pending payment; cancel aborted',
+          );
+        }
+        await this.inventoryLifecycle.releaseOrderItems(
+          id,
+          order.items.map((i) => ({
+            id: i.id,
+            variantId: i.variantId,
+            quantity: i.quantity,
+          })),
+          tx,
+          { reason: 'admin_cancel_unpaid' },
+        );
+        return tx.order.findUniqueOrThrow({
+          where: { id },
           include: {
             items: {
               include: {

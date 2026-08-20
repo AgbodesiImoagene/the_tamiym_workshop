@@ -22,6 +22,8 @@ import {
   ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
 } from '../admin-notifications/admin-notification-events';
 import { RefundsService } from './refunds.service';
+import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
+import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
 export interface PaystackWebhookEvent {
   event: string;
@@ -59,6 +61,8 @@ export class PaystackWebhookService {
     private notificationOutboxDelivery: NotificationOutboxDeliveryService,
     private adminNotify: AdminNotifyService,
     private refundsService: RefundsService,
+    private inventoryLifecycle: InventoryLifecycleService,
+    private inventoryLowStockNotifier: InventoryLowStockNotifier,
   ) {}
 
   /**
@@ -93,7 +97,14 @@ export class PaystackWebhookService {
         const payment = await this.prisma.payment.findFirst({
           where: { providerRef: reference },
           include: {
-            order: { include: { user: { select: { id: true, email: true } } } },
+            order: {
+              include: {
+                user: { select: { id: true, email: true } },
+                items: {
+                  select: { id: true, variantId: true, quantity: true },
+                },
+              },
+            },
             settlementClaim: true,
           },
         });
@@ -260,6 +271,20 @@ export class PaystackWebhookService {
               );
             }
 
+            await this.inventoryLifecycle.consumeOrderItems(
+              order.id,
+              order.items.map((i) => ({
+                id: i.id,
+                variantId: i.variantId,
+                quantity: i.quantity,
+              })),
+              tx,
+              {
+                reason: 'charge_success',
+                settlementBusinessKey: businessKey,
+              },
+            );
+
             if (order.campaignId) {
               await tx.campaign.update({
                 where: { id: order.campaignId },
@@ -335,6 +360,22 @@ export class PaystackWebhookService {
         }
 
         this.observability.recordChargeSettlement('settled');
+
+        // Low-stock alerts after commit so counters reflect consume (TTW-014).
+        await Promise.all(
+          order.items.map(async (item) => {
+            const inv = await this.prisma.inventoryItem.findUnique({
+              where: { variantId: item.variantId },
+            });
+            if (!inv?.trackInventory) return;
+            const afterAvailable = inv.stockOnHand - inv.reserved;
+            const previousAvailable = afterAvailable + item.quantity;
+            await this.inventoryLowStockNotifier.afterInventoryChange(
+              item.variantId,
+              previousAvailable,
+            );
+          }),
+        );
 
         if (notificationId) {
           await this.notificationOutboxDelivery.enqueueDelivery(notificationId);

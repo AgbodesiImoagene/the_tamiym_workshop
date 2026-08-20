@@ -308,6 +308,13 @@ enum RefundStatus {
   FAILED
 }
 
+/// Auditable inventory counter effect (TTW-014). Each tracked order line follows reserve→release or reserve→consume exactly once.
+enum InventoryMovementKind {
+  RESERVE
+  RELEASE
+  CONSUME
+}
+
 /// Type of layer in a workshop template (base, mask, outline, etc.).
 enum TemplateLayerType {
   BASE
@@ -750,6 +757,7 @@ model ProductVariant {
 
   optionValues VariantOptionValue[]
   inventory    InventoryItem?
+  movements    InventoryMovement[]
   prices       VariantPrice[]
   bulkPricing  BulkPricing[]
 
@@ -796,6 +804,38 @@ model InventoryItem {
   createdAt DateTime @default(now())
 
   @@map("inventory_items")
+}
+
+/// Append-only inventory effect keyed for exactly-once reserve/release/consume (TTW-014).
+model InventoryMovement {
+  id   String                @id @default(cuid())
+  kind InventoryMovementKind
+
+  /// Business effect key, e.g. `inventory.reserve:orderItem:{id}`.
+  effectKey String @unique
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  quantity         Int
+  reservedDelta    Int @default(0)
+  stockOnHandDelta Int @default(0)
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@index([orderItemId])
+  @@index([kind, createdAt])
+  @@map("inventory_movements")
 }
 
 /// Base price for a product per currency. One row per (product, currency).
@@ -1282,6 +1322,7 @@ model Order {
   payments       Payment[]
   refunds        Refund[]
   orderDiscounts OrderDiscount[]
+  inventoryMovements InventoryMovement[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId])
@@ -1328,6 +1369,8 @@ model OrderItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  inventoryMovements InventoryMovement[]
 
   @@index([orderId])
   @@index([variantId])
