@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "ticket": "TTW-067",
+  "objectives": {
+    "recoverable_service_data": {
+      "rpo_minutes": 15,
+      "rto_minutes": 240,
+      "description": "Recoverable service/data failures in primary region (lon1): Managed PG PITR + Droplet rebuild"
+    },
+    "primary_region_loss": {
+      "rpo_minutes": 1440,
+      "rto_minutes": 1440,
+      "description": "Primary-region loss: fra1 rebuild + off-provider DB/config + DNS cutover"
+    },
+    "spaces_and_state_regional": {
+      "rpo_minutes": null,
+      "rto_minutes": null,
+      "best_effort": true,
+      "may_exceed_regional_rpo_hours": 24,
+      "description": "Spaces media and OpenTofu state regional RPO may exceed 24h until cross-region/off-provider replication is funded (TTW-060 ADR honesty)"
+    }
+  },
+  "retention_days": {
+    "managed_postgres_pitr": 7,
+    "offsite_pg_logical_export": 30,
+    "spaces_object_versioning": null,
+    "opentofu_state_versions": null,
+    "notes": "spaces_object_versioning and state versions are provider/versioning-policy governed; prune policy is owner-owned. null means not a fixed day count in this policy file."
+  },
+  "data_classes": [
+    {
+      "id": "postgresql",
+      "authority": "authoritative",
+      "reconstructable": false,
+      "backup": ["managed_pitr", "encrypted_offsite_logical_export"]
+    },
+    {
+      "id": "spaces_objects",
+      "authority": "object_bytes",
+      "reconstructable": false,
+      "backup": ["versioning", "inventory_metadata_export"]
+    },
+    {
+      "id": "opentofu_state",
+      "authority": "infrastructure_bindings",
+      "reconstructable": false,
+      "backup": ["versioned_state_backend", "optional_offsite_state_copy"]
+    },
+    {
+      "id": "host_secrets_config",
+      "authority": "runtime_secrets_and_config",
+      "reconstructable": false,
+      "backup": ["owner_vault_current_and_previous"]
+    },
+    {
+      "id": "valkey",
+      "authority": "operational",
+      "reconstructable": true,
+      "backup": ["none_durable"],
+      "recovery": "postgresql_led_reconcile_and_safe_requeue"
+    }
+  ],
+  "alerts": {
+    "backup_stale": {
+      "alert_id": "backup_stale",
+      "catalog_relpath": "infra/runtime/observability/alerts/catalog.json",
+      "runbook_relpath": "infra/runtime/observability/runbooks/backup_stale.md",
+      "ticket": "TTW-066",
+      "notes": "Pages when Managed PG backup / PITR window older than approved RPO"
+    }
+  },
+  "authorization": {
+    "destructive_restore_requires_human_confirmation": true,
+    "confirm_env": "RESTORE_CONFIRM_TARGET",
+    "forbidden_without_confirmation": [
+      "production_pg_overwrite",
+      "dns_cutover",
+      "failback_to_production"
+    ]
+  },
+  "isolated_targets": ["temporary-validation", "fra1"],
+  "runbooks": [
+    "infra/runtime/backup/runbooks/droplet-loss.md",
+    "infra/runtime/backup/runbooks/postgres-restore.md",
+    "infra/runtime/backup/runbooks/region-loss.md",
+    "infra/runtime/backup/runbooks/valkey-loss.md",
+    "infra/runtime/backup/runbooks/failback.md"
+  ],
+  "scripts": [
+    "infra/runtime/backup/scripts/pg-logical-export.sh",
+    "infra/runtime/backup/scripts/spaces-inventory-export.sh",
+    "infra/runtime/backup/scripts/restore-isolated-check.sh"
+  ],
+  "invariants_sql": "infra/runtime/backup/invariants/post-restore-queries.sql"
+}
