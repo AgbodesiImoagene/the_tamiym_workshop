@@ -53,6 +53,22 @@ enum UserStatus {
   DELETED
 }
 
+/// TTW-025 data-subject request kinds.
+enum PrivacyRequestType {
+  EXPORT
+  ERASURE
+}
+
+/// TTW-025 privacy request lifecycle.
+enum PrivacyRequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+  HELD
+}
+
 /// External identity provider linked to a user (e.g. Google OAuth).
 enum OAuthProvider {
   GOOGLE
@@ -443,6 +459,7 @@ model User {
   authSessions         AuthSession[]
   oauthAccounts        UserOAuthAccount[]
   adminMfaCredential   AdminMfaCredential?
+  privacyRequests      PrivacyRequest[]
 
   @@index([email])
   @@index([role])
@@ -2155,6 +2172,68 @@ model AuditLog {
   @@index([traceId])
   @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
+}
+
+/**
+ * =========================
+ * Privacy / DSAR (TTW-025)
+ * =========================
+ */
+
+/// Authenticated data-subject request (export or erasure).
+model PrivacyRequest {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  type   PrivacyRequestType
+  status PrivacyRequestStatus @default(PENDING)
+
+  /// Policy document version applied when the request was accepted.
+  policyVersion String
+
+  /// When set and in the future, erasure executors must not proceed.
+  legalHoldUntil DateTime?
+
+  /// Object-store key for packaged export (EXPORT only); short-lived.
+  exportObjectKey String?
+  exportExpiresAt DateTime?
+  /// sha256 hex of export bytes (no plaintext in logs).
+  exportChecksum  String?
+
+  /// Opaque failure code for operators (no PII).
+  lastErrorCode String?
+
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  actions PrivacyRequestAction[]
+
+  @@index([userId, type, status])
+  @@index([status, createdAt])
+  @@map("privacy_requests")
+}
+
+/// Per-system executor evidence for a privacy request (no personal field values).
+model PrivacyRequestAction {
+  id        String         @id @default(cuid())
+  requestId String
+  request   PrivacyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  /// Stable system code, e.g. `postgres.user`, `postgres.sessions`, `object_store.media`.
+  systemCode String
+  /// Outcome code, e.g. `OK`, `LEGAL_HOLD`, `PROVIDER_DEFERRED`, `FAILED`.
+  outcomeCode String
+  /// Non-PII counts/checksums only.
+  evidence    Json?
+  attempt     Int       @default(1)
+  completedAt DateTime  @default(now())
+
+  @@index([requestId, systemCode])
+  @@map("privacy_request_actions")
 }
 
 /// Durable reconciliation run (TTW-015). Read-only vs business state.

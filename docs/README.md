@@ -62,6 +62,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 21. `epics/07-organic-discovery-seo-aeo-geo.md` — SEO, AEO and GEO discovery outcome and dependency graph
 22. `backend-production-readiness.md` — repo-state backend gaps, todos, and production checklist
 23. `tickets/README.md` — prioritized epics, deferred work, and implementation-ticket backlog
+24. `privacy/ttw-025-data-inventory.md` — interim privacy / DSAR inventory and retention matrix (TTW-025)
 
 ## Deep Dives
 

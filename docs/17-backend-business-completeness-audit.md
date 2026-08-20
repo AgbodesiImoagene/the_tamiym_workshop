@@ -70,7 +70,7 @@ Engineering can propose defaults, but the owner must approve these policies befo
 - when reserved stock becomes consumed and how cancelled/refunded fulfilled goods affect it;
 - payout cadence, minimum, settlement hold, fees, reversal handling and KYC/support escalation;
 - Nigeria VAT treatment, price inclusivity, shipping tax, invoice/receipt requirements and accounting exports;
-- moderation appeals, content retention, share-link expiry/revocation and data-deletion policy;
+- moderation appeals, content retention, share-link expiry/revocation and data-deletion policy (interim inventory + DSAR APIs: `docs/privacy/ttw-025-data-inventory.md`, TTW-025 — legal sign-off still required);
 - supported browser/device matrix, accessibility target and operational SLOs.
 
 ## Recommended delivery order
