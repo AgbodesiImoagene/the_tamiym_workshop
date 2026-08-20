@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after the TTW-020 security review follow-ups (CSRF transport, surface-bound refresh/logout) added auth unit coverage.",
+  "notes": "Raised after the TTW-020 Reviewer A must-fix follow-ups (extracted + unit-tested env-validation, CSRF exact-path exemption, surfacesWithSessionCookies empty-string fix) added coverage.",
   "floors": {
-    "statements": 55.87,
-    "branches": 48.74,
-    "functions": 55.01,
-    "lines": 56.22
+    "statements": 56.09,
+    "branches": 48.99,
+    "functions": 55.24,
+    "lines": 56.44
   }
 }
