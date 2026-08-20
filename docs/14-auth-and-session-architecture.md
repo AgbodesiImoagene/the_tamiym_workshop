@@ -92,7 +92,10 @@ ADMIN console login requires TOTP (or a single-use recovery code) before an `Aut
 
 Auth/recovery/MFA routes use Redis-backed `AuthRateLimitGuard` (not in-memory Nest Throttler):
 
-- Keys: `ttw:auth:rl:id:{bucket}:{normalizedEmail|user:<id>}` and `ttw:auth:rl:ip:{bucket}:{req.ip}`.
+- Keys: `ttw:auth:rl:id:{bucket}:{normalizedEmail|user:<id>|reset:<tokenHash>|mfa:<tokenHash>}` and `ttw:auth:rl:ip:{bucket}:{req.ip}`.
+- MFA identity uses **verified** JWT `sub` (signature checked; forged tokens fall back to a token fingerprint).
+- Password-reset identity is a truncated sha256 of the reset token (never a shared `anon` key).
+- Counters use atomic Redis `INCR`+`PEXPIRE` (Lua) so TTL cannot be lost after a partial failure.
 - Deny when **either** counter exceeds the bucket limit. Client IP comes from Express with `trust proxy = 1` (first hop only).
 - Redis failures fail-closed with generic `503` (same copy as `429` limits).
 - Metric: `auth_throttle_total{surface,bucket,outcome}` — never labels email or IP.

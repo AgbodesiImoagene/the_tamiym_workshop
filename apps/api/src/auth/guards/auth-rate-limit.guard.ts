@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import type { AuthRateLimitBucket } from '../../constants';
 import { AUTH_RATE_LIMIT_BUCKET_KEY } from '../auth-rate-limit';
@@ -26,11 +27,16 @@ export class AuthRateLimitGuard implements CanActivate {
     const body = (req.body ?? {}) as {
       email?: unknown;
       mfa_token?: unknown;
+      token?: unknown;
     };
     const email = typeof body.email === 'string' ? body.email : null;
-    const identityFromMfa = this.identityFromMfaToken(
-      typeof body.mfa_token === 'string' ? body.mfa_token : null,
-    );
+    const identity =
+      this.identityFromMfaToken(
+        typeof body.mfa_token === 'string' ? body.mfa_token : null,
+      ) ??
+      this.identityFromResetToken(
+        typeof body.token === 'string' ? body.token : null,
+      );
     const path = req.path ?? '';
     const surface =
       path.includes('/admin') || path.includes('/auth/admin')
@@ -40,28 +46,36 @@ export class AuthRateLimitGuard implements CanActivate {
     await this.rateLimit.consume({
       bucket,
       email,
-      identity: identityFromMfa,
+      identity,
       ip: req.ip,
       surface,
     });
     return true;
   }
 
-  /** Decode MFA JWT `sub` for identity key without treating decode failures as auth oracles. */
+  /**
+   * Verify MFA JWT signature before using `sub` as an identity key.
+   * Forged tokens must not burn another user's counters (ignoreExpiry so
+   * expired challenges still share the same bucket while they are attempted).
+   */
   private identityFromMfaToken(token: string | null): string | null {
     if (!token) return null;
     try {
-      const payload = this.jwt.decode(token) as { sub?: unknown } | null;
-      if (
-        payload &&
-        typeof payload.sub === 'string' &&
-        payload.sub.length > 0
-      ) {
+      const payload = this.jwt.verify<{ sub?: unknown }>(token, {
+        ignoreExpiration: true,
+      });
+      if (typeof payload.sub === 'string' && payload.sub.length > 0) {
         return `user:${payload.sub}`;
       }
     } catch {
-      // fall through
+      // fall through to token fingerprint
     }
-    return null;
+    return `mfa:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`;
+  }
+
+  /** Hash password-reset tokens so resets do not share a global `anon` key. */
+  private identityFromResetToken(token: string | null): string | null {
+    if (!token || token.trim().length === 0) return null;
+    return `reset:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`;
   }
 }

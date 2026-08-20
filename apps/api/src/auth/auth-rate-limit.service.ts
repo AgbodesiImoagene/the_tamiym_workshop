@@ -101,10 +101,22 @@ export class AuthRateLimitService implements OnModuleDestroy {
   }
 
   private async incrWithTtl(key: string, ttlMs: number): Promise<number> {
-    const count = await this.redis.incr(key);
-    if (count === 1) {
-      await this.redis.pexpire(key, ttlMs);
-    }
-    return count;
+    // Atomic INCR + PEXPIRE so a crashed/failed expire cannot leave a
+    // permanent counter (TTW-023 review).
+    const result = await this.redis.eval(
+      `
+      local count = redis.call('INCR', KEYS[1])
+      if count == 1 then
+        redis.call('PEXPIRE', KEYS[1], ARGV[1])
+      elseif redis.call('PTTL', KEYS[1]) < 0 then
+        redis.call('PEXPIRE', KEYS[1], ARGV[1])
+      end
+      return count
+      `,
+      1,
+      key,
+      String(ttlMs),
+    );
+    return Number(result);
   }
 }

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 const redisMock = {
   incr: jest.fn(),
   pexpire: jest.fn(),
+  eval: jest.fn(),
   quit: jest.fn().mockResolvedValue('OK'),
 };
 
@@ -41,7 +42,7 @@ describe('AuthRateLimitService', () => {
   });
 
   it('allows traffic under both identity and IP limits', async () => {
-    redisMock.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
+    redisMock.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
 
     await expect(
       service.consume({
@@ -57,11 +58,11 @@ describe('AuthRateLimitService', () => {
       bucket: 'admin_login',
       outcome: 'allowed',
     });
-    expect(redisMock.pexpire).toHaveBeenCalled();
+    expect(redisMock.eval).toHaveBeenCalled();
   });
 
   it('limits when identity counter exceeds bucket limit', async () => {
-    redisMock.incr.mockResolvedValueOnce(6).mockResolvedValueOnce(1);
+    redisMock.eval.mockResolvedValueOnce(6).mockResolvedValueOnce(1);
 
     await expect(
       service.consume({
@@ -82,7 +83,7 @@ describe('AuthRateLimitService', () => {
   });
 
   it('fail-closes when Redis is unavailable', async () => {
-    redisMock.incr.mockRejectedValue(new Error('ECONNREFUSED'));
+    redisMock.eval.mockRejectedValue(new Error('ECONNREFUSED'));
 
     await expect(
       service.consume({

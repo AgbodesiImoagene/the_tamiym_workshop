@@ -1,6 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { createHash } from 'node:crypto';
 import { AUTH_RATE_LIMIT_BUCKET_KEY } from '../auth-rate-limit';
 import { AuthRateLimitGuard } from './auth-rate-limit.guard';
 import { AuthRateLimitService } from '../auth-rate-limit.service';
@@ -8,7 +9,7 @@ import { AuthRateLimitService } from '../auth-rate-limit.service';
 describe('AuthRateLimitGuard', () => {
   const rateLimit = { consume: jest.fn().mockResolvedValue(undefined) };
   const jwt = {
-    decode: jest.fn().mockReturnValue({ sub: 'admin-1' }),
+    verify: jest.fn().mockReturnValue({ sub: 'admin-1' }),
   };
   const reflector = {
     getAllAndOverride: jest.fn(),
@@ -67,19 +68,53 @@ describe('AuthRateLimitGuard', () => {
     });
   });
 
-  it('derives MFA identity from mfa_token sub', async () => {
+  it('derives MFA identity from verified mfa_token sub', async () => {
     reflector.getAllAndOverride.mockReturnValue('admin_mfa');
     await expect(
       guard.canActivate(
         contextFor({ mfa_token: 'jwt.here' }, '/v1/auth/admin/mfa/challenge'),
       ),
     ).resolves.toBe(true);
+    expect(jwt.verify).toHaveBeenCalledWith('jwt.here', {
+      ignoreExpiration: true,
+    });
     expect(rateLimit.consume).toHaveBeenCalledWith({
       bucket: 'admin_mfa',
       email: null,
       identity: 'user:admin-1',
       ip: '127.0.0.1',
       surface: 'ADMIN',
+    });
+  });
+
+  it('fingerprints forged MFA tokens instead of trusting decode()', async () => {
+    reflector.getAllAndOverride.mockReturnValue('admin_mfa');
+    jwt.verify.mockImplementation(() => {
+      throw new Error('invalid signature');
+    });
+    const token = 'forged.jwt.token';
+    await guard.canActivate(
+      contextFor({ mfa_token: token }, '/v1/auth/admin/mfa/challenge'),
+    );
+    expect(rateLimit.consume).toHaveBeenCalledWith({
+      bucket: 'admin_mfa',
+      email: null,
+      identity: `mfa:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`,
+      ip: '127.0.0.1',
+      surface: 'ADMIN',
+    });
+  });
+
+  it('keys password reset by hashed token not shared anon', async () => {
+    reflector.getAllAndOverride.mockReturnValue('password_reset');
+    const token = 'reset-token-value';
+    await guard.canActivate(contextFor({ token }, '/v1/auth/reset-password'));
+    expect(rateLimit.consume).toHaveBeenCalledWith({
+      bucket: 'password_reset',
+      email: null,
+      identity: `reset:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`,
+      ip: '127.0.0.1',
+      surface: 'CUSTOMER',
     });
   });
 });
