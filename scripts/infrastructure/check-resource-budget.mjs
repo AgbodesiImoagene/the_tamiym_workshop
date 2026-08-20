@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const budget = JSON.parse(
-  readFileSync(join(root, 'docs/infrastructure/ttw-060-resource-budget.json'), 'utf8'),
+  readFileSync(join(root, 'docs/infrastructure/ttw-060-resource-budget.json'), 'utf8')
 );
 
 const hardSum = budget.containers.reduce((sum, c) => sum + c.hardMiB, 0);

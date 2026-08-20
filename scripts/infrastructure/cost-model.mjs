@@ -41,13 +41,11 @@ export const PRICE_CATALOG = Object.freeze({
   },
   reserved_ip_assigned: {
     usdPerMonth: 0.0,
-    source:
-      'https://docs.digitalocean.com/products/networking/reserved-ips/details/pricing/',
+    source: 'https://docs.digitalocean.com/products/networking/reserved-ips/details/pricing/',
   },
   reserved_ip_unassigned: {
     usdPerMonth: 5.0,
-    source:
-      'https://docs.digitalocean.com/products/networking/reserved-ips/details/pricing/',
+    source: 'https://docs.digitalocean.com/products/networking/reserved-ips/details/pricing/',
   },
   monitoring_included: {
     usdPerMonth: 0.0,
@@ -158,16 +156,14 @@ export function expectedTwelveMonthScenario() {
       {
         name: 'Spaces storage overage (25 GiB)',
         usdPerMonth: Number(
-          (25 * PRICE_CATALOG.spaces_storage_overage_per_gib.usdPerMonth).toFixed(2),
+          (25 * PRICE_CATALOG.spaces_storage_overage_per_gib.usdPerMonth).toFixed(2)
         ),
         source: PRICE_CATALOG.spaces_storage_overage_per_gib.source,
       },
       {
         name: 'Droplet bandwidth overage (50 GiB)',
         usdPerMonth: Number(
-          (50 * PRICE_CATALOG.droplet_bandwidth_overage_per_gib.usdPerMonth).toFixed(
-            2,
-          ),
+          (50 * PRICE_CATALOG.droplet_bandwidth_overage_per_gib.usdPerMonth).toFixed(2)
         ),
         source: PRICE_CATALOG.droplet_bandwidth_overage_per_gib.source,
       },
@@ -217,9 +213,7 @@ export function stressScaleScenario() {
       },
       {
         name: 'Spaces transfer overage (500 GiB)',
-        usdPerMonth: Number(
-          (500 * c.spaces_transfer_overage_per_gib.usdPerMonth).toFixed(2),
-        ),
+        usdPerMonth: Number((500 * c.spaces_transfer_overage_per_gib.usdPerMonth).toFixed(2)),
         source: c.spaces_transfer_overage_per_gib.source,
       },
     ],
@@ -273,20 +267,14 @@ export function buildCostReport() {
   return {
     priceAsOf: PRICE_AS_OF,
     normalMonthCeilingUsd: NORMAL_MONTH_CEILING_USD,
-    exclusions: [
-      'tax',
-      'payment-provider fees',
-      'domain renewal',
-      'exceptional scale events',
-    ],
+    exclusions: ['tax', 'payment-provider fees', 'domain renewal', 'exceptional scale events'],
     scenarios,
     temporaryValidationExample: temporaryValidationCost(8),
     verdict: {
       mandatoryBaselineFits:
         scenarios.find((s) => s.scenarioId === 'minimal')?.withinCeiling === true,
       expectedLowTrafficFits:
-        scenarios.find((s) => s.scenarioId === 'expected-12m')?.withinCeiling ===
-        true,
+        scenarios.find((s) => s.scenarioId === 'expected-12m')?.withinCeiling === true,
       stressExceedsCeiling:
         scenarios.find((s) => s.scenarioId === 'stress')?.withinCeiling === false,
     },
