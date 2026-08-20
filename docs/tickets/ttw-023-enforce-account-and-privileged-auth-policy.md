@@ -133,4 +133,4 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ## Completion summary
 
-Slice 1 (verified-email action policy) shipped. Remaining same-ticket work: admin TOTP + recovery, named hashed sessions, Redis identity+IP throttles, Playwright suites.
+Slice 1 (verified-email action policy) shipped. Slice 2 (hashed `AuthSession` wiring: JWT `sid`, list/revoke APIs, cleanup, tests) implemented on this branch. Remaining same-ticket work: admin TOTP + recovery, Redis identity+IP throttles, Playwright suites.
