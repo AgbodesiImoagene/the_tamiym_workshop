@@ -57,9 +57,10 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await page.getByPlaceholder('123456').fill('000000');
     await page.getByRole('button', { name: /Verify and sign in/i }).click();
 
-    // Next.js also mounts `#__next-route-announcer__` with role=alert.
-    const alert = page.getByRole('alert').filter({ hasText: /Unauthorized/i });
+    // Prefer the product error box class — Next also mounts an empty role=alert announcer.
+    const alert = page.locator('[role="alert"].border-red-200');
     await expect(alert).toBeVisible({ timeout: 10_000 });
+    await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
     await expect(page).toHaveURL(/\/auth\/login/);
 
     await page.getByPlaceholder('123456').fill(generateTotpCode(e2eUsers.admin.totpSecret));
@@ -87,16 +88,13 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     });
 
     await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    await page.getByLabel(/Recovery code/i).fill('not-a-valid-recovery-code');
+    const recoveryField = page.getByRole('textbox', { name: /Recovery code/i });
+    await expect(recoveryField).toBeVisible();
     await page.getByRole('button', { name: /Use recovery code/i }).click();
+    // Accessible field-level error (empty submit) — FormMessage, not the page alert.
+    await expect(page.getByText('Enter a recovery code')).toBeVisible();
 
-    // Prefer the product error box class — Next also mounts an empty role=alert announcer.
-    const alert = page.locator('[role="alert"].border-red-200');
-    await expect(alert).toBeVisible({ timeout: 10_000 });
-    await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
-    await expect(page.getByLabel(/Recovery code/i)).toBeVisible();
-
-    await page.getByLabel(/Recovery code/i).fill(recoveryCode);
+    await recoveryField.fill(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
