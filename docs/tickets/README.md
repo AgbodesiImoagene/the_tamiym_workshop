@@ -27,7 +27,7 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Complete | Permit at most one active payment attempt per order                          |
 | [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        |
 | [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     |
-| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Scoped   | Add scheduled financial/inventory reconciliation reports and repair runbooks |
+| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks |
 
 ## Epic 2 — Security and trust boundaries
 

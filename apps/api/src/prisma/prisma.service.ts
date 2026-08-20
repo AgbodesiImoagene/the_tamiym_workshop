@@ -58,4 +58,34 @@ export class PrismaService
     await this.$disconnect();
     await this.pool.end();
   }
+
+  /**
+   * Run `fn` while holding a PostgreSQL session advisory lock on a single
+   * pooled connection (acquire + release must share one backend PID).
+   * Returns `null` when the lock is already held elsewhere.
+   */
+  async withSessionAdvisoryLock<T>(
+    lockKey: string,
+    fn: () => Promise<T>,
+  ): Promise<T | null> {
+    const client = await this.pool.connect();
+    try {
+      const acquired = await client.query<{ locked: boolean }>(
+        'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
+        [lockKey],
+      );
+      if (!acquired.rows[0]?.locked) {
+        return null;
+      }
+      try {
+        return await fn();
+      } finally {
+        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [
+          lockKey,
+        ]);
+      }
+    } finally {
+      client.release();
+    }
+  }
 }

@@ -16,6 +16,7 @@ import {
   ADMIN_NOTIF_PAYOUT_FAILED,
   ADMIN_NOTIF_PAYOUT_SUCCEEDED,
   ADMIN_NOTIF_REFUND_COMPLETED,
+  ADMIN_NOTIF_RECONCILIATION_RUN,
 } from './admin-notification-events';
 
 export interface AdminNotificationTemplateDefaults {
@@ -163,5 +164,14 @@ export const ADMIN_NOTIFICATION_DEFAULTS: Record<
 <p><strong>{{previousStatus}}</strong> → <strong>{{newStatus}}</strong></p>
 {{#if actorUserId}}<p>Actor: <code>{{actorUserId}}</code></p>{{/if}}`,
     smsBody: 'Campaign {{campaignId}} {{previousStatus}}→{{newStatus}}',
+  },
+  [ADMIN_NOTIF_RECONCILIATION_RUN]: {
+    subject: 'Reconciliation {{kind}} {{runId}}: {{status}}',
+    emailBody: `<p>Reconciliation run needs attention.</p>
+<p>Kind: <code>{{kind}}</code></p>
+<p>Run: <code>{{runId}}</code></p>
+<p>Status: <strong>{{status}}</strong></p>
+<p>Open findings: {{findingsOpen}}</p>`,
+    smsBody: 'Recon {{kind}} {{runId}} {{status}} open={{findingsOpen}}',
   },
 };

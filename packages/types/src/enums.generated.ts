@@ -304,3 +304,56 @@ export enum BlendMode {
   DARKEN = 'DARKEN',
   LIGHTEN = 'LIGHTEN',
 }
+
+// TTW-015 reconciliation run kind.
+export enum ReconciliationRunKind {
+  INTERNAL = 'INTERNAL',
+  PROVIDER = 'PROVIDER',
+  TARGETED = 'TARGETED',
+}
+
+export enum ReconciliationRunStatus {
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  INCOMPLETE = 'INCOMPLETE',
+  FAILED = 'FAILED',
+}
+
+export enum ReconciliationDomain {
+  PAYMENT = 'PAYMENT',
+  REFUND = 'REFUND',
+  PAYOUT = 'PAYOUT',
+  CAMPAIGN = 'CAMPAIGN',
+  INVENTORY = 'INVENTORY',
+}
+
+export enum ReconciliationOutcome {
+  MATCHED = 'MATCHED',
+  MISMATCH = 'MISMATCH',
+  MISSING_INTERNAL = 'MISSING_INTERNAL',
+  MISSING_PROVIDER = 'MISSING_PROVIDER',
+  PENDING_GRACE = 'PENDING_GRACE',
+  UNVERIFIABLE = 'UNVERIFIABLE',
+}
+
+export enum ReconciliationFindingStatus {
+  OPEN = 'OPEN',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+  RESOLVED = 'RESOLVED',
+  WONT_FIX = 'WONT_FIX',
+}
+
+export enum ReconciliationSeverity {
+  CRITICAL = 'CRITICAL',
+  HIGH = 'HIGH',
+  MEDIUM = 'MEDIUM',
+  LOW = 'LOW',
+}
+
+export enum ReconciliationRepairStatus {
+  REQUESTED = 'REQUESTED',
+  APPROVED = 'APPROVED',
+  APPLIED = 'APPLIED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}

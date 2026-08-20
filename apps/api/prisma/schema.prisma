@@ -343,6 +343,59 @@ enum BlendMode {
   LIGHTEN
 }
 
+/// TTW-015 reconciliation run kind.
+enum ReconciliationRunKind {
+  INTERNAL
+  PROVIDER
+  TARGETED
+}
+
+enum ReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  INCOMPLETE
+  FAILED
+}
+
+enum ReconciliationDomain {
+  PAYMENT
+  REFUND
+  PAYOUT
+  CAMPAIGN
+  INVENTORY
+}
+
+enum ReconciliationOutcome {
+  MATCHED
+  MISMATCH
+  MISSING_INTERNAL
+  MISSING_PROVIDER
+  PENDING_GRACE
+  UNVERIFIABLE
+}
+
+enum ReconciliationFindingStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  WONT_FIX
+}
+
+enum ReconciliationSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ReconciliationRepairStatus {
+  REQUESTED
+  APPROVED
+  APPLIED
+  FAILED
+  CANCELLED
+}
+
 /**
  * =========================
  * Core Users & Addresses
@@ -1990,6 +2043,104 @@ model AuditLog {
   @@index([traceId])
   @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
+}
+
+/// Durable reconciliation run (TTW-015). Read-only vs business state.
+model ReconciliationRun {
+  id        String                  @id @default(cuid())
+  kind      ReconciliationRunKind
+  status    ReconciliationRunStatus @default(RUNNING)
+  /// Deterministic key, e.g. `internal:2026-08-19` or `provider:2026-08-19`.
+  windowKey String
+  cutoffAt  DateTime
+  fromAt    DateTime?
+  toAt      DateTime?
+
+  cursor           Json?
+  inputSnapshotHash String?
+  recordsChecked   Int @default(0)
+  findingsOpen     Int @default(0)
+  errorSummary     String?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  findings ReconciliationFinding[]
+  repairs  ReconciliationRepairRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, windowKey])
+  @@index([status, startedAt])
+  @@index([cutoffAt])
+  @@map("reconciliation_runs")
+}
+
+/// Deduplicated finding keyed by fingerprint while OPEN (TTW-015).
+model ReconciliationFinding {
+  id         String                      @id @default(cuid())
+  runId      String
+  run        ReconciliationRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  domain     ReconciliationDomain
+  outcome    ReconciliationOutcome
+  severity   ReconciliationSeverity
+  status     ReconciliationFindingStatus @default(OPEN)
+  fingerprint String
+
+  leftLabel  String
+  leftValue  String
+  rightLabel String
+  rightValue String
+  currency   String?
+  unit       String?
+
+  sourceIds Json?
+  evidence  Json?
+  incidentRef String?
+
+  acknowledgedByUserId String?
+  acknowledgedAt       DateTime?
+  resolvedByUserId     String?
+  resolvedAt           DateTime?
+
+  repairs ReconciliationRepairRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([runId])
+  @@index([domain, status, severity])
+  @@index([fingerprint, status])
+  @@index([severity, status, createdAt])
+  @@map("reconciliation_findings")
+}
+
+/// Two-person repair request for money/stock findings (TTW-015).
+model ReconciliationRepairRequest {
+  id        String                     @id @default(cuid())
+  runId     String
+  run       ReconciliationRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  findingId String
+  finding   ReconciliationFinding      @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  domain    ReconciliationDomain
+  status    ReconciliationRepairStatus @default(REQUESTED)
+
+  commandKey String
+  payload    Json?
+
+  requestedByUserId String
+  approvedByUserId  String?
+  beforeEvidence    Json?
+  afterEvidence     Json?
+  errorSummary      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([findingId, status])
+  @@index([status, createdAt])
+  @@map("reconciliation_repair_requests")
 }
 
 // OrderItem.pricingBreakdown (proposal)
