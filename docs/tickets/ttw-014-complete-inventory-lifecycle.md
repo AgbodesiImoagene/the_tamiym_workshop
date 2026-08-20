@@ -58,7 +58,7 @@ See `docs/decisions/ttw-014-inventory-consumption-policy.md`:
 - [x] Auditable, idempotent movement model and migration are implemented.
 - [x] Concurrent transitions preserve all invariants.
 - [x] Admin/customer availability and low-stock notifications agree.
-- [ ] Critical design and two independent implementation reviews pass.
+- [x] Critical design and two independent implementation reviews pass.
 
 ## Out of scope
 

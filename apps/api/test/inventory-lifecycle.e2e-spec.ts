@@ -110,7 +110,7 @@ describe('Inventory lifecycle (e2e)', () => {
         totalAmount: 1000 * qty,
         shipLine1: seeded.address.addressLine1,
         shipCity: seeded.address.city,
-        shipState: seeded.address.state!,
+        shipState: seeded.address.state ?? 'Lagos',
         shipCountry: 'Nigeria',
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         items: {

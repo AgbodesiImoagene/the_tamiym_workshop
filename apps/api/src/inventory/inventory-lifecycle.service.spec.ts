@@ -147,8 +147,27 @@ describe('InventoryLifecycleService', () => {
     expect(tx.$executeRaw).toHaveBeenCalled();
   });
 
-  it('refuses consume after release', async () => {
-    tx.inventoryMovement.findUnique.mockResolvedValue({ id: 'release' });
+  it('consumes as duplicate when effectKey already exists', async () => {
+    tx.inventoryMovement.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    await service.consumeOrderItems(
+      'ord-1',
+      [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+      tx as never,
+    );
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
+      'consume',
+      'duplicate',
+    );
+  });
+
+  it('throws when consume counter update cannot apply', async () => {
+    tx.$executeRaw.mockResolvedValue(0);
     await expect(
       service.consumeOrderItems(
         'ord-1',
@@ -156,6 +175,39 @@ describe('InventoryLifecycleService', () => {
         tx as never,
       ),
     ).rejects.toThrow(ConflictException);
+    expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
+      'consume',
+      'rejected',
+    );
+  });
+
+  it('rethrows non-unique movement insert failures', async () => {
+    tx.inventoryMovement.create.mockRejectedValue(new Error('db down'));
+    await expect(
+      service.reserveOrderItems(
+        'ord-1',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
+        tx as never,
+      ),
+    ).rejects.toThrow('db down');
+  });
+
+  it('releases as duplicate when insert loses the effectKey race', async () => {
+    tx.inventoryMovement.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    await service.releaseOrderItems(
+      'ord-1',
+      [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+      tx as never,
+    );
     expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(observability.recordInventoryMovement).toHaveBeenCalledWith(
+      'release',
+      'duplicate',
+    );
   });
 });
