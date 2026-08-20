@@ -33,6 +33,27 @@ Make the requested auth surface a trusted server-derived property, permit admin 
 - `apps/api/src/auth/strategies/jwt.strategy.ts:39-63` — cookie fallback.
 - `docs/14-auth-and-session-architecture.md` — intended boundary.
 
+## Security review follow-ups
+
+The first security review failed on four findings, all now fixed (see
+`docs/14-auth-and-session-architecture.md` for the resulting design):
+
+1. **CSRF transport.** API cookies are host-only on the API origin, so a
+   cross-origin SPA could not read the CSRF cookie. The token is now also
+   returned as `csrf_token` by register/login/admin login/refresh/`auth/me`,
+   stored in `sessionStorage` (`ttw_<surface>_csrf`) and sent as
+   `X-CSRF-Token`; the cookie remains the second half of the double submit.
+2. **CSRF on refresh/logout.** `@Public()` no longer means CSRF-exempt. Only
+   session-establishing auth paths and webhook paths are whitelisted; any
+   request presenting a surface access/refresh cookie is checked, so
+   `auth/refresh` and `auth/logout` can no longer be driven cross-site.
+3. **Surface binding.** `refresh`/`logout` reject a cookie-bearing request
+   whose Origin is unresolvable or belongs to the other surface instead of
+   defaulting to CUSTOMER, and logout revokes/clears only the resolved
+   surface.
+4. **Bearer surface/role.** `JwtStrategy.validate` requires a known `surface`
+   claim and re-checks role×surface for bearer callers too.
+
 ## Acceptance criteria
 
 - [x] Threat model and cookie/domain/CSRF decision are documented.

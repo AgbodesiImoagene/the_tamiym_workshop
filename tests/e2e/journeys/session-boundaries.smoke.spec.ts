@@ -1,10 +1,20 @@
 import { request } from '@playwright/test';
 import { test, expect, urls } from '../fixtures/test';
-import { originForSurface } from '../fixtures/api';
+import { csrfStorageKey, originForSurface } from '../fixtures/api';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const authDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../.auth');
+const DISALLOWED_ORIGIN = 'http://evil.example.com';
+
+/** API context bound to a saved session, with an explicit Origin header. */
+async function apiContextFor(role: 'customer' | 'admin', origin: string) {
+  return request.newContext({
+    baseURL: `${urls.api}/v1/`,
+    extraHTTPHeaders: { Origin: origin },
+    storageState: path.join(authDir, `${role}.json`),
+  });
+}
 
 test.describe('Session boundary negatives @smoke', () => {
   test('anonymous visitor cannot open customer dashboard', async ({ browser }) => {
@@ -59,6 +69,54 @@ test.describe('Session boundary negatives @smoke', () => {
     });
     const res = await api.get('auth/me');
     expect(res.status()).toBe(401);
+    await api.dispose();
+  });
+
+  test('cross-site logout cannot end a cookie session (TTW-020)', async () => {
+    const evil = await apiContextFor('customer', DISALLOWED_ORIGIN);
+    // A cross-site page holds no CSRF token, and the Origin is not on the
+    // surface allowlist either, so the forced logout is refused.
+    expect((await evil.post('auth/logout')).status()).toBe(403);
+    await evil.dispose();
+
+    const legitimate = await apiContextFor('customer', originForSurface('CUSTOMER'));
+    expect((await legitimate.get('auth/me')).status()).toBe(200);
+    await legitimate.dispose();
+  });
+
+  test('same-origin logout without the CSRF header is refused (TTW-020)', async () => {
+    const api = await apiContextFor('customer', originForSurface('CUSTOMER'));
+    expect((await api.post('auth/logout')).status()).toBe(403);
+
+    // Still signed in, and the token needed to log out for real is available
+    // from auth/me — the recovery path frontends use after a page load.
+    const me = await api.get('auth/me');
+    expect(me.status()).toBe(200);
+    expect((await me.json()).csrf_token).toEqual(expect.any(String));
+    await api.dispose();
+  });
+});
+
+test.describe('CSRF token storage @smoke', () => {
+  test('customer app stores the API CSRF token in sessionStorage', async ({ customerPage }) => {
+    await customerPage.goto('/dashboard');
+    await expect(
+      customerPage.getByRole('heading', { name: /Welcome To Your Workshop/i })
+    ).toBeVisible();
+
+    // The dashboard's auth/me call is what seeds the token for a tab that
+    // never saw a login response (TTW-020).
+    const stored = await customerPage.evaluate(
+      (key) => window.sessionStorage.getItem(key),
+      csrfStorageKey('CUSTOMER')
+    );
+    expect(stored).toEqual(expect.any(String));
+
+    // It is the token the API expects back in the CSRF header, i.e. the same
+    // value as the session's CSRF cookie.
+    const api = await apiContextFor('customer', originForSurface('CUSTOMER'));
+    const me = await api.get('auth/me');
+    expect((await me.json()).csrf_token).toBe(stored);
     await api.dispose();
   });
 });

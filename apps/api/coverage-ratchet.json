@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-020 auth surface isolation unit coverage.",
+  "notes": "Raised after the TTW-020 security review follow-ups (CSRF transport, surface-bound refresh/logout) added auth unit coverage.",
   "floors": {
-    "statements": 55.5,
-    "branches": 48.17,
-    "functions": 54.41,
-    "lines": 55.81
+    "statements": 55.87,
+    "branches": 48.74,
+    "functions": 55.01,
+    "lines": 56.22
   }
 }

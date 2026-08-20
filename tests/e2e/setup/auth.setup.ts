@@ -21,9 +21,12 @@ async function saveRoleState(
 ): Promise<void> {
   const surface: AuthSurface = role === 'admin' ? 'ADMIN' : 'CUSTOMER';
   const api = await createApiContext(surface);
-  await apiLogin(api, email, password, surface);
+  const { csrfToken } = await apiLogin(api, email, password, surface);
   const me = await api.get('auth/me');
   expect(me.ok(), `auth/me for ${email}`).toBeTruthy();
+  // A frontend that never saw the login response recovers the token here, so
+  // auth/me must echo the one the session already has (TTW-020).
+  expect((await me.json()).csrf_token, `auth/me csrf_token for ${email}`).toBe(csrfToken);
   await api.storageState({ path: path.join(authDir, `${role}.json`) });
   await api.dispose();
 }
