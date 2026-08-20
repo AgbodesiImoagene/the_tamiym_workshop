@@ -70,3 +70,39 @@ module "reserved_ip" {
 
   region = var.region
 }
+
+module "postgres" {
+  source = "../../modules/postgres"
+
+  name                = var.postgres_name
+  region              = var.region
+  size                = var.postgres_size
+  engine_version      = var.postgres_version
+  vpc_uuid            = module.vpc.uuid
+  project_id          = module.project.id
+  tags                = module.labeling.tag_list
+  deletion_protection = false
+  maintenance_day     = var.postgres_maintenance_day
+  maintenance_hour    = var.postgres_maintenance_hour
+  firewall_rules = [
+    { type = "ip_addr", value = var.vpc_ip_range }
+  ]
+}
+
+module "spaces" {
+  source = "../../modules/spaces"
+
+  name_prefix       = var.spaces_name_prefix
+  region            = var.spaces_region
+  force_destroy     = true
+  enable_versioning = true
+  cors_allowed_origins = [
+    "https://${var.web_hostname}",
+    "https://${var.app_hostname}",
+    "https://${var.admin_hostname}",
+  ]
+}
+
+module "valkey_config" {
+  source = "../../modules/valkey_config"
+}

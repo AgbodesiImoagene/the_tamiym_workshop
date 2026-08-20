@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Credential-free OpenTofu validation for TTW-061/062.
+# Credential-free OpenTofu validation for TTW-061/062/064.
 # Requires OpenTofu on PATH (CI installs 1.9.1; local: $HOME/.local/bin/tofu).
 set -euo pipefail
 
@@ -21,6 +21,9 @@ bash "${INFRA}/policy/deny-secrets.sh"
 echo "==> assert-network-invariants"
 bash "${INFRA}/policy/assert-network-invariants.sh"
 
+echo "==> assert-data-invariants"
+bash "${INFRA}/policy/assert-data-invariants.sh"
+
 echo "==> tofu fmt -check -recursive"
 (cd "$INFRA" && tofu fmt -check -recursive)
 
@@ -39,12 +42,15 @@ validate_root "modules/digitalocean_project"
 validate_root "modules/vpc"
 validate_root "modules/firewall"
 validate_root "modules/reserved_ip"
+validate_root "modules/postgres"
+validate_root "modules/spaces"
+validate_root "modules/spaces_protected"
 
 # Environment compositions.
 validate_root "envs/production"
 validate_root "envs/temporary-validation"
 
-# Labeling module has no providers; still fmt-clean and syntactically loadable
-# via a disposable init when called from envs above.
+# Labeling + valkey_config have no DO provider resources; loaded via envs above
+# (valkey ships runtime conf under infra/runtime/valkey/).
 
 echo "==> all infra validations passed"
