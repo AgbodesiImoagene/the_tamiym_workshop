@@ -46,6 +46,16 @@ const IN_FLIGHT_OR_SUCCEEDED: ReadonlySet<RefundStatus> = new Set([
   RefundStatus.SUCCEEDED,
 ]);
 
+/** Non-terminal statuses eligible for provider status updates. */
+const IN_FLIGHT: ReadonlySet<RefundStatus> = new Set([
+  RefundStatus.INITIATED,
+  RefundStatus.PROCESSING,
+  RefundStatus.NEEDS_ATTENTION,
+]);
+
+/** Stale INITIATED without providerRef may be re-driven (TTW-013). */
+const STALE_INITIATED_MS = 45_000;
+
 export type PaystackRefundWebhookPayload = {
   event: string;
   data: {
@@ -61,6 +71,18 @@ export type PaystackRefundWebhookPayload = {
   };
 };
 
+type RefundWithRelations = Prisma.RefundGetPayload<{
+  include: {
+    order: {
+      include: {
+        user: { select: { id: true; email: true; firstName: true } };
+      };
+    };
+    settlementClaim: true;
+    payment: true;
+  };
+}>;
+
 function isUniqueConstraintError(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -70,6 +92,16 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 function money(n: Prisma.Decimal | number | string): number {
   return Number(n);
+}
+
+function providerAmountMajor(
+  amount: number | string | undefined,
+): number | null {
+  if (amount == null) return null;
+  const raw = money(amount);
+  if (!Number.isFinite(raw)) return null;
+  // Paystack refund webhooks report kobo as integer/string.
+  return raw / 100;
 }
 
 function providerStatusToRefundStatus(
@@ -88,6 +120,24 @@ function providerStatusToRefundStatus(
     default:
       return RefundStatus.PROCESSING;
   }
+}
+
+function deriveOrderStatusAfterRefund(
+  current: OrderStatus,
+  succeededSum: number,
+  captured: number,
+): OrderStatus {
+  if (succeededSum + 1e-9 >= captured) {
+    return OrderStatus.REFUNDED;
+  }
+  // Keep fulfilment progress; only rewrite unpaid/paid money states.
+  if (
+    current === OrderStatus.PAID ||
+    current === OrderStatus.PARTIALLY_REFUNDED
+  ) {
+    return OrderStatus.PARTIALLY_REFUNDED;
+  }
+  return current;
 }
 
 @Injectable()
@@ -120,7 +170,7 @@ export class RefundsService {
       'refunds.initiate',
       { 'order.id': orderId, 'refund.amount': amount },
       async () => {
-        if (amount <= 0) {
+        if (!(amount > 0)) {
           throw new BadRequestException('Refund amount must be greater than 0');
         }
 
@@ -134,192 +184,287 @@ export class RefundsService {
                 'Idempotency key already used for a different order',
               );
             }
-            this.observability.recordRefund({ outcome: 'success' });
+            if (money(existing.amount) !== amount) {
+              throw new ConflictException(
+                'Idempotency key already used with a different amount',
+              );
+            }
+            // Re-drive provider only for stuck INITIATED with no providerRef.
+            if (
+              existing.status === RefundStatus.INITIATED &&
+              !existing.providerRef
+            ) {
+              return this.driveProviderForReservedRefund(
+                existing.id,
+                amount,
+                reason,
+                actorUserId,
+              );
+            }
+            this.observability.recordRefund({
+              outcome:
+                existing.status === RefundStatus.FAILED ? 'failure' : 'success',
+            });
             this.observability.recordRefundSettlement('reused');
             return existing;
           }
         }
 
-        const reserved = await this.prisma.$transaction(async (tx) => {
-          const order = await tx.order.findUnique({
-            where: { id: orderId },
-            include: {
-              user: { select: { id: true, email: true, firstName: true } },
-            },
-          });
-          if (!order) {
-            throw new NotFoundException('Order not found');
-          }
-          if (!REFUNDABLE_ORDER_STATUSES.has(order.status)) {
-            throw new BadRequestException(
-              `Order status ${order.status} is not refundable`,
-            );
-          }
+        const reserved = await this.reserveRefundRow(
+          orderId,
+          amount,
+          reason,
+          idempotencyKey,
+        );
 
-          const payment = await tx.payment.findFirst({
-            where: {
-              orderId,
-              status: PaymentStatus.SUCCEEDED,
-              providerRef: { not: null },
-            },
-            orderBy: { createdAt: 'asc' },
-          });
-          if (!payment?.providerRef) {
-            throw new BadRequestException(
-              'No succeeded Paystack payment found for this order',
-            );
-          }
-
-          const captured = money(payment.amount);
-          if (amount > captured) {
-            throw new BadRequestException(
-              `Refund amount must be between 0 and ${captured}`,
-            );
-          }
-
-          const prior = await tx.refund.findMany({
-            where: {
-              orderId,
-              status: { in: [...IN_FLIGHT_OR_SUCCEEDED] },
-            },
-            select: { amount: true, status: true },
-          });
-          const committed = prior.reduce((sum, r) => sum + money(r.amount), 0);
-          if (committed + amount > captured + 1e-9) {
-            throw new BadRequestException(
-              `Refund would exceed captured value: committed=${committed}, request=${amount}, captured=${captured}`,
-            );
-          }
-
-          try {
-            return {
-              order,
-              payment,
-              refund: await tx.refund.create({
-                data: {
-                  orderId,
-                  paymentId: payment.id,
-                  provider: PaymentProvider.PAYSTACK,
-                  status: RefundStatus.INITIATED,
-                  currency: (order.currency as 'NGN') ?? DEFAULT_CURRENCY,
-                  amount,
-                  reason: reason ?? null,
-                  transactionReference: payment.providerRef,
-                  idempotencyKey: idempotencyKey ?? null,
-                },
-              }),
-            };
-          } catch (error) {
-            if (isUniqueConstraintError(error) && idempotencyKey) {
-              const raced = await tx.refund.findUnique({
-                where: { idempotencyKey },
-              });
-              if (raced) {
-                return { order, payment, refund: raced, reused: true as const };
-              }
-            }
-            throw error;
-          }
-        });
-
-        if ('reused' in reserved && reserved.reused) {
+        if (reserved.reused && reserved.refund.providerRef) {
           this.observability.recordRefund({ outcome: 'success' });
           this.observability.recordRefundSettlement('reused');
           return reserved.refund;
         }
 
-        const { payment, refund } = reserved;
-
-        try {
-          const providerResult = await this.paystackRefundClient.createRefund({
-            transactionReference: payment.providerRef!,
-            amountKobo: Math.round(amount * 100),
-            customerNote: reason,
-            merchantNote: reason,
-          });
-
-          const nextStatus = providerStatusToRefundStatus(
-            providerResult.providerStatus,
-          );
-          // Provider may return processed synchronously — still settle via claim path.
-          const updated = await this.prisma.refund.update({
-            where: { id: refund.id },
-            data: {
-              providerRef: providerResult.providerRefundId,
-              transactionReference: providerResult.transactionReference,
-              status:
-                nextStatus === RefundStatus.SUCCEEDED
-                  ? RefundStatus.PROCESSING
-                  : nextStatus === RefundStatus.FAILED
-                    ? RefundStatus.FAILED
-                    : nextStatus,
-            },
-          });
-
-          await this.audit.log({
-            eventName: 'admin.order.refund.initiated',
-            action: AuditAction.REFUND,
-            entityType: 'Refund',
-            entityId: refund.id,
-            actorUserId: actorUserId ?? null,
-            before: { status: RefundStatus.INITIATED },
-            after: {
-              status: updated.status,
-              providerRef: updated.providerRef,
-              amount,
-            },
-            note: reason ?? 'Refund initiated with provider',
-          });
-
-          if (providerResult.providerStatus.toLowerCase() === 'processed') {
-            await this.settleRefundProcessed({
-              event: 'refund.processed',
-              data: {
-                id: Number(providerResult.providerRefundId),
-                status: 'processed',
-                amount: providerResult.amountKobo,
-                currency: providerResult.currency,
-                transaction_reference: providerResult.transactionReference,
-                refund_reference: providerResult.refundReference,
-              },
-            });
-            return this.prisma.refund.findUniqueOrThrow({
-              where: { id: refund.id },
-            });
-          }
-
-          if (updated.status === RefundStatus.FAILED) {
-            this.observability.recordRefund({ outcome: 'failure' });
-            this.observability.recordRefundSettlement('failed');
-          } else {
-            this.observability.recordRefund({ outcome: 'success' });
-            this.observability.recordRefundSettlement('initiated');
-          }
-
-          return updated;
-        } catch (error) {
-          if (error instanceof PaystackRefundTransientError) {
-            this.logger.warn(
-              `Paystack refund transient failure for ${refund.id}: ${error.message}`,
-            );
-            this.observability.recordRefund({ outcome: 'failure' });
-            this.observability.recordRefundSettlement('provider_transient');
-            throw new ConflictException(
-              'Refund provider is temporarily unavailable; retry the same request',
-            );
-          }
-
-          // Hard provider rejection: release the in-flight reservation.
-          await this.prisma.refund.update({
-            where: { id: refund.id },
-            data: { status: RefundStatus.FAILED },
-          });
-          this.observability.recordRefund({ outcome: 'failure' });
-          this.observability.recordRefundSettlement('provider_rejected');
-          throw error;
-        }
+        return this.driveProviderForReservedRefund(
+          reserved.refund.id,
+          amount,
+          reason,
+          actorUserId,
+        );
       },
     );
+  }
+
+  /**
+   * Serialize per-order refund reservations with FOR UPDATE so concurrent
+   * admins cannot breach the captured-value cap under Read Committed.
+   */
+  private async reserveRefundRow(
+    orderId: string,
+    amount: number,
+    reason: string | undefined,
+    idempotencyKey: string | undefined,
+  ): Promise<{
+    refund: {
+      id: string;
+      orderId: string;
+      status: RefundStatus;
+      amount: Prisma.Decimal;
+      providerRef: string | null;
+      transactionReference: string | null;
+      idempotencyKey: string | null;
+    };
+    paymentProviderRef: string;
+    reused?: boolean;
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT id FROM "orders" WHERE id = ${orderId} FOR UPDATE
+      `;
+
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      if (!REFUNDABLE_ORDER_STATUSES.has(order.status)) {
+        throw new BadRequestException(
+          `Order status ${order.status} is not refundable`,
+        );
+      }
+
+      const payment = await tx.payment.findFirst({
+        where: {
+          orderId,
+          status: PaymentStatus.SUCCEEDED,
+          providerRef: { not: null },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!payment?.providerRef) {
+        throw new BadRequestException(
+          'No succeeded Paystack payment found for this order',
+        );
+      }
+
+      const captured = money(payment.amount);
+      if (amount > captured) {
+        throw new BadRequestException(
+          `Refund amount must be between 0 and ${captured}`,
+        );
+      }
+
+      const prior = await tx.refund.findMany({
+        where: {
+          orderId,
+          status: { in: [...IN_FLIGHT_OR_SUCCEEDED] },
+        },
+        select: { amount: true },
+      });
+      const committed = prior.reduce((sum, r) => sum + money(r.amount), 0);
+      if (committed + amount > captured + 1e-9) {
+        throw new BadRequestException(
+          `Refund would exceed captured value: committed=${committed}, request=${amount}, captured=${captured}`,
+        );
+      }
+
+      try {
+        const refund = await tx.refund.create({
+          data: {
+            orderId,
+            paymentId: payment.id,
+            provider: PaymentProvider.PAYSTACK,
+            status: RefundStatus.INITIATED,
+            currency: (order.currency as 'NGN') ?? DEFAULT_CURRENCY,
+            amount,
+            reason: reason ?? null,
+            transactionReference: payment.providerRef,
+            idempotencyKey: idempotencyKey ?? null,
+          },
+        });
+        return {
+          refund,
+          paymentProviderRef: payment.providerRef,
+        };
+      } catch (error) {
+        if (isUniqueConstraintError(error) && idempotencyKey) {
+          const raced = await tx.refund.findUnique({
+            where: { idempotencyKey },
+          });
+          if (raced) {
+            return {
+              refund: raced,
+              paymentProviderRef: payment.providerRef,
+              reused: true,
+            };
+          }
+        }
+        throw error;
+      }
+    });
+  }
+
+  private async driveProviderForReservedRefund(
+    refundId: string,
+    amount: number,
+    reason: string | undefined,
+    actorUserId: string | undefined,
+  ) {
+    const refund = await this.prisma.refund.findUniqueOrThrow({
+      where: { id: refundId },
+      include: { payment: true },
+    });
+    const transactionReference =
+      refund.transactionReference ?? refund.payment?.providerRef;
+    if (!transactionReference) {
+      throw new BadRequestException(
+        'Refund reservation is missing a payment transaction reference',
+      );
+    }
+
+    try {
+      const providerResult = await this.paystackRefundClient.createRefund({
+        transactionReference,
+        amountKobo: Math.round(amount * 100),
+        customerNote: reason,
+        merchantNote: reason,
+      });
+
+      const nextStatus = providerStatusToRefundStatus(
+        providerResult.providerStatus,
+      );
+      const updated = await this.prisma.refund.updateMany({
+        where: {
+          id: refund.id,
+          status: RefundStatus.INITIATED,
+        },
+        data: {
+          providerRef: providerResult.providerRefundId,
+          transactionReference: providerResult.transactionReference,
+          status:
+            nextStatus === RefundStatus.SUCCEEDED
+              ? RefundStatus.PROCESSING
+              : nextStatus === RefundStatus.FAILED
+                ? RefundStatus.FAILED
+                : nextStatus,
+        },
+      });
+      if (updated.count !== 1) {
+        // Another path already moved this row; return current truth.
+        return this.prisma.refund.findUniqueOrThrow({
+          where: { id: refund.id },
+        });
+      }
+
+      const current = await this.prisma.refund.findUniqueOrThrow({
+        where: { id: refund.id },
+      });
+
+      await this.audit.log({
+        eventName: 'admin.order.refund.initiated',
+        action: AuditAction.REFUND,
+        entityType: 'Refund',
+        entityId: refund.id,
+        actorUserId: actorUserId ?? null,
+        before: { status: RefundStatus.INITIATED },
+        after: {
+          status: current.status,
+          providerRef: current.providerRef,
+          amount,
+        },
+        note: reason ?? 'Refund initiated with provider',
+      });
+
+      if (providerResult.providerStatus.toLowerCase() === 'processed') {
+        await this.settleRefundProcessed({
+          event: 'refund.processed',
+          data: {
+            id: Number.isFinite(Number(providerResult.providerRefundId))
+              ? Number(providerResult.providerRefundId)
+              : undefined,
+            status: 'processed',
+            amount: providerResult.amountKobo,
+            currency: providerResult.currency,
+            transaction_reference: providerResult.transactionReference,
+            refund_reference: providerResult.refundReference,
+          },
+        });
+        return this.prisma.refund.findUniqueOrThrow({
+          where: { id: refund.id },
+        });
+      }
+
+      if (current.status === RefundStatus.FAILED) {
+        this.observability.recordRefund({ outcome: 'failure' });
+        this.observability.recordRefundSettlement('failed');
+      } else {
+        this.observability.recordRefund({ outcome: 'success' });
+        this.observability.recordRefundSettlement('initiated');
+      }
+
+      return current;
+    } catch (error) {
+      if (error instanceof PaystackRefundTransientError) {
+        this.logger.warn(
+          `Paystack refund transient failure for ${refund.id}: ${error.message}`,
+        );
+        this.observability.recordRefund({ outcome: 'failure' });
+        this.observability.recordRefundSettlement('provider_transient');
+        throw new ConflictException(
+          'Refund provider is temporarily unavailable; retry the same request',
+        );
+      }
+
+      // Hard provider rejection only: release reservation if still INITIATED.
+      if (error instanceof BadRequestException) {
+        await this.prisma.refund.updateMany({
+          where: { id: refund.id, status: RefundStatus.INITIATED },
+          data: { status: RefundStatus.FAILED },
+        });
+        this.observability.recordRefund({ outcome: 'failure' });
+        this.observability.recordRefundSettlement('provider_rejected');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -351,14 +496,16 @@ export class RefundsService {
 
   private async findRefundForWebhook(
     data: PaystackRefundWebhookPayload['data'],
-  ) {
-    const providerRefundId =
-      data.id != null ? String(data.id) : data.refund_reference;
-    if (providerRefundId) {
+  ): Promise<RefundWithRelations | null> {
+    const candidates: string[] = [];
+    if (data.id != null) candidates.push(String(data.id));
+    if (data.refund_reference) candidates.push(String(data.refund_reference));
+
+    for (const providerRefundId of candidates) {
       const byRef = await this.prisma.refund.findFirst({
         where: {
           provider: PaymentProvider.PAYSTACK,
-          providerRef: String(providerRefundId),
+          providerRef: providerRefundId,
         },
         include: {
           order: {
@@ -376,19 +523,11 @@ export class RefundsService {
     const txnRef = data.transaction_reference;
     if (!txnRef) return null;
 
-    const amountMajor =
-      data.amount != null ? money(data.amount) / 100 : undefined;
-
-    return this.prisma.refund.findFirst({
+    const amountMajor = providerAmountMajor(data.amount);
+    const matches = await this.prisma.refund.findMany({
       where: {
         transactionReference: txnRef,
-        status: {
-          in: [
-            RefundStatus.INITIATED,
-            RefundStatus.PROCESSING,
-            RefundStatus.NEEDS_ATTENTION,
-          ],
-        },
+        status: { in: [...IN_FLIGHT] },
         ...(amountMajor != null ? { amount: amountMajor } : {}),
       },
       orderBy: { createdAt: 'asc' },
@@ -402,6 +541,14 @@ export class RefundsService {
         payment: true,
       },
     });
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      this.logger.error(
+        `Ambiguous refund webhook match for txn=${txnRef} amount=${amountMajor}: ${matches.length} candidates`,
+      );
+      this.observability.recordRefundSettlement('unmatched');
+    }
+    return null;
   }
 
   private async markRefundInFlight(
@@ -413,10 +560,7 @@ export class RefundsService {
       this.observability.recordRefundSettlement('unmatched');
       return false;
     }
-    if (
-      refund.status === RefundStatus.SUCCEEDED ||
-      refund.status === RefundStatus.FAILED
-    ) {
+    if (!IN_FLIGHT.has(refund.status)) {
       this.observability.recordRefundSettlement('stale');
       return true;
     }
@@ -426,21 +570,25 @@ export class RefundsService {
         ? RefundStatus.NEEDS_ATTENTION
         : RefundStatus.PROCESSING;
 
-    await this.prisma.refund.update({
-      where: { id: refund.id },
+    const updated = await this.prisma.refund.updateMany({
+      where: {
+        id: refund.id,
+        status: { in: [...IN_FLIGHT] },
+      },
       data: {
         status: next,
         providerRef:
           payload.data.id != null
             ? String(payload.data.id)
-            : (refund.providerRef ?? undefined),
-        transactionReference:
-          payload.data.transaction_reference ??
-          refund.transactionReference ??
-          undefined,
+            : payload.data.refund_reference
+              ? String(payload.data.refund_reference)
+              : undefined,
+        transactionReference: payload.data.transaction_reference ?? undefined,
       },
     });
-    this.observability.recordRefundSettlement('status_updated');
+    this.observability.recordRefundSettlement(
+      updated.count === 1 ? 'status_updated' : 'stale',
+    );
     return true;
   }
 
@@ -452,8 +600,7 @@ export class RefundsService {
       this.observability.recordRefundSettlement('unmatched');
       return false;
     }
-    if (refund.status === RefundStatus.SUCCEEDED) {
-      // Out-of-order: already settled — do not unwind without reconciliation.
+    if (refund.status === RefundStatus.SUCCEEDED || refund.settlementClaim) {
       this.logger.error(
         `refund.failed received after SUCCEEDED for refund ${refund.id}; leaving settled`,
       );
@@ -465,8 +612,11 @@ export class RefundsService {
       return true;
     }
 
-    await this.prisma.refund.update({
-      where: { id: refund.id },
+    const updated = await this.prisma.refund.updateMany({
+      where: {
+        id: refund.id,
+        status: { in: [...IN_FLIGHT] },
+      },
       data: {
         status: RefundStatus.FAILED,
         providerRef:
@@ -475,7 +625,9 @@ export class RefundsService {
             : (refund.providerRef ?? undefined),
       },
     });
-    this.observability.recordRefundSettlement('failed');
+    this.observability.recordRefundSettlement(
+      updated.count === 1 ? 'failed' : 'stale',
+    );
     return true;
   }
 
@@ -498,17 +650,63 @@ export class RefundsService {
     const providerRef =
       payload.data.id != null
         ? String(payload.data.id)
-        : (refund.providerRef ?? refund.id);
-    const businessKey = `refund.processed:${providerRef}`;
+        : payload.data.refund_reference
+          ? String(payload.data.refund_reference)
+          : (refund.providerRef ?? refund.id);
+    const businessKey = `refund.processed:${refund.id}:${providerRef}`;
     const amount = money(refund.amount);
     const currency = (refund.order.currency as 'NGN') ?? DEFAULT_CURRENCY;
     const order = refund.order;
     const captured = money(refund.payment?.amount ?? order.totalAmount);
 
+    const providerMajor = providerAmountMajor(payload.data.amount);
+    if (providerMajor != null && Math.abs(providerMajor - amount) > 0.009) {
+      this.logger.error(
+        `refund.processed amount mismatch for ${refund.id}: local=${amount} providerMajor=${providerMajor}`,
+      );
+      await this.prisma.refund.updateMany({
+        where: {
+          id: refund.id,
+          status: { in: [...IN_FLIGHT, RefundStatus.FAILED] },
+        },
+        data: { status: RefundStatus.NEEDS_ATTENTION, providerRef },
+      });
+      this.observability.recordRefundSettlement('rejected');
+      await this.adminNotify.emit(ADMIN_NOTIF_REFUND_COMPLETED, {
+        orderId: order.id,
+        amount,
+        currency,
+        reason: `Provider/local amount mismatch: provider=${providerMajor} local=${amount}`,
+        refundId: refund.id,
+      });
+      return true;
+    }
+    if (
+      payload.data.currency != null &&
+      payload.data.currency !== order.currency
+    ) {
+      this.logger.error(
+        `refund.processed currency mismatch for ${refund.id}: local=${order.currency} provider=${payload.data.currency}`,
+      );
+      await this.prisma.refund.updateMany({
+        where: {
+          id: refund.id,
+          status: { in: [...IN_FLIGHT, RefundStatus.FAILED] },
+        },
+        data: { status: RefundStatus.NEEDS_ATTENTION, providerRef },
+      });
+      this.observability.recordRefundSettlement('rejected');
+      return true;
+    }
+
     let notificationId: string | undefined;
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          SELECT id FROM "orders" WHERE id = ${order.id} FOR UPDATE
+        `;
+
         await tx.refundSettlementClaim.create({
           data: {
             provider: refund.provider ?? PaymentProvider.PAYSTACK,
@@ -518,6 +716,7 @@ export class RefundsService {
           },
         });
 
+        // Provider-confirmed success may reconcile a prior local FAILED.
         const statusUpdate = await tx.refund.updateMany({
           where: {
             id: refund.id,
@@ -526,6 +725,7 @@ export class RefundsService {
                 RefundStatus.INITIATED,
                 RefundStatus.PROCESSING,
                 RefundStatus.NEEDS_ATTENTION,
+                RefundStatus.FAILED,
               ],
             },
           },
@@ -537,8 +737,18 @@ export class RefundsService {
           },
         });
         if (statusUpdate.count !== 1) {
+          const current = await tx.refund.findUnique({
+            where: { id: refund.id },
+            include: { settlementClaim: true },
+          });
+          if (
+            current?.status === RefundStatus.SUCCEEDED ||
+            current?.settlementClaim
+          ) {
+            return;
+          }
           throw new Error(
-            `refund.processed claim won but refund ${refund.id} was already terminal`,
+            `refund.processed claim won but refund ${refund.id} could not transition`,
           );
         }
 
@@ -550,10 +760,11 @@ export class RefundsService {
           (sum, r) => sum + money(r.amount),
           0,
         );
-        const nextOrderStatus =
-          succeededSum + 1e-9 >= captured
-            ? OrderStatus.REFUNDED
-            : OrderStatus.PARTIALLY_REFUNDED;
+        const nextOrderStatus = deriveOrderStatusAfterRefund(
+          order.status,
+          succeededSum,
+          captured,
+        );
 
         await tx.order.update({
           where: { id: order.id },
@@ -621,7 +832,17 @@ export class RefundsService {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        this.observability.recordRefundSettlement('duplicate');
+        const claim = await this.prisma.refundSettlementClaim.findUnique({
+          where: { refundId: refund.id },
+        });
+        if (claim) {
+          this.observability.recordRefundSettlement('duplicate');
+          return true;
+        }
+        this.logger.error(
+          `Unique constraint during refund settlement for ${refund.id} without local claim`,
+        );
+        this.observability.recordRefundSettlement('rejected');
         return true;
       }
       throw error;
@@ -642,5 +863,26 @@ export class RefundsService {
     this.observability.recordRefund({ outcome: 'success' });
     this.observability.recordRefundSettlement('settled');
     return true;
+  }
+
+  /**
+   * Fail immortal INITIATED rows with no providerRef so the cap can recover
+   * (operator may retry with a new or same idempotency key).
+   */
+  async failStaleInitiatedRefunds(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - STALE_INITIATED_MS);
+    const result = await this.prisma.refund.updateMany({
+      where: {
+        status: RefundStatus.INITIATED,
+        providerRef: null,
+        createdAt: { lt: cutoff },
+      },
+      data: { status: RefundStatus.FAILED },
+    });
+    if (result.count > 0) {
+      this.observability.recordRefundSettlement('stale');
+      this.logger.warn(`Failed ${result.count} stale INITIATED refunds`);
+    }
+    return result.count;
   }
 }

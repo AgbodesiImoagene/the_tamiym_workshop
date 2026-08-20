@@ -127,6 +127,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
       .spyOn(paystackRefundClient, 'createRefund')
       .mockImplementation(async () => {
         providerCalls += 1;
+        await Promise.resolve();
         return {
           providerRefundId: `9001${suffix.slice(-4)}`,
           providerStatus: 'pending',
@@ -263,5 +264,63 @@ describe('Paystack refund lifecycle (e2e)', () => {
     await expect(
       refunds.initiateRefund(order.id, 2000, 'over'),
     ).rejects.toThrow(/exceed captured value|between 0/i);
+  });
+
+  it('serializes concurrent full-amount initiations under the captured-value cap', async () => {
+    const suffix = `race-${Date.now()}`;
+    const { order, providerRef, totalAmount } = await createPaidCampaignOrder(
+      suffix,
+      10_000,
+    );
+
+    let providerCalls = 0;
+    jest
+      .spyOn(paystackRefundClient, 'createRefund')
+      .mockImplementation(async () => {
+        providerCalls += 1;
+        await new Promise((r) => setTimeout(r, 15));
+        return {
+          providerRefundId: `6000${providerCalls}${suffix.slice(-3)}`,
+          providerStatus: 'pending',
+          refundReference: null,
+          transactionReference: providerRef,
+          amountKobo: Math.round(totalAmount * 100),
+          currency: 'NGN',
+        };
+      });
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) =>
+        refunds.initiateRefund(
+          order.id,
+          totalAmount,
+          `race-${i}`,
+          undefined,
+          `idem-race-${suffix}-${i}`,
+        ),
+      ),
+    );
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(7);
+    expect(providerCalls).toBe(1);
+
+    const rows = await prisma.refund.findMany({
+      where: {
+        orderId: order.id,
+        status: {
+          in: [
+            RefundStatus.INITIATED,
+            RefundStatus.PROCESSING,
+            RefundStatus.NEEDS_ATTENTION,
+            RefundStatus.SUCCEEDED,
+          ],
+        },
+      },
+    });
+    const inFlightTotal = rows.reduce((sum, r) => sum + Number(r.amount), 0);
+    expect(inFlightTotal).toBe(totalAmount);
   });
 });

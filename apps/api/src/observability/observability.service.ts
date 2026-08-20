@@ -175,7 +175,8 @@ export class ObservabilityService {
       | 'unmatched'
       | 'status_updated'
       | 'provider_transient'
-      | 'provider_rejected',
+      | 'provider_rejected'
+      | 'rejected',
   ): void {
     this.refundSettlements.add(1, { outcome });
   }

@@ -24,17 +24,18 @@ describe('PaystackRefundClient', () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({
-        status: true,
-        data: {
-          id: 42,
-          status: 'pending',
-          amount: 150000,
-          currency: 'NGN',
-          transaction_reference: 'txn_abc',
-          refund_reference: null,
-        },
-      }),
+      json: async () =>
+        Promise.resolve({
+          status: true,
+          data: {
+            id: 42,
+            status: 'pending',
+            amount: 150000,
+            currency: 'NGN',
+            transaction_reference: 'txn_abc',
+            refund_reference: null,
+          },
+        }),
     });
 
     const result = await client.createRefund({
@@ -64,7 +65,7 @@ describe('PaystackRefundClient', () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 503,
-      json: async () => ({ message: 'unavailable' }),
+      json: async () => Promise.resolve({ message: 'unavailable' }),
     });
     await expect(
       client.createRefund({
@@ -78,7 +79,8 @@ describe('PaystackRefundClient', () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => ({ status: false, message: 'bad request' }),
+      json: async () =>
+        Promise.resolve({ status: false, message: 'bad request' }),
     });
     await expect(
       client.createRefund({

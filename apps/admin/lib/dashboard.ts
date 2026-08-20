@@ -200,8 +200,23 @@ export async function updateAdminOrderStatus(id: string, status: string) {
   return apiClient.patch<AdminOrderDetail>(`/admin/orders/${id}`, { status });
 }
 
-export async function createAdminRefund(id: string, amount: number, reason?: string) {
-  return apiClient.post(`/admin/orders/${id}/refund`, { amount, reason });
+export async function createAdminRefund(
+  id: string,
+  amount: number,
+  reason?: string,
+  idempotencyKey?: string,
+) {
+  return apiClient.post<{
+    id: string;
+    orderId: string;
+    status: string;
+    amount: number;
+    providerRef?: string | null;
+  }>(`/admin/orders/${id}/refund`, {
+    amount,
+    reason,
+    idempotencyKey: idempotencyKey ?? `admin-refund:${id}:${amount}:${Date.now()}`,
+  });
 }
 
 export async function getAdminCampaigns() {

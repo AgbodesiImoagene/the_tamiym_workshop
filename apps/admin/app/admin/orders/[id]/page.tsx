@@ -59,7 +59,7 @@ export default function AdminOrderDetailPage() {
   const refundMutation = useMutation({
     mutationFn: (input: { amount: number; reason?: string }) =>
       createAdminRefund(orderId, input.amount, input.reason),
-    onSuccess: async (result: { status?: string }) => {
+    onSuccess: async (result) => {
       const status = result?.status ?? 'INITIATED';
       setMessage(
         status === 'SUCCEEDED'

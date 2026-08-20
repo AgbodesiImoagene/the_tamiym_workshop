@@ -65,3 +65,4 @@ redis_data/
 *.tsbuildinfo
 
 
+apps/api/.env
