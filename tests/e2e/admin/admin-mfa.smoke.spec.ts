@@ -57,9 +57,9 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await page.getByPlaceholder('123456').fill('000000');
     await page.getByRole('button', { name: /Verify and sign in/i }).click();
 
-    const alert = page.getByRole('alert');
+    // Next.js also mounts `#__next-route-announcer__` with role=alert.
+    const alert = page.getByRole('alert').filter({ hasText: /Unauthorized/i });
     await expect(alert).toBeVisible({ timeout: 10_000 });
-    await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
     await expect(page).toHaveURL(/\/auth\/login/);
 
     await page.getByPlaceholder('123456').fill(generateTotpCode(e2eUsers.admin.totpSecret));
