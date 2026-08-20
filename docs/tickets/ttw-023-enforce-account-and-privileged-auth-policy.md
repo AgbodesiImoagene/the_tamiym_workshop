@@ -106,32 +106,34 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Deferred (same ticket):** admin TOTP + recovery codes; Redis identity+IP throttles; Playwright MFA/session suites.
 
-### Slice 3 — admin TOTP + recovery (APPROVED)
+### Slice 3 — admin TOTP + recovery (shipped via PR #32)
+
+**Product decisions:** (see PR #32 / merge `20ccd99`) ADMIN-only TOTP + recovery before session; AES-GCM secrets; JWT MFA gate; admin console MFA UI.
+
+### Slice 4 — Redis identity+IP auth throttles (APPROVED)
 
 **Reviewer:** implementing agent — 2026-08-20\
 **Verdict:** APPROVED
 
-**Product decisions:**
+**Decisions:**
 
-1. MFA is ADMIN-only. CUSTOMER/ORGANIZER login and session issuance are unchanged.
-2. Password (and any future admin Google path) must not mint an ADMIN `AuthSession` until MFA completes.
-3. After successful ADMIN password verification:
-   - No enabled MFA → `{ mfa: { status: 'ENROLLMENT_REQUIRED' }, mfa_token }` (short-lived signed challenge JWT; no cookies/session).
-   - MFA enabled → `{ mfa: { status: 'CHALLENGE_REQUIRED' }, mfa_token }` similarly.
-4. Endpoints (ADMIN surface / Origin; CSRF-exempt like other session-establishing auth paths):
-   - `POST /auth/admin/mfa/enroll/start` — `mfa_token` (enroll) → otpauth URI + pending encrypted secret + recovery codes plaintext once
-   - `POST /auth/admin/mfa/enroll/confirm` — `mfa_token` + TOTP → enable MFA, issue AuthSession cookies
-   - `POST /auth/admin/mfa/challenge` — `mfa_token` + TOTP → issue AuthSession
-   - `POST /auth/admin/mfa/recover` — `mfa_token` + recovery code → consume code, issue AuthSession, audit
-5. TOTP secret encrypted AES-256-GCM with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64); `keyVersion` int on credential row for rotation. TOTP via `otpauth` (Jest-compatible official TOTP library).
-6. Ten recovery codes; store sha256 hashes only; single-use.
-7. Wrong TOTP/recovery → generic `401 Unauthorized` (no oracle).
-8. `POST /admin/users/:id/mfa/reset` for ADMIN actors (audited; clears MFA + revokes sessions).
-9. Env: require `MFA_TOTP_ENCRYPTION_KEY` in non-test modes; `.env.test.example` supplies a fixed test key.
-10. Prefer JWT `mfa_token` claims `{ sub, purpose: mfa_enroll|mfa_challenge, surface: ADMIN }`, TTL 5m, signed with `JWT_ACCESS_SECRET`.
-11. Redis throttles deferred (same ticket, later slice). Playwright MFA suites deferred.
+1. Replace in-memory Nest `ThrottlerGuard` on auth/recovery/MFA routes with a Redis-backed `AuthRateLimitGuard` keyed by **both** normalized email and trusted `req.ip` (Express `trust proxy = 1`).
+2. Storage: shared `ioredis` client (same `REDIS_*` as BullMQ) via `AuthRateLimitService` (`INCR` + `PEXPIRE`). Also point global `ThrottlerModule` at `@nest-lab/throttler-storage-redis` for non-auth IP limits (banks/broadcast).
+3. Buckets (deny if either identity or IP counter exceeds):
+   | Bucket | Identity limit | IP limit | TTL |
+   | customer_auth (login/register/resend/forgot) | 5 | 40 | 60s |
+   | admin_login | 5 | 40 | 60s |
+   | admin_mfa (enroll/challenge) | 5 | 30 | 5m |
+   | admin_recovery | 3 | 20 | 15m |
+   | password_reset | 5 | 40 | 60s |
+4. Redis errors on auth routes → fail-closed (`503` generic body; no oracle).
+5. Metrics: `auth_throttle_total{surface,bucket,outcome}` — no email/IP labels.
+6. Generic `429` message identical across buckets (“Too many requests. Try again later.”).
+7. Playwright MFA UI suites remain deferred to the next slice in this ticket.
 
-**Blast radius:** admin login response contract; new MFA tables; `AuthService` / `AdminMfaService`; CSRF exempt list; env validation; auth-surface e2e admin helpers; `create-admin-user` messaging; OpenAPI; `docs/14-auth-and-session-architecture.md`.
+**Blast radius:** `app.module` Throttler storage; auth controller guards; new auth rate-limit service/guard; observability; auth-surface e2e (IP burst must allow suite); docs.
+
+**Deferred (same ticket):** Playwright MFA/session suites.
 
 ## Implementation reviews
 
@@ -139,7 +141,7 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Implementation (slice 1):** PASS — OpenAPI notes on order/campaign-order/payout mutate; privileged 403 helper removed; service-boundary `code`/`action` assertions; 60 related unit tests green.
 
-**Slice 2 reviews:** pending (implementation wiring complete; independent review next).
+**Slice 2–3 reviews:** PASS (merged PRs #31 / #32).
 
 ## Verification evidence
 
@@ -153,20 +155,13 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 ### Slice 2 (hashed sessions wiring)
 
-- `pnpm --filter api exec tsc --noEmit` — pass.
-- Unit: auth session/crypto/service, auth.service, jwt.strategy, auth-token-cleanup, admin-users, related auth specs — 118 tests pass.
-- `pnpm coverage:diff` — 81.48% (≥80%).
-- MFA / Redis throttles / Playwright — still deferred.
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/31 — merged.
 
 ### Slice 3 (admin TOTP + recovery)
 
-- Migration: `20260820180000_ttw023_admin_mfa`
-- `pnpm --filter api exec tsc --noEmit` — pass.
-- Unit: `admin-mfa.crypto`, `admin-mfa.totp`, `admin-mfa.service`, `auth.service`, `auth.controller`, `env-validation`, `admin-users.service`, `csrf.guard` — 124 tests pass.
-- E2e: `auth-surface.e2e-spec.ts` — 32 tests pass (admin login → MFA enroll/confirm → cookies; `createAdminSession` completes MFA).
-- TOTP library: `otpauth` (official; Jest/CJS-compatible; replaces ESM-only `otplib` for this repo’s test runner).
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/32 — merged (`20ccd99`).
 - Redis identity+IP throttles / Playwright MFA suites — deferred (same ticket).
 
 ## Completion summary
 
-Slice 1 (verified-email action policy) shipped. Slice 2 (hashed `AuthSession` wiring) shipped. Slice 3 (admin TOTP enrollment/challenge/recovery + audited MFA reset) implemented on this branch. Remaining same-ticket work: Redis identity+IP throttles, Playwright suites.
+Slice 1–3 shipped. Remaining same-ticket work: Redis identity+IP throttles (slice 4 in progress), Playwright suites.

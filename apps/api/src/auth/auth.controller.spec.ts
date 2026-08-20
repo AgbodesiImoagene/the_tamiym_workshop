@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { surfaceCookieNames } from './auth-cookies';
@@ -80,7 +80,7 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [{ provide: AuthService, useValue: mockAuthService }],
     })
-      .overrideGuard(ThrottlerGuard)
+      .overrideGuard(AuthRateLimitGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

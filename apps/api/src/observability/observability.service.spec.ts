@@ -47,6 +47,24 @@ describe('ObservabilityService', () => {
     expect(() => service.recordRefundSettlement('unmatched')).not.toThrow();
   });
 
+  it('records auth throttle outcomes without identity labels', () => {
+    const service = new ObservabilityService();
+    expect(() =>
+      service.recordAuthThrottle({
+        surface: 'ADMIN',
+        bucket: 'admin_login',
+        outcome: 'limited',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordAuthThrottle({
+        surface: 'CUSTOMER',
+        bucket: 'customer_auth',
+        outcome: 'allowed',
+      }),
+    ).not.toThrow();
+  });
+
   it('records media virus scan and fetch-denied outcomes', () => {
     const service = new ObservabilityService();
     expect(() =>
