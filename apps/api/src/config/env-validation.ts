@@ -16,6 +16,7 @@ export const requiredEnvVars = [
 export const requiredProductionEnvVars = [
   'AUTH_ADMIN_ORIGINS',
   'AUTH_CUSTOMER_ORIGINS',
+  'CLAMAV_HOST',
 ] as const;
 
 export const forbiddenPlaceholders = new Set([
@@ -86,11 +87,24 @@ export function validateEnv(
           `Missing required production environment variable: ${key}`,
         );
       }
-      if (parseOriginEntries(value).length === 0) {
-        throw new Error(
-          `Environment variable ${key} must contain at least one valid origin URL`,
-        );
+      if (key === 'AUTH_ADMIN_ORIGINS' || key === 'AUTH_CUSTOMER_ORIGINS') {
+        if (parseOriginEntries(value).length === 0) {
+          throw new Error(
+            `Environment variable ${key} must contain at least one valid origin URL`,
+          );
+        }
       }
+    }
+
+    const virusScanner = String(
+      typeof config.VIRUS_SCANNER === 'string' ? config.VIRUS_SCANNER : '',
+    )
+      .trim()
+      .toLowerCase();
+    if (virusScanner === 'deterministic' || virusScanner === 'unavailable') {
+      throw new Error(
+        `VIRUS_SCANNER=${virusScanner} is forbidden in production; use clamav`,
+      );
     }
   }
   return config;

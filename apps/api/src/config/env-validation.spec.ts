@@ -109,6 +109,7 @@ describe('env-validation', () => {
         ...validBaseConfig,
         AUTH_ADMIN_ORIGINS: 'https://admin.example.com',
         AUTH_CUSTOMER_ORIGINS: 'https://shop.example.com',
+        CLAMAV_HOST: 'clamav.internal',
       };
 
       beforeEach(() => {
@@ -119,6 +120,32 @@ describe('env-validation', () => {
         expect(validateEnv(validProductionConfig)).toEqual(
           validProductionConfig,
         );
+      });
+
+      it('throws when CLAMAV_HOST is missing', () => {
+        expect(() =>
+          validateEnv(omit(validProductionConfig, 'CLAMAV_HOST')),
+        ).toThrow(
+          'Missing required production environment variable: CLAMAV_HOST',
+        );
+      });
+
+      it('throws when VIRUS_SCANNER=deterministic in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            VIRUS_SCANNER: 'deterministic',
+          }),
+        ).toThrow(/deterministic is forbidden in production/);
+      });
+
+      it('throws when VIRUS_SCANNER=unavailable in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            VIRUS_SCANNER: 'unavailable',
+          }),
+        ).toThrow(/unavailable is forbidden in production/);
       });
 
       it('throws when AUTH_ADMIN_ORIGINS is missing', () => {

@@ -19,10 +19,13 @@ import {
   MEDIA_DISPLAY_MAX,
   MEDIA_MAX_BYTES,
   MEDIA_QUEUE,
+  MEDIA_SHARP_LIMIT_INPUT_PIXELS,
   MEDIA_SUPPORTED_MIME_TYPES,
   MEDIA_THUMB_MAX,
 } from './media.constants';
 import { bullProcessorOptions } from '../queues/bull-processor.options';
+import { identifyImageBuffer } from './image-identify';
+import { SafeRemoteMediaFetcher } from './safe-remote-fetch';
 
 @Processor(MEDIA_QUEUE, bullProcessorOptions)
 export class MediaProcessor extends WorkerHost {
@@ -34,6 +37,7 @@ export class MediaProcessor extends WorkerHost {
     private virusScanService: VirusScanService,
     private moderationService: ModerationService,
     private observability: ObservabilityService,
+    private safeRemoteFetcher: SafeRemoteMediaFetcher,
   ) {
     super();
   }
@@ -65,27 +69,35 @@ export class MediaProcessor extends WorkerHost {
         });
 
         try {
-          const { buffer, mimeType, originalKey, originalUrl } =
-            await this.loadOriginal(assetId, asset);
-          if (!MEDIA_SUPPORTED_MIME_TYPES.has(mimeType)) {
-            throw new Error('Unsupported media type');
-          }
+          const { buffer, originalKey, originalUrl } = await this.loadOriginal(
+            assetId,
+            asset,
+          );
           if (buffer.length > MEDIA_MAX_BYTES) {
             throw new Error('File is too large');
           }
 
-          const scanStatus = await this.virusScanService.scanBuffer();
+          // Scan raw bytes before any sharp decode (quarantine order).
+          const scanStatus = await this.virusScanService.scanBuffer(buffer);
           if (scanStatus !== VirusScanStatus.CLEAN) {
+            const errorMessage =
+              scanStatus === VirusScanStatus.INFECTED
+                ? 'Virus scan detected malware'
+                : 'Virus scan failed';
             await this.prisma.mediaAsset.update({
               where: { id: assetId },
               data: {
                 scanStatus,
+                originalBytes: buffer.length,
                 status: MediaAssetStatus.FAILED,
-                errorMessage: 'Virus scan failed',
+                errorMessage,
               },
             });
             return;
           }
+
+          const identified = await identifyImageBuffer(buffer);
+          const mimeType = identified.mimeType;
 
           // AI moderation: use the public URL if available, otherwise skip image check.
           // REJECTED → fail the asset (blocks use); FLAGGED → mark for human review but
@@ -120,14 +132,13 @@ export class MediaProcessor extends WorkerHost {
             return;
           }
 
-          const originalMeta = await sharp(buffer).metadata();
           await this.prisma.mediaAsset.update({
             where: { id: assetId },
             data: {
               originalMime: mimeType,
               originalBytes: buffer.length,
-              originalWidth: originalMeta.width ?? null,
-              originalHeight: originalMeta.height ?? null,
+              originalWidth: identified.width,
+              originalHeight: identified.height,
               scanStatus,
               moderationStatus: moderationResult.status,
               moderationNotes: moderationResult.notes,
@@ -142,8 +153,8 @@ export class MediaProcessor extends WorkerHost {
               url: originalUrl,
               mimeType,
               sizeBytes: buffer.length,
-              width: originalMeta.width ?? null,
-              height: originalMeta.height ?? null,
+              width: identified.width,
+              height: identified.height,
             },
             create: {
               assetId,
@@ -152,12 +163,17 @@ export class MediaProcessor extends WorkerHost {
               url: originalUrl,
               mimeType,
               sizeBytes: buffer.length,
-              width: originalMeta.width ?? null,
-              height: originalMeta.height ?? null,
+              width: identified.width,
+              height: identified.height,
             },
           });
 
-          const displayBuffer = await sharp(buffer)
+          const sharpOpts = {
+            failOn: 'error' as const,
+            limitInputPixels: MEDIA_SHARP_LIMIT_INPUT_PIXELS,
+          };
+
+          const displayBuffer = await sharp(buffer, sharpOpts)
             .rotate()
             .resize({
               width: MEDIA_DISPLAY_MAX,
@@ -168,7 +184,7 @@ export class MediaProcessor extends WorkerHost {
             .webp({ quality: 85 })
             .toBuffer();
 
-          const thumbBuffer = await sharp(buffer)
+          const thumbBuffer = await sharp(buffer, sharpOpts)
             .rotate()
             .resize({
               width: MEDIA_THUMB_MAX,
@@ -327,47 +343,33 @@ export class MediaProcessor extends WorkerHost {
     if (!sourceUrl) {
       throw new Error('Missing source URL');
     }
-    const response = await fetch(sourceUrl);
-    if (!response.ok || !response.body) {
-      throw new Error('Failed to fetch source URL');
-    }
-    const contentType =
-      response.headers.get('content-type')?.split(';')[0] ?? '';
-    if (!MEDIA_SUPPORTED_MIME_TYPES.has(contentType)) {
-      throw new Error('Unsupported media type');
-    }
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && Number(contentLength) > MEDIA_MAX_BYTES) {
-      throw new Error('File is too large');
-    }
 
-    const reader = response.body.getReader();
-    const chunks: Buffer[] = [];
-    let total = 0;
+    const { buffer, contentType } =
+      await this.safeRemoteFetcher.fetch(sourceUrl);
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = Buffer.from(value);
-      total += chunk.length;
-      if (total > MEDIA_MAX_BYTES) {
-        throw new Error('File is too large');
-      }
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    const extension = contentType.split('/')[1] ?? 'bin';
+    // Header hint only — processor re-identifies before READY.
+    const mimeHint =
+      contentType && MEDIA_SUPPORTED_MIME_TYPES.has(contentType)
+        ? contentType
+        : 'application/octet-stream';
+    const extension =
+      mimeHint === 'image/jpeg'
+        ? 'jpg'
+        : mimeHint === 'image/png'
+          ? 'png'
+          : mimeHint === 'image/webp'
+            ? 'webp'
+            : 'bin';
     const originalKey = `media/${assetId}/original.${extension}`;
     const originalUpload = await this.s3Service.uploadObject({
       key: originalKey,
       buffer,
-      contentType,
+      contentType: mimeHint,
     });
 
     return {
       buffer,
-      mimeType: contentType,
+      mimeType: mimeHint,
       originalKey: originalUpload.key,
       originalUrl: originalUpload.url,
     };

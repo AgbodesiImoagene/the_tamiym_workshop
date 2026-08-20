@@ -46,4 +46,23 @@ describe('ObservabilityService', () => {
     expect(() => service.recordRefundSettlement('stale')).not.toThrow();
     expect(() => service.recordRefundSettlement('unmatched')).not.toThrow();
   });
+
+  it('records media virus scan and fetch-denied outcomes', () => {
+    const service = new ObservabilityService();
+    expect(() =>
+      service.recordMediaVirusScan({ outcome: 'clean' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordMediaVirusScan({ outcome: 'infected' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordMediaVirusScan({ outcome: 'failed' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordMediaVirusScan({ outcome: 'unavailable' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordMediaFetchDenied({ reason: 'blocked_host' }),
+    ).not.toThrow();
+  });
 });
