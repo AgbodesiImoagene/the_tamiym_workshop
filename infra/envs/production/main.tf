@@ -61,7 +61,7 @@ module "firewall" {
 
   name             = var.firewall_name
   tags             = module.labeling.tag_list
-  droplet_ids      = []
+  droplet_ids      = var.enable_app_droplet ? [module.droplet[0].id] : []
   ssh_source_cidrs = var.ssh_source_cidrs
   vpc_ip_range     = var.vpc_ip_range
 }
@@ -70,6 +70,22 @@ module "reserved_ip" {
   source = "../../modules/reserved_ip"
 
   region = var.region
+}
+
+module "droplet" {
+  count  = var.enable_app_droplet ? 1 : 0
+  source = "../../modules/droplet"
+
+  name                 = var.droplet_name
+  region               = var.region
+  size                 = var.droplet_size
+  image                = var.droplet_image
+  vpc_uuid             = module.vpc.uuid
+  ssh_key_fingerprints = var.droplet_ssh_key_fingerprints
+  tags                 = module.labeling.tag_list
+  user_data            = file("${path.module}/../../runtime/cloud-init/droplet.yaml")
+  assign_reserved_ip   = true
+  reserved_ip          = module.reserved_ip.ip_address
 }
 
 module "postgres" {
@@ -86,8 +102,7 @@ module "postgres" {
   maintenance_day     = var.postgres_maintenance_day
   maintenance_hour    = var.postgres_maintenance_hour
   # Trusted sources: VPC CIDR only at launch (never 0.0.0.0/0).
-  # Droplet-scoped tags/IDs are added in TTW-063 once the app Droplet exists —
-  # do not reuse shared labeling tags (they are account-wide and cross env).
+  # Droplet ID is attached via Cloud Firewall; DB trust remains VPC CIDR.
   firewall_rules = [
     { type = "ip_addr", value = var.vpc_ip_range }
   ]

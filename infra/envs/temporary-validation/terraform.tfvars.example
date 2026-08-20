@@ -2,7 +2,7 @@
 project                = "tamiym-workshop"
 environment_label      = "temporary-validation"
 managed_by             = "opentofu"
-ticket                 = "TTW-064"
+ticket                 = "TTW-063"
 do_project_name        = "ttw-tmpval"
 do_project_purpose     = "Web Application"
 do_project_environment = "Development"
@@ -24,3 +24,8 @@ postgres_size          = "db-s-1vcpu-1gb"
 postgres_version       = "16"
 spaces_name_prefix     = "ttw-tmpval"
 spaces_region          = "ams3"
+enable_app_droplet               = false
+droplet_name                     = "ttw-tmpval-app"
+droplet_size                     = "s-2vcpu-4gb"
+droplet_image                    = "ubuntu-24-04-x64"
+droplet_ssh_key_fingerprints     = []

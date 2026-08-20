@@ -34,8 +34,18 @@ output "firewall_id" {
 }
 
 output "reserved_ip" {
-  description = "Reserved public IPv4 for temporary-validation DNS A records."
+  description = "Reserved public IPv4 for temporary-validation DNS A records (assigned when enable_app_droplet)."
   value       = module.reserved_ip.ip_address
+}
+
+output "droplet_id" {
+  description = "Application Droplet ID when enable_app_droplet is true; otherwise null."
+  value       = var.enable_app_droplet ? module.droplet[0].id : null
+}
+
+output "droplet_private_ip" {
+  description = "Droplet private VPC IPv4 when enable_app_droplet is true; otherwise null."
+  value       = var.enable_app_droplet ? module.droplet[0].ipv4_address_private : null
 }
 
 output "public_hostnames" {

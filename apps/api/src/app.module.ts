@@ -42,6 +42,7 @@ import { RequestContextInterceptor } from './request-context/request-context.int
 import { RequestContextMiddleware } from './request-context/request-context.middleware';
 import { getRequestContext } from './request-context/request-context.store';
 import { validateEnv } from './config/env-validation';
+import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
 
 @Module({
   imports: [
@@ -151,6 +152,7 @@ import { validateEnv } from './config/env-validation';
   controllers: [AppController],
   providers: [
     AppService,
+    SchedulerRoleBootstrap,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

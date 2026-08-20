@@ -85,7 +85,7 @@ Local development, CI, tests, and production builds use the same contract:
 - Node.js 24 (Active LTS), pinned in `.nvmrc` and `package.json` `engines.node`
 - pnpm 9, pinned as `packageManager: pnpm@9.0.0` and `engines.pnpm`
 
-There is no application Dockerfile yet. When one is added, it must use a Node 24 image (for example `node:24-bookworm`) and Corepack/`pnpm@9`. `docker-compose.yml` only provisions datastore and observability sidecars, not the Node apps.
+Application images live under `docker/` (`Dockerfile.next` for web/app/admin, `Dockerfile.api` for api/worker/scheduler). They use Node 24 + Corepack/`pnpm@9` and run as non-root. Production Compose is `infra/runtime/compose/docker-compose.prod.yml`. Local `docker-compose.yml` still provisions datastore and observability sidecars only.
 
 ## Current deployment reality
 
