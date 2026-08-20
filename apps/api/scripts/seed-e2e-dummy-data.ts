@@ -58,6 +58,12 @@ const E2E_ADMIN_RECOVERY_CODES = [
   'B2C3-D4E5-F678-90AB-CDEF-0123-4567-89AB',
   'C3D4-E5F6-7890-ABCD-EF01-2345-6789-ABCD',
 ] as const;
+/** Distinct from primary — `codeHash` is globally unique. */
+const E2E_APPROVER_RECOVERY_CODES = [
+  'D4E5-F678-90AB-CDEF-0123-4567-89AB-CDEF',
+  'E5F6-7890-ABCD-EF01-2345-6789-ABCD-EF01',
+  'F678-90AB-CDEF-0123-4567-89AB-CDEF-0123',
+] as const;
 
 const IDS = {
   users: {
@@ -537,10 +543,10 @@ async function main() {
           enabledAt: daysAgo(7),
         },
       });
-      const recoveryCodes = [
-        ...E2E_ADMIN_RECOVERY_CODES,
-        ...generateRecoveryCodes(7),
-      ];
+      const recoveryCodes =
+        userId === IDS.users.adminPrimary
+          ? [...E2E_ADMIN_RECOVERY_CODES, ...generateRecoveryCodes(7)]
+          : [...E2E_APPROVER_RECOVERY_CODES, ...generateRecoveryCodes(7)];
       await prisma.adminMfaRecoveryCode.createMany({
         data: recoveryCodes.map((code) => ({
           userId,
@@ -1615,7 +1621,10 @@ async function main() {
       `- Admin MFA TOTP secret (seed only): ${E2E_ADMIN_TOTP_SECRET}`,
     );
     console.log(
-      `- Admin MFA recovery codes (primary only, seed only): ${E2E_ADMIN_RECOVERY_CODES.join(', ')}`,
+      `- Admin MFA recovery codes (primary, seed only): ${E2E_ADMIN_RECOVERY_CODES.join(', ')}`,
+    );
+    console.log(
+      `- Admin MFA recovery codes (approver, seed only): ${E2E_APPROVER_RECOVERY_CODES.join(', ')}`,
     );
     console.log(
       `- Admin enroll (no MFA yet): admin.enroll.e2e@tamiym.test / ${FIXTURE_PASSWORD}`,

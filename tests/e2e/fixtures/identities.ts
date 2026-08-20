@@ -17,6 +17,13 @@ export const E2E_ADMIN_RECOVERY_CODES = [
   'C3D4-E5F6-7890-ABCD-EF01-2345-6789-ABCD',
 ] as const;
 
+/** Distinct hashes from primary — DB enforces global unique codeHash. */
+export const E2E_APPROVER_RECOVERY_CODES = [
+  'D4E5-F678-90AB-CDEF-0123-4567-89AB-CDEF',
+  'E5F6-7890-ABCD-EF01-2345-6789-ABCD-EF01',
+  'F678-90AB-CDEF-0123-4567-89AB-CDEF-0123',
+] as const;
+
 /** Stable seed id for the unenrolled admin (MFA reset target). */
 export const E2E_ADMIN_ENROLL_USER_ID = 'e2e-user-admin-enroll';
 
