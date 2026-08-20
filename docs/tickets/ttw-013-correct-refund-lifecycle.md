@@ -87,13 +87,17 @@ ALTER TABLE "refunds" DROP COLUMN IF EXISTS "transactionReference";
 
 ## Implementation reviews
 
-| Iteration | Reviewer           | Verdict | Notes |
-| --------- | ------------------ | ------- | ----- |
-| pending   | independent agents | —       | —     |
+| Iteration | Reviewer                | Verdict | Notes                                                                        |
+| --------- | ----------------------- | ------- | ---------------------------------------------------------------------------- |
+| 1         | independent agents (×2) | FAIL    | Cap race, out-of-order throw, amount validation, stuck INITIATED retry, lint |
+| 2         | pending                 | —       | After FOR UPDATE serialization, CAS, amount/currency checks, re-drive        |
 
 ## Verification evidence
 
-- Pending unit/e2e/playwright + coverage ratchet after reviews.
+- Unit: initiate/reuse/re-drive/transient/hard-fail/mismatch/out-of-order/CAS
+- E2E: concurrent webhook settlement; concurrent initiation cap (8→1); partial status
+- `pnpm coverage:diff` ≥80%; ratchet raised
+- `pnpm lint` clean for TTW-013 files
 
 ## Completion summary
 

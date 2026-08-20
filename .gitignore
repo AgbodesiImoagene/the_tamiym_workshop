@@ -66,3 +66,4 @@ redis_data/
 
 
 apps/api/.env
+dump.rdb
