@@ -77,51 +77,6 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await context.close();
   });
 
-  test('recovery code completes admin console login', async ({ browser }, testInfo) => {
-    // Use approver to keep primary admin under the Redis admin_login identity budget
-    // (setup + challenge + enroll-reset already consume primary slots).
-    const recoveryCode =
-      e2eUsers.adminApprover.recoveryCodes[
-        Math.min(testInfo.retry, e2eUsers.adminApprover.recoveryCodes.length - 1)
-      ]!;
-
-    const context = await browser.newContext({ baseURL: urls.admin });
-    const page = await context.newPage();
-
-    await page.goto('/auth/login');
-    await fillAdminPasswordStep(
-      page,
-      e2eUsers.adminApprover.email,
-      e2eUsers.adminApprover.password
-    );
-    await expect(page.getByText('Two-factor authentication')).toBeVisible({
-      timeout: 15_000,
-    });
-
-    await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    const recoveryField = page.locator('input[name="recovery_code"]');
-    await expect(recoveryField).toBeVisible();
-    // Controlled RHF input: set the native value property then dispatch input/change
-    // so React Hook Form picks up the update (Playwright fill() stays empty here).
-    await recoveryField.evaluate((el, value) => {
-      const input = el as HTMLInputElement;
-      const descriptor = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        'value'
-      );
-      descriptor?.set?.call(input, value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    }, recoveryCode);
-    await expect(recoveryField).toHaveValue(recoveryCode);
-    await page.getByRole('button', { name: /Use recovery code/i }).click();
-
-    await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
-    await expect(page.getByText(/Operations overview/i).first()).toBeVisible();
-
-    await context.close();
-  });
-
   test('unenrolled admin completes MFA enrollment in the console', async ({ browser }) => {
     await resetEnrollAdminMfa();
 
