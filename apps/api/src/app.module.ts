@@ -45,6 +45,7 @@ import { getRequestContext } from './request-context/request-context.store';
 import { validateEnv } from './config/env-validation';
 import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
 import { PrivacyModule } from './privacy/privacy.module';
+import { redactPublicDesignShareUrl } from './designs/design-share.redact';
 
 @Module({
   imports: [
@@ -136,7 +137,8 @@ import { PrivacyModule } from './privacy/privacy.module';
           req: (req: Request) => ({
             id: req.id,
             method: req.method,
-            url: req.url,
+            // TTW-026: design-share bearers live in the path; never log them.
+            url: redactPublicDesignShareUrl(req.url),
           }),
           res: (res: Response) => ({
             statusCode: res.statusCode,

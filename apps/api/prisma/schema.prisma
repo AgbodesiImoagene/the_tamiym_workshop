@@ -1307,6 +1307,7 @@ model Design {
   updatedAt DateTime @updatedAt
 
   views DesignView[]
+  shareLinks DesignShareLink[]
 
   orderItems       OrderItem[]
   campaignProducts CampaignProduct[]
@@ -1317,6 +1318,33 @@ model Design {
   @@index([moderationStatus])
   @@index([createdAt])
   @@map("designs")
+}
+
+/**
+ * Digested bearer token for anonymous read-only design shares (TTW-026).
+ * Plaintext is returned once at creation and never stored.
+ */
+model DesignShareLink {
+  id       String @id @default(cuid())
+  designId String
+  design   Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 hex of the bearer token (unique lookup key).
+  tokenHash String @unique
+
+  /// Policy document version applied when the link was created.
+  policyVersion String
+
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  lastAccessedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([designId, createdAt])
+  @@index([expiresAt])
+  @@map("design_share_links")
 }
 
 /// Uploaded asset (image/file) owned by a user. Referenced from design layers.

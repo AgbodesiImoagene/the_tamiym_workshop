@@ -12,7 +12,6 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
-  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -25,9 +24,9 @@ import {
   ApiBody,
   ApiConsumes,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { DesignsService } from './designs.service';
 import { CreateDesignDto } from './dto/create-design.dto';
+import { CreateDesignShareDto } from './dto/create-design-share.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -191,24 +190,23 @@ export class DesignsController {
   }
 
   /**
-   * Generate a share token for a design (own only). Returns a read-only share URL.
+   * Create a digested share link for a design (own only). Returns the bearer once.
    */
   @Post(':id/share')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Generate a share link for a design' })
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create an expiring digested share link for a design',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Design ID' })
   @ApiResponse({
-    status: 200,
-    description: 'Share token generated',
-    schema: {
-      type: 'object',
-      properties: {
-        shareToken: { type: 'string' },
-        shareUrl: { type: 'string' },
-      },
-    },
+    status: 201,
+    description: 'Share link created (plaintext token returned once)',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Disallowed TTL or moderation state',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -216,9 +214,32 @@ export class DesignsController {
   async share(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Req() req: Request,
+    @Body() body: CreateDesignShareDto,
   ) {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    return this.designsService.generateShareToken(user.id, id, baseUrl);
+    return this.designsService.createShareLink(user.id, id, body.ttlDays);
+  }
+
+  @Get(':id/share-links')
+  @ApiOperation({
+    summary: 'List share links for a design (no plaintext tokens)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Design ID' })
+  listShareLinks(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.designsService.listShareLinks(user.id, id);
+  }
+
+  @Post(':id/share-links/:linkId/revoke')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke a design share link (idempotent)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  revokeShareLink(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('linkId') linkId: string,
+  ) {
+    return this.designsService.revokeShareLink(user.id, id, linkId);
   }
 }

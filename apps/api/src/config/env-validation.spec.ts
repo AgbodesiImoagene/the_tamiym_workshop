@@ -130,6 +130,7 @@ describe('env-validation', () => {
         AUTH_ADMIN_ORIGINS: 'https://admin.example.com',
         AUTH_CUSTOMER_ORIGINS: 'https://shop.example.com',
         CLAMAV_HOST: 'clamav.internal',
+        DESIGN_SHARE_PUBLIC_ORIGIN: 'https://app.example.com',
       };
 
       beforeEach(() => {
@@ -147,6 +148,17 @@ describe('env-validation', () => {
           validateEnv(omit(validProductionConfig, 'CLAMAV_HOST')),
         ).toThrow(
           'Missing required production environment variable: CLAMAV_HOST',
+        );
+      });
+
+      it('throws when DESIGN_SHARE_PUBLIC_ORIGIN is invalid', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            DESIGN_SHARE_PUBLIC_ORIGIN: 'not-a-url',
+          }),
+        ).toThrow(
+          'Environment variable DESIGN_SHARE_PUBLIC_ORIGIN must be a valid http(s) absolute URL',
         );
       });
 

@@ -1,7 +1,7 @@
 # TTW-026 — Secure the design-share lifecycle
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** Not started\
+**Status:** In progress\
 **Risk:** High\
 **Blocked by:** TTW-003, TTW-004, TTW-021, TTW-025\
 **Blocks:** TTW-053, TTW-054
@@ -73,16 +73,34 @@ Define which moderation states may be shared and what happens when a design is e
 
 ## Design review
 
-Pending. Include threat model, entropy/digest choice, public DTO, moderation/edit policy, expiry/revocation/cache sequence, migration/rollback, rate limits/headers, privacy/telemetry review, test matrix and verdict.
+### Slice 1 — interim digested share links (APPROVED for engineering interim)
+
+**Reviewer:** implementing agent — 2026-08-20\
+**Verdict:** APPROVED for interim v1 engineering policy pending product/privacy sign-off.
+
+**Interim policy (`design-share-policy/v1-interim-2026-08-20`):**
+
+| Decision                             | Choice                                                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Entropy                              | 32-byte `base64url` bearer; stored only as SHA-256 hex                                                                        |
+| Lifetimes                            | Allowed `ttlDays` ∈ {1, 7, 30}; default 7                                                                                     |
+| Shareable moderation                 | `APPROVED` only; other states → uniform public 404                                                                            |
+| Public DTO                           | `id`, `name`, `designData`, `thumbnailUrl`, `createdAt`, `product`, `views` — no bearer, no owner, no moderation notes/status |
+| URL origin                           | `DESIGN_SHARE_PUBLIC_ORIGIN` (required in production); never request Host                                                     |
+| Legacy plaintext `Design.shareToken` | Cleared in migration; new links use `DesignShareLink` only                                                                    |
+| Privacy closure                      | TTW-025 erasure revokes all active `DesignShareLink` rows for the owner                                                       |
+| Public controls                      | Throttle 60/min; `Cache-Control: private, no-store`; `X-Robots-Tag: noindex`                                                  |
+
+**Deferred:** Playwright workshop UI, CDN purge, edit/re-moderation auto-invalidate worker, multi-link analytics dashboards.
 
 ## Implementation reviews
 
-Pending. Require independent implementation and security review, including token leakage and cache-revocation verification.
+Pending slice 1 dual review.
 
 ## Verification evidence
 
-Pending implementation.
+Pending slice 1 gates.
 
 ## Completion summary
 
-Pending implementation.
+TTW-025 merged (`06d5a22`). TTW-026 slice 1 in progress on `codex/ttw-026-secure-design-shares`.

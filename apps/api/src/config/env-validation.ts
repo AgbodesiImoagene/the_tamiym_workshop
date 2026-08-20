@@ -18,6 +18,7 @@ export const requiredProductionEnvVars = [
   'AUTH_ADMIN_ORIGINS',
   'AUTH_CUSTOMER_ORIGINS',
   'CLAMAV_HOST',
+  'DESIGN_SHARE_PUBLIC_ORIGIN',
 ] as const;
 
 export const forbiddenPlaceholders = new Set([
@@ -110,6 +111,21 @@ export function validateEnv(
         if (parseOriginEntries(value).length === 0) {
           throw new Error(
             `Environment variable ${key} must contain at least one valid origin URL`,
+          );
+        }
+      }
+      if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN') {
+        try {
+          const originUrl = new URL(value.trim());
+          if (
+            originUrl.protocol !== 'http:' &&
+            originUrl.protocol !== 'https:'
+          ) {
+            throw new Error('unsupported protocol');
+          }
+        } catch {
+          throw new Error(
+            'Environment variable DESIGN_SHARE_PUBLIC_ORIGIN must be a valid http(s) absolute URL',
           );
         }
       }

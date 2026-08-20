@@ -487,8 +487,16 @@ export class PrivacyService {
         where: { userId, shareToken: { not: null } },
         data: { shareToken: null, shareTokenExpiresAt: null },
       });
+      const digestedRevoked = await tx.designShareLink.updateMany({
+        where: {
+          revokedAt: null,
+          design: { userId },
+        },
+        data: { revokedAt: new Date() },
+      });
       await this.recordActionTx(tx, requestId, 'postgres.design_shares', 'OK', {
         cleared: shareCleared.count,
+        revokedLinks: digestedRevoked.count,
       });
 
       await this.recordActionTx(
@@ -590,8 +598,16 @@ export class PrivacyService {
         moderationStatus: true,
         createdAt: true,
         updatedAt: true,
-        shareToken: true,
-        shareTokenExpiresAt: true,
+        shareLinks: {
+          select: {
+            id: true,
+            expiresAt: true,
+            revokedAt: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
       },
       take: 500,
       orderBy: { createdAt: 'desc' },
@@ -602,13 +618,18 @@ export class PrivacyService {
       user,
       addresses,
       orders,
-      designs: designs.map(({ shareToken, shareTokenExpiresAt, ...rest }) => ({
-        ...rest,
-        hadShareLink: shareToken != null,
-        shareExpired:
-          shareTokenExpiresAt != null &&
-          shareTokenExpiresAt.getTime() < Date.now(),
-      })),
+      designs: designs.map(({ shareLinks, ...rest }) => {
+        const active = shareLinks.filter((l) => !l.revokedAt);
+        const now = Date.now();
+        return {
+          ...rest,
+          shareLinkCount: shareLinks.length,
+          activeShareLinkCount: active.filter(
+            (l) => l.expiresAt.getTime() > now,
+          ).length,
+          hadShareLink: shareLinks.length > 0,
+        };
+      }),
     };
   }
 

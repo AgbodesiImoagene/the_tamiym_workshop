@@ -50,6 +50,7 @@ describe('PrivacyService', () => {
     adminMfaCredential: { deleteMany: jest.fn() },
     userOAuthAccount: { deleteMany: jest.fn() },
     design: { findMany: jest.fn(), updateMany: jest.fn() },
+    designShareLink: { updateMany: jest.fn() },
   };
   const authSessions = { revokeAllForUser: jest.fn() };
   const audit = { log: jest.fn() };
@@ -249,6 +250,7 @@ describe('PrivacyService', () => {
     prisma.userPayoutProfile.updateMany.mockResolvedValue({ count: 1 });
     prisma.campaign.updateMany.mockResolvedValue({ count: 0 });
     prisma.design.updateMany.mockResolvedValue({ count: 1 });
+    prisma.designShareLink.updateMany.mockResolvedValue({ count: 1 });
     prisma.user.update.mockResolvedValue({});
     prisma.privacyRequestAction.create.mockResolvedValue({});
     prisma.privacyRequest.update.mockResolvedValue({});
@@ -296,6 +298,7 @@ describe('PrivacyService', () => {
     prisma.userPayoutProfile.updateMany.mockResolvedValue({ count: 0 });
     prisma.campaign.updateMany.mockResolvedValue({ count: 0 });
     prisma.design.updateMany.mockResolvedValue({ count: 0 });
+    prisma.designShareLink.updateMany.mockResolvedValue({ count: 0 });
     prisma.user.update.mockResolvedValue({});
     prisma.privacyRequestAction.create.mockResolvedValue({});
     prisma.privacyRequest.update.mockResolvedValue({});
@@ -378,9 +381,25 @@ describe('PrivacyService', () => {
       emailVerifiedAt: null,
       createdAt: new Date(),
     });
-    prisma.address.findMany.mockResolvedValue([]);
-    prisma.order.findMany.mockResolvedValue([]);
-    prisma.design.findMany.mockResolvedValue([]);
+    prisma.design.findMany.mockResolvedValue([
+      {
+        id: 'd1',
+        name: 'Design',
+        productId: 'p1',
+        campaignId: null,
+        moderationStatus: 'APPROVED',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        shareLinks: [
+          {
+            id: 'l1',
+            expiresAt: new Date(Date.now() + 60_000),
+            revokedAt: null,
+            createdAt: new Date(),
+          },
+        ],
+      },
+    ]);
     audit.log.mockResolvedValue({});
 
     const payload = await service.downloadExport(
@@ -389,7 +408,8 @@ describe('PrivacyService', () => {
       'TestPassword1!',
     );
     expect(payload.data.user.id).toBe('u1');
-    expect(payload.data.designs).toEqual([]);
+    expect(payload.data.designs[0].hadShareLink).toBe(true);
+    expect(payload.data.designs[0].activeShareLinkCount).toBe(1);
     expect(payload.checksum).toMatch(/^[a-f0-9]{64}$/);
   });
 });
