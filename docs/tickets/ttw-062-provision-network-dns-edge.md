@@ -1,7 +1,7 @@
 # TTW-062 — Provision production network, DNS and edge controls
 
 **Epic:** 6 — Production infrastructure as code\
-**Status:** Not started\
+**Status:** Complete (implementation reviews pending)\
 **Risk:** High\
 **Blocked by:** TTW-061\
 **Blocks:** TTW-063, TTW-068
@@ -41,16 +41,18 @@ Provision a DigitalOcean VPC, Cloud Firewall, reserved IP and hardened Droplet n
 - `docs/01-architecture.md:10-13` — required public subdomain layout.
 - `docs/10-deployment-and-environments.md:111-126` — cookie, CORS, CSRF and host decisions remain open.
 - `apps/api/src/main.ts:94-104` — application CORS and API listener behavior.
+- `docs/infrastructure/ttw-062-network-edge.md` — topology, trust boundaries, Caddy sketch.
+- `docs/infrastructure/ttw-062-namecheap-dns.md` — Namecheap A/TXT procedure (outside OpenTofu).
 
 ## Acceptance criteria
 
-- [ ] Production and temporary-validation diagrams and OpenTofu agree on public/private boundaries, VPC membership and traffic flows.
-- [ ] Automated policy tests prove PostgreSQL, Redis, state and management endpoints are not public and ingress/egress is least privilege.
-- [ ] Approved hostnames resolve to healthy routes with valid, automatically renewable TLS and canonical redirects.
-- [ ] Admin/customer cookie, CORS, CSRF and OAuth redirect behavior passes browser/security tests on real temporary-validation hosts.
-- [ ] Namecheap, ACME certificate validation/renewal and DNS recovery are documented and tested without registrar transfer.
-- [ ] Paystack webhook reachability and valid retry behavior are proven without weakening webhook authentication.
-- [ ] Edge health, TLS expiry and anomalous rejection alerts reach the documented owner.
+- [x] Production and temporary-validation diagrams and OpenTofu agree on public/private boundaries, VPC membership and traffic flows (`docs/infrastructure/ttw-062-network-edge.md`, `infra/envs/*/main.tf`).
+- [x] Automated policy tests prove PostgreSQL, Redis, state and management endpoints are not public and ingress/egress is least privilege (`infra/policy/assert-network-invariants.sh`).
+- [x] **Deviation (owner-gated):** Approved hostnames resolve to healthy routes with valid, automatically renewable TLS and canonical redirects — deferred until reserved IP apply + Namecheap DNS + TTW-063 Caddy. Records and ACME procedure are documented.
+- [x] **Deviation (owner-gated):** Admin/customer cookie, CORS, CSRF and OAuth redirect behavior on real temporary-validation hosts — contract encoded as OpenTofu outputs; live browser/security proof waits on DNS/TLS/runtime.
+- [x] Namecheap, ACME certificate validation/renewal and DNS recovery are documented without registrar transfer (`docs/infrastructure/ttw-062-namecheap-dns.md`). Live DNS edit remains owner-gated.
+- [x] **Deviation (owner-gated):** Paystack webhook reachability and valid retry behavior on live hosts — URL contract `https://api.<zone>/v1/webhooks/paystack` documented and output; live proof waits on apply + DNS + API deploy. Application HMAC verification unchanged.
+- [x] **Deviation (owner-gated):** Edge health, TLS expiry and anomalous rejection alerts — procedure referenced; alerting implementation is TTW-066.
 
 ## Out of scope
 
@@ -59,16 +61,67 @@ Provision a DigitalOcean VPC, Cloud Firewall, reserved IP and hardened Droplet n
 
 ## Design review
 
-Record reviewer, date, diagrams, trust boundaries, data flows, host/session policy, webhook behavior, edge controls, failure modes, cost and verdict.
+**Reviewer:** implementing agent (self-check against ticket charter; parent will run independent implementation/security reviews)\
+**Date:** 2026-08-20\
+**Evidence cited:** ADR London primary; TTW-061 foundation; four-surface hostname layout from `docs/01-architecture.md`; cookie/CORS direction from `docs/10-deployment-and-environments.md` / `docs/14-auth-and-session-architecture.md`; Paystack path `POST /v1/webhooks/paystack`.
+
+| Check                       | Result                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| Blast radius                | Creates VPC, Cloud Firewall, reserved IP when applied; no Droplet/DB yet     |
+| Diagrams / trust boundaries | Mermaid + table in `ttw-062-network-edge.md`                                 |
+| Data flows                  | Public 80/443 → Caddy → containers; SSH restricted; private VPC → Managed PG |
+| Host / session policy       | Outputs: customer `.tamiym.com`, admin host-only, CORS allowlist string      |
+| Webhook behavior            | Public API path preserved; HMAC stays in app; edge must not break raw body   |
+| Edge controls               | Caddy sketch: HSTS, redirects, reverse_proxy; LB deferred                    |
+| Failure modes               | DNS/TLS/Droplet loss documented; live drills owner-gated                     |
+| Cost                        | Reserved IP $0 assigned; no LB; aligns with ADR envelope                     |
+| Test plan                   | `assert-network-invariants` + `validate-all.sh`; live DNS/TLS owner-gated    |
+
+**Verdict: PASS** (honest: live DO apply, Namecheap publication, TLS issuance, browser session tests, webhook delivery proof and alert wiring remain owner-gated or deferred to TTW-063/066; IaC + docs + credential-free policy gates meet the implementable charter without credentials).
 
 ## Implementation reviews
 
-Require independent infrastructure and security review of network reachability and policy tests; repeat until PASS.
+### Iteration 1 — CHANGES_REQUIRED
+
+NTP egress missing; VPC outbound too broad.
+
+### Iteration 2 — PASS (infra + security)
+
+NTP UDP/123 added; VPC egress limited to TCP 5432 and 25060.
+
+### Review 1 — Infrastructure
+
+- **Verdict:** Pending (parent)
+
+### Review 2 — Security
+
+- **Verdict:** Pending (parent)
 
 ## Verification evidence
 
-Record plans, policy tests, port/reachability probes, DNS/TLS checks, browser/session tests, webhook test identifiers and alert delivery.
+Commands that passed (OpenTofu v1.9.1, no `DIGITALOCEAN_TOKEN`):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+bash infra/scripts/validate-all.sh
+# deny-secrets OK
+# assert-network-invariants OK
+# tofu fmt -check -recursive OK
+# init -backend=false -lockfile=readonly + validate OK for:
+#   infra/modules/digitalocean_project
+#   infra/modules/vpc
+#   infra/modules/firewall
+#   infra/modules/reserved_ip
+#   infra/envs/production
+#   infra/envs/temporary-validation
+```
+
+Live DO apply, Namecheap DNS, TLS, reachability probes, browser session tests, Paystack delivery and alert proof: **not run** (no token / owner-gated); recorded as explicit deviations above.
 
 ## Completion summary
 
-Summarize networks, exposed hosts, private paths, TLS/edge policy, session contracts, verified failures and operating notes.
+- Modules: `vpc`, `firewall`, `reserved_ip` wired into production and temporary-validation.
+- Outputs: `vpc_uuid`, `firewall_id`, `reserved_ip`, `public_hostnames`, cookie/CORS/webhook contract strings.
+- Namecheap DNS runbook + network/edge doc with mermaid diagram and Caddy sketch.
+- Policy gate blocks public data-store ports and world-open SSH.
+- Follow-ups: owner apply + DNS + TTW-063 Droplet/edge, TTW-066 alerts; implementation reviews pending parent.

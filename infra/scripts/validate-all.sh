@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Credential-free OpenTofu validation for TTW-061.
+# Credential-free OpenTofu validation for TTW-061/062.
 # Requires OpenTofu on PATH (CI installs 1.9.1; local: $HOME/.local/bin/tofu).
 set -euo pipefail
 
@@ -18,6 +18,9 @@ tofu version
 echo "==> deny-secrets"
 bash "${INFRA}/policy/deny-secrets.sh"
 
+echo "==> assert-network-invariants"
+bash "${INFRA}/policy/assert-network-invariants.sh"
+
 echo "==> tofu fmt -check -recursive"
 (cd "$INFRA" && tofu fmt -check -recursive)
 
@@ -31,8 +34,11 @@ validate_root() {
   )
 }
 
-# Module roots that declare providers (digitalocean_project).
+# Module roots that declare providers.
 validate_root "modules/digitalocean_project"
+validate_root "modules/vpc"
+validate_root "modules/firewall"
+validate_root "modules/reserved_ip"
 
 # Environment compositions.
 validate_root "envs/production"

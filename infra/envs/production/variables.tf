@@ -19,7 +19,7 @@ variable "managed_by" {
 variable "ticket" {
   description = "Owning ticket for this composition."
   type        = string
-  default     = "TTW-061"
+  default     = "TTW-062"
 }
 
 variable "do_project_name" {
@@ -31,7 +31,7 @@ variable "do_project_name" {
 variable "do_project_description" {
   description = "DigitalOcean project description."
   type        = string
-  default     = "Tamiym Workshop production (TTW-061 foundation)."
+  default     = "Tamiym Workshop production (TTW-062 network/DNS/edge)."
 }
 
 variable "do_project_purpose" {
@@ -50,4 +50,77 @@ variable "region" {
   description = "Default DigitalOcean region (ADR London primary)."
   type        = string
   default     = "lon1"
+}
+
+variable "vpc_name" {
+  description = "Production VPC name."
+  type        = string
+  default     = "ttw-prod-vpc"
+}
+
+variable "vpc_ip_range" {
+  description = "Production VPC CIDR."
+  type        = string
+  default     = "10.10.0.0/16"
+}
+
+variable "vpc_description" {
+  description = "Production VPC description."
+  type        = string
+  default     = "Tamiym Workshop production VPC (lon1)."
+}
+
+variable "firewall_name" {
+  description = "Production Cloud Firewall name."
+  type        = string
+  default     = "ttw-prod-edge"
+}
+
+variable "ssh_source_cidrs" {
+  description = "CIDRs allowed for SSH. Replace before apply with operator admin IPs. Must never include 0.0.0.0/0."
+  type        = list(string)
+  # Loopback placeholder keeps credential-free validate green; owner must override for real SSH.
+  default = ["127.0.0.1/32"]
+}
+
+variable "root_domain" {
+  description = "Apex domain registered at Namecheap."
+  type        = string
+  default     = "tamiym.com"
+}
+
+variable "web_hostname" {
+  description = "Public marketing hostname."
+  type        = string
+  default     = "www.tamiym.com"
+}
+
+variable "app_hostname" {
+  description = "Customer app hostname."
+  type        = string
+  default     = "app.tamiym.com"
+}
+
+variable "admin_hostname" {
+  description = "Admin app hostname."
+  type        = string
+  default     = "admin.tamiym.com"
+}
+
+variable "api_hostname" {
+  description = "API hostname."
+  type        = string
+  default     = "api.tamiym.com"
+}
+
+variable "customer_cookie_domain" {
+  description = "Parent-domain cookie scope for shared customer session (web + app)."
+  type        = string
+  default     = ".tamiym.com"
+}
+
+variable "admin_cookie_domain" {
+  description = "Isolated admin cookie host (no parent-domain sharing with customers)."
+  type        = string
+  default     = "admin.tamiym.com"
 }
