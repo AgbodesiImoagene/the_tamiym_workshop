@@ -96,6 +96,10 @@ Define DigitalOcean owner, CI, Droplet and application access with least privile
 
 ## Implementation reviews
 
+### Iteration 1 — PASS (infra + security)
+
+Identity/secrets docs, cloud-init hardening, security invariant gate; no live credential leakage in tracked files. Live rotation drills remain owner-gated.
+
 ### Review 1 — Infrastructure / identity correctness
 
 - **Verdict:** Pending (parent)
