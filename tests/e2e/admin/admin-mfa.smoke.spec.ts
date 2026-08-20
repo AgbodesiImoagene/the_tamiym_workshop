@@ -94,7 +94,12 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     // Accessible field-level error (empty submit) — FormMessage, not the page alert.
     await expect(page.getByText('Enter a recovery code')).toBeVisible();
 
-    await recoveryField.fill(recoveryCode);
+    // react-hook-form controlled inputs often ignore a bare fill() after validation;
+    // click + pressSequentially reliably commits the value.
+    await recoveryField.click();
+    await recoveryField.fill('');
+    await recoveryField.pressSequentially(recoveryCode, { delay: 15 });
+    await expect(recoveryField).toHaveValue(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
