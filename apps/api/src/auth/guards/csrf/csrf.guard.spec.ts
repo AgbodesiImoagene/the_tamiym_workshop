@@ -9,12 +9,14 @@ import { CSRF_HEADER_NAME } from '../../../constants';
 
 function buildContext(opts: {
   method: string;
+  path?: string;
   cookies?: Record<string, string>;
   headers?: Record<string, string>;
   isPublic?: boolean;
 }): ExecutionContext {
   const request = {
     method: opts.method,
+    path: opts.path ?? '/v1/some/protected/route',
     cookies: opts.cookies ?? {},
     headers: opts.headers ?? {},
   };
@@ -45,17 +47,12 @@ describe('CsrfGuard', () => {
       );
   });
 
-  it('allows public routes through regardless of method', () => {
-    const context = buildContext({ method: 'POST', isPublic: true });
-    expect(guard.canActivate(context)).toBe(true);
-  });
-
   it('allows non-mutating methods through without a CSRF check', () => {
     const context = buildContext({ method: 'GET' });
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('allows a mutating request with no surface access cookie (bearer-only or anonymous)', () => {
+  it('allows a mutating request with no surface session cookie (bearer-only or anonymous)', () => {
     const context = buildContext({
       method: 'POST',
       headers: { authorization: 'Bearer some.jwt.token' },
@@ -159,5 +156,148 @@ describe('CsrfGuard', () => {
       headers: { origin: 'http://localhost:3000', [CSRF_HEADER_NAME]: '' },
     });
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
+  describe('public routes', () => {
+    const sessionEstablishingPaths = [
+      '/v1/auth/login',
+      '/v1/auth/admin/login',
+      '/v1/auth/register',
+      '/v1/auth/google',
+      '/v1/auth/google/callback',
+      '/v1/auth/forgot-password',
+      '/v1/auth/reset-password',
+      '/v1/auth/verify-email',
+      '/v1/auth/resend-verification',
+      '/v1/webhooks/paystack',
+    ];
+
+    it.each(sessionEstablishingPaths)(
+      'exempts %s even when session cookies are attached',
+      (path) => {
+        const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+        const context = buildContext({
+          method: 'POST',
+          path,
+          isPublic: true,
+          cookies: { [names.access]: 'access-token' },
+          headers: { origin: 'http://evil.example.com' },
+        });
+        expect(guard.canActivate(context)).toBe(true);
+      },
+    );
+
+    it('exempts a login path carrying a query string', () => {
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/login?next=%2Fdashboard',
+        isPublic: true,
+      });
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('does not treat /auth/admin/login as the customer /auth/login suffix', () => {
+      // Guards against a sloppy suffix match: both paths are exempt, but for
+      // their own entries — a path must never match a *different* route.
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/admin/login',
+        isPublic: true,
+      });
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('enforces CSRF on public auth/refresh when a refresh cookie is present', () => {
+      const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/refresh',
+        isPublic: true,
+        cookies: { [names.refresh]: 'refresh-token' },
+        headers: { origin: 'http://localhost:3000' },
+      });
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
+    it('allows public auth/refresh with a matching Origin + CSRF header', () => {
+      const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/refresh',
+        isPublic: true,
+        cookies: { [names.refresh]: 'refresh-token', [names.csrf]: 'tok' },
+        headers: {
+          origin: 'http://localhost:3000',
+          [CSRF_HEADER_NAME]: 'tok',
+        },
+      });
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('rejects a cross-site public auth/refresh carrying session cookies', () => {
+      const names = surfaceCookieNames(AuthSurface.CUSTOMER);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/refresh',
+        isPublic: true,
+        cookies: { [names.refresh]: 'refresh-token', [names.csrf]: 'tok' },
+        headers: {
+          origin: 'http://evil.example.com',
+          [CSRF_HEADER_NAME]: 'tok',
+        },
+      });
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
+    it('exempts body-only (cookie-less) public auth/refresh', () => {
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/refresh',
+        isPublic: true,
+      });
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('enforces CSRF on public auth/logout when an access cookie is present', () => {
+      const names = surfaceCookieNames(AuthSurface.ADMIN);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/logout',
+        isPublic: true,
+        cookies: { [names.access]: 'access-token', [names.csrf]: 'tok' },
+        headers: { origin: 'http://localhost:3003' },
+      });
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    });
+
+    it('allows public auth/logout with a matching Origin + CSRF header', () => {
+      const names = surfaceCookieNames(AuthSurface.ADMIN);
+      const context = buildContext({
+        method: 'POST',
+        path: '/v1/auth/logout',
+        isPublic: true,
+        cookies: { [names.access]: 'access-token', [names.csrf]: 'tok' },
+        headers: {
+          origin: 'http://localhost:3003',
+          [CSRF_HEADER_NAME]: 'tok',
+        },
+      });
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('falls back to originalUrl when express path is unavailable', () => {
+      const request = {
+        method: 'POST',
+        originalUrl: '/v1/auth/login',
+        cookies: {},
+        headers: {},
+      };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => ({ __isPublic: true }),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext;
+      expect(guard.canActivate(context)).toBe(true);
+    });
   });
 });

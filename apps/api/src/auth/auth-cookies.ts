@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import * as crypto from 'node:crypto';
 import { AuthSurface } from '../generated/prisma/enums';
 import {
@@ -67,13 +67,19 @@ function oppositeSurface(surface: AuthSurface): AuthSurface {
  * Set the access/refresh/CSRF cookies for `surface`. Always also clears the
  * legacy shared cookie names and the *opposite* surface's cookies, so a
  * browser can never simultaneously present two surfaces' credentials.
+ *
+ * Returns the generated CSRF token so the caller can also hand it to the
+ * client in the response body: SPA frontends served from a different origin
+ * than the API cannot read the (host-only) CSRF cookie via `document.cookie`,
+ * so the body copy is the only way they learn the token to echo back in
+ * `X-CSRF-Token`. See docs/14-auth-and-session-architecture.md.
  */
 export function setSurfaceAuthCookies(
   res: Response,
   surface: AuthSurface,
   accessToken: string,
   refreshToken: string,
-): void {
+): string {
   const names = surfaceCookieNames(surface);
   const base = authCookieBaseOptions();
 
@@ -86,15 +92,66 @@ export function setSurfaceAuthCookies(
     maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
   });
 
-  const csrfToken = crypto.randomBytes(32).toString('hex');
-  res.cookie(names.csrf, csrfToken, {
-    ...base,
-    httpOnly: false,
-    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-  });
+  const csrfToken = generateCsrfToken();
+  setSurfaceCsrfCookie(res, surface, csrfToken);
 
   clearSurfaceAuthCookies(res, oppositeSurface(surface));
   clearLegacyAuthCookies(res);
+
+  return csrfToken;
+}
+
+/** Fresh double-submit CSRF token value. */
+export function generateCsrfToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/** Set the readable (non-httpOnly) double-submit CSRF cookie for `surface`. */
+export function setSurfaceCsrfCookie(
+  res: Response,
+  surface: AuthSurface,
+  csrfToken: string,
+): void {
+  res.cookie(surfaceCookieNames(surface).csrf, csrfToken, {
+    ...authCookieBaseOptions(),
+    httpOnly: false,
+    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
+  });
+}
+
+/** Surfaces whose access or refresh cookie is present on this request. */
+export function surfacesWithSessionCookies(
+  req: Pick<Request, 'cookies'>,
+): AuthSurface[] {
+  return [AuthSurface.CUSTOMER, AuthSurface.ADMIN].filter((surface) => {
+    const names = surfaceCookieNames(surface);
+    return Boolean(req.cookies?.[names.access] ?? req.cookies?.[names.refresh]);
+  });
+}
+
+/**
+ * The CSRF token a cookie-session request should echo in `X-CSRF-Token`:
+ * the existing cookie value when the browser already holds one (so parallel
+ * tabs keep working), otherwise a freshly minted token that is also set as
+ * the cookie. Returns `undefined` for requests with no surface session cookie
+ * at all (bearer-only or anonymous clients get no CSRF cookie).
+ */
+export function ensureSurfaceCsrfCookie(
+  req: Pick<Request, 'cookies'>,
+  res: Response,
+  surface: AuthSurface,
+): string | undefined {
+  const names = surfaceCookieNames(surface);
+  const existing = req.cookies?.[names.csrf] as string | undefined;
+  if (typeof existing === 'string' && existing.length > 0) {
+    return existing;
+  }
+  if (!surfacesWithSessionCookies(req).includes(surface)) {
+    return undefined;
+  }
+  const csrfToken = generateCsrfToken();
+  setSurfaceCsrfCookie(res, surface, csrfToken);
+  return csrfToken;
 }
 
 /** Clear the access/refresh/CSRF cookies for `surface`. */

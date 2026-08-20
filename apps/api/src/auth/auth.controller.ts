@@ -6,6 +6,7 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
   UseGuards,
   Get,
 } from '@nestjs/common';
@@ -38,9 +39,30 @@ import {
   setSurfaceAuthCookies,
   clearSurfaceAuthCookies,
   clearLegacyAuthCookies,
+  ensureSurfaceCsrfCookie,
   surfaceCookieNames,
+  surfacesWithSessionCookies,
 } from './auth-cookies';
 import { resolveSurfaceFromOrigin } from './auth-surface';
+
+/**
+ * Swagger schema for the `csrf_token` returned by every session-issuing
+ * response. Frontends store it (sessionStorage) and echo it in
+ * `X-CSRF-Token` on mutating requests — the CSRF cookie itself is host-only
+ * on the API origin and therefore unreadable to a cross-origin SPA.
+ */
+const CSRF_TOKEN_SCHEMA = {
+  type: 'string',
+  description:
+    'Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests.',
+} as const;
+
+/** `refresh_token` supplied in the request body by a non-browser client. */
+function bodyRefreshToken(req: Request): string | undefined {
+  if (!req?.body || typeof req.body !== 'object') return undefined;
+  const token = (req.body as { refresh_token?: unknown }).refresh_token;
+  return typeof token === 'string' && token.length > 0 ? token : undefined;
+}
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -77,6 +99,7 @@ export class AuthController {
             updatedAt: { type: 'string', format: 'date-time' },
           },
         },
+        csrf_token: CSRF_TOKEN_SCHEMA,
       },
     },
   })
@@ -97,7 +120,7 @@ export class AuthController {
       AuthSurface.CUSTOMER,
     );
 
-    setSurfaceAuthCookies(
+    const csrfToken = setSurfaceAuthCookies(
       res,
       AuthSurface.CUSTOMER,
       loginResult.access_token,
@@ -106,6 +129,7 @@ export class AuthController {
 
     return {
       user: loginResult.user,
+      csrf_token: csrfToken,
     };
   }
 
@@ -138,6 +162,7 @@ export class AuthController {
             status: { type: 'string', example: 'ACTIVE' },
           },
         },
+        csrf_token: CSRF_TOKEN_SCHEMA,
       },
     },
   })
@@ -151,7 +176,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto, AuthSurface.CUSTOMER);
 
-    setSurfaceAuthCookies(
+    const csrfToken = setSurfaceAuthCookies(
       res,
       AuthSurface.CUSTOMER,
       result.access_token,
@@ -160,6 +185,7 @@ export class AuthController {
 
     return {
       user: result.user,
+      csrf_token: csrfToken,
     };
   }
 
@@ -192,6 +218,7 @@ export class AuthController {
             status: { type: 'string', example: 'ACTIVE' },
           },
         },
+        csrf_token: CSRF_TOKEN_SCHEMA,
       },
     },
   })
@@ -205,7 +232,7 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto, AuthSurface.ADMIN);
 
-    setSurfaceAuthCookies(
+    const csrfToken = setSurfaceAuthCookies(
       res,
       AuthSurface.ADMIN,
       result.access_token,
@@ -214,6 +241,7 @@ export class AuthController {
 
     return {
       user: result.user,
+      csrf_token: csrfToken,
     };
   }
 
@@ -364,7 +392,11 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiOperation({
+    summary: 'Refresh access token',
+    description:
+      'Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt.',
+  })
   @ApiResponse({
     status: 200,
     description: 'New access and refresh tokens issued',
@@ -383,34 +415,38 @@ export class AuthController {
             status: { type: 'string', example: 'ACTIVE' },
           },
         },
+        csrf_token: CSRF_TOKEN_SCHEMA,
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  @ApiResponse({
+    status: 403,
+    description: 'Missing/invalid CSRF token or disallowed Origin',
+  })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Surface is server-derived from Origin/Referer (never a client body
-    // field). Non-browser callers with no resolvable Origin default to
-    // CUSTOMER — genuine admin-app browser requests always send Origin.
-    const surface = resolveSurfaceFromOrigin(req) ?? AuthSurface.CUSTOMER;
-    const refreshCookieName = surfaceCookieNames(surface).refresh;
+    const surface = this.resolveSessionSurface(req);
+    if (!surface) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
     const refreshToken =
-      (req?.cookies?.[refreshCookieName] as string | undefined) ??
-      (req?.body && typeof req.body === 'object' && 'refresh_token' in req.body
-        ? (req.body as { refresh_token?: string }).refresh_token
-        : undefined);
+      (req?.cookies?.[surfaceCookieNames(surface).refresh] as
+        | string
+        | undefined) ?? bodyRefreshToken(req);
     const result = await this.authService.refresh(refreshToken ?? '', surface);
 
-    setSurfaceAuthCookies(
+    const csrfToken = setSurfaceAuthCookies(
       res,
       surface,
       result.access_token,
       result.refresh_token,
     );
 
-    return { user: result.user };
+    return { user: result.user, csrf_token: csrfToken };
   }
 
   /**
@@ -419,7 +455,11 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout and clear auth cookies' })
+  @ApiOperation({
+    summary: 'Logout and clear auth cookies',
+    description:
+      'Revokes and clears only the resolved surface. Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Successfully logged out',
@@ -430,18 +470,70 @@ export class AuthController {
       },
     },
   })
+  @ApiResponse({
+    status: 401,
+    description:
+      'Session surface could not be resolved for the presented cookies',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Missing/invalid CSRF token or disallowed Origin',
+  })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const surface = resolveSurfaceFromOrigin(req) ?? AuthSurface.CUSTOMER;
-    const refreshCookieName = surfaceCookieNames(surface).refresh;
+    const surface = this.resolveSessionSurface(req);
+
+    // Nothing to revoke (no session cookies, no body token): stay idempotent
+    // and only clear the legacy shared cookie names.
+    if (!surface) {
+      clearLegacyAuthCookies(res);
+      return { message: 'Logged out successfully' };
+    }
+
     const refreshToken =
-      (req?.cookies?.[refreshCookieName] as string | undefined) ??
-      (req?.body && typeof req.body === 'object' && 'refresh_token' in req.body
-        ? (req.body as { refresh_token?: string }).refresh_token
-        : undefined);
-    await this.authService.logout(refreshToken);
+      (req?.cookies?.[surfaceCookieNames(surface).refresh] as
+        | string
+        | undefined) ?? bodyRefreshToken(req);
+    await this.authService.logout(refreshToken, surface);
     clearSurfaceAuthCookies(res, surface);
     clearLegacyAuthCookies(res);
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * Surface a cookie-scoped `refresh`/`logout` acts on.
+   *
+   * Origin (fallback Referer) is the only trusted surface signal for a
+   * browser request, so a request that presents surface session cookies is
+   * rejected — never silently defaulted to CUSTOMER (TTW-020 review fix) —
+   * when the Origin is unknown or points at the other surface. Only a
+   * cookie-less caller supplying `refresh_token` in the body (a non-browser
+   * client) defaults to CUSTOMER. Returns `undefined` when the request
+   * presents no credentials at all.
+   *
+   * @throws UnauthorizedException when cookies are present but the surface
+   * cannot be trusted.
+   */
+  private resolveSessionSurface(req: Request): AuthSurface | undefined {
+    const originSurface = resolveSurfaceFromOrigin(req);
+    const cookieSurfaces = surfacesWithSessionCookies(req);
+
+    if (originSurface) {
+      if (
+        cookieSurfaces.length > 0 &&
+        !cookieSurfaces.includes(originSurface)
+      ) {
+        throw new UnauthorizedException('Session surface mismatch');
+      }
+      return originSurface;
+    }
+
+    if (cookieSurfaces.length > 0) {
+      throw new UnauthorizedException(
+        'Session surface could not be resolved from the request Origin',
+      );
+    }
+
+    return bodyRefreshToken(req) ? AuthSurface.CUSTOMER : undefined;
   }
 
   /**
@@ -449,7 +541,11 @@ export class AuthController {
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiOperation({
+    summary: 'Get current authenticated user',
+    description:
+      'Also returns the session CSRF token for cookie-authenticated callers, so a frontend that lost its in-memory copy (new tab, OAuth redirect) can recover it without rotating the session.',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiResponse({
@@ -465,11 +561,21 @@ export class AuthController {
         phone: { type: 'string', nullable: true },
         role: { type: 'string', enum: Object.values(UserRole) },
         status: { type: 'string', example: 'ACTIVE' },
+        surface: { type: 'string', enum: Object.values(AuthSurface) },
+        csrf_token: {
+          ...CSRF_TOKEN_SCHEMA,
+          description: `${CSRF_TOKEN_SCHEMA.description} Absent for bearer-only callers, which hold no cookie session.`,
+        },
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getMe(@CurrentUser() user: RequestUser) {
-    return user;
+  getMe(
+    @CurrentUser() user: RequestUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const csrfToken = ensureSurfaceCsrfCookie(req, res, user.surface);
+    return csrfToken ? { ...user, csrf_token: csrfToken } : { ...user };
   }
 }

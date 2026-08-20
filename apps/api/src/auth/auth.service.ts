@@ -713,9 +713,17 @@ export class AuthService {
   }
 
   /**
-   * Invalidate a refresh token (e.g. on logout). No-op if token not found.
+   * Invalidate a refresh token (e.g. on logout), scoped to `surface`.
+   *
+   * No-op if the token is unknown, or if it belongs to a *different* surface:
+   * a logout resolved for one surface must never revoke the other surface's
+   * session (TTW-020 — that would be a cross-surface forced logout). Legacy
+   * pre-cutover rows (`authSurface: null`) are revocable from either surface.
    */
-  async logout(refreshToken: string | undefined): Promise<void> {
+  async logout(
+    refreshToken: string | undefined,
+    surface: AuthSurface,
+  ): Promise<void> {
     if (!refreshToken) return;
     const record = await this.prisma.authToken.findFirst({
       where: { token: refreshToken, tokenType: TokenType.REFRESH },
@@ -724,10 +732,17 @@ export class AuthService {
     if (!record) {
       return;
     }
+    if (record.authSurface !== null && record.authSurface !== surface) {
+      return;
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.authToken.deleteMany({
-        where: { token: refreshToken, tokenType: TokenType.REFRESH },
+        where: {
+          token: refreshToken,
+          tokenType: TokenType.REFRESH,
+          OR: [{ authSurface: null }, { authSurface: surface }],
+        },
       });
       await this.audit.log(
         {
@@ -737,6 +752,7 @@ export class AuthService {
           entityId: record.userId,
           actorUserId: record.userId,
           actorRole: record.user.role,
+          after: { authSurface: surface },
           note: 'Refresh token invalidated on logout',
         },
         tx,

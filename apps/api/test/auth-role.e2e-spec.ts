@@ -86,8 +86,11 @@ describe('Auth and role boundaries (e2e)', () => {
       })
       .expect(201);
     // Satisfy CSRF (Origin allowlist + double-submit token) so this request
-    // is rejected for the role, not for a missing/invalid CSRF token.
-    const csrfToken = cookieValue(registerRes, 'ttw_customer_csrf');
+    // is rejected for the role, not for a missing/invalid CSRF token. The
+    // token comes from the response body, the way a cross-origin SPA gets it
+    // (TTW-020); it must equal the cookie the browser will send back.
+    const csrfToken = registerRes.body.csrf_token as string;
+    expect(csrfToken).toBe(cookieValue(registerRes, 'ttw_customer_csrf'));
     await agent
       .post('/v1/campaigns')
       .set('Origin', 'http://localhost:3000')

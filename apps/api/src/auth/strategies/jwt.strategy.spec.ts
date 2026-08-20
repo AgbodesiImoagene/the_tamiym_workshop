@@ -125,16 +125,110 @@ describe('JwtStrategy', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
-  it('allows a bearer-authenticated request even when the surface would otherwise mismatch', async () => {
+  it('allows a bearer-authenticated request with no resolvable Origin', async () => {
     prisma.user.findUnique.mockResolvedValue(mockDbUser);
-    // Bearer requests are surface-agnostic: no Origin header at all, plus an
-    // explicit Authorization header, must still succeed.
+    // Bearer callers have no cookie jar and no Origin; the role×surface check
+    // is their surface gate.
     const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
 
     const result = await strategy.validate(req, {
       sub: 'user-1',
       email: 'user@example.com',
       role: UserRole.CUSTOMER,
+      surface: AuthSurface.CUSTOMER,
+    });
+
+    expect(result.surface).toBe(AuthSurface.CUSTOMER);
+  });
+
+  it('rejects a bearer token whose surface the account role may not use', async () => {
+    prisma.user.findUnique.mockResolvedValue(mockDbUser);
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.CUSTOMER,
+        surface: AuthSurface.ADMIN,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects an ORGANIZER on the ADMIN surface (bearer)', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ORGANIZER,
+    });
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.ORGANIZER,
+        surface: AuthSurface.ADMIN,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects a session whose account was promoted to ADMIN after it was minted', async () => {
+    // The JWT still claims CUSTOMER surface; the account is now ADMIN, which
+    // is not permitted on that surface, so the old session must stop working.
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+    });
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.CUSTOMER,
+        surface: AuthSurface.CUSTOMER,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects a token with no surface claim', async () => {
+    prisma.user.findUnique.mockResolvedValue(mockDbUser);
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.CUSTOMER,
+      } as any),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects a token with an unknown surface claim', async () => {
+    prisma.user.findUnique.mockResolvedValue(mockDbUser);
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    await expect(
+      strategy.validate(req, {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role: UserRole.CUSTOMER,
+        surface: 'SUPERUSER',
+      } as any),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('accepts an ADMIN-role bearer token on the ADMIN surface', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+    });
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    const result = await strategy.validate(req, {
+      sub: 'user-1',
+      email: 'user@example.com',
+      role: UserRole.ADMIN,
       surface: AuthSurface.ADMIN,
     });
 

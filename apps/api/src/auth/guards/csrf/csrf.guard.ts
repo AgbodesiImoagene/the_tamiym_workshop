@@ -13,43 +13,84 @@ import {
   adminOrigins,
   customerOrigins,
   requestOrigin,
+  resolveSurfaceFromOrigin,
 } from '../../auth-surface';
-import { surfaceCookieNames } from '../../auth-cookies';
+import {
+  surfaceCookieNames,
+  surfacesWithSessionCookies,
+} from '../../auth-cookies';
 import { CSRF_HEADER_NAME } from '../../../constants';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
+ * Public paths that are exempt from CSRF because they either establish a
+ * session from credentials the browser cannot supply ambiently (login,
+ * register, token-bearing email flows) or are provider callbacks that
+ * authenticate by signature/state instead of a cookie.
+ *
+ * Matched as path suffixes so the global `/v1` prefix (and any future
+ * versioned prefix) does not need to be repeated here.
+ */
+const CSRF_EXEMPT_PUBLIC_PATHS = [
+  'auth/login',
+  'auth/admin/login',
+  'auth/register',
+  'auth/google',
+  'auth/google/callback',
+  'auth/forgot-password',
+  'auth/reset-password',
+  'auth/verify-email',
+  'auth/resend-verification',
+];
+
+/** Provider webhook path segments (signature-authenticated, never cookies). */
+const CSRF_EXEMPT_PATH_SEGMENTS = ['webhooks', 'paystack'];
+
+/**
  * TTW-020 CSRF defense for cookie-authenticated mutations.
  *
  * Policy (see docs/14-auth-and-session-architecture.md):
- * - Public routes (session-establishing auth endpoints, webhooks) are exempt.
  * - Non-mutating methods are exempt.
- * - Requests carrying NO surface access cookie (bearer-only, or unauthenticated)
- *   are exempt — an explicit bearer token cannot be forged by a browser via
- *   cross-site form/fetch the way an ambient cookie can.
- * - Otherwise: the Origin (fallback Referer) must be in that surface's
- *   allowlist, and the `X-CSRF-Token` header must match the surface's CSRF
- *   cookie (timing-safe compare, double-submit pattern).
+ * - Session-establishing public auth paths and webhook paths are exempt.
+ * - Every other request — including the remaining `@Public()` routes
+ *   `auth/refresh` and `auth/logout` — is checked whenever it presents a
+ *   surface **access or refresh** cookie. Those two routes act on an ambient
+ *   cookie, so skipping CSRF for them would leave forced-logout and
+ *   session-rotation CSRF open.
+ * - Requests carrying NO surface session cookie (bearer-only, body-only
+ *   refresh, or anonymous) are exempt — an explicit token cannot be forged by
+ *   a browser via cross-site form/fetch the way an ambient cookie can.
+ * - Otherwise: the Origin (fallback Referer) must resolve to the surface whose
+ *   cookie is presented, and the `X-CSRF-Token` header must match that
+ *   surface's CSRF cookie (timing-safe compare, double-submit pattern).
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<Request>();
+    if (!MUTATING_METHODS.has(request.method.toUpperCase())) return true;
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
+    if (isPublic && this.isCsrfExemptPath(request)) return true;
 
-    const request = context.switchToHttp().getRequest<Request>();
-    if (!MUTATING_METHODS.has(request.method.toUpperCase())) return true;
+    const presentedSurfaces = surfacesWithSessionCookies(request);
+    if (presentedSurfaces.length === 0) return true;
 
-    const presented = this.presentedSurfaceCookie(request);
-    if (!presented) return true;
+    const surface = resolveSurfaceFromOrigin(request);
+    if (!surface || !presentedSurfaces.includes(surface)) {
+      throw new ForbiddenException(
+        'Request Origin is not allowed for this session',
+      );
+    }
 
-    const { surface } = presented;
+    // Redundant given `resolveSurfaceFromOrigin`, but keeps the allowlist the
+    // explicit gate even if surface resolution gains other inputs later.
     const allowlist =
       surface === AuthSurface.ADMIN ? adminOrigins() : customerOrigins();
     const origin = requestOrigin(request);
@@ -69,16 +110,27 @@ export class CsrfGuard implements CanActivate {
     return true;
   }
 
-  /** The surface (if any) whose access cookie is present on this request. */
-  private presentedSurfaceCookie(
-    request: Request,
-  ): { surface: AuthSurface } | null {
-    for (const surface of [AuthSurface.CUSTOMER, AuthSurface.ADMIN]) {
-      const accessCookieName = surfaceCookieNames(surface).access;
-      const value = request.cookies?.[accessCookieName] as string | undefined;
-      if (value) return { surface };
+  /** Whether this request's path is on the CSRF exemption list. */
+  private isCsrfExemptPath(request: Request): boolean {
+    const path = this.normalizedPath(request);
+    if (!path) return false;
+    if (
+      CSRF_EXEMPT_PUBLIC_PATHS.some((exempt) => path.endsWith(`/${exempt}`))
+    ) {
+      return true;
     }
-    return null;
+    const segments = path.split('/').filter(Boolean);
+    return CSRF_EXEMPT_PATH_SEGMENTS.some((segment) =>
+      segments.includes(segment),
+    );
+  }
+
+  /** Request path without query string, always leading-slashed. */
+  private normalizedPath(request: Request): string {
+    const raw = request.path || request.originalUrl || request.url || '';
+    const withoutQuery = raw.split('?')[0] ?? '';
+    if (!withoutQuery) return '';
+    return withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
   }
 
   private csrfTokensMatch(

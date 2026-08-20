@@ -314,27 +314,75 @@ describe('AuthService', () => {
     });
   });
 
-  it('should write an audit log on logout when the refresh token exists', async () => {
-    prisma.authToken.findFirst.mockResolvedValue({
+  describe('logout', () => {
+    const logoutRecord = (authSurface: AuthSurface | null) => ({
       id: 'auth-token-1',
       userId: 'user-1',
       token: 'refresh-token',
       tokenType: TokenType.REFRESH,
+      authSurface,
       expiresAt: new Date(Date.now() + 60_000),
       user: { id: 'user-1', role: UserRole.ADMIN },
     });
-    prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
 
-    await service.logout('refresh-token');
+    it('should write an audit log on logout when the refresh token exists', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        logoutRecord(AuthSurface.ADMIN),
+      );
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
 
-    expect(prisma.authToken.deleteMany).toHaveBeenCalled();
-    expect(audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventName: 'auth.logout',
-        actorUserId: 'user-1',
-      }),
-      expect.anything(),
-    );
+      await service.logout('refresh-token', AuthSurface.ADMIN);
+
+      expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+        where: {
+          token: 'refresh-token',
+          tokenType: TokenType.REFRESH,
+          OR: [{ authSurface: null }, { authSurface: AuthSurface.ADMIN }],
+        },
+      });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: 'auth.logout',
+          actorUserId: 'user-1',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('does not revoke a refresh token belonging to the other surface', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        logoutRecord(AuthSurface.ADMIN),
+      );
+
+      await service.logout('refresh-token', AuthSurface.CUSTOMER);
+
+      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('revokes a legacy null-surface refresh token from either surface', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(logoutRecord(null));
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.logout('refresh-token', AuthSurface.CUSTOMER);
+
+      expect(prisma.authToken.deleteMany).toHaveBeenCalled();
+    });
+
+    it('is a no-op without a refresh token', async () => {
+      await service.logout(undefined, AuthSurface.CUSTOMER);
+
+      expect(prisma.authToken.findFirst).not.toHaveBeenCalled();
+      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op for an unknown refresh token', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(null);
+
+      await service.logout('missing-token', AuthSurface.CUSTOMER);
+
+      expect(prisma.authToken.deleteMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('refresh', () => {

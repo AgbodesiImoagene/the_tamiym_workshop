@@ -5,9 +5,20 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
 /**
- * Customer-surface double-submit CSRF cookie (TTW-020). Readable (non-httpOnly)
- * by design; must match `CUSTOMER_CSRF_COOKIE_NAME` in apps/api/src/constants.ts.
+ * Customer-surface double-submit CSRF token (TTW-020).
+ *
+ * The API sets the token as a host-only cookie on its own origin *and*
+ * returns it in the body of every session-issuing response (login, register,
+ * refresh, `auth/me`). When the API is served from a different origin than
+ * this app — the deployed topology — `document.cookie` cannot see that
+ * cookie, so the body copy kept here in `sessionStorage` is the only value we
+ * can echo back in `X-CSRF-Token`. The browser still attaches the cookie
+ * itself, which is the other half of the double submit.
+ *
+ * Storage key and cookie name must match `CUSTOMER_CSRF_COOKIE_NAME` in
+ * apps/api/src/constants.ts.
  */
+const CSRF_STORAGE_KEY = 'ttw_customer_csrf';
 const CSRF_COOKIE_NAME = 'ttw_customer_csrf';
 /** Must match `CSRF_HEADER_NAME` in apps/api/src/constants.ts. */
 const CSRF_HEADER_NAME = 'x-csrf-token';
@@ -21,14 +32,59 @@ function readCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
+/** `sessionStorage` can throw (SSR, privacy modes, storage disabled). */
+function safeSessionStorage(): Storage | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Persist the CSRF token returned by a session-issuing API response. */
+export function setCsrfToken(token: string | null | undefined): void {
+  const storage = safeSessionStorage();
+  if (!storage) return;
+  try {
+    if (token) {
+      storage.setItem(CSRF_STORAGE_KEY, token);
+    } else {
+      storage.removeItem(CSRF_STORAGE_KEY);
+    }
+  } catch {
+    // Storage full or blocked: fall back to the cookie read below.
+  }
+}
+
+/** Forget the stored CSRF token (e.g. on logout). */
+export function clearCsrfToken(): void {
+  setCsrfToken(null);
+}
+
+/**
+ * Current CSRF token: the stored body copy first, then the API cookie as a
+ * fallback for same-origin setups (and API-driven tests) where it is readable.
+ */
+export function getCsrfToken(): string | undefined {
+  const storage = safeSessionStorage();
+  try {
+    const stored = storage?.getItem(CSRF_STORAGE_KEY);
+    if (stored) return stored;
+  } catch {
+    // Ignore and fall through to the cookie.
+  }
+  return readCookie(CSRF_COOKIE_NAME);
+}
+
 /**
  * Headers for a mutating (POST/PUT/PATCH/DELETE) request made via raw
  * `fetch` instead of `apiClient` (e.g. multipart/form-data uploads). Returns
- * an empty object when there is no CSRF cookie to echo (unauthenticated, or
+ * an empty object when there is no CSRF token to echo (unauthenticated, or
  * bearer-only auth with no cookie session).
  */
 export function csrfHeaders(): Record<string, string> {
-  const csrfToken = readCookie(CSRF_COOKIE_NAME);
+  const csrfToken = getCsrfToken();
   return csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {};
 }
 
@@ -52,11 +108,11 @@ export class ApiClient {
       ...(options.headers as Record<string, string> | undefined),
     };
 
-    // Double-submit CSRF: echo the readable CSRF cookie in a request header
-    // on cookie-authenticated mutations (TTW-020). No-op if unauthenticated
-    // or authenticating via bearer token only (no CSRF cookie present).
+    // Double-submit CSRF: echo the stored CSRF token in a request header on
+    // cookie-authenticated mutations (TTW-020). No-op if unauthenticated or
+    // authenticating via bearer token only (no CSRF token issued).
     if (MUTATING_METHODS.has(method)) {
-      const csrfToken = readCookie(CSRF_COOKIE_NAME);
+      const csrfToken = getCsrfToken();
       if (csrfToken) {
         headers[CSRF_HEADER_NAME] = csrfToken;
       }
