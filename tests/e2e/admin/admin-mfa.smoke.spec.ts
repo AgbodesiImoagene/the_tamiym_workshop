@@ -90,9 +90,8 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await page.getByPlaceholder('XXXX-XXXX-...').fill('0000-0000-0000-0000-0000-0000-0000-0000');
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
-    const alert = page.getByRole('alert');
+    const alert = page.getByRole('alert').filter({ hasText: /Unauthorized/i });
     await expect(alert).toBeVisible({ timeout: 10_000 });
-    await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
     await expect(page.getByPlaceholder('XXXX-XXXX-...')).toBeVisible();
 
     await page.getByPlaceholder('XXXX-XXXX-...').fill(recoveryCode);
