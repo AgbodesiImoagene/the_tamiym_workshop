@@ -91,15 +91,16 @@ Replace bare refresh-token rows with named, audience-bound sessions (`customer` 
 
 **Security (slice 1):** PASS — auth boundary uses generic 401; `EMAIL_NOT_VERIFIED` only on post-auth action gates. Residual (non-blocking): payment initiation not gated for legacy pending orders.
 
-**Implementation (slice 1):** CHANGES_REQUIRED → remediated OpenAPI on campaign order + payout mutate, removed `assertVerifiedForPrivilegedRole` oracle helper, asserted machine-readable error bodies at service boundaries. Re-review pending.
+**Implementation (slice 1):** PASS — OpenAPI notes on order/campaign-order/payout mutate; privileged 403 helper removed; service-boundary `code`/`action` assertions; 60 related unit tests green.
 
 ## Verification evidence
 
-- Unit: `account-policy`, `auth.service`, `jwt.strategy`, `orders.service`, `payout-profiles.service` verification-gate suites (60 tests).
-- Diff coverage vs `origin/main`: local `pnpm coverage:diff` ≥80%.
-- E2e: `auth-surface` admin/organiser fixtures set `emailVerifiedAt`; CI API Integration green after that fix.
-- CI (post-oracle/e2e push): Coverage + API Integration passed on run `32382756095` (remaining container build pending at check time).
+- Unit: `account-policy`, `auth.service`, `jwt.strategy`, `orders.service`, `payout-profiles.service` (60 tests).
+- Diff coverage vs `origin/main`: ≥80% (`pnpm coverage:diff` + CI Coverage).
+- E2e: `auth-surface` privileged fixtures set `emailVerifiedAt`; CI API Integration green.
+- CI: all checks green on https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/32383125073
+- PR: https://github.com/AgbodesiImoagene/the_tamiym_workshop/pull/30
 
 ## Completion summary
 
-Pending.
+Slice 1 (verified-email action policy) shipped. Remaining same-ticket work: admin TOTP + recovery, named hashed sessions, Redis identity+IP throttles, Playwright suites.
