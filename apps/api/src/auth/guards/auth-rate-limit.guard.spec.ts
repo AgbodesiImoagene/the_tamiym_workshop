@@ -70,6 +70,11 @@ describe('AuthRateLimitGuard', () => {
 
   it('derives MFA identity from verified mfa_token sub', async () => {
     reflector.getAllAndOverride.mockReturnValue('admin_mfa');
+    jwt.verify.mockReturnValue({
+      sub: 'admin-1',
+      purpose: 'mfa_challenge',
+      surface: 'ADMIN',
+    });
     await expect(
       guard.canActivate(
         contextFor({ mfa_token: 'jwt.here' }, '/v1/auth/admin/mfa/challenge'),
@@ -82,6 +87,26 @@ describe('AuthRateLimitGuard', () => {
       bucket: 'admin_mfa',
       email: null,
       identity: 'user:admin-1',
+      ip: '127.0.0.1',
+      surface: 'ADMIN',
+    });
+  });
+
+  it('fingerprints access JWTs that lack MFA purpose/surface', async () => {
+    reflector.getAllAndOverride.mockReturnValue('admin_mfa');
+    jwt.verify.mockReturnValue({
+      sub: 'admin-1',
+      surface: 'ADMIN',
+      sid: 'sess-1',
+    });
+    const token = 'access.jwt.token';
+    await guard.canActivate(
+      contextFor({ mfa_token: token }, '/v1/auth/admin/mfa/challenge'),
+    );
+    expect(rateLimit.consume).toHaveBeenCalledWith({
+      bucket: 'admin_mfa',
+      email: null,
+      identity: `mfa:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`,
       ip: '127.0.0.1',
       surface: 'ADMIN',
     });
