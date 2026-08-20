@@ -82,7 +82,7 @@ export function resolveSurfaceFromOrigin(
  * ADMIN; every other auth login/register route is CUSTOMER.
  */
 export function resolveLoginSurfaceFromPath(path: string): AuthSurface {
-  const normalizedPath = path.split('?')[0] ?? path;
+  const normalizedPath = (path.split('?')[0] ?? path).toLowerCase();
   return /\/auth\/admin(\/|$)/.test(normalizedPath)
     ? AuthSurface.ADMIN
     : AuthSurface.CUSTOMER;

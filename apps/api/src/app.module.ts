@@ -38,11 +38,31 @@ const requiredEnvVars = [
   'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
 ] as const;
+/** Required in production only — surface Origin allowlists (TTW-020). */
+const requiredProductionEnvVars = [
+  'AUTH_ADMIN_ORIGINS',
+  'AUTH_CUSTOMER_ORIGINS',
+] as const;
 const forbiddenPlaceholders = new Set([
   'secret',
   'your-access-secret-key-change-in-production',
   'your-refresh-secret-key-change-in-production',
 ]);
+
+function parseOriginEntries(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      try {
+        return new URL(entry).origin;
+      } catch {
+        return null;
+      }
+    })
+    .filter((entry): entry is string => Boolean(entry));
+}
 
 function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   if (process.env.NODE_ENV === 'test') {
@@ -65,6 +85,21 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
       throw new Error(
         `Environment variable ${key} must be set to a secure value, not a placeholder`,
       );
+    }
+  }
+  if (process.env.NODE_ENV === 'production') {
+    for (const key of requiredProductionEnvVars) {
+      const value = config[key];
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new Error(
+          `Missing required production environment variable: ${key}`,
+        );
+      }
+      if (parseOriginEntries(value).length === 0) {
+        throw new Error(
+          `Environment variable ${key} must contain at least one valid origin URL`,
+        );
+      }
     }
   }
   return config;

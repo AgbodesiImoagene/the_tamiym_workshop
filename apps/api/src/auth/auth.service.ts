@@ -143,8 +143,9 @@ export class AuthService {
    * Resend verification email. Always returns success to avoid leaking account existence.
    */
   async resendVerification(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
     const user = await this.prisma.user.findFirst({
-      where: { email, status: { not: UserStatus.DELETED } },
+      where: { email: normalizedEmail, status: { not: UserStatus.DELETED } },
       select: { id: true, email: true, emailVerifiedAt: true },
     });
 
@@ -162,8 +163,9 @@ export class AuthService {
    * Request password reset. Sends reset link to email if user exists. Always returns success.
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase().trim();
     const user = await this.prisma.user.findFirst({
-      where: { email, status: { not: UserStatus.DELETED } },
+      where: { email: normalizedEmail, status: { not: UserStatus.DELETED } },
       select: { id: true, email: true },
     });
 

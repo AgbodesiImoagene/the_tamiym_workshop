@@ -100,6 +100,9 @@ describe('auth-surface', () => {
       expect(resolveLoginSurfaceFromPath('/v1/auth/admin/login')).toBe(
         AuthSurface.ADMIN,
       );
+      expect(resolveLoginSurfaceFromPath('/v1/AUTH/ADMIN/LOGIN')).toBe(
+        AuthSurface.ADMIN,
+      );
     });
 
     it('resolves CUSTOMER for /auth/login', () => {
