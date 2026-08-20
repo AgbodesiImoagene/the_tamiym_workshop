@@ -90,7 +90,61 @@ ALTER TABLE "refunds" DROP COLUMN IF EXISTS "transactionReference";
 | Iteration | Reviewer                | Verdict | Notes                                                                        |
 | --------- | ----------------------- | ------- | ---------------------------------------------------------------------------- |
 | 1         | independent agents (×2) | FAIL    | Cap race, out-of-order throw, amount validation, stuck INITIATED retry, lint |
-| 2         | pending                 | —       | After FOR UPDATE serialization, CAS, amount/currency checks, re-drive        |
+| 2         | independent agent       | FAIL    | Stale sweep releases the cap on ambiguous provider outcomes (see below)      |
+
+### Iteration 2 findings (blocking)
+
+1. **Ambiguous provider outcomes release the captured-value cap.** After a transient
+   failure (or a crash mid-drive) the row is `INITIATED` with `providerRef` null or
+   `driving:{id}` — a state where Paystack may already have accepted the refund.
+   `failStaleInitiatedRefunds` flips it to `FAILED` after `STALE_INITIATED_MS`
+   (45 s) and is now invoked both at `initiateRefund` start and by the 5-minute
+   cron, so the reservation is released while the provider outcome is unknown.
+   Reproduced end to end: provider pays the customer, the order stays `PAID`, no
+   `REFUND_APPLIED` row is written, and a second full-amount refund is then
+   accepted for the same capture (two provider calls, one captured value).
+   Suggested direction: sweep ambiguous rows to `NEEDS_ATTENTION` (cap retained,
+   operator resolves), or confirm with the provider (`GET /refund?transaction=`)
+   before releasing the reservation.
+2. **Late provider confirmation cannot be matched.** `settleRefundProcessed`
+   deliberately accepts `FAILED → SUCCEEDED`, but `findRefundForWebhook`'s
+   transaction-reference fallback filters `status in IN_FLIGHT` and the sweep nulls
+   `providerRef`, so a `refund.processed` that arrives after the sweep is recorded
+   as `unmatched` and dropped. Include `FAILED` in the fallback match so the
+   reconciliation path is reachable.
+3. **`initiateRefund` retry with the stable admin key is a permanent no-op.** The
+   sweep runs before the idempotency lookup, so a human retry (> 45 s) finds a
+   `FAILED` row and returns it with HTTP 200 without calling the provider. Because
+   the admin client key is `admin-refund:{orderId}:{amount}:{reason}`, that
+   (amount, reason) pair can never be refunded again from the UI, contradicting the
+   documented "retry the same request" recovery for 409s.
+4. **Stale sweep `updateMany` has no compare-and-swap guard.** The update matches on
+   `id` only, so a refund that settles between the sweep's `SELECT` and `UPDATE` is
+   rewritten to `FAILED` with `providerRef` null while its order/campaign/ledger
+   effects remain applied — releasing the cap below the settled total. Repeat the
+   select predicate (`status`, `providerRef`, `updatedAt`) in the update.
+
+### Iteration 2 findings (non-blocking)
+
+- `driveProviderForReservedRefund` posts the caller's `amount` rather than the
+  reserved row's amount; the idempotency re-check inside `reserveRefundRow` does not
+  re-validate `orderId`/`amount`, so a concurrent same-key/different-amount request
+  can drive the provider for an amount the row does not record.
+- `settleRefundProcessed` derives the next order status from an `order.status` read
+  before the `FOR UPDATE` lock; re-read inside the transaction.
+- The `driving:{refundId}` claim token is returned to the admin API/UI through
+  `providerRef` (skip path plus `findOneForAdmin` selection).
+- Two legitimately distinct partial refunds with the same amount and reason collapse
+  onto one stable admin key and the second silently returns the first row.
+- New `PARTIALLY_REFUNDED → CANCELLED` admin transition skips `cancelledAt` and
+  inventory release and leaves the remaining balance unrefundable.
+- Playwright specs assert the simulator fixture and a route-mocked response; no admin
+  or customer UI state is exercised, and `refunds` are exposed only on
+  `findOneForAdmin`.
+- Migration backfill uses `refund.processed:{providerRef}` while runtime uses
+  `refund.processed:{refundId}:{providerRef}`.
+- `pnpm lint` fails (`refunds.service.spec.ts` template literal on `unknown`) and
+  `pnpm format:check` fails on four files; both gates are clean on `main`.
 
 ## Verification evidence
 
