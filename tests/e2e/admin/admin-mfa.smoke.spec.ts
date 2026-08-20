@@ -87,14 +87,16 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     });
 
     await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    await page.getByPlaceholder('XXXX-XXXX-...').fill('0000-0000-0000-0000-0000-0000-0000-0000');
+    await page.getByLabel(/Recovery code/i).fill('not-a-valid-recovery-code');
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
-    const alert = page.getByRole('alert').filter({ hasText: /Unauthorized/i });
+    // Prefer the product error box class — Next also mounts an empty role=alert announcer.
+    const alert = page.locator('[role="alert"].border-red-200');
     await expect(alert).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByPlaceholder('XXXX-XXXX-...')).toBeVisible();
+    await expect(alert).toContainText(/Unauthorized|rejected|try again/i);
+    await expect(page.getByLabel(/Recovery code/i)).toBeVisible();
 
-    await page.getByPlaceholder('XXXX-XXXX-...').fill(recoveryCode);
+    await page.getByLabel(/Recovery code/i).fill(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 20_000 });
