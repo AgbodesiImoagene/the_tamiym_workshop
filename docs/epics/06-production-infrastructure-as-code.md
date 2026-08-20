@@ -8,7 +8,7 @@ Provision a repeatable, cost-constrained DigitalOcean production environment fro
 
 The repository has development-only Docker Compose services and no production images, IaC, remote state, deployment workflow or formal validation environment. The API combines HTTP, BullMQ processors and cron schedulers in one NestJS process. Production also requires PostgreSQL, Valkey/Redis-compatible queue state, S3-compatible media storage, Paystack webhooks, delivery providers, DNS/TLS, secrets and OpenTelemetry.
 
-ADR-001 selects DigitalOcean because the previously proposed AWS managed stack cannot meet the approved cost ceiling. Frankfurt is the provisional primary region, London is the recovery/fallback region, Namecheap remains the registrar and permanent staging is deferred.
+ADR-001 selects DigitalOcean because the previously proposed AWS managed stack cannot meet the approved cost ceiling. **London is the primary region** after the TTW-060 Nigeria latency probe; Frankfurt is the recovery/fallback region. Namecheap remains the registrar and permanent staging is deferred.
 
 ## Scope
 

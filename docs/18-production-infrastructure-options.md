@@ -9,7 +9,7 @@
 
 Use DigitalOcean for the cost-constrained first production environment and keep application contracts portable through containers, PostgreSQL, Redis-compatible protocols, S3 APIs and OpenTelemetry.
 
-The approved launch combines a USD 24/month 4 GiB Droplet, USD 15.15/month single-node Managed PostgreSQL and USD 5/month Spaces subscription. Valkey runs on the application Droplet initially. The approximate USD 44.15 baseline leaves only a narrow margin for backup storage and variable charges, so TTW-060 must reproduce current regional prices before provisioning.
+The approved launch combines a USD 24/month 4 GiB Droplet, USD 15.15/month single-node Managed PostgreSQL and USD 5/month Spaces subscription. Valkey runs on the application Droplet initially. TTW-060 reproduced dated prices on 2026-08-20: mandatory baseline **USD 45.65**/month (including USD 1.50 off-provider backup estimate) under the USD 50 ceiling. **London (`lon1`) is primary** after the Nigeria latency probe; Frankfurt remains the recovery region.
 
 This is deliberately not a highly available or horizontally autoscaled launch. It protects the authoritative PostgreSQL data with a managed service while accepting a single application-node failure domain. The system upgrades to a load balancer, multiple Droplets and managed Valkey when measured demand or business risk justifies the additional cost.
 
@@ -70,15 +70,15 @@ AWS should be reconsidered only if a future compliance, residency, identity or s
 - **Railway:** usage-based and convenient, but less predictable under sustained multi-service load and not the selected dedicated managed PostgreSQL operating model.
 - **DigitalOcean App Platform:** a good later operational simplification, but the required always-on components and autoscaling tiers do not fit the current ceiling as comfortably as a consolidated Droplet.
 
-## TTW-060 decision gate
+## TTW-060 decision gate (status 2026-08-20)
 
-Before persistent resources are created, TTW-060 must:
+TTW-060 **completed** the architecture/cost gate with recorded deviations:
 
-1. measure latency from Nigeria to Frankfurt and London and approve the primary region;
-2. reproduce a dated minimal, expected and stress cost model, including backups, traffic, monitoring and temporary validation;
-3. approve the Droplet process/container layout and resource budgets;
-4. prove the monorepo images, HTTP health, worker/scheduler split, PostgreSQL TLS, Valkey no-eviction behavior, Spaces uploads, provider webhooks and OpenTelemetry export;
-5. select and prove a locking/recovery mechanism for OpenTofu remote state;
-6. document provider-token, SSH, secrets, patching and break-glass controls;
-7. approve backup retention, off-provider export and region-rebuild procedures; and
-8. record upgrade triggers and the exit path for database and object data.
+1. ✅ Measured Lagos→Frankfurt/London latency; approved **London primary**, Frankfurt recovery (`docs/infrastructure/ttw-060-latency-evidence.md`).
+2. ✅ Reproduced dated minimal (**45.65**), expected (**47.65**) and stress (**89.65**) cost model via `pnpm infra:cost-model`.
+3. ✅ Approved Droplet container layout/budgets (`docs/infrastructure/ttw-060-resource-budget.md`); constrained host boot remains TTW-063.
+4. ⚠️ Compatibility: MinIO Spaces-compatible + app webhook/OTel contracts proven; **live Managed PostgreSQL disposable spike deferred to TTW-061/064** (owner API token).
+5. ⚠️ Remote state: MinIO S3+lockfile proven; **Spaces bootstrap proof is TTW-061**.
+6. ✅ Documented token/SSH/secrets ownership (hardening TTW-065).
+7. ✅ Approved backup retention and RPO by data class (media/state regional risk explicit).
+8. ✅ Recorded upgrade triggers and exit path in ADR-001.

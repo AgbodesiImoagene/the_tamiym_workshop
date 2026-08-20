@@ -1,0 +1,26 @@
+{
+  "host": {
+    "sku": "basic-4gib-2vcpu",
+    "memoryMiB": 4096,
+    "vcpus": 2,
+    "diskGiB": 80,
+    "swapAllowedForCorrectness": false,
+    "reservedHostHeadroomMiB": 512
+  },
+  "containers": [
+    { "role": "proxy", "softMiB": 64, "hardMiB": 128 },
+    { "role": "web", "softMiB": 384, "hardMiB": 512 },
+    { "role": "app", "softMiB": 384, "hardMiB": 512 },
+    { "role": "admin", "softMiB": 384, "hardMiB": 512 },
+    { "role": "api", "softMiB": 512, "hardMiB": 768 },
+    { "role": "worker", "softMiB": 384, "hardMiB": 512 },
+    { "role": "scheduler", "softMiB": 192, "hardMiB": 256 },
+    {
+      "role": "valkey",
+      "softMiB": 256,
+      "hardMiB": 384,
+      "maxmemoryMiB": 256,
+      "maxmemoryPolicy": "noeviction"
+    }
+  ]
+}

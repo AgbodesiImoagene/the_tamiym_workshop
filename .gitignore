@@ -66,3 +66,17 @@ redis_data/
 
 # Local redis dump
 dump.rdb
+
+# OpenTofu / Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+infra/**/backend.hcl
