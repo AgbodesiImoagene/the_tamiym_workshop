@@ -144,7 +144,14 @@ if (!fs.existsSync(firewallMain)) {
     }
   }
   for (const port of ["5432", "6379", "27017", "2375", "9000"]) {
-    if (new RegExp(`inbound_rule[\\s\\S]*?port_range\\s*=\\s*"${port}"`).test(body)) {
+    const inboundOnly = [
+      ...body.matchAll(/inbound_rule\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g),
+    ].map((m) => m[1]);
+    if (
+      inboundOnly.some((block) =>
+        new RegExp(`port_range\\s*=\\s*"${port}"`).test(block),
+      )
+    ) {
       failures.push(`firewall module inbound declares forbidden port ${port}`);
     }
   }
