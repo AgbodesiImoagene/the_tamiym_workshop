@@ -72,6 +72,23 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     await context.close();
   });
 
+  test('recovery field shows accessible empty-state validation', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: urls.admin });
+    const page = await context.newPage();
+
+    await page.goto('/auth/login');
+    await fillAdminPasswordStep(page, e2eUsers.admin.email, e2eUsers.admin.password);
+    await expect(page.getByText('Two-factor authentication')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
+    await page.getByRole('button', { name: /Use recovery code/i }).click();
+    await expect(page.getByText('Enter a recovery code')).toBeVisible();
+
+    await context.close();
+  });
+
   test('recovery code completes admin console login', async ({ browser }, testInfo) => {
     const recoveryCode =
       e2eUsers.admin.recoveryCodes[
@@ -88,17 +105,10 @@ test.describe('Admin MFA console login @smoke @admin', () => {
     });
 
     await page.getByRole('button', { name: /Use a recovery code instead/i }).click();
-    const recoveryField = page.getByRole('textbox', { name: /Recovery code/i });
+    const recoveryField = page.getByPlaceholder('XXXX-XXXX-...');
     await expect(recoveryField).toBeVisible();
-    await page.getByRole('button', { name: /Use recovery code/i }).click();
-    // Accessible field-level error (empty submit) — FormMessage, not the page alert.
-    await expect(page.getByText('Enter a recovery code')).toBeVisible();
-
-    // react-hook-form controlled inputs often ignore a bare fill() after validation;
-    // click + pressSequentially reliably commits the value.
     await recoveryField.click();
-    await recoveryField.fill('');
-    await recoveryField.pressSequentially(recoveryCode, { delay: 15 });
+    await recoveryField.fill(recoveryCode);
     await expect(recoveryField).toHaveValue(recoveryCode);
     await page.getByRole('button', { name: /Use recovery code/i }).click();
 
