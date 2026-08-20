@@ -33,6 +33,9 @@ export default function AdminOrderDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState(OrderStatus.PROCESSING);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  const [refundIdempotencyKey] = useState(
+    () => `admin-refund:${orderId}:${crypto.randomUUID()}`,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +61,7 @@ export default function AdminOrderDetailPage() {
 
   const refundMutation = useMutation({
     mutationFn: (input: { amount: number; reason?: string }) =>
-      createAdminRefund(orderId, input.amount, input.reason),
+      createAdminRefund(orderId, input.amount, input.reason, refundIdempotencyKey),
     onSuccess: async (result) => {
       const status = result?.status ?? 'INITIATED';
       setMessage(

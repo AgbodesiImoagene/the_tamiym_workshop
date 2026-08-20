@@ -91,6 +91,7 @@ ALTER TABLE "refunds" DROP COLUMN IF EXISTS "transactionReference";
 | --------- | ----------------------- | ------- | ---------------------------------------------------------------------------- |
 | 1         | independent agents (×2) | FAIL    | Cap race, out-of-order throw, amount validation, stuck INITIATED retry, lint |
 | 2         | independent agent       | FAIL    | Stale sweep releases the cap on ambiguous provider outcomes (see below)      |
+| 3         | pending                 | —       | Cap-safe NEEDS_ATTENTION escalate; driving clear only; FAILED webhook match  |
 
 ### Iteration 2 findings (blocking)
 

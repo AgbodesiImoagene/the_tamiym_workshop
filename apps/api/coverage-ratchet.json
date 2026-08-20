@@ -2,11 +2,11 @@
   "version": 1,
   "source": "apps/api",
   "measuredAt": "2026-08-20",
-  "notes": "Raised after TTW-013 single-flight drive claim fixes.",
+  "notes": "Raised after TTW-013 stale-sweep cap-safe fix.",
   "floors": {
-    "statements": 49.4,
+    "statements": 49.44,
     "branches": 43.93,
     "functions": 47.1,
-    "lines": 49.49
+    "lines": 49.54
   }
 }

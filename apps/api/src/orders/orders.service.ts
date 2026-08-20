@@ -635,10 +635,7 @@ export class OrdersService {
   > = {
     [OrderStatus.PENDING_PAYMENT]: [OrderStatus.CANCELLED],
     [OrderStatus.PAID]: [OrderStatus.PROCESSING],
-    [OrderStatus.PARTIALLY_REFUNDED]: [
-      OrderStatus.PROCESSING,
-      OrderStatus.CANCELLED,
-    ],
+    [OrderStatus.PARTIALLY_REFUNDED]: [OrderStatus.PROCESSING],
     [OrderStatus.PROCESSING]: [OrderStatus.FULFILLED, OrderStatus.CANCELLED],
     [OrderStatus.FULFILLED]: [OrderStatus.DELIVERED],
   };

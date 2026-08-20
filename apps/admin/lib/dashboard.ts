@@ -206,10 +206,9 @@ export async function createAdminRefund(
   reason?: string,
   idempotencyKey?: string,
 ) {
-  // Stable per order+amount so retries reuse the same reservation after transient failures.
-  const key =
-    idempotencyKey ??
-    `admin-refund:${id}:${amount.toFixed(2)}:${reason?.trim() ?? ''}`;
+  // Callers should pass a page-session-stable key so transient retries reuse
+  // the same reservation without collapsing distinct partial refunds.
+  const key = idempotencyKey ?? `admin-refund:${id}:${crypto.randomUUID()}`;
   return apiClient.post<{
     id: string;
     orderId: string;

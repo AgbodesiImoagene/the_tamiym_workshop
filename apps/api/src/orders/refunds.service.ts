@@ -174,8 +174,8 @@ export class RefundsService {
           throw new BadRequestException('Refund amount must be greater than 0');
         }
 
-        // Release immortal INITIATED / stale drive claims so retries can proceed.
-        await this.failStaleInitiatedRefunds();
+        // Clear only stale drive claims (never release the captured-value cap).
+        await this.clearStaleDriveClaims();
 
         if (idempotencyKey) {
           const existing = await this.prisma.refund.findUnique({
@@ -192,15 +192,26 @@ export class RefundsService {
                 'Idempotency key already used with a different amount',
               );
             }
-            // Re-drive provider for stuck INITIATED (no ref or stale drive claim).
+            // Re-drive when still INITIATED (null / driving) or NEEDS_ATTENTION.
             if (
-              existing.status === RefundStatus.INITIATED &&
-              (existing.providerRef == null ||
-                existing.providerRef.startsWith('driving:'))
+              existing.status === RefundStatus.INITIATED ||
+              existing.status === RefundStatus.NEEDS_ATTENTION
             ) {
+              if (existing.status === RefundStatus.NEEDS_ATTENTION) {
+                await this.prisma.refund.updateMany({
+                  where: {
+                    id: existing.id,
+                    status: RefundStatus.NEEDS_ATTENTION,
+                  },
+                  data: {
+                    status: RefundStatus.INITIATED,
+                    providerRef: null,
+                  },
+                });
+              }
               return this.driveProviderForReservedRefund(
                 existing.id,
-                amount,
+                money(existing.amount),
                 reason,
                 actorUserId,
               );
@@ -427,9 +438,10 @@ export class RefundsService {
     }
 
     try {
+      const reservedAmount = money(refund.amount);
       const providerResult = await this.paystackRefundClient.createRefund({
         transactionReference,
-        amountKobo: Math.round(amount * 100),
+        amountKobo: Math.round(reservedAmount * 100),
         customerNote: reason,
         merchantNote: reason,
         idempotencyKey: refund.idempotencyKey ?? refund.id,
@@ -604,7 +616,9 @@ export class RefundsService {
     const matches = await this.prisma.refund.findMany({
       where: {
         transactionReference: txnRef,
-        status: { in: [...IN_FLIGHT] },
+        status: {
+          in: [...IN_FLIGHT, RefundStatus.FAILED],
+        },
         ...(amountMajor != null ? { amount: amountMajor } : {}),
       },
       orderBy: { createdAt: 'asc' },
@@ -783,6 +797,9 @@ export class RefundsService {
         await tx.$executeRaw`
           SELECT id FROM "orders" WHERE id = ${order.id} FOR UPDATE
         `;
+        const lockedOrder = await tx.order.findUniqueOrThrow({
+          where: { id: order.id },
+        });
 
         await tx.refundSettlementClaim.create({
           data: {
@@ -838,7 +855,7 @@ export class RefundsService {
           0,
         );
         const nextOrderStatus = deriveOrderStatusAfterRefund(
-          order.status,
+          lockedOrder.status,
           succeededSum,
           captured,
         );
@@ -943,31 +960,49 @@ export class RefundsService {
   }
 
   /**
-   * Fail immortal INITIATED rows with no providerRef so the cap can recover
-   * (operator may retry with a new or same idempotency key).
+   * Clear stale driving: claims so retries can re-drive without releasing the
+   * captured-value cap. Ambiguous INITIATED (null providerRef) rows escalate to
+   * NEEDS_ATTENTION and remain in-flight for the cap until an operator or
+   * provider webhook resolves them (TTW-013 review 2).
    */
-  async failStaleInitiatedRefunds(now = new Date()): Promise<number> {
+  async clearStaleDriveClaims(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - STALE_INITIATED_MS);
-    const stale = await this.prisma.refund.findMany({
+    const result = await this.prisma.refund.updateMany({
       where: {
         status: RefundStatus.INITIATED,
+        providerRef: { startsWith: 'driving:' },
         updatedAt: { lt: cutoff },
-        OR: [
-          { providerRef: null },
-          { providerRef: { startsWith: 'driving:' } },
-        ],
       },
-      select: { id: true },
-    });
-    if (stale.length === 0) return 0;
-    const result = await this.prisma.refund.updateMany({
-      where: { id: { in: stale.map((r) => r.id) } },
-      data: { status: RefundStatus.FAILED, providerRef: null },
+      data: { providerRef: null },
     });
     if (result.count > 0) {
       this.observability.recordRefundSettlement('stale');
-      this.logger.warn(`Failed ${result.count} stale INITIATED refunds`);
+      this.logger.warn(`Cleared ${result.count} stale refund drive claims`);
     }
     return result.count;
+  }
+
+  /**
+   * Escalate long-lived ambiguous INITIATED rows to NEEDS_ATTENTION without
+   * releasing the cumulative captured-value reservation.
+   */
+  async failStaleInitiatedRefunds(now = new Date()): Promise<number> {
+    const cleared = await this.clearStaleDriveClaims(now);
+    const cutoff = new Date(now.getTime() - STALE_INITIATED_MS);
+    const result = await this.prisma.refund.updateMany({
+      where: {
+        status: RefundStatus.INITIATED,
+        providerRef: null,
+        updatedAt: { lt: cutoff },
+      },
+      data: { status: RefundStatus.NEEDS_ATTENTION },
+    });
+    if (result.count > 0) {
+      this.observability.recordRefundSettlement('status_updated');
+      this.logger.warn(
+        `Escalated ${result.count} stale INITIATED refunds to NEEDS_ATTENTION`,
+      );
+    }
+    return cleared + result.count;
   }
 }

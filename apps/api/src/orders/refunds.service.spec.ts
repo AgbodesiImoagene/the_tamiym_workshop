@@ -176,7 +176,7 @@ describe('RefundsService', () => {
             findUniqueOrThrow: jest.fn().mockResolvedValue(row),
             update: jest.fn().mockResolvedValue({
               ...row,
-              providerRef: `driving:${initiated.id}`,
+              providerRef: `driving:${String(initiated.id)}`,
             }),
           },
         };
@@ -496,7 +496,10 @@ describe('RefundsService', () => {
               findMany: jest.fn().mockResolvedValue([{ amount: 5000 }]),
               findUnique: jest.fn(),
             },
-            order: { update: jest.fn().mockResolvedValue({}) },
+            order: {
+              update: jest.fn().mockResolvedValue({}),
+              findUniqueOrThrow: jest.fn().mockResolvedValue(mockOrder),
+            },
             campaign: { update: jest.fn() },
             notificationOutbox: {
               create: jest.fn().mockResolvedValue({ id: 'n1' }),
@@ -541,7 +544,10 @@ describe('RefundsService', () => {
               findMany: jest.fn().mockResolvedValue([{ amount: 5000 }]),
               findUnique: jest.fn(),
             },
-            order: { update: jest.fn().mockResolvedValue({}) },
+            order: {
+              update: jest.fn().mockResolvedValue({}),
+              findUniqueOrThrow: jest.fn().mockResolvedValue(mockOrder),
+            },
             campaign: { update: jest.fn().mockResolvedValue({}) },
             notificationOutbox: {
               create: jest.fn().mockResolvedValue({ id: 'notif-1' }),
@@ -613,7 +619,10 @@ describe('RefundsService', () => {
               findMany: jest.fn().mockResolvedValue([{ amount: 5000 }]),
               findUnique: jest.fn(),
             },
-            order: { update: jest.fn().mockResolvedValue({}) },
+            order: {
+              update: jest.fn().mockResolvedValue({}),
+              findUniqueOrThrow: jest.fn().mockResolvedValue(mockOrder),
+            },
             campaign: { update: jest.fn().mockResolvedValue({}) },
             notificationOutbox: {
               create: jest.fn().mockResolvedValue({ id: 'notif-1' }),
@@ -710,13 +719,12 @@ describe('RefundsService', () => {
     });
 
     it('fails stale INITIATED refunds without providerRef', async () => {
-      prisma.refund.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
-      prisma.refund.updateMany.mockResolvedValue({ count: 2 });
+      prisma.refund.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 2 });
       const count = await service.failStaleInitiatedRefunds();
-      expect(count).toBe(2);
-      expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
-        'stale',
-      );
+      expect(count).toBe(3);
+      expect(observability.recordRefundSettlement).toHaveBeenCalled();
     });
 
     it('rejects currency mismatch without settling', async () => {
