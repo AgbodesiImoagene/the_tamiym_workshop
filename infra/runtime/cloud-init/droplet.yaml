@@ -1,0 +1,102 @@
+#cloud-config
+# TTW-065 — Droplet host hardening sketch for The Tamiym Workshop.
+# Wire into Droplet create (TTW-063). Review before live apply; no secrets here.
+#
+# Goals:
+# - SSH key-only (PasswordAuthentication no)
+# - Unattended security updates with a controlled reboot window
+# - fail2ban sketch for sshd
+# - Notes for non-root Docker / Compose workloads
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - unattended-upgrades
+  - fail2ban
+  - apt-listchanges
+
+users:
+  - default
+  # Named operator users / SSH keys are owner-provisioned; do not embed private keys.
+  # Example (uncomment and replace with real public keys at apply time):
+  # - name: tamiym-ops
+  #   groups: [sudo, docker]
+  #   shell: /bin/bash
+  #   sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+  #   ssh_authorized_keys:
+  #     - ssh-ed25519 PLACEHOLDER_OPERATOR_PUBLIC_KEY
+
+ssh_pwauth: false
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-tamiym-hardening.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # TTW-065 — password auth off; keys only
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      PermitRootLogin prohibit-password
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+  - path: /etc/apt/apt.conf.d/50unattended-upgrades-tamiym
+    owner: root:root
+    permissions: "0644"
+    content: |
+      // TTW-065 — security updates; controlled reboot window (adjust as needed)
+      Unattended-Upgrade::Allowed-Origins {
+        "${distro_id}:${distro_codename}-security";
+        "${distro_id}ESMApps:${distro_codename}-apps-security";
+        "${distro_id}ESM:${distro_codename}-infra-security";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:30";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+  - path: /etc/fail2ban/jail.d/sshd.local
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # TTW-065 — fail2ban sketch for sshd (tune after first soak)
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
+  - path: /etc/tamiym/README-secrets
+    owner: root:root
+    permissions: "0640"
+    content: |
+      Place runtime secrets at /etc/tamiym/secrets.env (root:root 0600).
+      See infra/runtime/secrets/README.md — values never enter OpenTofu state.
+
+runcmd:
+  - systemctl enable --now fail2ban
+  - systemctl enable --now unattended-upgrades
+  - systemctl reload ssh || systemctl reload sshd || true
+  - install -d -m 0750 -o root -g root /etc/tamiym
+
+final_message: |
+  TTW-065 cloud-init complete. Next:
+  - Install Docker Engine from the official docs; add only named ops users to the docker group.
+  - Run Compose services as non-root container users (see infra/runtime/valkey/compose.snippet.yml user: "999:999").
+  - Prefer read_only rootfs, cap_drop ALL, no-new-privileges, and internal networks for data-plane services.
+  - Do not run api/worker/scheduler as UID 0 inside containers.
+  - Cloud Firewall (TTW-062) remain the primary SSH allowlist; fail2ban is defense-in-depth.
