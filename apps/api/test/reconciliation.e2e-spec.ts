@@ -304,4 +304,59 @@ describe('Reconciliation (e2e)', () => {
     expect(JSON.stringify(masked)).not.toContain('customer@example.com');
     void admin;
   });
+
+  it('documents inventory drift with two-person WONT_FIX repair', async () => {
+    const passwordHash = await bcrypt.hash('TestPassword1!', 10);
+    const stamp = Date.now();
+    const requester = await prisma.user.create({
+      data: {
+        email: `recon-inv-req-${stamp}@example.com`,
+        passwordHash,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        firstName: 'Req',
+        lastName: 'Inv',
+      },
+    });
+    const approver = await prisma.user.create({
+      data: {
+        email: `recon-inv-apr-${stamp}@example.com`,
+        passwordHash,
+        role: UserRole.ADMIN,
+        status: UserStatus.ACTIVE,
+        firstName: 'Apr',
+        lastName: 'Inv',
+      },
+    });
+    const run = await runs.runInternal(new Date());
+    const finding = await prisma.reconciliationFinding.create({
+      data: {
+        runId: run!.id,
+        domain: 'INVENTORY',
+        outcome: 'MISMATCH',
+        severity: 'CRITICAL',
+        fingerprint: `inv-doc-${stamp}`,
+        leftLabel: 'inventory.reserved',
+        leftValue: '1',
+        rightLabel: 'sum(movement.reservedDelta)',
+        rightValue: '0',
+        sourceIds: { variantId: `var-${stamp}` },
+      },
+    });
+
+    const request = await repairs.requestRepair({
+      findingId: finding.id,
+      actorUserId: requester.id,
+      commandKey: 'inventory.noop_document_drift',
+    });
+    await repairs.approveAndApply({
+      repairId: request.id,
+      actorUserId: approver.id,
+    });
+
+    const updated = await prisma.reconciliationFinding.findUniqueOrThrow({
+      where: { id: finding.id },
+    });
+    expect(updated.status).toBe(ReconciliationFindingStatus.WONT_FIX);
+  });
 });

@@ -10,11 +10,20 @@ import {
   ReconciliationDomain,
   ReconciliationFindingStatus,
   ReconciliationRepairStatus,
+  ReconciliationRunStatus,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ReconciliationRunsService } from './reconciliation-runs.service';
+
+const COMMAND_BY_DOMAIN: Record<ReconciliationDomain, readonly string[]> = {
+  [ReconciliationDomain.PAYMENT]: ['payment.document_missing_claim'],
+  [ReconciliationDomain.REFUND]: ['refund.document_missing_claim'],
+  [ReconciliationDomain.PAYOUT]: ['payout.document_ledger_gap'],
+  [ReconciliationDomain.CAMPAIGN]: ['campaign.recompute_current_amount'],
+  [ReconciliationDomain.INVENTORY]: ['inventory.noop_document_drift'],
+};
 
 @Injectable()
 export class ReconciliationRepairService {
@@ -42,6 +51,7 @@ export class ReconciliationRepairService {
         'Finding is not repairable in current status',
       );
     }
+    this.assertCommandForDomain(finding.domain, params.commandKey);
 
     const repair = await this.prisma.reconciliationRepairRequest.create({
       data: {
@@ -98,6 +108,7 @@ export class ReconciliationRepairService {
     if (!moneyOrStock) {
       throw new BadRequestException('Unsupported repair domain');
     }
+    this.assertCommandForDomain(repair.domain, repair.commandKey);
 
     await this.prisma.reconciliationRepairRequest.update({
       where: { id: repair.id },
@@ -123,8 +134,24 @@ export class ReconciliationRepairService {
         after,
       });
 
-      // Targeted verification run (reporting); close finding only when verified.
-      await this.runs.runTargeted(repair.findingId);
+      const verifyRun = await this.runs.runTargeted(repair.findingId);
+      if (
+        !verifyRun ||
+        verifyRun.status === ReconciliationRunStatus.FAILED ||
+        verifyRun.status === ReconciliationRunStatus.INCOMPLETE
+      ) {
+        await this.prisma.reconciliationRepairRequest.update({
+          where: { id: repair.id },
+          data: {
+            status: ReconciliationRepairStatus.FAILED,
+            errorSummary: `Targeted verification run status=${verifyRun?.status ?? 'null'}`,
+            afterEvidence: after as Prisma.InputJsonValue,
+          },
+        });
+        throw new BadRequestException(
+          'Repair verification failed: targeted run did not complete',
+        );
+      }
 
       if (isDocumentOnly) {
         await this.prisma.reconciliationFinding.update({
@@ -211,6 +238,18 @@ export class ReconciliationRepairService {
     }
   }
 
+  private assertCommandForDomain(
+    domain: ReconciliationDomain,
+    commandKey: string,
+  ) {
+    const allowed = COMMAND_BY_DOMAIN[domain] ?? [];
+    if (!allowed.includes(commandKey)) {
+      throw new BadRequestException(
+        `Command ${commandKey} is not allowed for domain ${domain}`,
+      );
+    }
+  }
+
   private async applyCommand(
     commandKey: string,
     finding: {
@@ -241,8 +280,6 @@ export class ReconciliationRepairService {
     }
 
     if (commandKey === 'inventory.noop_document_drift') {
-      // Safe no-op repair that records evidence; historical consume backfill
-      // is intentionally manual via TTW-014 effect keys when operators approve.
       return {
         variantId: sourceIds.variantId ?? null,
         note: 'Documented inventory drift; no automatic counter rewrite',

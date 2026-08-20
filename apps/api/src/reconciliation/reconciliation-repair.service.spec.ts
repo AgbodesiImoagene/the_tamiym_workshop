@@ -54,7 +54,9 @@ describe('ReconciliationRepairService', () => {
           .mockResolvedValue({ id: 'c1', currentAmount: 12 }),
       },
     };
-    runs = { runTargeted: jest.fn().mockResolvedValue({}) };
+    runs = {
+      runTargeted: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -127,6 +129,29 @@ describe('ReconciliationRepairService', () => {
         }),
       }),
     );
+  });
+
+  it('rejects command/domain mismatch', async () => {
+    prisma.reconciliationRepairRequest.findUnique.mockResolvedValue({
+      id: 'rep1',
+      status: ReconciliationRepairStatus.REQUESTED,
+      requestedByUserId: 'admin-a',
+      domain: ReconciliationDomain.PAYMENT,
+      commandKey: 'campaign.recompute_current_amount',
+      findingId: 'f1',
+      finding: {
+        id: 'f1',
+        domain: ReconciliationDomain.PAYMENT,
+        sourceIds: { paymentId: 'pay1' },
+        leftValue: 'x',
+        rightValue: 'y',
+        fingerprint: 'fp1',
+      },
+    });
+
+    await expect(
+      service.approveAndApply({ repairId: 'rep1', actorUserId: 'admin-b' }),
+    ).rejects.toThrow(/not allowed for domain/i);
   });
 
   it('marks WONT_FIX for payment.document_missing_claim', async () => {
