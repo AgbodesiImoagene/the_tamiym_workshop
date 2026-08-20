@@ -12,7 +12,7 @@
 4. **Exactly-once effect keys.** Append-only `InventoryMovement` rows with unique `effectKey` of the form `inventory.{reserve|release|consume}:orderItem:{id}`. Each line follows exactly one terminal path after reserve: release **or** consume.
 5. **`trackInventory = false`.** Skips counter mutations and movement writes for that variant.
 6. **Historical drift.** Orders already `PAID` before this migration may still hold `reserved` without a `CONSUME` movement. Do not auto-mutate production counters in this ticket; TTW-015 reconciliation/repair owns backfill with evidence.
-7. **Expired + in-flight payment.** If `charge.success` arrives after `expiresAt` while the order is still `PENDING_PAYMENT`, reject settlement (manual refund) but cancel the order and **release** reserved stock so inventory cannot leak while expiry cron skips `INITIATED` payments.
+7. **Rejected unsettled charges.** If `charge.success` cannot settle (expired, amount/currency mismatch) while the order is still `PENDING_PAYMENT`, cancel the order and **release** reserved stock so an `INITIATED` payment cannot block expiry and leak inventory. Money still requires a manual refund / ops follow-up.
 
 ## Consequences
 
