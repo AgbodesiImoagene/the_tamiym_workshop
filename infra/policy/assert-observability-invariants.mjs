@@ -113,7 +113,9 @@ export function assertObservabilityInvariants(root) {
       if (!mustExist(rb)) {
         // mustExist already recorded
       } else if (!rb.startsWith('infra/runtime/observability/runbooks/')) {
-        failures.push(`${label}: runbook_relpath should live under infra/runtime/observability/runbooks/`);
+        failures.push(
+          `${label}: runbook_relpath should live under infra/runtime/observability/runbooks/`
+        );
       }
     }
   }
@@ -124,7 +126,11 @@ export function assertObservabilityInvariants(root) {
   if (/dop_v1_[A-Za-z0-9_]{20,}/.test(collector)) {
     failures.push(`${COLLECTOR_REL}: contains DigitalOcean token pattern dop_v1_…`);
   }
-  if (/DIGITALOCEAN_TOKEN\s*[:=]\s*["']?(?!\$\{env:)(?!PLACEHOLDER)[A-Za-z0-9_+/=-]{8,}/.test(collector)) {
+  if (
+    /DIGITALOCEAN_TOKEN\s*[:=]\s*["']?(?!\$\{env:)(?!PLACEHOLDER)[A-Za-z0-9_+/=-]{8,}/.test(
+      collector
+    )
+  ) {
     failures.push(`${COLLECTOR_REL}: must not hardcode DIGITALOCEAN_TOKEN`);
   }
   // Reject obvious hardcoded secrets (non-env placeholders).
@@ -150,7 +156,9 @@ export function assertObservabilityInvariants(root) {
 
   // Destination must be env-configured, not a hardcoded vendor URL with credentials.
   if (!/\$\{env:OTEL_EXPORTER_OTLP_ENDPOINT\}/.test(collector)) {
-    failures.push(`${COLLECTOR_REL}: exporter endpoint must use \${env:OTEL_EXPORTER_OTLP_ENDPOINT}`);
+    failures.push(
+      `${COLLECTOR_REL}: exporter endpoint must use \${env:OTEL_EXPORTER_OTLP_ENDPOINT}`
+    );
   }
 
   return failures;
