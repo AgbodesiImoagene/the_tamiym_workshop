@@ -258,9 +258,7 @@ export default function DashboardOrderDetailPage() {
                   <ol className="space-y-2 border-t border-black/10 pt-3">
                     {order.shipment.events.map((event) => (
                       <li key={event.id} className="text-sm text-black/75">
-                        <span className="font-semibold">
-                          {event.type.replaceAll('_', ' ')}
-                        </span>
+                        <span className="font-semibold">{event.type.replaceAll('_', ' ')}</span>
                         <span className="text-black/50">
                           {' '}
                           · {new Date(event.occurredAt).toLocaleString()}
@@ -274,8 +272,7 @@ export default function DashboardOrderDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafafa] p-4 text-sm text-black/70">
-                  {order.shipmentPlaceholder ??
-                    'Shipping updates will appear here when available.'}
+                  {order.shipmentPlaceholder ?? 'Shipping updates will appear here when available.'}
                 </div>
               )}
 
