@@ -57,6 +57,7 @@ describe('ShipmentsService', () => {
       findFirst: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     shipmentEvent: { create: jest.Mock; findFirst: jest.Mock };
     notificationOutbox: { create: jest.Mock };
@@ -75,6 +76,7 @@ describe('ShipmentsService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       shipmentEvent: { create: jest.fn(), findFirst: jest.fn() },
       notificationOutbox: {
@@ -200,7 +202,7 @@ describe('ShipmentsService', () => {
           events: [],
         });
       prisma.shipmentEvent.create.mockResolvedValue({});
-      prisma.shipment.update.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.updateStatus(
         'ship-1',
@@ -220,8 +222,9 @@ describe('ShipmentsService', () => {
           }),
         }),
       );
-      expect(prisma.shipment.update).toHaveBeenCalledWith(
+      expect(prisma.shipment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: 'ship-1', status: ShipmentStatus.READY },
           data: expect.objectContaining({
             status: ShipmentStatus.DISPATCHED,
             trackingNumber: 'TRK1',
@@ -274,7 +277,7 @@ describe('ShipmentsService', () => {
           events: [],
         });
       prisma.shipmentEvent.create.mockResolvedValue({});
-      prisma.shipment.update.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
       prisma.order.updateMany.mockResolvedValue({ count: 1 });
 
       await service.updateStatus(
@@ -308,7 +311,7 @@ describe('ShipmentsService', () => {
           events: [],
         });
       prisma.shipmentEvent.create.mockResolvedValue({});
-      prisma.shipment.update.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
 
       await service.updateStatus(
         'ship-1',
@@ -321,8 +324,9 @@ describe('ShipmentsService', () => {
         'admin-1',
       );
 
-      expect(prisma.shipment.update).toHaveBeenCalledWith(
+      expect(prisma.shipment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: 'ship-1', status: ShipmentStatus.IN_TRANSIT },
           data: expect.objectContaining({
             status: ShipmentStatus.EXCEPTION,
             exceptionCode: 'LOST',
@@ -331,6 +335,96 @@ describe('ShipmentsService', () => {
           }),
         }),
       );
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not derive order status on CANCELLED', async () => {
+      prisma.shipment.findUnique
+        .mockResolvedValueOnce({
+          ...baseShipment,
+          status: ShipmentStatus.READY,
+        })
+        .mockResolvedValueOnce({
+          ...baseShipment,
+          status: ShipmentStatus.CANCELLED,
+          events: [],
+        });
+      prisma.shipmentEvent.create.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateStatus(
+        'ship-1',
+        { status: 'CANCELLED', idempotencyKey: 'idem-cancel-1' },
+        'admin-1',
+      );
+
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects concurrent status claim misses', async () => {
+      prisma.shipment.findUnique.mockResolvedValue({
+        ...baseShipment,
+        trackingNumber: 'TRK1',
+      });
+      prisma.shipmentEvent.create.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.updateStatus(
+          'ship-1',
+          {
+            status: 'DISPATCHED',
+            idempotencyKey: 'idem-race-1',
+            trackingNumber: 'TRK1',
+          },
+          'admin-1',
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('allows same-status correction on DELIVERED with supersedesEventId', async () => {
+      prisma.shipment.findUnique
+        .mockResolvedValueOnce({
+          ...baseShipment,
+          status: ShipmentStatus.DELIVERED,
+          trackingNumber: 'TRK1',
+          deliveredAt: new Date(),
+          events: [],
+        })
+        .mockResolvedValueOnce({
+          ...baseShipment,
+          status: ShipmentStatus.DELIVERED,
+          events: [{ id: 'evt-corr' }],
+        });
+      prisma.shipmentEvent.findFirst.mockResolvedValue({
+        id: 'evt-prior',
+        shipmentId: 'ship-1',
+      });
+      prisma.shipmentEvent.create.mockResolvedValue({});
+      prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateStatus(
+        'ship-1',
+        {
+          status: 'DELIVERED',
+          idempotencyKey: 'idem-corr-1',
+          trackingNumber: 'TRK1',
+          supersedesEventId: 'evt-prior',
+          correctionReason: 'Fixed customer message typo',
+          customerMessage: 'Delivered to reception.',
+        },
+        'admin-1',
+      );
+
+      expect(prisma.shipmentEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: ShipmentEventType.CORRECTION,
+            supersedesEventId: 'evt-prior',
+          }),
+        }),
+      );
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
     });
 
     it('returns existing shipment on duplicate idempotency key', async () => {

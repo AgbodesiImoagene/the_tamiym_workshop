@@ -49,6 +49,9 @@ IN_TRANSIT → OUT_FOR_DELIVERY | DELIVERED | EXCEPTION
 OUT_FOR_DELIVERY → DELIVERED | EXCEPTION
 EXCEPTION → IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | CANCELLED
 DELIVERED → (terminal for v1 transitions; corrections append superseding events only)
+CANCELLED → (terminal)
+
+Same-status corrections (e.g. `DELIVERED` → `DELIVERED`) are allowed only when `supersedesEventId` + `correctionReason` are set; they append a `CORRECTION` event and do not re-derive order status. All status writes use conditional `updateMany` on the prior status (CAS).
 CANCELLED → terminal
 ```
 

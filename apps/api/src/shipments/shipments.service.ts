@@ -227,7 +227,9 @@ export class ShipmentsService {
 
     const nextStatus = dto.status as ShipmentStatus;
     const allowed = SHIPMENT_ALLOWED_TRANSITIONS[existing.status];
-    if (!allowed.includes(nextStatus)) {
+    const isSameStatusCorrection =
+      !!dto.supersedesEventId && nextStatus === existing.status;
+    if (!isSameStatusCorrection && !allowed.includes(nextStatus)) {
       throw new BadRequestException(
         `Transition from ${existing.status} to ${nextStatus} is not allowed`,
       );
@@ -374,13 +376,19 @@ export class ShipmentsService {
           },
         });
 
-        await tx.shipment.update({
-          where: { id: shipmentId },
+        const claimed = await tx.shipment.updateMany({
+          where: { id: shipmentId, status: existing.status },
           data: shipmentData,
         });
+        if (claimed.count !== 1) {
+          throw new ConflictException(
+            'Shipment status changed concurrently; retry with the latest status',
+          );
+        }
 
         if (
           nextStatus === ShipmentStatus.DELIVERED &&
+          existing.status !== ShipmentStatus.DELIVERED &&
           existing.order.status !== OrderStatus.DELIVERED
         ) {
           if (existing.order.status !== OrderStatus.FULFILLED) {
