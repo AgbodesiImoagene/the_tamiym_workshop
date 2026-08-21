@@ -161,7 +161,13 @@ describe('RefundsService', () => {
         if (calls === 1) {
           const tx = {
             $executeRaw: jest.fn().mockResolvedValue(undefined),
-            order: { findUnique: jest.fn().mockResolvedValue(mockOrder) },
+            order: {
+              findUnique: jest.fn().mockResolvedValue({
+                ...mockOrder,
+                items: [{ designId: null }],
+              }),
+            },
+            shipment: { findFirst: jest.fn().mockResolvedValue(null) },
             payment: { findFirst: jest.fn().mockResolvedValue(mockPayment) },
             refund: {
               findMany: jest.fn().mockResolvedValue([]),
@@ -271,13 +277,20 @@ describe('RefundsService', () => {
         async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
           const tx = {
             $executeRaw: jest.fn().mockResolvedValue(undefined),
-            order: { findUnique: jest.fn().mockResolvedValue(mockOrder) },
+            order: {
+              findUnique: jest.fn().mockResolvedValue({
+                ...mockOrder,
+                items: [{ designId: null }],
+              }),
+            },
+            shipment: { findFirst: jest.fn().mockResolvedValue(null) },
             payment: { findFirst: jest.fn().mockResolvedValue(mockPayment) },
             refund: {
               findMany: jest
                 .fn()
                 .mockResolvedValue([{ amount: 8000, status: 'SUCCEEDED' }]),
               create: jest.fn(),
+              findUnique: jest.fn(),
             },
           };
           return cb(tx);
@@ -367,14 +380,19 @@ describe('RefundsService', () => {
       expect(result.status).toBe(RefundStatus.PROCESSING);
     });
 
-    it('throws NotFound when order is missing', async () => {
+    it('throws NotFound when order is missing under the reservation lock', async () => {
       prisma.$transaction.mockImplementation(
         async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
           const tx = {
             $executeRaw: jest.fn().mockResolvedValue(undefined),
             order: { findUnique: jest.fn().mockResolvedValue(null) },
+            shipment: { findFirst: jest.fn().mockResolvedValue(null) },
             payment: { findFirst: jest.fn() },
-            refund: { findMany: jest.fn(), create: jest.fn() },
+            refund: {
+              findMany: jest.fn(),
+              create: jest.fn(),
+              findUnique: jest.fn(),
+            },
           };
           return cb(tx);
         },
@@ -384,7 +402,7 @@ describe('RefundsService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('rejects non-refundable order status', async () => {
+    it('rejects non-refundable order status under the reservation lock', async () => {
       prisma.$transaction.mockImplementation(
         async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
           const tx = {
@@ -393,10 +411,16 @@ describe('RefundsService', () => {
               findUnique: jest.fn().mockResolvedValue({
                 ...mockOrder,
                 status: OrderStatus.PENDING_PAYMENT,
+                items: [{ designId: null }],
               }),
             },
+            shipment: { findFirst: jest.fn().mockResolvedValue(null) },
             payment: { findFirst: jest.fn() },
-            refund: { findMany: jest.fn(), create: jest.fn() },
+            refund: {
+              findMany: jest.fn(),
+              create: jest.fn(),
+              findUnique: jest.fn(),
+            },
           };
           return cb(tx);
         },
@@ -404,6 +428,58 @@ describe('RefundsService', () => {
       await expect(
         service.initiateRefund('order-1', 10, RefundReasonCode.ADMIN_GOODWILL),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('re-drives reserved INITIATED refund even if live policy would now deny', async () => {
+      const existing = {
+        id: 'refund-stuck',
+        orderId: 'order-1',
+        status: RefundStatus.INITIATED,
+        amount: 1000,
+        providerRef: null,
+        transactionReference: 'txn_123',
+        idempotencyKey: 'idem-policy-skip',
+        payment: mockPayment,
+        updatedAt: new Date(),
+      };
+      // Live order would deny CHANGE_OF_MIND after customization/fulfilment.
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.FULFILLED,
+        items: [{ designId: 'design-1' }],
+      });
+      prisma.refund.findUnique.mockResolvedValue(existing);
+      prisma.$transaction.mockImplementation(
+        async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
+          const tx = {
+            $executeRaw: jest.fn().mockResolvedValue(undefined),
+            refund: {
+              findUniqueOrThrow: jest.fn().mockResolvedValue(existing),
+              update: jest.fn().mockResolvedValue({
+                ...existing,
+                providerRef: 'driving:refund-stuck',
+              }),
+            },
+          };
+          return cb(tx);
+        },
+      );
+      prisma.refund.findUniqueOrThrow.mockResolvedValue({
+        ...existing,
+        status: RefundStatus.PROCESSING,
+        providerRef: '991',
+      });
+      prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.initiateRefund(
+        'order-1',
+        1000,
+        RefundReasonCode.CHANGE_OF_MIND,
+        undefined,
+        'admin',
+        'idem-policy-skip',
+      );
+      expect(paystackRefundClient.createRefund).toHaveBeenCalled();
+      expect(result.status).toBe(RefundStatus.PROCESSING);
     });
 
     it('marks FAILED and rethrows on hard provider rejection', async () => {

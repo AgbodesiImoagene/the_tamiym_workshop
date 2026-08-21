@@ -14,6 +14,44 @@ export const RESOLUTION_POLICY_VERSION =
 /** Calendar days after deliveredAt for automatic return eligibility. */
 export const RETURN_WINDOW_CALENDAR_DAYS = 7;
 
+/** Policy calendar for return-window boundaries (interim). */
+export const RESOLUTION_TIME_ZONE = 'Africa/Lagos';
+
+/**
+ * YYYY-MM-DD calendar date in the given IANA time zone.
+ */
+export function calendarDateInTimeZone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** Add whole calendar days to a YYYY-MM-DD string (UTC date arithmetic). */
+export function addCalendarDaysYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const utc = new Date(Date.UTC(y!, m! - 1, d! + days));
+  return utc.toISOString().slice(0, 10);
+}
+
+/**
+ * True when `now`'s calendar date (in `timeZone`) is on or before
+ * `from`'s calendar date + `days` (inclusive end day).
+ */
+export function isWithinCalendarDaysFrom(
+  from: Date,
+  now: Date,
+  days: number,
+  timeZone: string = RESOLUTION_TIME_ZONE,
+): boolean {
+  const start = calendarDateInTimeZone(from, timeZone);
+  const deadline = addCalendarDaysYmd(start, days);
+  const today = calendarDateInTimeZone(now, timeZone);
+  return today <= deadline;
+}
+
 export const RefundReasonCode = {
   CHANGE_OF_MIND: 'CHANGE_OF_MIND',
   DEFECT_OR_NOT_AS_DESCRIBED: 'DEFECT_OR_NOT_AS_DESCRIBED',
@@ -386,8 +424,8 @@ export function evaluateReturnEligibility(
     );
   }
 
-  const deliveredAt = asDate(input.deliveredAt);
-  if (!deliveredAt || Number.isNaN(deliveredAt.getTime())) {
+  const delivered = asDate(input.deliveredAt);
+  if (!delivered) {
     return decision(
       false,
       ResolutionCode.RETURN_NOT_ALLOWED_NOT_DELIVERED,
@@ -406,12 +444,18 @@ export function evaluateReturnEligibility(
     );
   }
 
-  const windowMs = RETURN_WINDOW_CALENDAR_DAYS * 24 * 60 * 60 * 1000;
-  if (now.getTime() - deliveredAt.getTime() > windowMs) {
+  if (
+    !isWithinCalendarDaysFrom(
+      delivered,
+      now,
+      RETURN_WINDOW_CALENDAR_DAYS,
+      RESOLUTION_TIME_ZONE,
+    )
+  ) {
     return decision(
       false,
       ResolutionCode.RETURN_NOT_ALLOWED_WINDOW_EXPIRED,
-      `Return window of ${RETURN_WINDOW_CALENDAR_DAYS} calendar days has expired.`,
+      `Return window of ${RETURN_WINDOW_CALENDAR_DAYS} calendar days (${RESOLUTION_TIME_ZONE}) has expired.`,
     );
   }
 

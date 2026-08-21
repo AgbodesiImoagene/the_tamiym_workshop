@@ -162,25 +162,34 @@ export class RefundsService {
   ) {}
 
   /**
-   * TTW-041: server-side refund eligibility before any reservation or provider call.
+   * TTW-041: server-side refund eligibility.
    * Shipment EXCEPTION alone never grants a refund (explicit reason still required).
+   * Prefer the tx-scoped overload after FOR UPDATE so reason×status cannot TOCTOU.
    */
   private async assertRefundPolicy(
     orderId: string,
     reasonCode: RefundReasonCode,
+    tx?: {
+      order: { findUnique: (args: unknown) => Promise<unknown> };
+      shipment: { findFirst: (args: unknown) => Promise<unknown> };
+    },
   ): Promise<void> {
-    const order = await this.prisma.order.findUnique({
+    const db = tx ?? this.prisma;
+    const order = (await db.order.findUnique({
       where: { id: orderId },
       select: {
         status: true,
         items: { select: { designId: true } },
       },
-    });
+    })) as {
+      status: OrderStatus;
+      items: Array<{ designId: string | null }>;
+    } | null;
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    const shipment = await this.prisma.shipment.findFirst({
+    const shipment = (await db.shipment.findFirst({
       where: {
         orderId,
         direction: ShipmentDirection.OUTBOUND,
@@ -188,7 +197,10 @@ export class RefundsService {
       },
       select: { status: true, deliveredAt: true },
       orderBy: { createdAt: 'desc' },
-    });
+    })) as {
+      status: ShipmentStatus;
+      deliveredAt: Date | null;
+    } | null;
 
     assertResolutionAllowed(
       evaluateRefundEligibility({
@@ -206,6 +218,7 @@ export class RefundsService {
    * cap before calling Paystack. Financial effects apply only on
    * provider-confirmed `refund.processed` settlement (TTW-013).
    * Eligibility is server-authoritative (TTW-041); clients must not invent it.
+   * Idempotent re-drive of an already-reserved row skips live matrix checks.
    */
   async initiateRefund(
     orderId: string,
@@ -222,8 +235,6 @@ export class RefundsService {
         if (!(amount > 0)) {
           throw new BadRequestException('Refund amount must be greater than 0');
         }
-
-        await this.assertRefundPolicy(orderId, reasonCode);
 
         const persistedReason = reason?.trim()
           ? `${reasonCode}: ${reason.trim()}`
@@ -248,6 +259,7 @@ export class RefundsService {
               );
             }
             // Re-drive when still INITIATED (null / driving) or NEEDS_ATTENTION.
+            // Skip live policy: the row already reserved under the captured-value cap.
             if (
               existing.status === RefundStatus.INITIATED ||
               existing.status === RefundStatus.NEEDS_ATTENTION
@@ -280,10 +292,14 @@ export class RefundsService {
           }
         }
 
+        // New initiate: optimistic check, then authoritative re-check under FOR UPDATE.
+        await this.assertRefundPolicy(orderId, reasonCode);
+
         const reserved = await this.reserveRefundRow(
           orderId,
           amount,
           persistedReason,
+          reasonCode,
           idempotencyKey,
         );
 
@@ -311,6 +327,7 @@ export class RefundsService {
     orderId: string,
     amount: number,
     reason: string | undefined,
+    reasonCode: RefundReasonCode,
     idempotencyKey: string | undefined,
   ): Promise<{
     refund: {
@@ -352,6 +369,9 @@ export class RefundsService {
           };
         }
       }
+
+      // Authoritative TTW-041 matrix under the same lock as the captured-value cap.
+      await this.assertRefundPolicy(orderId, reasonCode, tx);
 
       const order = await tx.order.findUnique({
         where: { id: orderId },

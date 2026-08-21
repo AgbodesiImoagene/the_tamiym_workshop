@@ -1,6 +1,7 @@
 import { OrderStatus, ShipmentStatus } from '../generated/prisma/enums';
 import {
   RESOLUTION_POLICY_VERSION,
+  RESOLUTION_TIME_ZONE,
   RefundReasonCode,
   ResolutionCode,
   ReturnReasonCode,
@@ -10,6 +11,8 @@ import {
   evaluateResolutionEligibility,
   evaluateReturnEligibility,
   evaluateShipmentExceptionRemedyGrant,
+  isWithinCalendarDaysFrom,
+  calendarDateInTimeZone,
 } from './resolution-policy';
 
 describe('resolution-policy (TTW-041)', () => {
@@ -171,16 +174,42 @@ describe('resolution-policy (TTW-041)', () => {
       });
     });
 
-    it('denies after window', () => {
+    it('denies after Africa/Lagos calendar window', () => {
+      // delivered 10 Aug Lagos calendar → deadline 17 Aug inclusive
       const d = evaluateReturnEligibility({
         orderStatus: OrderStatus.DELIVERED,
         hasCustomizedLine: false,
         activeOutboundShipmentStatus: ShipmentStatus.DELIVERED,
         deliveredAt,
-        now: new Date('2026-08-20T12:00:01.000Z'),
+        now: new Date('2026-08-18T00:00:00.000Z'),
         reasonCode: ReturnReasonCode.CHANGE_OF_MIND,
       });
       expect(d.code).toBe(ResolutionCode.RETURN_NOT_ALLOWED_WINDOW_EXPIRED);
+    });
+
+    it('uses calendar days not wall-clock hours', () => {
+      // Delivered late on 10 Aug Lagos; ~6.1 days later still same calendar window.
+      const lateDelivery = new Date('2026-08-10T22:30:00.000Z'); // 11 Aug 00:30 Lagos?
+      // 22:30 UTC = 23:30 Lagos on Aug 10
+      expect(calendarDateInTimeZone(lateDelivery, RESOLUTION_TIME_ZONE)).toBe(
+        '2026-08-10',
+      );
+      expect(
+        isWithinCalendarDaysFrom(
+          lateDelivery,
+          new Date('2026-08-17T22:00:00.000Z'),
+          7,
+          RESOLUTION_TIME_ZONE,
+        ),
+      ).toBe(true);
+      expect(
+        isWithinCalendarDaysFrom(
+          lateDelivery,
+          new Date('2026-08-18T00:00:00.000Z'),
+          7,
+          RESOLUTION_TIME_ZONE,
+        ),
+      ).toBe(false);
     });
 
     it('denies custom change-of-mind', () => {
