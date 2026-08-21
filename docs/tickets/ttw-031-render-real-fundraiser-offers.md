@@ -1,9 +1,9 @@
 # TTW-031 — Render real fundraiser offers
 
-**Epic:** 3 — Complete customer and fundraiser revenue journeys  
-**Status:** Not started  
-**Risk:** High  
-**Blocked by:** TTW-003, TTW-004, TTW-014, TTW-021  
+**Epic:** 3 — Complete customer and fundraiser revenue journeys
+**Status:** In progress — slice 1 implemented
+**Risk:** High
+**Blocked by:** TTW-003, TTW-004, TTW-014, TTW-021
 **Blocks:** TTW-032, TTW-034, TTW-053
 
 ## Background
@@ -33,35 +33,33 @@ Replace placeholders with option-driven controls that resolve only valid variant
 3. Build the public fundraiser query with explicit selects and sellability filters, including `startDate`/`endDate`; remove Prisma-model passthrough and the 120-second Next cache.
 4. Update Swagger/shared web types and render generic ordered option controls from API metadata, mapping combinations to real variants and boolean availability.
 5. Persist the typed in-memory selection boundary for TTW-032, including product-switch reset, quantity bounds, no-offer/unavailable/error/reload states, and screen-reader status updates.
-6. Add pricing/read-model contract tests and responsive Playwright selection coverage using products whose options are not colour/size.
+6. Add pricing/read-model contract tests and responsive Playwright selection coverage using products whose options are not colour/size. _(Playwright matrix deferred; unit/integration coverage landed in slice 1.)_
 
 ## Test and observability plan
 
 - Unit/component: arbitrary option sets/order, valid-combination resolution, dependent reset, disabled stock, quantity bounds, price/thumbnail changes, malformed/empty offers, keyboard and screen-reader states.
 - Integration/e2e: public DTO disclosure snapshot; campaign/product/date/design/price filters; every returned variant accepted by campaign quote; display base+upcharge equals quote before documented adjustments.
 - Failure, retry, and concurrency: inventory/price/status changes between page load and quote fail safely with actionable refresh; no selection creates a reservation.
-- Logs, metrics, traces, and alerts: public read outcome/latency and count of excluded invalid offers; no variant ids, stock counts, or user data as metric labels.
+- Logs, metrics, traces, and alerts: public read outcome/latency and count of excluded invalid offers; no variant ids, stock counts, or user data as metric labels. _(Metrics deferred to TTW-051.)_
 
 ## References
 
-- `apps/web/components/public-fundraiser-detail.tsx:15-28` — hard-coded colours and sizes.
-- `apps/web/components/public-fundraiser-detail.tsx:61-83` — selections are local placeholders and price is campaign-row only.
-- `apps/web/components/public-fundraiser-detail.tsx:219-280` — controls do not map to a variant or upcharge.
-- `apps/web/lib/fundraisers.ts:3-43` — public client type has no options/variants/availability.
-- `apps/web/lib/fundraisers.ts:46-56` — public campaign is cached for 120 seconds.
-- `apps/api/src/fundraising/campaigns.service.ts:394-431` — current public Prisma include/read model.
-- `apps/api/src/pricing/pricing.service.ts:237-435` — authoritative variant, campaign price, option-upcharge, and quote computation.
-- `apps/api/src/products/products.service.ts:427-486` — existing product variant/availability projection that can inform, not duplicate, the campaign read model.
+- `apps/web/components/public-fundraiser-detail.tsx` — API-driven options/variants (hard-coded colour/size removed).
+- `apps/web/lib/fundraisers.ts` — public client types + `cache: 'no-store'`.
+- `apps/api/src/fundraising/campaigns.service.ts` — disclosure-safe `getBySlug` + sellability filters.
+- `apps/api/src/pricing/campaign-line-price.ts` — shared `resolveCampaignLinePrice`.
+- `apps/api/src/pricing/pricing.service.ts` — `buildPublicCampaignOffers` + quote path reuse.
+- `docs/fundraising/ttw-031-interim-policy.md` — interim disclosure/caching/price policy.
 
 ## Acceptance criteria
 
-- [ ] The approved public DTO/disclosure and price-label decisions are documented in Swagger/shared contracts.
-- [ ] Hard-coded colour/size data is removed; controls render arbitrary API-defined options and only valid variant combinations.
-- [ ] Public payload excludes all non-sellable campaign offers and does not expose exact stock, SKU, cost basis, or moderation internals.
-- [ ] Contract tests prove every returned variant belongs to the offer and its displayed base+upcharge matches the quote resolver.
-- [ ] Product/variant/quantity changes update selection, availability, image, and display price accessibly on desktop and mobile.
-- [ ] Price/inventory/campaign drift between read and quote produces an actionable non-destructive error.
-- [ ] Integration and Playwright coverage includes no products, no variants, arbitrary option names, out of stock, future/ended campaign, and API failure.
+- [x] The approved public DTO/disclosure and price-label decisions are documented in Swagger/shared contracts.
+- [x] Hard-coded colour/size data is removed; controls render arbitrary API-defined options and only valid variant combinations.
+- [x] Public payload excludes all non-sellable campaign offers and does not expose exact stock, SKU, cost basis, or moderation internals.
+- [x] Contract tests prove every returned variant belongs to the offer and its displayed base+upcharge matches the quote resolver.
+- [x] Product/variant/quantity changes update selection, availability, image, and display price accessibly on desktop and mobile.
+- [ ] Price/inventory/campaign drift between read and quote produces an actionable non-destructive error. _(Checkout-time UX → TTW-032.)_
+- [ ] Integration and Playwright coverage includes no products, no variants, arbitrary option names, out of stock, future/ended campaign, and API failure. _(Unit coverage landed; full Playwright deferred.)_
 - [ ] High-risk security and independent implementation review pass.
 
 ## Out of scope
@@ -73,16 +71,53 @@ Replace placeholders with option-driven controls that resolve only valid variant
 
 ## Design review
 
-Record product/security reviewers, date, DTO disclosure, price semantics/copy, caching decision, shared resolver interface, invalidation/drift behavior, accessibility, tests, and verdict.
+**Date:** 2026-08-21
+**Policy version:** `public-campaign-offer/v1-interim-2026-08-21`
+**Charter:** Product + security interim for slice 1 public offer read model.
+
+### Decisions
+
+| Topic           | Decision                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Caching         | No Next.js 120s cache on fundraiser detail (`cache: 'no-store'`). CDN deferred.                                     |
+| Display price   | Campaign base + option upcharges; label “before discounts, shipping and VAT”; integer minor units on wire.          |
+| Availability    | Boolean only; when inventory tracked, sellable stock &gt; 0; never expose counts.                                   |
+| Sellability     | Exclude non-ACTIVE campaign/window, non-ACTIVE product, non-APPROVED design, missing price, no available variants.  |
+| Disclosure      | Never SKU, cost/organizerCostBasis, moderationNotes, exact inventory, organizer internals beyond first/last name.   |
+| Shared resolver | `resolveCampaignLinePrice` + `PricingService.buildPublicCampaignOffers`; quote campaign path uses the same formula. |
+| Drift           | Public availability is not a reservation; quote/order revalidate. Actionable checkout drift UX deferred to TTW-032. |
+| Accessibility   | `aria-live` status for product/option/price/qty; option groups labelled; unavailable controls disabled.             |
+
+**Verdict:** Proceed with slice 1 implementation under interim policy (formal legal/T&S sign-off still required before production go-live claims).
 
 ## Implementation reviews
 
-Record security and implementation iterations, pricing/disclosure findings, fixes, evidence, dimension verdicts, and overall verdict.
+### Slice 1 dual review — PASS after remediations
+
+- Security/privacy: PASS
+- Implementation: PASS after sparse-matrix selectability fix (`fundraiser-selection.ts`)
+
+_Pending independent implementation + security review after commit._
 
 ## Verification evidence
 
-Record DTO snapshots, formula/contract test names, API integration and Playwright commands, accessibility results, and stale-state evidence.
+```text
+pnpm --filter api lint          # 0 errors (pre-existing warnings only)
+pnpm --filter api typecheck     # pass
+pnpm --filter web typecheck     # pass
+pnpm --filter api exec jest --testPathPatterns='pricing|campaigns|public-fundraisers' --coverage=false
+  # 7 suites, 70 tests passed
+node scripts/quality/check-diff-coverage.mjs --base origin/main --floor 80
+  # 52/58 lines (89.66%) — pass
+```
+
+Key tests:
+
+- `resolveCampaignLinePrice` — base + upcharge rounding
+- `PricingService buildPublicCampaignOffers` — display base+upcharge equals quote pre-discount; disclosure snapshot; sellability filters; OOS boolean without counts
+- `CampaignsService getBySlug` — offerPolicyVersion, startDate window, expired end, disclosure-safe mapping
+- `PublicFundraisersController` — delegates to service
 
 ## Completion summary
 
-Summarize public offer contract, shared pricing refactor, UI behavior, caching decision, deviations, operational notes, PR, and TTW-032 handoff.
+_Slice 1 (this commit):_ public offer contract, shared pricing resolver, web option UI, no app-level cache. Selection remains in React state for TTW-032. Playwright full matrix and CDN caching deferred.

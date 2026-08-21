@@ -14,16 +14,123 @@ import type {
   QuoteMode,
 } from './pricing.types';
 import type { QuoteRequestDto } from './dto/quote-request.dto';
-import { roundToMinor, roundToDisplayGranularity } from './currency-rounding';
+import {
+  roundToMinor,
+  roundToDisplayGranularity,
+  toMinorUnits,
+} from './currency-rounding';
 import { PRICING_POLICY_VERSION, type QuoteResult } from './pricing-policy';
+import {
+  PUBLIC_CAMPAIGN_PRICE_DISCLOSURE,
+  resolveCampaignLinePrice,
+} from './campaign-line-price';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
-import { CampaignStatus } from '../generated/prisma/enums';
+import {
+  CampaignStatus,
+  ModerationStatus,
+  ProductStatus,
+} from '../generated/prisma/enums';
 import type {
   CanonicalShippingAddress,
   ShipmentSummary,
   ShipmentSummaryLine,
 } from '../shipping/shipping.types';
+
+/** Sellable public campaign product offer (TTW-031). */
+export type PublicCampaignOffer = {
+  campaignProductId: string;
+  productId: string;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+  };
+  design: {
+    id: string;
+    name: string;
+    thumbnailUrl: string | null;
+  };
+  baseAmountMinor: number;
+  currency: string;
+  priceDisclosure: string;
+  options: Array<{
+    id: string;
+    code: string;
+    name: string;
+    sortOrder: number;
+    values: Array<{
+      id: string;
+      valueCode: string;
+      displayName: string;
+      sortOrder: number;
+      metadata: Record<string, unknown> | null;
+    }>;
+  }>;
+  variants: Array<{
+    id: string;
+    optionValueIds: string[];
+    optionValueCodes: string[];
+    available: boolean;
+    unitAmountMinor: number;
+    currency: string;
+  }>;
+};
+
+type CampaignProductOfferSource = {
+  id: string;
+  productId: string;
+  designId: string | null;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    status: ProductStatus;
+    options: Array<{
+      id: string;
+      code: string;
+      name: string;
+      sortOrder: number;
+      values: Array<{
+        id: string;
+        valueCode: string;
+        displayName: string;
+        sortOrder: number;
+        metadata: unknown;
+      }>;
+    }>;
+    variants: Array<{
+      id: string;
+      isAvailable: boolean;
+      optionValues: Array<{
+        optionId: string;
+        optionValueId: string;
+        option: { id: string; code: string; sortOrder: number };
+        optionValue: {
+          id: string;
+          valueCode: string;
+          displayName: string;
+          sortOrder: number;
+          upcharges: Array<{ amount: unknown }>;
+        };
+      }>;
+      inventory: {
+        trackInventory: boolean;
+        stockOnHand: number;
+        reserved: number;
+      } | null;
+    }>;
+  };
+  design: {
+    id: string;
+    name: string;
+    thumbnailUrl: string | null;
+    moderationStatus: ModerationStatus;
+  } | null;
+  prices: Array<{ amount: unknown; currency: string }>;
+};
 
 type ComputedLineItem = {
   output: PricingLineItemOutput;
@@ -374,10 +481,6 @@ export class PricingService {
       }
     }
 
-    const baseAfterBulk = roundToMinor(
-      unitBasePrice + optionUpcharge + bulkAdjustment,
-      currency,
-    );
     let unitViewSurcharge = 0;
     if (mode === 'standard' && item.designId) {
       unitViewSurcharge = await this.computeViewSurchargeForDesign(
@@ -391,10 +494,17 @@ export class PricingService {
       unitViewSurcharge = 0; // buyer does not pay view surcharge
     }
 
-    const unitBeforeDiscount = roundToMinor(
-      baseAfterBulk + unitViewSurcharge,
-      currency,
-    );
+    // Campaign merchandise unit (pre-discount) shares resolveCampaignLinePrice with public offers.
+    const campaignLine =
+      mode === 'campaign'
+        ? resolveCampaignLinePrice(unitBasePrice, optionUpcharge, currency)
+        : null;
+    const unitBeforeDiscount = campaignLine
+      ? campaignLine.unitBeforeDiscount
+      : roundToMinor(
+          unitBasePrice + optionUpcharge + bulkAdjustment + unitViewSurcharge,
+          currency,
+        );
     let unitDiscountAmount = 0;
     let appliedDiscountId: string | null = null;
     if (mode === 'campaign' && campaignId) {
@@ -552,6 +662,132 @@ export class PricingService {
       if (rule) total += Number(rule.surchargeAmount);
     }
     return roundToMinor(total, currency);
+  }
+
+  /**
+   * Project sellable public campaign offers from loaded campaign products.
+   * Excludes non-ACTIVE products, non-APPROVED designs, unpriced rows, and offers with no variants.
+   * Prices use {@link resolveCampaignLinePrice} (base + option upcharges) in integer minor units.
+   */
+  buildPublicCampaignOffers(
+    campaignProducts: CampaignProductOfferSource[],
+    currency: string,
+  ): PublicCampaignOffer[] {
+    const offers: PublicCampaignOffer[] = [];
+    for (const cp of campaignProducts) {
+      if (cp.product.status !== ProductStatus.ACTIVE) continue;
+      if (
+        !cp.design ||
+        cp.design.moderationStatus !== ModerationStatus.APPROVED
+      ) {
+        continue;
+      }
+      const priceRow =
+        cp.prices.find((p) => p.currency === currency) ?? cp.prices[0];
+      if (!priceRow) continue;
+      const unitBasePrice = Number(priceRow.amount);
+      if (!(unitBasePrice > 0)) continue;
+
+      const options = [...cp.product.options]
+        .sort(
+          (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code),
+        )
+        .map((opt) => ({
+          id: opt.id,
+          code: opt.code,
+          name: opt.name,
+          sortOrder: opt.sortOrder,
+          values: [...opt.values]
+            .sort(
+              (a, b) =>
+                a.sortOrder - b.sortOrder ||
+                a.valueCode.localeCompare(b.valueCode),
+            )
+            .map((v) => ({
+              id: v.id,
+              valueCode: v.valueCode,
+              displayName: v.displayName,
+              sortOrder: v.sortOrder,
+              metadata: this.sanitizeOptionMetadata(v.metadata),
+            })),
+        }));
+
+      const variants: PublicCampaignOffer['variants'] = [];
+      for (const variant of cp.product.variants) {
+        const available = this.isVariantPubliclyAvailable(variant);
+        const optionUpcharge = this.sumOptionValueUpcharges(variant, currency);
+        const line = resolveCampaignLinePrice(
+          unitBasePrice,
+          optionUpcharge,
+          currency,
+        );
+        const orderedOptionValues = [...variant.optionValues].sort(
+          (a, b) =>
+            a.option.sortOrder - b.option.sortOrder ||
+            a.option.code.localeCompare(b.option.code),
+        );
+        variants.push({
+          id: variant.id,
+          optionValueIds: orderedOptionValues.map((ov) => ov.optionValueId),
+          optionValueCodes: orderedOptionValues.map(
+            (ov) => ov.optionValue.valueCode,
+          ),
+          available,
+          unitAmountMinor: toMinorUnits(line.unitBeforeDiscount, currency),
+          currency,
+        });
+      }
+
+      // Offer must have at least one selectable variant.
+      if (!variants.some((v) => v.available)) continue;
+
+      offers.push({
+        campaignProductId: cp.id,
+        productId: cp.productId,
+        product: {
+          id: cp.product.id,
+          name: cp.product.name,
+          slug: cp.product.slug,
+          description: cp.product.description,
+        },
+        design: {
+          id: cp.design.id,
+          name: cp.design.name,
+          thumbnailUrl: cp.design.thumbnailUrl,
+        },
+        baseAmountMinor: toMinorUnits(unitBasePrice, currency),
+        currency,
+        priceDisclosure: PUBLIC_CAMPAIGN_PRICE_DISCLOSURE,
+        options,
+        variants,
+      });
+    }
+    return offers;
+  }
+
+  /** Boolean availability only — never expose stock counts. */
+  private isVariantPubliclyAvailable(variant: {
+    isAvailable: boolean;
+    inventory: {
+      trackInventory: boolean;
+      stockOnHand: number;
+      reserved: number;
+    } | null;
+  }): boolean {
+    if (!variant.isAvailable) return false;
+    const inv = variant.inventory;
+    if (!inv || !inv.trackInventory) return true;
+    return inv.stockOnHand - inv.reserved > 0;
+  }
+
+  private sanitizeOptionMetadata(
+    metadata: unknown,
+  ): Record<string, unknown> | null {
+    if (metadata == null || typeof metadata !== 'object') return null;
+    const raw = metadata as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    if (typeof raw.hex === 'string') out.hex = raw.hex;
+    return Object.keys(out).length > 0 ? out : null;
   }
 
   /**

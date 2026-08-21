@@ -1,4 +1,9 @@
-import { roundToMinor, roundToDisplayGranularity } from './currency-rounding';
+import {
+  roundToMinor,
+  roundToDisplayGranularity,
+  toMinorUnits,
+  fromMinorUnits,
+} from './currency-rounding';
 
 describe('currency-rounding', () => {
   describe('roundToMinor', () => {
@@ -20,6 +25,14 @@ describe('currency-rounding', () => {
       expect(roundToDisplayGranularity(10457, 'NGN')).toBe(10500); // 104.57 → 105
       expect(roundToDisplayGranularity(10450, 'NGN')).toBe(10400); // half-even: 104.5 → 104 (even)
       expect(roundToDisplayGranularity(10550, 'NGN')).toBe(10600);
+    });
+  });
+
+  describe('toMinorUnits / fromMinorUnits', () => {
+    it('converts NGN major amounts to integer kobo and back', () => {
+      expect(toMinorUnits(5000, 'NGN')).toBe(500_000);
+      expect(toMinorUnits(5250.5, 'NGN')).toBe(525_050);
+      expect(fromMinorUnits(525_050, 'NGN')).toBe(5250.5);
     });
   });
 

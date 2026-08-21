@@ -126,3 +126,22 @@ export function roundToDisplayGranularity(
   if (config.displayGranularity <= 0) return roundToMinor(amount, currency);
   return roundWithMode(amount, config.displayGranularity, config.roundingMode);
 }
+
+/**
+ * Convert a major-unit amount to an integer minor-unit count (e.g. NGN → kobo).
+ * Input is first rounded with {@link roundToMinor}.
+ */
+export function toMinorUnits(amountMajor: number, currency: string): number {
+  const config = getConfig(currency);
+  return Math.round(
+    roundToMinor(amountMajor, currency) * config.minorUnitsPerMajor,
+  );
+}
+
+/**
+ * Convert an integer minor-unit count to major units (e.g. kobo → NGN).
+ */
+export function fromMinorUnits(amountMinor: number, currency: string): number {
+  const config = getConfig(currency);
+  return amountMinor / config.minorUnitsPerMajor;
+}
