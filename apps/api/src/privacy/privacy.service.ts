@@ -457,6 +457,9 @@ export class PrivacyService {
           accountNumber: '0000000000',
           recipientCode: null,
           isDefault: false,
+          status: 'SUSPENDED' as const,
+          bankResolutionStatus: null,
+          suspendedAt: new Date(),
         },
       });
       await this.recordActionTx(

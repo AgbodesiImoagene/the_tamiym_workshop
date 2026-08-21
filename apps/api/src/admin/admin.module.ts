@@ -9,6 +9,7 @@ import { AdminSiteSettingsController } from './admin-site-settings.controller';
 import { AdminShippingController } from './admin-shipping.controller';
 import { AdminPayoutsController } from './admin-payouts.controller';
 import { AdminPayoutRunsController } from './admin-payout-runs.controller';
+import { AdminPayoutProfilesController } from './admin-payout-profiles.controller';
 import { AdminManualPayoutsController } from './admin-manual-payouts.controller';
 import { AdminDiscountsController } from './admin-discounts.controller';
 import { AdminBulkPricingController } from './admin-bulk-pricing.controller';
@@ -77,6 +78,7 @@ import { AdminShipmentsController } from './admin-shipments.controller';
     AdminShippingController,
     AdminPayoutsController,
     AdminPayoutRunsController,
+    AdminPayoutProfilesController,
     AdminManualPayoutsController,
     AdminDiscountsController,
     AdminBulkPricingController,

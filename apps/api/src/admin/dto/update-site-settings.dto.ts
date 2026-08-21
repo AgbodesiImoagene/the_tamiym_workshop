@@ -38,7 +38,7 @@ export class UpdateSiteSettingsDto {
   @ApiPropertyOptional({
     enum: PayoutMode,
     description:
-      'Fundraiser payout mode: MANUAL, AUTO_APPROVAL_REQUIRED, AUTO_EXECUTE',
+      'Fundraiser payout mode: MANUAL, AUTO_APPROVAL_REQUIRED, AUTO_EXECUTE. AUTO_EXECUTE requires PAYOUT_AUTO_EXECUTE_ENABLED=true (TTW-042).',
   })
   @IsOptional()
   @IsEnum(PayoutMode)

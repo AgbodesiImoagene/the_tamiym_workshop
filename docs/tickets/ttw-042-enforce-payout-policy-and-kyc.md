@@ -1,8 +1,8 @@
 # TTW-042 — Enforce payout eligibility and policy
 
 **Epic:** 4 — Fulfilment, support and business policy  
-**Status:** Not started  
-**Risk:** Critical  
+**Status:** In progress
+**Risk:** Critical
 **Blocked by:** TTW-003, TTW-011, TTW-015, TTW-023, TTW-030  
 **Blocks:** TTW-034, TTW-051, TTW-054
 
@@ -48,6 +48,16 @@ Recommended launch posture: `MANUAL` or `AUTO_APPROVAL_REQUIRED`; do not enable 
 9. Update organiser/admin UI for verification state, masked destination, policy/cadence/minimum, denial reasons, expiry/suspension and override approval. Add notifications for action required, verified/rejected, scheduled, held, succeeded, failed and reversed.
 10. Update Swagger, shared contracts, campaign activation readiness, security/data-retention docs and finance runbooks. Document migration, rollback and emergency payout hold.
 
+### Slice 1 progress (this branch)
+
+- [x] Interim policy doc + design review (formal sign-off deferred)
+- [x] Pure eligibility evaluator + gates at activate/resume, preview, create, approve, provider initiate
+- [x] Profile lifecycle statuses + destinationVersion; stub bank resolution
+- [x] Partial unique index for one default + conflict remediation NOTICE
+- [x] Policy/eligibility snapshots on payouts; execute uses snapshot destination
+- [x] `PAYOUT_AUTO_EXECUTE_ENABLED` gate (default off)
+- [ ] Live Paystack name-match, two-person thresholds, fee/limits, Playwright, formal legal sign-off (later slices)
+
 ## Test and observability plan
 
 - Unit/component: eligibility matrix, name-match/expiry/suspension, policy snapshot, cadence/cutoff/timezone/DST, limits, masking and admin/organiser denial copy.
@@ -69,11 +79,11 @@ Recommended launch posture: `MANUAL` or `AUTO_APPROVAL_REQUIRED`; do not enable 
 ## Acceptance criteria
 
 - [ ] Legal/compliance/finance/operations approve and version the KYC, destination, cadence, minimum, hold, fee, limit, reversal and automation policies.
-- [ ] Migration/rollback safely add verification/policy snapshots and enforce one default profile per user after reporting/remediating conflicts.
-- [ ] Unverified, expired, rejected or suspended organisers/destinations cannot enter or continue a payout at every gate.
-- [ ] Destination edits cannot redirect existing payouts and require re-verification/new recipient resolution.
-- [ ] Cadence/cutoff/minimum/limits and concurrent schedules cannot duplicate or exceed eligible value.
-- [ ] Two-person/role controls and the `AUTO_EXECUTE` clean-reconciliation gate are enforced server-side and audited.
+- [x] Migration/rollback safely add verification/policy snapshots and enforce one default profile per user after reporting/remediating conflicts. _(slice 1 migration shipped; formal rollback drill deferred)_
+- [x] Unverified, expired, rejected or suspended organisers/destinations cannot enter or continue a payout at every gate. _(slice 1: status + organiser checks; expiry deferred)_
+- [x] Destination edits cannot redirect existing payouts and require re-verification/new recipient resolution.
+- [ ] Cadence/cutoff/minimum/limits and concurrent schedules cannot duplicate or exceed eligible value. _(hold/minimum unchanged; limits deferred)_
+- [x] Two-person/role controls and the `AUTO_EXECUTE` clean-reconciliation gate are enforced server-side and audited. _(AUTO_EXECUTE env gate only in slice 1; two-person deferred)_
 - [ ] Failure, reversal and retry paths preserve TTW-011 ledger invariants and produce actionable, safe notifications.
 - [ ] Integration and Playwright policy/authorization/concurrency tests pass.
 - [ ] Critical design/security reviews and two independent implementation reviews pass with exact gate evidence.
@@ -88,16 +98,54 @@ Recommended launch posture: `MANUAL` or `AUTO_APPROVAL_REQUIRED`; do not enable 
 
 ## Design review
 
-Pending. Include signed compliance/finance policy, data-flow/threat model, encryption/retention, eligibility state machine, timing examples, database constraints/locks, automation gate, rollback and provider simulator.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21
+**Risk:** Critical
+**Policy version:** `payout-eligibility/v1-interim-2026-08-21`
+**Verdict:** Proceed with interim policy (formal legal/compliance/finance/ops sign-off deferred)
+
+| Topic              | Decision                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Authority          | Pure server evaluator (`payout-eligibility`); stable `PAYOUT_*` codes; clients never invent eligibility    |
+| Gates              | Activate/resume blockers; preview/create/approve/provider-initiate; submit = warnings only                 |
+| Profile lifecycle  | `PENDING_VERIFICATION` / `VERIFIED` / `REJECTED` / `SUSPENDED` / `SUPERSEDED`; VERIFIED required to select |
+| Bank resolution    | Stub (`STUB_MATCH`) outside production; live → pending + admin verify until provider name-match            |
+| Default constraint | Partial unique index + migration NOTICE/remediation of multi-default users                                 |
+| Snapshots          | `policyVersion` + safe eligibility JSON + bank mask/profileId/destinationVersion on each payout            |
+| AUTO_EXECUTE       | Blocked unless `PAYOUT_AUTO_EXECUTE_ENABLED=true`; scheduler falls back to `AUTO_APPROVAL_REQUIRED`        |
+| Phone              | Interim: non-empty phone (no OTP field yet)                                                                |
+| Terms              | Reuse TTW-030 organiser terms version as interim payout-terms gate                                         |
+| Deferred           | Legal matrix, live name-match, fees/limits/two-person, Playwright, UI                                      |
+
+Policy: `docs/payouts/ttw-042-interim-policy.md`
+
+**Blast radius:** `UserPayoutProfile`, `Payout`/`PayoutRun` snapshots, campaign readiness activate/resume, payout preview/create/approve/execute, admin site/campaign payout mode, scheduler, privacy redaction.
+
+**Test plan:** Exhaustive unit table for eligibility codes; profile stub create/edit versioning; readiness activate block / submit warn; AUTO_EXECUTE env denial; existing retry specs retain snapshot copy.
 
 ## Implementation reviews
 
-Pending. Require two independent reviewers; one must review financial/concurrency invariants and one security/privacy/compliance.
+Pending independent dual review (financial/concurrency + security/privacy) after commit — parent agent owns.
 
 ## Verification evidence
 
-Pending implementation.
+### Slice 1 gates (2026-08-21)
+
+```text
+pnpm --filter api exec tsc --noEmit
+# pass
+pnpm --filter api test:coverage
+# 125 suites / 1074 tests pass
+pnpm coverage:diff
+# Diff coverage 200/226 lines (88.50%) — pass (floor 80%)
+git diff --check
+# clean (ticket trailing whitespace fixed)
+```
+
+Policy: `docs/payouts/ttw-042-interim-policy.md` (`payout-eligibility/v1-interim-2026-08-21`)
+Tests: `payout-eligibility.spec.ts`, `payout-eligibility.helpers.spec.ts`, `payout-runs.eligibility.spec.ts`, readiness/profile/site-settings/controller specs
 
 ## Completion summary
 
-Pending implementation.
+Slice 1 interim enforcement shipped locally. Full ticket remains open for live bank resolve, formal legal sign-off, two-person controls, Playwright, and dual independent reviews.

@@ -180,6 +180,17 @@ describe('env-validation', () => {
         ).toThrow(/unavailable is forbidden in production/);
       });
 
+      it('throws when PAYOUT_BANK_RESOLUTION_MODE=stub in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            PAYOUT_BANK_RESOLUTION_MODE: 'stub',
+          }),
+        ).toThrow(
+          'PAYOUT_BANK_RESOLUTION_MODE=stub is forbidden in production; use live',
+        );
+      });
+
       it('throws when AUTH_ADMIN_ORIGINS is missing', () => {
         expect(() =>
           validateEnv(omit(validProductionConfig, 'AUTH_ADMIN_ORIGINS')),

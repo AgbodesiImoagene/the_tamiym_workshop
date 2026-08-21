@@ -50,12 +50,15 @@ All submit blockers, plus:
 
 ### Warnings (non-blocking in slice 1)
 
-| Check                         | Code                                 |
-| ----------------------------- | ------------------------------------ |
-| Future `startDate`            | `CAMPAIGN_READINESS_SCHEDULED_START` |
-| Payout / KYC not yet enforced | `CAMPAIGN_READINESS_PAYOUT_DEFERRED` |
+| Check              | Code                                 |
+| ------------------ | ------------------------------------ |
+| Future `startDate` | `CAMPAIGN_READINESS_SCHEDULED_START` |
 
-Payout eligibility remains TTW-042. Slice 1 records the deferred warning only; it does not block activation.
+### Payout eligibility (TTW-042)
+
+Activate / resume **block** when payout eligibility fails (stable `PAYOUT_*` codes). Submit surfaces the same issues as **warnings** only.
+
+See `docs/payouts/ttw-042-interim-policy.md`.
 
 ## Future start (scheduled)
 
@@ -108,5 +111,4 @@ Submission acknowledgment, pause, disable, and end templates are deferred to a l
 - Full transition / readiness snapshot schema and quarantine migration for invalid ACTIVE rows
 - Atomic pause-edit → DRAFT + resubmission UX
 - Playwright full lifecycle matrix
-- Payout KYC hard gate (TTW-042)
 - Preference / dead-letter machinery beyond existing outbox (TTW-043)

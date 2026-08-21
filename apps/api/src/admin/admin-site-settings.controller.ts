@@ -16,6 +16,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../generated/prisma/enums';
+import { isPayoutAutoExecuteEnabled } from '../payouts/payout-eligibility';
+import { assertAutoExecuteModeAllowed } from '../payouts/payout-eligibility.helpers';
 
 const SITE_SETTINGS_ID = 'default';
 
@@ -84,7 +86,13 @@ export class AdminSiteSettingsController {
     if (dto.vatAppliesToShipping !== undefined)
       data.vatAppliesToShipping = dto.vatAppliesToShipping;
     if (dto.currency !== undefined) data.currency = dto.currency;
-    if (dto.payoutMode !== undefined) data.payoutMode = dto.payoutMode;
+    if (dto.payoutMode !== undefined) {
+      assertAutoExecuteModeAllowed(
+        dto.payoutMode,
+        isPayoutAutoExecuteEnabled(process.env.PAYOUT_AUTO_EXECUTE_ENABLED),
+      );
+      data.payoutMode = dto.payoutMode;
+    }
     if (dto.payoutCadenceDays !== undefined)
       data.payoutCadenceDays = dto.payoutCadenceDays;
     if (dto.payoutSettlementHoldDays !== undefined)

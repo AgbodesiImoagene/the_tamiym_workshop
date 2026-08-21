@@ -28,6 +28,8 @@ import {
   NotificationChannel,
   PayoutMode,
 } from '../generated/prisma/enums';
+import { isPayoutAutoExecuteEnabled } from '../payouts/payout-eligibility';
+import { assertAutoExecuteModeAllowed } from '../payouts/payout-eligibility.helpers';
 import { DEFAULT_CURRENCY } from '../constants';
 import { PricingService } from '../pricing/pricing.service';
 import { PUBLIC_CAMPAIGN_OFFER_POLICY_VERSION } from '../pricing/campaign-line-price';
@@ -652,6 +654,12 @@ export class CampaignsService {
     if (payoutModeOverride === undefined) {
       throw new BadRequestException(
         'payoutModeOverride is required (use null to clear override and use site default)',
+      );
+    }
+    if (payoutModeOverride === PayoutMode.AUTO_EXECUTE) {
+      assertAutoExecuteModeAllowed(
+        payoutModeOverride,
+        isPayoutAutoExecuteEnabled(process.env.PAYOUT_AUTO_EXECUTE_ENABLED),
       );
     }
     const campaign = await this.prisma.campaign.findUnique({

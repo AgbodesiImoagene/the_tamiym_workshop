@@ -16,10 +16,11 @@ import {
   AuditSource,
   NotificationChannel,
   PayoutRunStatus,
+  OrganizerApplicationStatus,
+  AuditAction,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
 import { DEFAULT_CURRENCY } from '../constants';
-import { AuditAction } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
@@ -42,6 +43,17 @@ import {
   transferEventToStatus,
 } from './payout-transfer-transitions';
 import { toPaystackTransferReference } from './paystack-transfer-reference';
+import {
+  maskAccountNumber,
+  PAYOUT_ELIGIBILITY_POLICY_VERSION,
+  PayoutEligibilityGate,
+} from './payout-eligibility';
+import {
+  assertPayoutEligible,
+  evaluateForGate,
+  snapshotFromResult,
+  toEligibilityProfile,
+} from './payout-eligibility.helpers';
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -196,6 +208,12 @@ export class PayoutsService {
             payoutProfile: true,
             organizer: {
               include: {
+                organizerApplications: {
+                  where: { status: OrganizerApplicationStatus.APPROVED },
+                  orderBy: { reviewedAt: 'desc' },
+                  take: 1,
+                  select: { termsVersion: true },
+                },
                 payoutProfiles: {
                   where: { isDefault: true },
                   take: 1,
@@ -214,6 +232,21 @@ export class PayoutsService {
           );
         }
 
+        const eligibility = evaluateForGate({
+          gate: PayoutEligibilityGate.PROVIDER_INITIATE,
+          organiser: {
+            id: campaign.organizer.id,
+            role: campaign.organizer.role,
+            status: campaign.organizer.status,
+            emailVerifiedAt: campaign.organizer.emailVerifiedAt,
+            phone: campaign.organizer.phone,
+            termsVersion:
+              campaign.organizer.organizerApplications[0]?.termsVersion ?? null,
+          },
+          profile: toEligibilityProfile(profile),
+        });
+        assertPayoutEligible(eligibility);
+
         const currency = (campaign.currency as 'NGN') ?? DEFAULT_CURRENCY;
 
         // Create the payout row in PROCESSING so it is visible before hitting Paystack.
@@ -225,6 +258,17 @@ export class PayoutsService {
             status: PayoutStatus.PROCESSING,
             currency,
             amount,
+            snapshotBankCode: profile.bankCode,
+            snapshotAccountName: profile.accountName,
+            snapshotAccountMask: maskAccountNumber(profile.accountNumber),
+            snapshotRecipientCode: profile.recipientCode,
+            snapshotProfileId: profile.id,
+            snapshotDestinationVersion: profile.destinationVersion,
+            policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
+            eligibilitySnapshot: snapshotFromResult(
+              eligibility,
+              campaign.organizerId,
+            ),
           },
         });
 

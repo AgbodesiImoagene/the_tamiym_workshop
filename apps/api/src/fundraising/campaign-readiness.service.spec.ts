@@ -38,8 +38,20 @@ describe('CampaignReadinessService', () => {
         id: 'user-1',
         role: UserRole.ORGANIZER,
         status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date('2026-01-01'),
+        phone: '+2348012345678',
         organizerApplications: [{ termsVersion: ORGANIZER_TERMS_VERSION }],
+        payoutProfiles: [
+          {
+            id: 'prof-1',
+            userId: 'user-1',
+            status: 'VERIFIED',
+            bankResolutionStatus: 'STUB_MATCH',
+            destinationVersion: 1,
+          },
+        ],
       },
+      payoutProfile: null,
       products: [
         {
           id: 'cp-1',
@@ -103,9 +115,68 @@ describe('CampaignReadinessService', () => {
     expect(result.ready).toBe(true);
     expect(result.policyVersion).toBe(CAMPAIGN_READINESS_POLICY_VERSION);
     expect(result.blockers).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('warns on submit when payout profile missing', async () => {
+    prisma.campaign.findUnique.mockResolvedValue(
+      baseCampaign({
+        organizer: {
+          id: 'user-1',
+          role: UserRole.ORGANIZER,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date('2026-01-01'),
+          phone: '+2348012345678',
+          organizerApplications: [{ termsVersion: ORGANIZER_TERMS_VERSION }],
+          payoutProfiles: [],
+        },
+        payoutProfile: null,
+        products: [
+          {
+            ...baseCampaign().products[0],
+            design: {
+              id: 'design-1',
+              moderationStatus: ModerationStatus.PENDING,
+            },
+          },
+        ],
+      }),
+    );
+    const result = await service.evaluate(
+      'camp-1',
+      CampaignReadinessPhase.SUBMIT,
+    );
+    expect(result.ready).toBe(true);
     expect(
       result.warnings.some(
-        (w) => w.code === CampaignReadinessCode.PAYOUT_DEFERRED,
+        (w) => w.code === CampaignReadinessCode.PAYOUT_PROFILE_MISSING,
+      ),
+    ).toBe(true);
+  });
+
+  it('blocks activate when payout profile is missing', async () => {
+    prisma.campaign.findUnique.mockResolvedValue(
+      baseCampaign({
+        organizer: {
+          id: 'user-1',
+          role: UserRole.ORGANIZER,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date('2026-01-01'),
+          phone: '+2348012345678',
+          organizerApplications: [{ termsVersion: ORGANIZER_TERMS_VERSION }],
+          payoutProfiles: [],
+        },
+        payoutProfile: null,
+      }),
+    );
+    const result = await service.evaluate(
+      'camp-1',
+      CampaignReadinessPhase.ACTIVATE,
+    );
+    expect(result.ready).toBe(false);
+    expect(
+      result.blockers.some(
+        (b) => b.code === CampaignReadinessCode.PAYOUT_PROFILE_MISSING,
       ),
     ).toBe(true);
   });
@@ -204,7 +275,18 @@ describe('CampaignReadinessService', () => {
           id: 'user-1',
           role: UserRole.ORGANIZER,
           status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date('2026-01-01'),
+          phone: '+2348012345678',
           organizerApplications: [{ termsVersion: 'stale-terms' }],
+          payoutProfiles: [
+            {
+              id: 'prof-1',
+              userId: 'user-1',
+              status: 'VERIFIED',
+              bankResolutionStatus: 'STUB_MATCH',
+              destinationVersion: 1,
+            },
+          ],
         },
       }),
     );

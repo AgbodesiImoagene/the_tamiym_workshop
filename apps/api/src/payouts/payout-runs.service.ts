@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CampaignLedgerService } from './campaign-ledger.service';
@@ -12,10 +13,25 @@ import {
   PayoutStatus,
   PayoutMode,
   AuditAction,
+  OrganizerApplicationStatus,
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
 import { ObservabilityService } from '../observability/observability.service';
 import { isTerminalPayoutStatus } from './payout-transfer-transitions';
+import {
+  maskAccountNumber,
+  PAYOUT_ELIGIBILITY_POLICY_VERSION,
+  PayoutEligibilityGate,
+} from './payout-eligibility';
+import {
+  assertPayoutEligible,
+  assertAutoExecuteModeAllowed,
+  evaluateForGate,
+  loadPayoutEligibilityOrganiser,
+  readAutoExecuteEnabled,
+  snapshotFromResult,
+  toEligibilityProfile,
+} from './payout-eligibility.helpers';
 
 export interface PayoutRunPreviewItem {
   campaignId: string;
@@ -24,14 +40,29 @@ export interface PayoutRunPreviewItem {
   eligibleBalance: number;
   currency: string;
   payoutProfileId: string | null;
+  /** Present when preview excludes a campaign for policy reasons. */
+  denialCode?: string;
 }
 
 export interface PayoutRunPreviewResult {
   cutoffAt: Date;
   minimumPayoutAmount: number;
+  policyVersion: string;
   items: PayoutRunPreviewItem[];
   totalAmount: number;
 }
+
+const PROFILE_SELECT = {
+  id: true,
+  userId: true,
+  status: true,
+  bankResolutionStatus: true,
+  destinationVersion: true,
+  bankCode: true,
+  accountName: true,
+  accountNumber: true,
+  recipientCode: true,
+} as const;
 
 @Injectable()
 export class PayoutRunsService {
@@ -41,6 +72,7 @@ export class PayoutRunsService {
     private payoutsService: PayoutsService,
     private audit: AuditService,
     private observability: ObservabilityService,
+    private config: ConfigService,
   ) {}
 
   /** Resolve effective payout mode for a campaign (site default or campaign override). */
@@ -55,6 +87,10 @@ export class PayoutRunsService {
     return (
       campaign?.payoutModeOverride ?? site?.payoutMode ?? PayoutMode.MANUAL
     );
+  }
+
+  private assertAutoExecuteAllowed(mode: PayoutMode): void {
+    assertAutoExecuteModeAllowed(mode, readAutoExecuteEnabled(this.config));
   }
 
   /**
@@ -78,11 +114,26 @@ export class PayoutRunsService {
       },
       include: {
         organizer: {
-          include: {
-            payoutProfiles: { where: { isDefault: true }, take: 1 },
+          select: {
+            id: true,
+            role: true,
+            status: true,
+            emailVerifiedAt: true,
+            phone: true,
+            organizerApplications: {
+              where: { status: OrganizerApplicationStatus.APPROVED },
+              orderBy: { reviewedAt: 'desc' },
+              take: 1,
+              select: { termsVersion: true },
+            },
+            payoutProfiles: {
+              where: { isDefault: true },
+              take: 1,
+              select: PROFILE_SELECT,
+            },
           },
         },
-        payoutProfile: true,
+        payoutProfile: { select: PROFILE_SELECT },
       },
     });
 
@@ -96,8 +147,22 @@ export class PayoutRunsService {
     for (const c of campaigns) {
       const balance = balances.get(c.id) ?? 0;
       if (balance < minimumPayoutAmount) continue;
-      const profile = c.payoutProfile ?? c.organizer.payoutProfiles?.[0];
-      if (!profile) continue;
+      const profile =
+        c.payoutProfile ?? c.organizer.payoutProfiles?.[0] ?? null;
+      const eligibility = evaluateForGate({
+        gate: PayoutEligibilityGate.PREVIEW,
+        organiser: {
+          id: c.organizer.id,
+          role: c.organizer.role,
+          status: c.organizer.status,
+          emailVerifiedAt: c.organizer.emailVerifiedAt,
+          phone: c.organizer.phone,
+          termsVersion:
+            c.organizer.organizerApplications[0]?.termsVersion ?? null,
+        },
+        profile: profile ? toEligibilityProfile(profile) : null,
+      });
+      if (!eligibility.eligible || !profile) continue;
       items.push({
         campaignId: c.id,
         campaignTitle: c.title,
@@ -112,6 +177,7 @@ export class PayoutRunsService {
     return {
       cutoffAt: asOf,
       minimumPayoutAmount,
+      policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
       items,
       totalAmount,
     };
@@ -129,11 +195,9 @@ export class PayoutRunsService {
     mode: PayoutMode,
     requestedByUserId: string,
   ): Promise<{ id: string; status: string; payoutCount: number }> {
+    this.assertAutoExecuteAllowed(mode);
     const preview = await this.previewPayoutRun(cutoffAt);
 
-    // Filter preview items by effective payout mode.
-    // A MANUAL-mode campaign should only be paid via direct admin initiation,
-    // not via batch runs whose mode is AUTO or AUTO_WITH_APPROVAL.
     const eligibleItems =
       mode === PayoutMode.MANUAL
         ? preview.items
@@ -160,6 +224,7 @@ export class PayoutRunsService {
           mode,
           status: PayoutRunStatus.DRAFT,
           requestedByUserId,
+          policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
         },
       });
 
@@ -167,10 +232,25 @@ export class PayoutRunsService {
         const campaign = await tx.campaign.findUnique({
           where: { id: item.campaignId },
           include: {
-            payoutProfile: true,
+            payoutProfile: { select: PROFILE_SELECT },
             organizer: {
-              include: {
-                payoutProfiles: { where: { isDefault: true }, take: 1 },
+              select: {
+                id: true,
+                role: true,
+                status: true,
+                emailVerifiedAt: true,
+                phone: true,
+                organizerApplications: {
+                  where: { status: OrganizerApplicationStatus.APPROVED },
+                  orderBy: { reviewedAt: 'desc' },
+                  take: 1,
+                  select: { termsVersion: true },
+                },
+                payoutProfiles: {
+                  where: { isDefault: true },
+                  take: 1,
+                  select: PROFILE_SELECT,
+                },
               },
             },
           },
@@ -179,6 +259,21 @@ export class PayoutRunsService {
         const profile =
           campaign.payoutProfile ?? campaign.organizer.payoutProfiles?.[0];
         if (!profile) continue;
+
+        const eligibility = evaluateForGate({
+          gate: PayoutEligibilityGate.RUN_CREATE,
+          organiser: {
+            id: campaign.organizer.id,
+            role: campaign.organizer.role,
+            status: campaign.organizer.status,
+            emailVerifiedAt: campaign.organizer.emailVerifiedAt,
+            phone: campaign.organizer.phone,
+            termsVersion:
+              campaign.organizer.organizerApplications[0]?.termsVersion ?? null,
+          },
+          profile: toEligibilityProfile(profile),
+        });
+        if (!eligibility.eligible) continue;
 
         await tx.payout.create({
           data: {
@@ -190,10 +285,15 @@ export class PayoutRunsService {
             amount: item.eligibleBalance,
             snapshotBankCode: profile.bankCode,
             snapshotAccountName: profile.accountName,
-            snapshotAccountMask: profile.accountNumber
-              ? `***${profile.accountNumber.slice(-4)}`
-              : null,
+            snapshotAccountMask: maskAccountNumber(profile.accountNumber),
             snapshotRecipientCode: profile.recipientCode,
+            snapshotProfileId: profile.id,
+            snapshotDestinationVersion: profile.destinationVersion,
+            policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
+            eligibilitySnapshot: snapshotFromResult(
+              eligibility,
+              item.organizerId,
+            ),
           },
         });
       }
@@ -204,6 +304,16 @@ export class PayoutRunsService {
     const count = await this.prisma.payout.count({
       where: { payoutRunId: run.id },
     });
+
+    if (count === 0) {
+      await this.prisma.payoutRun.update({
+        where: { id: run.id },
+        data: { status: PayoutRunStatus.CANCELLED },
+      });
+      throw new BadRequestException(
+        'No campaigns remained eligible after payout policy evaluation',
+      );
+    }
 
     await this.audit.log({
       eventName: 'admin.payout-run.created',
@@ -242,6 +352,34 @@ export class PayoutRunsService {
       throw new BadRequestException(
         `Payout run cannot be approved (current status: ${run.status})`,
       );
+    }
+
+    this.assertAutoExecuteAllowed(run.mode);
+
+    for (const payout of run.payouts) {
+      const organiser = await loadPayoutEligibilityOrganiser(
+        this.prisma,
+        payout.recipientUserId,
+      );
+      if (!organiser) {
+        throw new BadRequestException({
+          message: 'Payout recipient not found',
+          code: 'PAYOUT_ORGANISER_NOT_ACTIVE',
+        });
+      }
+      const profileId = payout.snapshotProfileId;
+      const profile = profileId
+        ? await this.prisma.userPayoutProfile.findUnique({
+            where: { id: profileId },
+            select: PROFILE_SELECT,
+          })
+        : null;
+      const eligibility = evaluateForGate({
+        gate: PayoutEligibilityGate.RUN_APPROVE,
+        organiser,
+        profile: profile ? toEligibilityProfile(profile) : null,
+      });
+      assertPayoutEligible(eligibility);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -320,12 +458,6 @@ export class PayoutRunsService {
           }
         }
 
-        // Mark the run EXECUTING — payouts that reached INITIATED are still
-        // waiting for Paystack transfer webhooks.  The webhook handler in
-        // PayoutsService.updatePayoutStatusByReference will flip the run to
-        // COMPLETED once every payout reaches a terminal state.
-        // Only move to COMPLETED immediately if every payout failed inline
-        // (none are INITIATED / waiting for a webhook).
         const allPayouts = await this.prisma.payout.findMany({
           where: { payoutRunId: runId },
         });
@@ -362,23 +494,11 @@ export class PayoutRunsService {
   }
 
   /**
-   * Execute a single payout: reserve ledger, resolve recipient, call Paystack, update payout.
+   * Execute a single payout: reserve ledger, resolve recipient from snapshot, call Paystack.
    */
   async executeSinglePayout(payoutId: string): Promise<void> {
     const payout = await this.prisma.payout.findUnique({
       where: { id: payoutId },
-      include: {
-        campaign: {
-          include: {
-            payoutProfile: true,
-            organizer: {
-              include: {
-                payoutProfiles: { where: { isDefault: true }, take: 1 },
-              },
-            },
-          },
-        },
-      },
     });
     if (!payout) throw new NotFoundException('Payout not found');
     if (
@@ -390,11 +510,38 @@ export class PayoutRunsService {
       );
     }
 
-    const profile =
-      payout.campaign.payoutProfile ??
-      payout.campaign.organizer.payoutProfiles?.[0];
-    if (!profile) {
-      throw new BadRequestException('No payout profile for campaign');
+    const organiser = await loadPayoutEligibilityOrganiser(
+      this.prisma,
+      payout.recipientUserId,
+    );
+    if (!organiser) {
+      throw new BadRequestException({
+        message: 'Payout recipient not found',
+        code: 'PAYOUT_ORGANISER_NOT_ACTIVE',
+      });
+    }
+
+    const profileId = payout.snapshotProfileId;
+    const profile = profileId
+      ? await this.prisma.userPayoutProfile.findUnique({
+          where: { id: profileId },
+          select: PROFILE_SELECT,
+        })
+      : null;
+
+    const eligibility = evaluateForGate({
+      gate: PayoutEligibilityGate.PROVIDER_INITIATE,
+      organiser,
+      profile: profile ? toEligibilityProfile(profile) : null,
+      // Destination is immutable on the payout row; only suspension/rejection block.
+      allowNonVerifiedProfile: true,
+    });
+    assertPayoutEligible(eligibility);
+
+    if (!payout.snapshotBankCode || !payout.snapshotAccountName) {
+      throw new BadRequestException(
+        'Payout is missing immutable destination snapshot',
+      );
     }
 
     const amount = Number(payout.amount);
@@ -413,9 +560,13 @@ export class PayoutRunsService {
     );
 
     try {
-      const recipientCode = await this.payoutsService.resolveRecipient(
-        profile.id,
-      );
+      let recipientCode = payout.snapshotRecipientCode;
+      if (!recipientCode) {
+        if (!profileId) {
+          throw new BadRequestException('No snapshotted payout profile');
+        }
+        recipientCode = await this.payoutsService.resolveRecipient(profileId);
+      }
       const idempotencyKey = payout.idempotencyKey ?? `payout-${payoutId}`;
 
       const result = await this.payoutsService.initiateTransfer(
@@ -456,17 +607,6 @@ export class PayoutRunsService {
 
   /**
    * Retry a failed payout in a run by creating a **new** payout row and executing it.
-   *
-   * TTW-011 enforces at most one PAYOUT_RESERVED / PAYOUT_FAILED / PAYOUT_SUCCEEDED
-   * per payoutId. Re-using the failed row would violate those uniqueness constraints,
-   * so each retry attempt is a distinct payout with its own ledger lifecycle.
-   *
-   * The original row is moved to CANCELLED under a row lock so a second click
-   * (or concurrent retry) cannot start another Paystack transfer. If the run
-   * was already COMPLETED, it is reopened to EXECUTING until the retry is terminal.
-   *
-   * If the previous attempt crashed after PAYOUT_RESERVED but before PAYOUT_FAILED,
-   * we release the dangling debit on the **failed** payout before starting the retry.
    */
   async retryPayout(payoutId: string): Promise<{ id: string; status: string }> {
     const retry = await this.prisma.$transaction(async (tx) => {
@@ -510,10 +650,14 @@ export class PayoutRunsService {
           status: PayoutStatus.QUEUED,
           currency: payout.currency,
           amount: payout.amount,
-          // Ambiguous local failures leave providerRef null — reuse the original
-          // Paystack Idempotency-Key so we recover the same transfer instead of
-          // minting a second one. Webhook-failed rows keep providerRef and get a
-          // fresh key via executeSinglePayout (`payout-${newId}`).
+          snapshotBankCode: payout.snapshotBankCode,
+          snapshotAccountName: payout.snapshotAccountName,
+          snapshotAccountMask: payout.snapshotAccountMask,
+          snapshotRecipientCode: payout.snapshotRecipientCode,
+          snapshotProfileId: payout.snapshotProfileId,
+          snapshotDestinationVersion: payout.snapshotDestinationVersion,
+          policyVersion: payout.policyVersion,
+          eligibilitySnapshot: payout.eligibilitySnapshot ?? undefined,
           idempotencyKey:
             payout.providerRef == null
               ? (payout.idempotencyKey ?? `payout-${payout.id}`)
@@ -553,7 +697,6 @@ export class PayoutRunsService {
     return { id: retry.id, status: updated?.status ?? PayoutStatus.QUEUED };
   }
 
-  /** Serialize with webhook completion: COMPLETED iff every member is terminal. */
   private async markRunCompletedIfAllTerminal(runId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`

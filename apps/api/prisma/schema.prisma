@@ -370,6 +370,16 @@ enum PayoutMode {
   AUTO_EXECUTE
 }
 
+/// Lifecycle of a saved payout destination (TTW-042).
+/// Only VERIFIED profiles may be selected for new payouts.
+enum PayoutProfileStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  SUSPENDED
+  SUPERSEDED
+}
+
 /// Status of a payout run (batch).
 enum PayoutRunStatus {
   DRAFT
@@ -2088,7 +2098,8 @@ model CampaignProduct {
 }
 
 /// Saved bank account for payouts. Organizers can attach to campaigns instead of inline bank fields.
-/// Missing constraint: at most one profile per user may have isDefault = true. Enforce in app when setting default, or add migration: CREATE UNIQUE INDEX user_payout_profiles_one_default_per_user ON user_payout_profiles (user_id) WHERE is_default = true;
+/// One default per user is enforced by partial unique index
+/// `user_payout_profiles_one_default_per_user` (WHERE isDefault = true) — TTW-042.
 model UserPayoutProfile {
   id     String @id @default(cuid())
   userId String
@@ -2102,6 +2113,15 @@ model UserPayoutProfile {
   /// Paystack transfer recipient code (set after first successful resolve/create)
   recipientCode String? @unique
 
+  status               PayoutProfileStatus @default(PENDING_VERIFICATION)
+  /// STUB_MATCH | LIVE_MATCH | LEGACY_GRANDFATHER — never log account numbers.
+  bankResolutionStatus String?
+  /// Increments when bank identity fields change; snapshotted onto Payout rows.
+  destinationVersion   Int                 @default(1)
+  verifiedAt           DateTime?
+  rejectedAt           DateTime?
+  suspendedAt          DateTime?
+
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2109,6 +2129,7 @@ model UserPayoutProfile {
   campaigns Campaign[]
 
   @@index([userId])
+  @@index([userId, status])
   @@index([bankCode])
   @@map("user_payout_profiles")
 }
@@ -2120,6 +2141,9 @@ model PayoutRun {
   cutoffAt     DateTime /// Settlement cutoff (orders paid before this count).
   mode         PayoutMode
   status       PayoutRunStatus @default(DRAFT)
+
+  /// TTW-042 policy stamp at run creation (immutable).
+  policyVersion String?
 
   requestedByUserId String?
   requestedBy       User?     @relation("PayoutRunRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
@@ -2164,10 +2188,15 @@ model Payout {
   amount   Decimal      @db.Decimal(10, 2)
 
   /// Snapshot of destination at time of payout (immutable for audit).
-  snapshotBankCode      String?
-  snapshotAccountName   String?
-  snapshotAccountMask   String? /// e.g. ***6789
-  snapshotRecipientCode String?
+  snapshotBankCode            String?
+  snapshotAccountName         String?
+  snapshotAccountMask         String? /// e.g. ***6789
+  snapshotRecipientCode       String?
+  snapshotProfileId           String?
+  snapshotDestinationVersion  Int?
+  /// TTW-042 policy stamp + safe eligibility codes (no account numbers / KYC).
+  policyVersion               String?
+  eligibilitySnapshot         Json?
 
   /// For exceptional manual adjustments: two-person approval.
   requestedByUserId  String?
