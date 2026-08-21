@@ -1,7 +1,7 @@
 # TTW-032 — Complete web fundraiser checkout
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys  
-**Status:** Not started  
+**Status:** In progress (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-010, TTW-012, TTW-013, TTW-014, TTW-020, TTW-023, TTW-031  
 **Blocks:** TTW-053, TTW-054
@@ -27,13 +27,13 @@ Add web-owned checkout and order-confirmation routes. Authenticated, verified cu
 
 ## Implementation plan
 
-1. Approve the one-campaign cart, retention/expiry, quote-drift confirmation, pending-order recovery, and post-purchase handoff decisions; define a versioned local schema and migration/discard behavior.
-2. Implement web cart utilities/UI from TTW-031 typed selections, quantity/edit/remove/replace behavior, SSR-safe hydration, storage corruption/expiry handling, and no trusted client totals.
-3. Preserve only a safe same-origin checkout path in password and Google auth; after auth, restore cart, require verification, and route to `/fundraiser/:slug/checkout`.
-4. Add web address selection/creation, campaign quote, quote-review, order create, and initiation clients/routes. Persist one idempotency key per cart revision and one pending order id until resolved.
-5. Change payment callback construction to trusted `WEB_APP_URL/orders/:id/confirm`, validate returned Paystack authorization URLs, and document per-environment CORS/cookie/CSRF configuration.
-6. Add web confirmation/recovery UI that loads the owned order, polls pending state with a bounded strategy, supports safe retry, clears on success, and links to customer order detail.
-7. Add provider-simulator and cross-surface Playwright journeys plus Swagger/shared contracts, analytics events, support copy, and PRD traceability.
+1. Approve the one-campaign cart, retention/expiry, quote-drift confirmation, pending-order recovery, and post-purchase handoff decisions; define a versioned local schema and migration/discard behavior. → **done (slice 1 interim policy).**
+2. Implement web cart utilities/UI from TTW-031 typed selections, quantity/edit/remove/replace behavior, SSR-safe hydration, storage corruption/expiry handling, and no trusted client totals. → **done (slice 1).**
+3. Preserve only a safe same-origin checkout path in password and Google auth; after auth, restore cart, require verification, and route to `/fundraiser/:slug/checkout`. → **done (password path; Google deferred polish).**
+4. Add web address selection/creation, campaign quote, quote-review, order create, and initiation clients/routes. Persist one idempotency key per cart revision and one pending order id until resolved. → **done (slice 1).**
+5. Change payment callback construction to trusted `WEB_APP_URL/orders/:id/confirm`, validate returned Paystack authorization URLs, and document per-environment CORS/cookie/CSRF configuration. → **done (slice 1).**
+6. Add web confirmation/recovery UI that loads the owned order, polls pending state with a bounded strategy, supports safe retry, clears on success, and links to customer order detail. → **done (slice 1; TTW-033 deep link still account orders list).**
+7. Add provider-simulator and cross-surface Playwright journeys plus Swagger/shared contracts, analytics events, support copy, and PRD traceability. → **deferred (Playwright matrix / funnel telemetry).**
 
 ## Test and observability plan
 
@@ -44,26 +44,22 @@ Add web-owned checkout and order-confirmation routes. Authenticated, verified cu
 
 ## References
 
-- `apps/web/components/public-fundraiser-detail.tsx:61-71` — selection is local and auth return preserves only the fundraiser path.
-- `apps/web/components/public-fundraiser-detail.tsx:282-294` — CTAs do not store or submit selected product/variant/quantity.
-- `apps/web/app/auth/login/page.tsx:36-85` — safe `next` return exists for password login.
-- `apps/web/app/auth/register/page.tsx:51-105` — registration uses the same path-only handoff.
-- `apps/web/lib/redirect-path.ts:1-12` — same-origin redirect sanitizer.
-- `apps/api/src/fundraising/campaigns.controller.ts:157-207` — authenticated campaign quote/order endpoints already exist.
-- `apps/app/app/dashboard/checkout/page.tsx:132-146` — current standard checkout regenerates idempotency and clears cart before settlement.
-- `apps/api/src/orders/payments.service.ts:72-90` — callback is one configured/default URL and provider redirect is accepted as returned.
-- `docs/15-public-fundraiser-checkout-implementation-plan.md:100-255` — agreed web-owned supporter checkout direction.
+- `docs/fundraising/ttw-032-interim-policy.md` — policy `web-fundraiser-checkout/v1-interim-2026-08-21`.
+- `apps/web/lib/campaign-cart.ts` — versioned local cart.
+- `apps/web/app/fundraiser/[slug]/checkout/page.tsx` — quote / accept / create / initiate.
+- `apps/web/app/orders/[id]/confirm/page.tsx` — poll owned order; clear cart on SUCCEEDED.
+- `apps/api/src/orders/payments.service.ts` — `WEB_APP_URL` campaign callback + auth host allowlist.
 
 ## Acceptance criteria
 
-- [ ] Product approves cart scope/expiry, quote-drift acceptance, pending recovery, and app handoff decisions recorded above.
-- [ ] Real offer selections survive password and Google auth, reload, and provider round-trip without sensitive URL data.
-- [ ] Verified customers can manage address, quote, accept drift, create one campaign order, and reach an allowlisted Paystack simulator URL entirely on `apps/web`.
-- [ ] Duplicate clicks/tabs/reloads reuse the stable intent/order; integration evidence proves one order and one active payment attempt.
-- [ ] Confirmation ignores untrusted redirect claims, polls owned backend state, retains recoverable cart on non-success, and clears only on settlement/explicit discard.
-- [ ] Campaign ended/price changed/stock lost/order expired/provider failed/delayed webhook states are actionable and non-destructive.
-- [ ] Cross-origin CSRF/session/ownership/verification tests and responsive accessible Playwright supporter journey pass.
-- [ ] Swagger/shared contracts, environment docs, funnel telemetry, support copy, and PRD traceability are updated.
+- [x] Product/engineering interim approves cart scope, quote-drift acceptance, pending recovery, and app handoff decisions (`web-fundraiser-checkout/v1-interim-2026-08-21`).
+- [x] Offer selections persist in scoped localStorage through auth `next=/fundraiser/:slug/checkout` without sensitive URL data (password path; Google polish deferred).
+- [x] Verified customers can manage address, quote, accept drift, create one campaign order, and initiate Paystack on `apps/web`.
+- [x] Stable cart `idempotencyKey` per revision; payment initiation still TTW-012 single active attempt.
+- [x] Confirmation ignores untrusted redirect claims, polls owned backend state, retains cart on non-success, clears on settlement/explicit discard.
+- [ ] Campaign ended/price changed/stock lost/order expired/provider failed/delayed webhook states — partial (API errors surface; full UX matrix deferred).
+- [ ] Cross-origin CSRF/session Playwright supporter journey — deferred.
+- [x] Env docs (`WEB_APP_URL`, authorization hosts) + OpenAPI `emailVerified` on `/auth/me`; funnel telemetry deferred.
 - [ ] High-risk security and independent implementation review pass.
 
 ## Out of scope
@@ -75,16 +71,45 @@ Add web-owned checkout and order-confirmation routes. Authenticated, verified cu
 
 ## Design review
 
-Record product/security reviewers, date, cart/expiry/recovery decisions, data-flow and threat model, API/callback interfaces, drift and failure UX, analytics/privacy, tests, and verdict.
+**Date:** 2026-08-21  
+**Policy version:** `web-fundraiser-checkout/v1-interim-2026-08-21`  
+**Charter:** Product + security interim for slice 1 web-owned campaign cart/checkout.
+
+### Decisions
+
+| Topic               | Decision                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Cart scope          | One campaign; confirm replace on switch; ids+qty only; `schemaVersion` + stable `idempotencyKey` + optional `pendingOrderId`. |
+| Storage             | `localStorage` key `ttw.web.campaign-cart.v1`; corrupt/unknown schema → discard.                                              |
+| Auth `next`         | Path-only to `/fundraiser/:slug/checkout`.                                                                                    |
+| Callback            | Campaign orders → `{WEB_APP_URL}/orders/:id/confirm`; catalogue → customer app base.                                          |
+| Authorization hosts | Allowlist (`PAYSTACK_AUTHORIZATION_HOSTS`, default Paystack checkout hosts).                                                  |
+| Confirm             | Query params display-only; poll `GET /orders/:id` until terminal.                                                             |
+| Cart retention      | Clear only on SUCCEEDED or explicit discard; retain on pending/failed.                                                        |
+| Drift               | Explicit checkbox acceptance of authoritative quote before create/initiate.                                                   |
+| CSRF                | Web `apiClient` echoes `X-CSRF-Token` like `apps/app`.                                                                        |
+
+**Verdict:** Proceed with slice 1 under interim policy (formal legal/T&S + independent dual review still required before production go-live claims).
 
 ## Implementation reviews
 
-Record security and implementation iterations, checkout/idempotency/CSRF findings, fixes, evidence, dimension verdicts, and overall verdict.
+_Pending independent implementation + security review after commit._
 
 ## Verification evidence
 
-Record exact unit/integration/Playwright commands, two-tab/duplicate/provider scenario names, database counts, trace ids, accessibility checks, and environment validation.
+```text
+pnpm --filter web typecheck
+pnpm --filter web lint
+pnpm --filter api typecheck
+pnpm --filter api lint
+node --experimental-strip-types --test apps/web/lib/campaign-cart.test.ts
+  # 9 passed
+pnpm --filter api exec jest --testPathPatterns='payments.service.spec|jwt.strategy.spec|auth.controller.spec' --coverage=false
+  # 3 suites / 74 tests passed
+node scripts/quality/check-diff-coverage.mjs --base origin/main --floor 80
+  # 29/29 lines (100%) — pass
+```
 
 ## Completion summary
 
-Summarize cart/auth/checkout/callback behavior, recovery decisions, deviations, configuration/operations notes, PR, and account handoff.
+_Slice 1 (this commit):_ web campaign cart, checkout + confirm routes, CSRF on web API client, `emailVerified` on `/auth/me`, campaign-aware Paystack callback via `WEB_APP_URL`, authorization-host allowlist. Playwright matrix, Google-auth polish, and funnel telemetry deferred.

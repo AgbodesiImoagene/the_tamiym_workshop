@@ -78,6 +78,10 @@ function isDuplicateReferenceMessage(message: string): boolean {
   return m.includes('duplicate') && m.includes('reference');
 }
 
+function trimTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -95,6 +99,85 @@ export class PaymentsService {
     );
     const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
     return safe * 60_000;
+  }
+
+  /**
+   * Build the Paystack return URL from trusted app bases (TTW-032).
+   * Campaign orders return to the public web confirm route; catalogue orders
+   * return to the customer app. `PAYSTACK_CALLBACK_URL` may override with an
+   * absolute URL that includes `{orderId}` (or the literal order id segment).
+   */
+  buildPaymentCallbackUrl(orderId: string, campaignId: string | null): string {
+    const override = this.config.get<string>('PAYSTACK_CALLBACK_URL');
+    if (override && override.trim().length > 0) {
+      if (override.includes('{orderId}')) {
+        return override.replaceAll('{orderId}', orderId);
+      }
+      // Legacy absolute override without placeholder — keep as-is for ops
+      // that intentionally force a single callback host/path.
+      if (!override.includes('/orders/')) {
+        return override;
+      }
+    }
+
+    const webBase = trimTrailingSlash(
+      this.config.get<string>('WEB_APP_URL') ||
+        this.config.get<string>('APP_URL') ||
+        'http://localhost:3000',
+    );
+    const customerBase = trimTrailingSlash(
+      this.config.get<string>('CUSTOMER_APP_URL') ||
+        this.config.get<string>('FRONTEND_URL') ||
+        'http://localhost:3002',
+    );
+    const base = campaignId ? webBase : customerBase;
+    return `${base}/orders/${orderId}/confirm`;
+  }
+
+  /**
+   * Reject unexpected Paystack authorization hosts before handing the URL
+   * to the browser (TTW-032).
+   */
+  assertAllowedAuthorizationUrl(authorizationUrl: string): string {
+    let parsed: URL;
+    try {
+      parsed = new URL(authorizationUrl);
+    } catch {
+      throw new BadRequestException('Invalid payment authorization URL');
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new BadRequestException('Invalid payment authorization URL');
+    }
+    const configured =
+      this.config.get<string>('PAYSTACK_AUTHORIZATION_HOSTS') ||
+      'checkout.paystack.com,checkout.paystack.test';
+    const allowed = configured
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+    if (!allowed.includes(parsed.hostname.toLowerCase())) {
+      this.logger.warn(
+        `Rejected payment authorization host: ${parsed.hostname}`,
+      );
+      throw new BadRequestException(
+        'Payment provider returned an unexpected authorization host',
+      );
+    }
+    return authorizationUrl;
+  }
+
+  private toInitiationResult(
+    authorizationUrl: string,
+    reference: string,
+    accessCode: string,
+    attemptOutcome: InitiatePaymentResult['attemptOutcome'],
+  ): InitiatePaymentResult {
+    return {
+      authorizationUrl: this.assertAllowedAuthorizationUrl(authorizationUrl),
+      reference,
+      accessCode,
+      attemptOutcome,
+    };
   }
 
   /**
@@ -137,9 +220,9 @@ export class PaymentsService {
           throw new BadRequestException('Customer email is required');
         }
 
-        const callbackUrl = this.config.get<string>(
-          'PAYSTACK_CALLBACK_URL',
-          `${this.config.get('APP_URL', 'http://localhost:3000')}/orders/${orderId}/confirm`,
+        const callbackUrl = this.buildPaymentCallbackUrl(
+          orderId,
+          order.campaignId ?? null,
         );
 
         const ctx: InitContext = {
@@ -212,12 +295,12 @@ export class PaymentsService {
         );
       }
       this.observability.recordPaymentInitiation({ outcome });
-      return {
-        authorizationUrl: init.authorizationUrl,
-        reference: init.reference,
-        accessCode: init.accessCode,
-        attemptOutcome: outcome,
-      };
+      return this.toInitiationResult(
+        init.authorizationUrl,
+        init.reference,
+        init.accessCode,
+        outcome,
+      );
     } catch (error) {
       if (error instanceof ConflictException) {
         throw error;
@@ -282,12 +365,12 @@ export class PaymentsService {
       active.providerRef
     ) {
       this.observability.recordPaymentInitiation({ outcome: 'reused' });
-      return {
-        authorizationUrl: active.authorizationUrl,
-        reference: active.providerRef,
-        accessCode: active.accessCode,
-        attemptOutcome: 'reused',
-      };
+      return this.toInitiationResult(
+        active.authorizationUrl,
+        active.providerRef,
+        active.accessCode,
+        'reused',
+      );
     }
 
     if (this.isPendingStale(active)) {
@@ -320,12 +403,12 @@ export class PaymentsService {
         active.providerRef
       ) {
         this.observability.recordPaymentInitiation({ outcome: 'reused' });
-        return {
-          authorizationUrl: active.authorizationUrl,
-          reference: active.providerRef,
-          accessCode: active.accessCode,
-          attemptOutcome: 'reused',
-        };
+        return this.toInitiationResult(
+          active.authorizationUrl,
+          active.providerRef,
+          active.accessCode,
+          'reused',
+        );
       }
     }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { marketingAssets } from '@/lib/assets';
 import { Progress } from '@tamiym/ui';
 import { customerAppPath, webLoginWithNext, webRegisterWithNext } from '@/lib/site';
@@ -14,6 +15,13 @@ import {
   findVariantForSelection,
   isOptionValueSelectable,
 } from '@/lib/fundraiser-selection';
+import {
+  addSelectionToCart,
+  checkoutPathForSlug,
+  loadCampaignCart,
+  needsCampaignReplaceConfirm,
+  saveCampaignCart,
+} from '@/lib/campaign-cart';
 
 function formatCurrency(amountMajor: number, currency: string) {
   return new Intl.NumberFormat('en-NG', {
@@ -28,6 +36,7 @@ interface PublicFundraiserDetailProps {
 }
 
 export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailProps) {
+  const router = useRouter();
   const currency = fundraiser.performance.currency || fundraiser.currency || 'NGN';
   const products = fundraiser.products ?? [];
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -36,11 +45,12 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
     products[0] ? defaultOptionSelection(products[0]) : {}
   );
   const [shareDone, setShareDone] = useState(false);
+  const [cartMessage, setCartMessage] = useState<string | null>(null);
 
   const selected = products[selectedIndex] ?? products[0] ?? null;
-  const returnPath = `/fundraiser/${fundraiser.slug}`;
-  const registerHref = webRegisterWithNext(returnPath);
-  const loginHref = webLoginWithNext(returnPath);
+  const checkoutPath = checkoutPathForSlug(fundraiser.slug);
+  const registerHref = webRegisterWithNext(checkoutPath);
+  const loginHref = webLoginWithNext(checkoutPath);
 
   const organizerName = useMemo(() => {
     const first = fundraiser.organizer?.firstName?.trim();
@@ -119,8 +129,45 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
     }
   }
 
-  // Keep selection in React state for TTW-032 handoff (not persisted yet).
-  void selection;
+  function persistSelection(replaceCampaign: boolean) {
+    if (!selection) return null;
+    const next = addSelectionToCart(loadCampaignCart(), selection, { replaceCampaign });
+    saveCampaignCart(next);
+    return next;
+  }
+
+  function handleAddToCart() {
+    if (!selection) return;
+    setCartMessage(null);
+    const existing = loadCampaignCart();
+    if (needsCampaignReplaceConfirm(existing, selection.campaignId)) {
+      const confirmed = window.confirm(
+        'Your cart has items from another fundraiser. Replace the cart with this campaign?'
+      );
+      if (!confirmed) return;
+      persistSelection(true);
+      setCartMessage('Cart updated with this campaign.');
+      return;
+    }
+    persistSelection(false);
+    setCartMessage('Added to cart.');
+  }
+
+  function handleCheckout() {
+    if (!selection) return;
+    setCartMessage(null);
+    const existing = loadCampaignCart();
+    if (needsCampaignReplaceConfirm(existing, selection.campaignId)) {
+      const confirmed = window.confirm(
+        'Your cart has items from another fundraiser. Replace the cart with this campaign and continue to checkout?'
+      );
+      if (!confirmed) return;
+      persistSelection(true);
+    } else {
+      persistSelection(false);
+    }
+    router.push(checkoutPath);
+  }
 
   return (
     <div className="space-y-0">
@@ -244,8 +291,7 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
 
               <div className="space-y-6 rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
                 <p className="text-xs text-black/60">
-                  Choose options here; you will confirm shipping and payment after you sign in or
-                  create an account.
+                  Choose options, add them to your cart, then sign in to confirm shipping and pay.
                 </p>
 
                 <div>
@@ -343,17 +389,45 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
                   </div>
                 </div>
 
+                {cartMessage ? (
+                  <p className="text-sm text-tamiym-blue" role="status">
+                    {cartMessage}
+                  </p>
+                ) : null}
+
                 <div className="space-y-3 border-t border-black/10 pt-4">
+                  <button
+                    type="button"
+                    disabled={!selection}
+                    onClick={handleAddToCart}
+                    className={`flex h-11 w-full items-center justify-center rounded-lg border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                      selection
+                        ? 'border-black/20 text-tamiym-blue'
+                        : 'border-black/10 text-black/40'
+                    }`}
+                  >
+                    Add to cart
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!selection}
+                    onClick={handleCheckout}
+                    className={`flex h-12 w-full items-center justify-center rounded-lg text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
+                      selection ? 'bg-accent text-tamiym-blue' : 'bg-black/10 text-black/40'
+                    }`}
+                  >
+                    Checkout
+                  </button>
                   <Link
                     href={registerHref}
                     aria-disabled={!selection}
-                    className={`flex h-12 items-center justify-center rounded-lg text-sm font-bold ${
+                    className={`flex h-11 items-center justify-center rounded-lg border text-sm font-semibold ${
                       selection
-                        ? 'bg-accent text-tamiym-blue'
-                        : 'pointer-events-none bg-black/10 text-black/40'
+                        ? 'border-black/20 text-tamiym-blue'
+                        : 'pointer-events-none border-black/10 text-black/40'
                     }`}
                   >
-                    Continue to sign up &amp; checkout
+                    New here? Sign up &amp; checkout
                   </Link>
                   <Link
                     href={loginHref}

@@ -764,6 +764,11 @@ export class AuthController {
         phone: { type: 'string', nullable: true },
         role: { type: 'string', enum: Object.values(UserRole) },
         status: { type: 'string', example: 'ACTIVE' },
+        emailVerified: {
+          type: 'boolean',
+          description:
+            'True when the account email is verified (TTW-023). Used by web checkout gates.',
+        },
         surface: { type: 'string', enum: Object.values(AuthSurface) },
         sessionId: {
           type: 'string',

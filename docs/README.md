@@ -66,6 +66,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 25. `moderation/ttw-027-interim-policy.md` — interim content moderation & appeals matrix (TTW-027)
 26. `organiser/ttw-030-interim-policy.md` — interim organiser onboarding matrix (TTW-030)
 27. `fundraising/ttw-031-interim-policy.md` — interim public campaign-offer disclosure & pricing matrix (TTW-031)
+28. `fundraising/ttw-032-interim-policy.md` — interim web fundraiser cart/checkout & Paystack callback matrix (TTW-032)
 
 ## Deep Dives
 
@@ -73,6 +74,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 - `moderation/ttw-027-interim-policy.md` — interim content moderation appeals matrix (TTW-027)
 - `organiser/ttw-030-interim-policy.md` — interim organiser onboarding matrix (TTW-030)
 - `fundraising/ttw-031-interim-policy.md` — public campaign offer disclosure, display price, and caching (TTW-031)
+- `fundraising/ttw-032-interim-policy.md` — web campaign cart, checkout, callback, and confirmation (TTW-032)
 - `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
 - `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
 - `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout

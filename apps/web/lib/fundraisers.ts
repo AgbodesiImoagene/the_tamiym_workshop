@@ -1,6 +1,6 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
 
-/** Typed selection handoff for TTW-032 (in-memory only in this slice). */
+/** Typed selection handoff for TTW-032 campaign cart. */
 export interface FundraiserSelection {
   campaignId: string;
   campaignProductId: string;

@@ -36,6 +36,7 @@ describe('PaymentsService (TTW-012)', () => {
     userId: 'user_1',
     status: OrderStatus.PENDING_PAYMENT,
     totalAmount: 2500,
+    campaignId: null as string | null,
     user: { email: 'cust@example.com' },
   };
 
@@ -450,6 +451,132 @@ describe('PaymentsService (TTW-012)', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(observability.recordPaymentInitiation).toHaveBeenCalledWith({
       outcome: 'blocked',
+    });
+  });
+
+  describe('callback URL + authorization host allowlist (TTW-032)', () => {
+    it('builds WEB_APP_URL confirm callback for campaign orders', async () => {
+      const configMap: Record<string, string> = {
+        WEB_APP_URL: 'https://www.example.com',
+        CUSTOMER_APP_URL: 'https://app.example.com',
+      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          PaymentsService,
+          { provide: PrismaService, useValue: prisma },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string, fallback?: string) =>
+                configMap[key] ?? fallback,
+            },
+          },
+          { provide: ObservabilityService, useValue: observability },
+          { provide: PaystackTransactionClient, useValue: paystack },
+        ],
+      }).compile();
+      const payments = module.get(PaymentsService);
+      prisma.order.findUnique.mockResolvedValue({
+        ...order,
+        campaignId: 'camp_1',
+      });
+
+      await payments.initiatePayment('ord_1', 'user_1', undefined);
+
+      expect(paystack.initialize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          callbackUrl: 'https://www.example.com/orders/ord_1/confirm',
+        }),
+      );
+    });
+
+    it('builds CUSTOMER_APP_URL confirm callback for catalogue orders', async () => {
+      const configMap: Record<string, string> = {
+        WEB_APP_URL: 'https://www.example.com',
+        CUSTOMER_APP_URL: 'https://app.example.com',
+      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          PaymentsService,
+          { provide: PrismaService, useValue: prisma },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string, fallback?: string) =>
+                configMap[key] ?? fallback,
+            },
+          },
+          { provide: ObservabilityService, useValue: observability },
+          { provide: PaystackTransactionClient, useValue: paystack },
+        ],
+      }).compile();
+      const payments = module.get(PaymentsService);
+
+      await payments.initiatePayment('ord_1', 'user_1', undefined);
+
+      expect(paystack.initialize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          callbackUrl: 'https://app.example.com/orders/ord_1/confirm',
+        }),
+      );
+    });
+
+    it('rejects unexpected authorization hosts', () => {
+      expect(() =>
+        service.assertAllowedAuthorizationUrl('https://evil.example/pay'),
+      ).toThrow(BadRequestException);
+    });
+
+    it('allows configured Paystack checkout hosts', () => {
+      expect(
+        service.assertAllowedAuthorizationUrl(
+          'https://checkout.paystack.com/abc',
+        ),
+      ).toBe('https://checkout.paystack.com/abc');
+    });
+
+    it('expands PAYSTACK_CALLBACK_URL {orderId} placeholder', () => {
+      const configMap: Record<string, string> = {
+        PAYSTACK_CALLBACK_URL:
+          'https://callback.example/orders/{orderId}/confirm',
+      };
+      expect(
+        (() => {
+          const payments = new PaymentsService(
+            prisma as never,
+            { get: (key: string) => configMap[key] } as never,
+            observability as never,
+            paystack as never,
+          );
+          return payments.buildPaymentCallbackUrl('ord_9', 'camp_1');
+        })(),
+      ).toBe('https://callback.example/orders/ord_9/confirm');
+    });
+
+    it('keeps legacy PAYSTACK_CALLBACK_URL without /orders/ path', () => {
+      const payments = new PaymentsService(
+        prisma as never,
+        {
+          get: (key: string) =>
+            key === 'PAYSTACK_CALLBACK_URL'
+              ? 'https://legacy.example/pay/return'
+              : undefined,
+        } as never,
+        observability as never,
+        paystack as never,
+      );
+      expect(payments.buildPaymentCallbackUrl('ord_9', null)).toBe(
+        'https://legacy.example/pay/return',
+      );
+    });
+
+    it('rejects malformed and non-http authorization URLs', () => {
+      expect(() => service.assertAllowedAuthorizationUrl('not-a-url')).toThrow(
+        BadRequestException,
+      );
+      expect(() =>
+        service.assertAllowedAuthorizationUrl('ftp://checkout.paystack.com/x'),
+      ).toThrow(BadRequestException);
     });
   });
 });
