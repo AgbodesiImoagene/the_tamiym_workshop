@@ -103,6 +103,9 @@ export class PayoutRunsService {
     id: string;
     recipientCode: string | null;
     destinationVersion: number;
+    bankCode: string;
+    accountName: string;
+    accountNumber: string;
   }): Promise<string> {
     if (profile.recipientCode) {
       return profile.recipientCode;
@@ -117,7 +120,12 @@ export class PayoutRunsService {
         profile.destinationVersion,
       );
     }
-    return this.payoutsService.resolveRecipient(profile.id);
+    return this.payoutsService.resolveRecipient(profile.id, {
+      destinationVersion: profile.destinationVersion,
+      bankCode: profile.bankCode,
+      accountNumber: profile.accountNumber,
+      accountName: profile.accountName,
+    });
   }
 
   /**
@@ -348,6 +356,16 @@ export class PayoutRunsService {
         const profile =
           campaign.payoutProfile ?? campaign.organizer.payoutProfiles?.[0];
         if (!profile || profile.id !== frozen.profileId) {
+          throw new BadRequestException(
+            `Campaign ${item.campaignId} payout destination changed during run create`,
+          );
+        }
+        if (
+          profile.destinationVersion !== frozen.destinationVersion ||
+          profile.bankCode !== frozen.bankCode ||
+          profile.accountNumber !== frozen.accountNumber ||
+          profile.accountName !== frozen.accountName
+        ) {
           throw new BadRequestException(
             `Campaign ${item.campaignId} payout destination changed during run create`,
           );

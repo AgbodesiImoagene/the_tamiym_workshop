@@ -80,8 +80,18 @@ export class PayoutsService {
 
   /**
    * Resolve or create Paystack transfer recipient for a payout profile. Returns recipient_code.
+   * When `expected` is provided, bank identity must still match that tuple (CAS) so a
+   * concurrent destination edit cannot bind a recipient to a desynced snapshot.
    */
-  async resolveRecipient(profileId: string): Promise<string> {
+  async resolveRecipient(
+    profileId: string,
+    expected?: {
+      destinationVersion: number;
+      bankCode: string;
+      accountNumber: string;
+      accountName: string;
+    },
+  ): Promise<string> {
     return this.observability.startSpan(
       'payouts.resolve_recipient',
       { 'payout.profile_id': profileId },
@@ -90,6 +100,18 @@ export class PayoutsService {
           where: { id: profileId },
         });
         if (!profile) throw new NotFoundException('Payout profile not found');
+        if (expected) {
+          if (
+            profile.destinationVersion !== expected.destinationVersion ||
+            profile.bankCode !== expected.bankCode ||
+            profile.accountNumber !== expected.accountNumber ||
+            profile.accountName !== expected.accountName
+          ) {
+            throw new BadRequestException(
+              'Payout destination changed while resolving transfer recipient',
+            );
+          }
+        }
         if (profile.recipientCode) return profile.recipientCode;
 
         const secretKey = this.config.get<string>('PAYSTACK_SECRET_KEY');
@@ -119,11 +141,37 @@ export class PayoutsService {
             data.message ?? 'Failed to create transfer recipient',
           );
         }
-        await this.prisma.userPayoutProfile.update({
-          where: { id: profileId },
-          data: { recipientCode: data.data.recipient_code },
+        const recipientCode = data.data.recipient_code;
+        const claimed = await this.prisma.userPayoutProfile.updateMany({
+          where: {
+            id: profileId,
+            destinationVersion: profile.destinationVersion,
+            bankCode: profile.bankCode,
+            accountNumber: profile.accountNumber,
+            accountName: profile.accountName,
+            recipientCode: null,
+          },
+          data: { recipientCode },
         });
-        return data.data.recipient_code;
+        if (claimed.count === 0) {
+          const again = await this.prisma.userPayoutProfile.findUnique({
+            where: { id: profileId },
+          });
+          if (
+            again?.recipientCode &&
+            (!expected ||
+              (again.destinationVersion === expected.destinationVersion &&
+                again.bankCode === expected.bankCode &&
+                again.accountNumber === expected.accountNumber &&
+                again.accountName === expected.accountName))
+          ) {
+            return again.recipientCode;
+          }
+          throw new BadRequestException(
+            'Payout destination changed while resolving transfer recipient',
+          );
+        }
+        return recipientCode;
       },
     );
   }
@@ -263,7 +311,12 @@ export class PayoutsService {
                   profile.id,
                   profile.destinationVersion,
                 )
-              : await this.resolveRecipient(profile.id);
+              : await this.resolveRecipient(profile.id, {
+                  destinationVersion: profile.destinationVersion,
+                  bankCode: profile.bankCode,
+                  accountNumber: profile.accountNumber,
+                  accountName: profile.accountName,
+                });
         }
 
         // Create the payout row in PROCESSING so it is visible before hitting Paystack.
