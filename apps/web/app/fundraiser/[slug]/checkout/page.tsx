@@ -69,7 +69,6 @@ export default function FundraiserCheckoutPage() {
   const [quoteAccepted, setQuoteAccepted] = useState(false);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
 
   const hydrateCart = useCallback(() => {
