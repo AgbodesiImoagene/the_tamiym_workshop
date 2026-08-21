@@ -149,6 +149,9 @@ describe('OrdersService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      shipment: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       inventoryItem: { findUnique: jest.fn(), update: jest.fn() },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       notificationOutbox: {
@@ -826,6 +829,23 @@ describe('OrdersService', () => {
         expect.anything(),
         { reason: 'admin_cancel_unpaid' },
       );
+    });
+
+    it('rejects paid PROCESSING cancel with stable TTW-041 code', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        status: OrderStatus.PROCESSING,
+        items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+      });
+
+      await expect(
+        service.updateOrderStatus('order-1', OrderStatus.CANCELLED),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'CANCEL_NOT_ALLOWED_USE_REFUND',
+        },
+      });
     });
 
     it('rejects direct FULFILLED and DELIVERED bypass', async () => {

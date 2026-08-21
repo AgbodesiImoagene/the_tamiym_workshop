@@ -1,9 +1,9 @@
 # TTW-041 — Encode cancellation, refund and return policy
 
-**Epic:** 4 — Fulfilment, support and business policy  
-**Status:** Not started  
-**Risk:** Critical  
-**Blocked by:** TTW-003, TTW-004, TTW-013, TTW-014, TTW-040  
+**Epic:** 4 — Fulfilment, support and business policy
+**Status:** In progress (slice 1)
+**Risk:** Critical
+**Blocked by:** TTW-003, TTW-004, TTW-013, TTW-014, TTW-040
 **Blocks:** TTW-053, TTW-054
 
 ## Background
@@ -88,16 +88,52 @@ Recommended v1: customers request rather than directly execute paid cancellation
 
 ## Design review
 
-Pending. Include signed policy and worked examples, state machine, legal copy, financial/inventory invariants, authorization/segregation, concurrency, data retention, migration/backfill and full test matrix.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21
+**Risk:** Critical
+**Policy version:** `cancellation-refund-return/v1-interim-2026-08-21`
+**Verdict:** Proceed with interim policy (formal owner/legal/finance/ops sign-off deferred)
+
+| Topic            | Decision                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| Authority        | Pure server evaluator; stable denial/allow codes; clients never invent eligibility                       |
+| Cancel           | Unpaid `PENDING_PAYMENT` only; paid cancel removed (`PROCESSING → CANCELLED` gone)                       |
+| Refund           | Admin initiate requires `reasonCode`; reason×status×customization matrix enforced before TTW-013 reserve |
+| Return           | Evaluate-only in slice 1 (7-day window); no case/disposition models yet                                  |
+| TTW-040          | Shipment `EXCEPTION` never auto-grants cancel/refund/return/stock (`SHIPMENT_EXCEPTION_IS_NOT_REMEDY`)   |
+| Money / stock    | No new settlement path; disposition deferred; TTW-013/014 remain authorities                             |
+| Customer surface | Order detail projects `resolution` eligibility snapshot                                                  |
+| Deferred         | OrderResolution cases, customer request APIs, fee allocation, thresholds, Playwright                     |
+
+Policy: `docs/orders/ttw-041-interim-policy.md`
+
+**Blast radius:** `OrdersService.updateOrderStatus` cancel path; `RefundsService.initiateRefund`; customer order detail DTO; admin `CreateRefundDto`.
+
+**Test plan:** Exhaustive unit table for cancel/refund/return codes; cancel denial on paid; refund denial before reserve; TTW-040 exception non-remedy; existing refund lifecycle specs updated for `reasonCode`.
 
 ## Implementation reviews
 
-Pending. Require two independent reviewers; one must review financial/inventory correctness and one security/privacy/operations.
+Pending independent dual review (financial/inventory + security/ops) after commit.
 
 ## Verification evidence
 
-Pending implementation.
+### Slice 1 gates (2026-08-21)
+
+```text
+pnpm --filter api exec tsc --noEmit
+# pass
+pnpm --filter api test:coverage
+# 120 suites / 1031 tests pass
+pnpm coverage:diff
+# Diff coverage 97/108 lines (89.81%) — pass (floor 80%)
+git diff --check
+# clean
+```
+
+Policy: `docs/orders/ttw-041-interim-policy.md` (`cancellation-refund-return/v1-interim-2026-08-21`)
+Tests: `resolution-policy.spec.ts`, cancel/refund service specs (incl. PROCESSING cancel denial, reasonCode gate, TTW-040 exception non-remedy)
 
 ## Completion summary
 
-Pending implementation.
+Pending slice 1 commit.

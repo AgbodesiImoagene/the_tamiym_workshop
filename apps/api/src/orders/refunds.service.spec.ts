@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CampaignLedgerService } from '../payouts/campaign-ledger.service';
 import { OrderStatus, RefundStatus } from '../generated/prisma/enums';
+import { RefundReasonCode } from './resolution-policy';
 import { Prisma } from '../generated/prisma/client';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
@@ -44,6 +45,7 @@ describe('RefundsService', () => {
   let service: RefundsService;
   let prisma: {
     order: { findUnique: jest.Mock };
+    shipment: { findFirst: jest.Mock };
     payment: { findFirst: jest.Mock };
     refund: {
       create: jest.Mock;
@@ -74,6 +76,7 @@ describe('RefundsService', () => {
   beforeEach(async () => {
     prisma = {
       order: { findUnique: jest.fn() },
+      shipment: { findFirst: jest.fn() },
       payment: { findFirst: jest.fn() },
       refund: {
         create: jest.fn(),
@@ -94,6 +97,11 @@ describe('RefundsService', () => {
       $executeRaw: jest.fn(),
     };
     prisma.refund.findMany.mockResolvedValue([]);
+    prisma.order.findUnique.mockResolvedValue({
+      status: OrderStatus.PAID,
+      items: [{ designId: null }],
+    });
+    prisma.shipment.findFirst.mockResolvedValue(null);
 
     paystackRefundClient = {
       createRefund: jest.fn().mockResolvedValue({
@@ -190,6 +198,40 @@ describe('RefundsService', () => {
   });
 
   describe('initiateRefund', () => {
+    it('rejects when order is missing during policy check', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.initiateRefund(
+          'missing-order',
+          1000,
+          RefundReasonCode.ADMIN_GOODWILL,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects ineligible reason with stable TTW-041 code before reserving', async () => {
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.FULFILLED,
+        items: [{ designId: 'design-1' }],
+      });
+
+      await expect(
+        service.initiateRefund(
+          'order-1',
+          1000,
+          RefundReasonCode.CHANGE_OF_MIND,
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'REFUND_NOT_ALLOWED_CUSTOM_CHANGE_OF_MIND',
+        },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(paystackRefundClient.createRefund).not.toHaveBeenCalled();
+    });
+
     it('reserves then moves to PROCESSING without settling money', async () => {
       const initiated = {
         id: 'refund-1',
@@ -211,6 +253,7 @@ describe('RefundsService', () => {
       const result = await service.initiateRefund(
         'order-1',
         5000,
+        RefundReasonCode.ADMIN_GOODWILL,
         'partial',
         'admin-1',
       );
@@ -242,7 +285,11 @@ describe('RefundsService', () => {
       );
 
       await expect(
-        service.initiateRefund('order-1', 3000),
+        service.initiateRefund(
+          'order-1',
+          3000,
+          RefundReasonCode.ADMIN_GOODWILL,
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(paystackRefundClient.createRefund).not.toHaveBeenCalled();
     });
@@ -261,6 +308,7 @@ describe('RefundsService', () => {
       const result = await service.initiateRefund(
         'order-1',
         1000,
+        RefundReasonCode.ADMIN_GOODWILL,
         undefined,
         'admin',
         'idem-1',
@@ -310,6 +358,7 @@ describe('RefundsService', () => {
       const result = await service.initiateRefund(
         'order-1',
         1000,
+        RefundReasonCode.ADMIN_GOODWILL,
         undefined,
         'admin',
         'idem-stuck',
@@ -331,7 +380,7 @@ describe('RefundsService', () => {
         },
       );
       await expect(
-        service.initiateRefund('missing', 10),
+        service.initiateRefund('missing', 10, RefundReasonCode.ADMIN_GOODWILL),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -353,7 +402,7 @@ describe('RefundsService', () => {
         },
       );
       await expect(
-        service.initiateRefund('order-1', 10),
+        service.initiateRefund('order-1', 10, RefundReasonCode.ADMIN_GOODWILL),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -374,7 +423,11 @@ describe('RefundsService', () => {
       );
 
       await expect(
-        service.initiateRefund('order-1', 5000),
+        service.initiateRefund(
+          'order-1',
+          5000,
+          RefundReasonCode.ADMIN_GOODWILL,
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.refund.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -403,7 +456,11 @@ describe('RefundsService', () => {
       );
 
       await expect(
-        service.initiateRefund('order-1', 5000),
+        service.initiateRefund(
+          'order-1',
+          5000,
+          RefundReasonCode.ADMIN_GOODWILL,
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
         'provider_transient',
@@ -411,9 +468,9 @@ describe('RefundsService', () => {
     });
 
     it('rejects amount <= 0', async () => {
-      await expect(service.initiateRefund('order-1', 0)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.initiateRefund('order-1', 0, RefundReasonCode.ADMIN_GOODWILL),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects idempotency key on a different order', async () => {
@@ -425,7 +482,14 @@ describe('RefundsService', () => {
         providerRef: '1',
       });
       await expect(
-        service.initiateRefund('order-1', 10, undefined, 'a', 'k'),
+        service.initiateRefund(
+          'order-1',
+          10,
+          RefundReasonCode.ADMIN_GOODWILL,
+          undefined,
+          'a',
+          'k',
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -438,7 +502,14 @@ describe('RefundsService', () => {
         providerRef: '1',
       });
       await expect(
-        service.initiateRefund('order-1', 10, undefined, 'a', 'k'),
+        service.initiateRefund(
+          'order-1',
+          10,
+          RefundReasonCode.ADMIN_GOODWILL,
+          undefined,
+          'a',
+          'k',
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -510,7 +581,11 @@ describe('RefundsService', () => {
         },
       );
 
-      const result = await service.initiateRefund('order-1', 5000);
+      const result = await service.initiateRefund(
+        'order-1',
+        5000,
+        RefundReasonCode.ADMIN_GOODWILL,
+      );
       expect(result.status).toBe(RefundStatus.SUCCEEDED);
     });
   });
@@ -771,6 +846,11 @@ describe('RefundsService', () => {
     it('returns false when refund.failed cannot be matched', async () => {
       prisma.refund.findFirst.mockResolvedValue(null);
       prisma.refund.findMany.mockResolvedValue([]);
+      prisma.order.findUnique.mockResolvedValue({
+        status: OrderStatus.PAID,
+        items: [{ designId: null }],
+      });
+      prisma.shipment.findFirst.mockResolvedValue(null);
       const ok = await service.applyRefundWebhookEvent({
         event: 'refund.failed',
         data: { id: 404 },

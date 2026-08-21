@@ -5,7 +5,8 @@ import { OrderStatus } from '../../generated/prisma/enums';
 /**
  * Statuses that admin may set via PATCH.
  * FULFILLED/DELIVERED are derived by shipment APIs (TTW-040).
- * REFUNDED is set only by the refund flow; CANCELLED only from PENDING_PAYMENT (or PROCESSING cancel path).
+ * REFUNDED is set only by the refund flow.
+ * CANCELLED is unpaid-only (PENDING_PAYMENT) per TTW-041; paid unwind uses refund.
  */
 const ADMIN_SETTABLE_STATUSES = [
   OrderStatus.PROCESSING,

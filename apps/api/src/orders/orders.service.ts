@@ -42,9 +42,15 @@ import {
 import { CUSTOMER_SHIPMENT_ABSENT_MESSAGE } from '../shipments/shipments.constants';
 import { ShipmentsService } from '../shipments/shipments.service';
 import { isPaymentRetryEligible as computePaymentRetryEligible } from './payment-eligibility';
+import {
+  evaluateCancellationEligibility,
+  evaluateResolutionEligibility,
+} from './resolution-policy';
+import { assertResolutionAllowed } from './resolution-policy.assert';
 import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import type { PricingLineItemOutput } from '../pricing/pricing.types';
 import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
+import { ShipmentDirection, ShipmentStatus } from '../generated/prisma/enums';
 
 type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
 
@@ -718,6 +724,23 @@ export class OrdersService {
 
     const shipment = await this.shipments.getCustomerSummaryForOrder(order.id);
 
+    const activeShipment = await this.prisma.shipment.findFirst({
+      where: {
+        orderId: order.id,
+        direction: ShipmentDirection.OUTBOUND,
+        status: { not: ShipmentStatus.CANCELLED },
+      },
+      select: { status: true, deliveredAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const resolution = evaluateResolutionEligibility({
+      orderStatus: order.status,
+      hasCustomizedLine: order.items.some((item) => item.designId != null),
+      activeOutboundShipmentStatus: activeShipment?.status ?? null,
+      deliveredAt: activeShipment?.deliveredAt ?? null,
+    });
+
     return {
       policyVersion: CUSTOMER_ORDER_DETAIL_POLICY_VERSION,
       id: order.id,
@@ -800,6 +823,7 @@ export class OrdersService {
       paymentRetryEligible,
       shipment,
       shipmentPlaceholder: shipment ? null : CUSTOMER_SHIPMENT_ABSENT_MESSAGE,
+      resolution,
     };
   }
 
@@ -877,17 +901,22 @@ export class OrdersService {
    * Admin-driven transitions that do not go through the shipment lifecycle.
    * FULFILLED and DELIVERED are derived only by ShipmentsService (TTW-040).
    */
+  /**
+   * Admin-driven transitions that do not go through the shipment lifecycle.
+   * FULFILLED/DELIVERED are derived only by ShipmentsService (TTW-040).
+   * Paid cancel is denied — use refund (TTW-041).
+   */
   private static readonly ALLOWED_ADMIN_TRANSITIONS: Partial<
     Record<OrderStatus, OrderStatus[]>
   > = {
     [OrderStatus.PENDING_PAYMENT]: [OrderStatus.CANCELLED],
     [OrderStatus.PAID]: [OrderStatus.PROCESSING],
     [OrderStatus.PARTIALLY_REFUNDED]: [OrderStatus.PROCESSING],
-    [OrderStatus.PROCESSING]: [OrderStatus.CANCELLED],
   };
 
   /**
-   * Update order status (admin). Enforces allowed state transitions; CANCELLED from PENDING_PAYMENT releases inventory (TTW-014).
+   * Update order status (admin). Enforces allowed state transitions and TTW-041
+   * cancellation policy; CANCELLED from PENDING_PAYMENT releases inventory (TTW-014).
    * Writes an audit log entry for the status change.
    * FULFILLED/DELIVERED must be set via shipment APIs (TTW-040).
    */
@@ -910,6 +939,11 @@ export class OrdersService {
     ) {
       throw new BadRequestException(
         'FULFILLED and DELIVERED are derived from shipment lifecycle; use shipment APIs',
+      );
+    }
+    if (newStatus === OrderStatus.CANCELLED) {
+      assertResolutionAllowed(
+        evaluateCancellationEligibility({ orderStatus: currentStatus }),
       );
     }
     const allowed = OrdersService.ALLOWED_ADMIN_TRANSITIONS[currentStatus];

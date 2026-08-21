@@ -16,6 +16,8 @@ import {
   NotificationChannel,
   AuditAction,
   AuditSource,
+  ShipmentDirection,
+  ShipmentStatus,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
 import { DEFAULT_CURRENCY } from '../constants';
@@ -28,6 +30,11 @@ import {
   PaystackRefundClient,
   PaystackRefundTransientError,
 } from './paystack-refund.client';
+import {
+  evaluateRefundEligibility,
+  type RefundReasonCode,
+} from './resolution-policy';
+import { assertResolutionAllowed } from './resolution-policy.assert';
 
 /** Order statuses that may receive a new provider refund attempt. */
 const REFUNDABLE_ORDER_STATUSES: ReadonlySet<OrderStatus> = new Set([
@@ -155,13 +162,55 @@ export class RefundsService {
   ) {}
 
   /**
+   * TTW-041: server-side refund eligibility before any reservation or provider call.
+   * Shipment EXCEPTION alone never grants a refund (explicit reason still required).
+   */
+  private async assertRefundPolicy(
+    orderId: string,
+    reasonCode: RefundReasonCode,
+  ): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        status: true,
+        items: { select: { designId: true } },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const shipment = await this.prisma.shipment.findFirst({
+      where: {
+        orderId,
+        direction: ShipmentDirection.OUTBOUND,
+        status: { not: ShipmentStatus.CANCELLED },
+      },
+      select: { status: true, deliveredAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    assertResolutionAllowed(
+      evaluateRefundEligibility({
+        orderStatus: order.status,
+        hasCustomizedLine: order.items.some((item) => item.designId != null),
+        activeOutboundShipmentStatus: shipment?.status ?? null,
+        deliveredAt: shipment?.deliveredAt ?? null,
+        reasonCode,
+      }),
+    );
+  }
+
+  /**
    * Initiate a provider refund. Reserves an INITIATED row under the cumulative
    * cap before calling Paystack. Financial effects apply only on
    * provider-confirmed `refund.processed` settlement (TTW-013).
+   * Eligibility is server-authoritative (TTW-041); clients must not invent it.
    */
   async initiateRefund(
     orderId: string,
     amount: number,
+    reasonCode: RefundReasonCode,
     reason?: string,
     actorUserId?: string,
     idempotencyKey?: string,
@@ -173,6 +222,12 @@ export class RefundsService {
         if (!(amount > 0)) {
           throw new BadRequestException('Refund amount must be greater than 0');
         }
+
+        await this.assertRefundPolicy(orderId, reasonCode);
+
+        const persistedReason = reason?.trim()
+          ? `${reasonCode}: ${reason.trim()}`
+          : reasonCode;
 
         // Clear only stale drive claims (never release the captured-value cap).
         await this.clearStaleDriveClaims();
@@ -228,7 +283,7 @@ export class RefundsService {
         const reserved = await this.reserveRefundRow(
           orderId,
           amount,
-          reason,
+          persistedReason,
           idempotencyKey,
         );
 
@@ -241,7 +296,7 @@ export class RefundsService {
         return this.driveProviderForReservedRefund(
           reserved.refund.id,
           amount,
-          reason,
+          persistedReason,
           actorUserId,
         );
       },

@@ -276,4 +276,33 @@ export class CustomerOrderDetailDto {
       'Honest absent-state copy when no shipment exists; null when shipment is present',
   })
   shipmentPlaceholder?: string | null;
+
+  @ApiProperty({
+    description:
+      'Server-authoritative cancel/refund/return eligibility (TTW-041). Clients must not invent eligibility.',
+    type: Object,
+  })
+  resolution!: {
+    policyVersion: string;
+    cancellation: {
+      allowed: boolean;
+      code: string;
+      message: string;
+    };
+    refund: {
+      allowed: boolean;
+      code: string;
+      message: string;
+    };
+    return: {
+      allowed: boolean;
+      code: string;
+      message: string;
+    };
+    shipmentExceptionIsNotRemedy: {
+      allowed: boolean;
+      code: string;
+      message: string;
+    };
+  };
 }
