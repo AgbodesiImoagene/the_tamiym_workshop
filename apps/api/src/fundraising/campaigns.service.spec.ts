@@ -76,26 +76,25 @@ describe('CampaignsService', () => {
   let adminNotifyService: jest.Mocked<AdminNotifyService>;
 
   beforeEach(async () => {
-    const mockPrisma = {
-      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn(mockPrisma),
-      ),
-      campaign: {
-        findUnique: jest.fn(),
-        findUniqueOrThrow: jest.fn(),
-        findFirst: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-      },
-      product: { findUnique: jest.fn() },
-      design: { findUnique: jest.fn() },
-      campaignProduct: {
-        create: jest.fn(),
-        findUnique: jest.fn(),
-      },
-      campaignProductPrice: { create: jest.fn() },
+    const mockPrisma: Record<string, unknown> = {};
+    mockPrisma.$transaction = jest.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) => fn(mockPrisma),
+    );
+    mockPrisma.campaign = {
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     };
+    mockPrisma.product = { findUnique: jest.fn() };
+    mockPrisma.design = { findUnique: jest.fn() };
+    mockPrisma.campaignProduct = {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+    };
+    mockPrisma.campaignProductPrice = { create: jest.fn() };
     const mockPricingService = {
       getMinCampaignProductPrice: jest.fn().mockResolvedValue(0),
     };
@@ -142,6 +141,21 @@ describe('CampaignsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('findAll strips moderationNotes for organizers', async () => {
+    (prisma.campaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        moderationNotes: 'Categories above threshold: hate: 0.9',
+        products: [],
+      },
+    ]);
+    const result = await service.findAll('user-1');
+    expect(result[0]).not.toHaveProperty('moderationNotes');
+    expect(result[0]).toEqual(
+      expect.objectContaining({ id: 'camp-1', title: 'School Fundraiser' }),
+    );
   });
 
   // -------------------------------------------------------------------------

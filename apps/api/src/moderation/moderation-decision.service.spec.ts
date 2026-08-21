@@ -510,6 +510,75 @@ describe('ModerationDecisionService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('recordAiDecision wraps InTx in a transaction', async () => {
+    (
+      prisma.moderationDecision as { create: jest.Mock }
+    ).create.mockResolvedValue({
+      id: 'dec-ai',
+      outcome: ModerationStatus.FLAGGED,
+    });
+    (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+
+    await service.recordAiDecision({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: 'design-1',
+      outcome: ModerationStatus.FLAGGED,
+      notes: 'borderline',
+      maxScore: 0.5,
+      withdrawPendingAppeals: false,
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(
+      (prisma.moderationDecision as { create: jest.Mock }).create,
+    ).toHaveBeenCalled();
+  });
+
+  it('recordAdminDecision wraps InTx in a transaction', async () => {
+    (
+      prisma.moderationDecision as { create: jest.Mock }
+    ).create.mockResolvedValue({
+      id: 'dec-admin',
+      outcome: ModerationStatus.APPROVED,
+    });
+    (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+
+    await service.recordAdminDecision({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: 'design-1',
+      outcome: ModerationStatus.APPROVED,
+      actorUserId: 'admin-1',
+      notes: 'ok',
+      withdrawPendingAppeals: false,
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('listAppealsForAdmin and getAppealForAdmin include decision evidence', async () => {
+    (
+      prisma.moderationAppeal as { findMany: jest.Mock }
+    ).findMany.mockResolvedValue([{ id: 'a1' }]);
+    (
+      prisma.moderationAppeal as { findUnique: jest.Mock }
+    ).findUnique.mockResolvedValue({
+      id: 'a1',
+      decision: { internalEvidence: { notes: 'x' } },
+    });
+
+    await expect(
+      service.listAppealsForAdmin(ModerationAppealStatus.PENDING),
+    ).resolves.toEqual([{ id: 'a1' }]);
+    await expect(service.getAppealForAdmin('a1')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'a1',
+        decision: expect.objectContaining({
+          internalEvidence: { notes: 'x' },
+        }),
+      }),
+    );
+  });
+
   it('getAppealForOwner never selects internalEvidence', async () => {
     (
       prisma.moderationAppeal as { findUnique: jest.Mock }
