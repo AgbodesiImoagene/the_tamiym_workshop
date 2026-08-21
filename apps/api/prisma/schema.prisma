@@ -372,6 +372,14 @@ enum InventoryMovementKind {
   CONSUME
 }
 
+/// Provenance of OrderItem customer-visible display snapshots (TTW-033).
+/// PURCHASE = written at order creation; BACKFILLED_CURRENT_CATALOG = migrated from
+/// catalogue at backfill time (not historical evidence of what the buyer saw).
+enum OrderItemSnapshotSource {
+  PURCHASE
+  BACKFILLED_CURRENT_CATALOG
+}
+
 /// Type of layer in a workshop template (base, mask, outline, etc.).
 enum TemplateLayerType {
   BASE
@@ -1693,6 +1701,17 @@ model OrderItem {
   /// [{ "option": "Size", "optionCode": "size", "value": "Large", "valueCode": "L" }]
   variantSnapshot Json?
 
+  /// Customer-visible product name at purchase (or backfill). Immutable after write.
+  productNameSnapshot String
+  /// Customer-visible variant label (name + SKU) at purchase (or backfill).
+  variantDisplaySnapshot String
+  /// Customer-visible option presentation at purchase (or backfill). Same shape as variantSnapshot.
+  optionPresentationSnapshot Json?
+  /// Whether this display snapshot was captured at purchase or backfilled from catalogue.
+  snapshotSource OrderItemSnapshotSource
+  /// Display-snapshot schema version (see ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION).
+  snapshotVersion Int @default(1)
+
   pricingBreakdown         Json?
   organizerDiscountApplied Decimal? @db.Decimal(10, 2) // y (resolved) for audit, optional
   organizerCostBasis       Decimal? @db.Decimal(10, 2) // (x - y), optional
@@ -1705,6 +1724,7 @@ model OrderItem {
   @@index([orderId])
   @@index([variantId])
   @@index([campaignId])
+  @@index([snapshotSource])
   @@map("order_items")
 }
 

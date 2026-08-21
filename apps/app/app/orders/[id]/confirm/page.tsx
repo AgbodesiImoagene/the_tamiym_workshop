@@ -1,41 +1,13 @@
 'use client';
 
+import { OrderStatusBanner } from '@/components/order-status-banner';
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { ApiError, User, authApi } from '@/lib/auth';
 import { getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
-import { OrderStatus, PaymentStatus } from '@tamiym/types';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-
-function getStatusCopy(paymentStatus?: PaymentStatus, orderStatus?: OrderStatus) {
-  if (paymentStatus === PaymentStatus.SUCCEEDED) {
-    return {
-      title: 'Payment confirmed',
-      body: 'Your payment was received successfully. We have your order and it is now in our fulfillment flow.',
-    };
-  }
-
-  if (paymentStatus === PaymentStatus.FAILED) {
-    return {
-      title: 'Payment failed',
-      body: 'The payment attempt did not complete. You can retry payment for this order.',
-    };
-  }
-
-  if (orderStatus === OrderStatus.CANCELLED) {
-    return {
-      title: 'Order cancelled',
-      body: 'This order is no longer active. Create a new order from your cart when you are ready.',
-    };
-  }
-
-  return {
-    title: 'Waiting for payment confirmation',
-    body: 'We are still checking the payment status for this order. Paystack and the webhook can take a moment to settle.',
-  };
-}
+import { useEffect, useState } from 'react';
 
 export default function OrderConfirmPage() {
   const params = useParams<{ id: string }>();
@@ -69,19 +41,12 @@ export default function OrderConfirmPage() {
     enabled: !!user && typeof params.id === 'string',
     refetchInterval: (query) => {
       const paymentStatus = query.state.data?.paymentStatus;
-      return paymentStatus === PaymentStatus.PENDING || paymentStatus === PaymentStatus.INITIATED
-        ? 3000
-        : false;
+      return paymentStatus === 'PENDING' || paymentStatus === 'INITIATED' ? 3000 : false;
     },
   });
 
-  const statusCopy = useMemo(
-    () => getStatusCopy(orderQuery.data?.paymentStatus, orderQuery.data?.status),
-    [orderQuery.data?.paymentStatus, orderQuery.data?.status]
-  );
-
   async function handleRetryPayment() {
-    if (!orderQuery.data) {
+    if (!orderQuery.data?.paymentRetryEligible) {
       return;
     }
 
@@ -117,10 +82,16 @@ export default function OrderConfirmPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#004385]">
               Order Confirmation
             </p>
-            <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">
-              {statusCopy.title}
-            </h1>
-            <p className="max-w-2xl text-sm leading-6 text-black/70">{statusCopy.body}</p>
+            {orderQuery.data ? (
+              <OrderStatusBanner
+                paymentStatus={orderQuery.data.paymentStatus}
+                orderStatus={orderQuery.data.status}
+              />
+            ) : (
+              <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">
+                Checking payment status
+              </h1>
+            )}
             {searchParams.get('reference') ? (
               <p className="text-xs text-black/55">
                 Paystack reference: {searchParams.get('reference')}
@@ -139,7 +110,9 @@ export default function OrderConfirmPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
                     Order ID
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-black">{orderQuery.data.id}</p>
+                  <p className="mt-2 break-all text-sm font-semibold text-black">
+                    {orderQuery.data.id}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/50">
@@ -160,7 +133,7 @@ export default function OrderConfirmPage() {
                     Total
                   </p>
                   <p className="mt-2 text-sm font-semibold text-black">
-                    {formatCurrency(orderQuery.data.totalAmount, orderQuery.data.currency)}
+                    {formatCurrency(orderQuery.data.totalAmount, String(orderQuery.data.currency))}
                   </p>
                 </div>
               </div>
@@ -174,8 +147,8 @@ export default function OrderConfirmPage() {
                       className="flex items-start justify-between gap-4 rounded-2xl border border-black/10 p-4"
                     >
                       <div>
-                        <p className="font-semibold text-black">{item.product.name}</p>
-                        <p className="text-sm text-black/60">{item.variant.name}</p>
+                        <p className="font-semibold text-black">{item.productNameSnapshot}</p>
+                        <p className="text-sm text-black/60">{item.variantDisplaySnapshot}</p>
                       </div>
                       <p className="text-sm font-semibold text-black">Qty {item.quantity}</p>
                     </div>
@@ -187,10 +160,10 @@ export default function OrderConfirmPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/dashboard/orders"
+                  href={`/dashboard/orders/${orderQuery.data.id}`}
                   className="inline-flex rounded-lg bg-[#004385] px-5 py-3 text-sm font-semibold text-white"
                 >
-                  View orders
+                  View order detail
                 </Link>
                 <button
                   type="button"
@@ -199,8 +172,7 @@ export default function OrderConfirmPage() {
                 >
                   Refresh status
                 </button>
-                {orderQuery.data.paymentStatus !== PaymentStatus.SUCCEEDED &&
-                orderQuery.data.status !== OrderStatus.CANCELLED ? (
+                {orderQuery.data.paymentRetryEligible ? (
                   <button
                     type="button"
                     onClick={() => void handleRetryPayment()}
@@ -221,7 +193,7 @@ export default function OrderConfirmPage() {
             <div className="space-y-3 text-sm leading-6 text-black/70">
               <p>1. We verify the Paystack redirect against your real order status.</p>
               <p>2. Successful payments move your order into the production queue.</p>
-              <p>3. You can track the latest status anytime from your orders page.</p>
+              <p>3. You can track the latest status anytime from your order detail page.</p>
             </div>
           </div>
         </aside>

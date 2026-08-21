@@ -5,6 +5,7 @@
  */
 
 import type { ShippingQuoteBreakdown } from '../shipping/shipping.types';
+import type { OrderItemDisplaySnapshots } from '../orders/order-item-snapshot';
 
 /** Input for pricing pipeline. Product is derived from the variant. */
 export interface PricingLineItemInput {
@@ -14,7 +15,7 @@ export interface PricingLineItemInput {
   quantity: number;
 }
 
-export interface PricingLineItemOutput {
+export interface PricingLineItemOutput extends OrderItemDisplaySnapshots {
   productId: string;
   variantId: string;
   designId: string | null;

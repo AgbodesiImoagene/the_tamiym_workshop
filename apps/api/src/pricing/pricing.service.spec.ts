@@ -56,6 +56,7 @@ describe('PricingService', () => {
     ],
     prices: [{ amount: 5000 }],
     product: {
+      name: 'Classic Tee',
       prices: [],
       bulkPricingTiers: [],
       weightGrams: 300,
@@ -189,6 +190,11 @@ describe('PricingService', () => {
       );
       expect(result.items[0].pricingBreakdown).toBeDefined();
       expect(result.items[0].variantSnapshot).toBeDefined();
+      expect(result.items[0].productNameSnapshot).toBe('Classic Tee');
+      expect(result.items[0].variantDisplaySnapshot).toBe('S (SKU-S)');
+      expect(result.items[0].optionPresentationSnapshot).toEqual(
+        result.items[0].variantSnapshot,
+      );
     });
   });
 

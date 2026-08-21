@@ -16,6 +16,8 @@ import {
   PaymentStatus,
   AuditAction,
   NotificationChannel,
+  OrderItemSnapshotSource,
+  RefundStatus,
 } from '../generated/prisma/enums';
 import { ORDER_PENDING_EXPIRY_MINUTES } from '../constants';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
@@ -33,6 +35,16 @@ import {
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 import { AccountPolicyService } from '../auth/account-policy.service';
+import {
+  CUSTOMER_ORDER_DETAIL_POLICY_VERSION,
+  CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER,
+  ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION,
+} from './order-item-snapshot';
+import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
+import type { PricingLineItemOutput } from '../pricing/pricing.types';
+import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
+
+type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
 
 @Injectable()
 export class OrdersService {
@@ -134,20 +146,9 @@ export class OrdersService {
           expiresAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           items: {
-            create: quote.items.map((item) => ({
-              productId: item.productId,
-              variantId: item.variantId,
-              designId: item.designId,
-              campaignId: item.campaignId,
-              quantity: item.quantity,
-              unitBasePrice: item.unitBasePrice,
-              unitViewSurcharge: item.unitViewSurcharge,
-              unitDiscountAmount: item.unitDiscountAmount,
-              unitFinalPrice: item.unitFinalPrice,
-              variantSnapshot: item.variantSnapshot as object,
-              pricingBreakdown: item.pricingBreakdown as object,
-              organizerCostBasis: item.organizerCostBasis,
-            })),
+            create: quote.items.map((item) =>
+              this.toOrderItemCreateData(item as QuoteLineForCreate),
+            ),
           },
         },
         include: this.orderInclude(),
@@ -298,20 +299,12 @@ export class OrdersService {
           expiresAt,
           idempotencyKey: dto.idempotencyKey ?? null,
           items: {
-            create: quote.items.map((item) => ({
-              productId: item.productId,
-              variantId: item.variantId,
-              designId: item.designId,
-              campaignId: campaignId,
-              quantity: item.quantity,
-              unitBasePrice: item.unitBasePrice,
-              unitViewSurcharge: item.unitViewSurcharge,
-              unitDiscountAmount: item.unitDiscountAmount,
-              unitFinalPrice: item.unitFinalPrice,
-              variantSnapshot: item.variantSnapshot as object,
-              pricingBreakdown: item.pricingBreakdown as object,
-              organizerCostBasis: item.organizerCostBasis,
-            })),
+            create: quote.items.map((item) =>
+              this.toOrderItemCreateData(
+                item as QuoteLineForCreate,
+                campaignId,
+              ),
+            ),
           },
         },
         include: this.orderInclude(),
@@ -404,6 +397,89 @@ export class OrdersService {
         select: { id: true, city: true, state: true, country: true },
       },
     } as const;
+  }
+
+  /**
+   * Persist PURCHASE display snapshots from the pricing quote (TTW-033).
+   */
+  private toOrderItemCreateData(
+    item: QuoteLineForCreate,
+    campaignIdOverride?: string,
+  ) {
+    return {
+      productId: item.productId,
+      variantId: item.variantId,
+      designId: item.designId,
+      campaignId: campaignIdOverride ?? item.campaignId,
+      quantity: item.quantity,
+      unitBasePrice: item.unitBasePrice,
+      unitViewSurcharge: item.unitViewSurcharge,
+      unitDiscountAmount: item.unitDiscountAmount,
+      unitFinalPrice: item.unitFinalPrice,
+      variantSnapshot: item.variantSnapshot as object,
+      productNameSnapshot: item.productNameSnapshot,
+      variantDisplaySnapshot: item.variantDisplaySnapshot,
+      optionPresentationSnapshot: item.optionPresentationSnapshot as object,
+      snapshotSource: OrderItemSnapshotSource.PURCHASE,
+      snapshotVersion: ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION,
+      pricingBreakdown: item.pricingBreakdown as object,
+      organizerCostBasis: item.organizerCostBasis,
+    };
+  }
+
+  private decimalToNumber(value: unknown): number {
+    if (value == null) return 0;
+    return Number(value);
+  }
+
+  private toIso(value: Date | string | null | undefined): string | null {
+    if (value == null) return null;
+    return value instanceof Date ? value.toISOString() : String(value);
+  }
+
+  /**
+   * Payment retry is allowed only for an owned, unexpired PENDING_PAYMENT order
+   * with no active (PENDING|INITIATED) payment attempt (TTW-033 interim).
+   */
+  isPaymentRetryEligible(input: {
+    status: OrderStatus;
+    expiresAt: Date | string | null;
+    payments: Array<{
+      status: PaymentStatus;
+      expiresAt?: Date | string | null;
+    }>;
+    now?: Date;
+  }): boolean {
+    if (input.status !== OrderStatus.PENDING_PAYMENT) {
+      return false;
+    }
+    const now = input.now ?? new Date();
+    if (input.expiresAt != null) {
+      const expiresAt =
+        input.expiresAt instanceof Date
+          ? input.expiresAt
+          : new Date(input.expiresAt);
+      if (expiresAt.getTime() <= now.getTime()) {
+        return false;
+      }
+    }
+    const hasActiveAttempt = input.payments.some((payment) => {
+      if (
+        payment.status !== PaymentStatus.PENDING &&
+        payment.status !== PaymentStatus.INITIATED
+      ) {
+        return false;
+      }
+      if (payment.expiresAt == null) {
+        return true;
+      }
+      const attemptExpires =
+        payment.expiresAt instanceof Date
+          ? payment.expiresAt
+          : new Date(payment.expiresAt);
+      return attemptExpires.getTime() > now.getTime();
+    });
+    return !hasActiveAttempt;
   }
 
   /**
@@ -529,47 +605,226 @@ export class OrdersService {
   }
 
   /**
-   * List orders for current user
+   * List orders for current user (customer-safe list projection).
    */
   async findAll(userId: string) {
-    return this.prisma.order.findMany({
+    const orders = await this.prisma.order.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        currency: true,
+        totalAmount: true,
+        createdAt: true,
+        expiresAt: true,
         items: {
-          include: {
-            product: { select: { id: true, name: true, slug: true } },
-            variant: { select: { id: true, name: true, sku: true } },
+          select: {
+            id: true,
+            quantity: true,
+            productNameSnapshot: true,
+            variantDisplaySnapshot: true,
+            snapshotSource: true,
+            unitFinalPrice: true,
           },
         },
       },
     });
+    return orders.map((order) => ({
+      id: order.id,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      currency: order.currency,
+      totalAmount: this.decimalToNumber(order.totalAmount),
+      createdAt: this.toIso(order.createdAt)!,
+      expiresAt: this.toIso(order.expiresAt),
+      items: order.items.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        productNameSnapshot: item.productNameSnapshot,
+        variantDisplaySnapshot: item.variantDisplaySnapshot,
+        snapshotSource: item.snapshotSource,
+        unitFinalPrice: this.decimalToNumber(item.unitFinalPrice),
+      })),
+    }));
   }
 
   /**
-   * Get a single order by ID (own only)
+   * Get a single owned order as an explicit customer-safe detail DTO (TTW-033).
+   * Unauthorized and missing ids both return NotFoundException.
    */
-  async findOne(userId: string, id: string) {
+  async findOne(userId: string, id: string): Promise<CustomerOrderDetailDto> {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        paymentStatus: true,
+        currency: true,
+        subtotalAmount: true,
+        shippingFee: true,
+        discountAmount: true,
+        vatAmount: true,
+        totalAmount: true,
+        createdAt: true,
+        updatedAt: true,
+        expiresAt: true,
+        cancelledAt: true,
+        paymentReference: true,
+        shipRecipientName: true,
+        shipPhone: true,
+        shipLine1: true,
+        shipLine2: true,
+        shipCity: true,
+        shipState: true,
+        shipPostalCode: true,
+        shipCountry: true,
+        shipLandmark: true,
+        campaignId: true,
+        campaign: {
+          select: { id: true, title: true, slug: true },
+        },
         items: {
-          include: {
-            product: { select: { id: true, name: true, slug: true } },
-            variant: { select: { id: true, name: true, sku: true } },
-            design: { select: { id: true, name: true } },
+          select: {
+            id: true,
+            productId: true,
+            variantId: true,
+            designId: true,
+            campaignId: true,
+            quantity: true,
+            unitFinalPrice: true,
+            productNameSnapshot: true,
+            variantDisplaySnapshot: true,
+            optionPresentationSnapshot: true,
+            snapshotSource: true,
+            snapshotVersion: true,
           },
         },
-        shippingAddress: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            currency: true,
+            providerRef: true,
+            createdAt: true,
+            expiresAt: true,
+          },
+        },
+        refunds: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            currency: true,
+            reason: true,
+            createdAt: true,
+          },
+        },
       },
     });
-    if (!order) {
+
+    if (!order || order.userId !== userId) {
       throw new NotFoundException('Order not found');
     }
-    if (order.userId !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-    return order;
+
+    const refundedAmountConfirmed = order.refunds
+      .filter((refund) => refund.status === RefundStatus.SUCCEEDED)
+      .reduce((sum, refund) => sum + this.decimalToNumber(refund.amount), 0);
+
+    const paymentRetryEligible = this.isPaymentRetryEligible({
+      status: order.status,
+      expiresAt: order.expiresAt,
+      payments: order.payments,
+    });
+
+    return {
+      policyVersion: CUSTOMER_ORDER_DETAIL_POLICY_VERSION,
+      id: order.id,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      currency: order.currency,
+      subtotalAmount: this.decimalToNumber(order.subtotalAmount),
+      shippingFee: this.decimalToNumber(order.shippingFee),
+      discountAmount: this.decimalToNumber(order.discountAmount),
+      vatAmount:
+        order.vatAmount == null ? null : this.decimalToNumber(order.vatAmount),
+      totalAmount: this.decimalToNumber(order.totalAmount),
+      createdAt: this.toIso(order.createdAt)!,
+      updatedAt: this.toIso(order.updatedAt)!,
+      expiresAt: this.toIso(order.expiresAt),
+      cancelledAt: this.toIso(order.cancelledAt),
+      paymentReference: order.paymentReference,
+      items: order.items.map((item) => {
+        const unitFinalPrice = this.decimalToNumber(item.unitFinalPrice);
+        return {
+          id: item.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          designId: item.designId,
+          campaignId: item.campaignId,
+          quantity: item.quantity,
+          unitFinalPrice,
+          lineTotal: unitFinalPrice * item.quantity,
+          productNameSnapshot: item.productNameSnapshot,
+          variantDisplaySnapshot: item.variantDisplaySnapshot,
+          optionPresentationSnapshot: Array.isArray(
+            item.optionPresentationSnapshot,
+          )
+            ? (item.optionPresentationSnapshot as unknown as CustomerOrderDetailDto['items'][number]['optionPresentationSnapshot'])
+            : null,
+          snapshotSource: item.snapshotSource,
+          snapshotVersion: item.snapshotVersion,
+          legacySnapshotDisclosure:
+            item.snapshotSource ===
+            OrderItemSnapshotSource.BACKFILLED_CURRENT_CATALOG,
+        };
+      }),
+      shipping: {
+        recipientName: order.shipRecipientName,
+        phone: order.shipPhone,
+        line1: order.shipLine1,
+        line2: order.shipLine2,
+        city: order.shipCity,
+        state: order.shipState,
+        postalCode: order.shipPostalCode,
+        country: order.shipCountry,
+        landmark: order.shipLandmark,
+      },
+      payments: order.payments.map((payment) => ({
+        id: payment.id,
+        status: payment.status,
+        amount: this.decimalToNumber(payment.amount),
+        currency: payment.currency,
+        providerRef: payment.providerRef,
+        createdAt: this.toIso(payment.createdAt)!,
+        expiresAt: this.toIso(payment.expiresAt),
+      })),
+      refunds: order.refunds.map((refund) => ({
+        id: refund.id,
+        status: refund.status,
+        amount: this.decimalToNumber(refund.amount),
+        currency: refund.currency,
+        reason: refund.reason,
+        createdAt: this.toIso(refund.createdAt)!,
+      })),
+      refundedAmountConfirmed,
+      campaignId: order.campaignId,
+      campaign: order.campaign
+        ? {
+            id: order.campaign.id,
+            title: order.campaign.title,
+            slug: order.campaign.slug,
+          }
+        : null,
+      paymentRetryEligible,
+      // TTW-040 owns shipment timeline; no Shipment model in slice 1.
+      shipmentPlaceholder: CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER,
+    };
   }
 
   /**

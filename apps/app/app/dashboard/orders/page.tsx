@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const fallbackImages = customerAssets.productFallbacks;
 
@@ -40,26 +40,7 @@ export default function DashboardOrdersPage() {
     enabled: !!user,
   });
 
-  const cards = useMemo(() => {
-    const orders = ordersQuery.data ?? [];
-    if (orders.length > 0) {
-      return orders.map((order, index) => ({
-        id: order.id,
-        title: order.items[0]?.product.name ?? 'Workshop order',
-        subtitle: `${order.items.length} item${order.items.length === 1 ? '' : 's'} · ${order.status.replaceAll('_', ' ')}`,
-        amount: formatCurrency(Number(order.totalAmount), order.currency),
-        image: fallbackImages[index % fallbackImages.length],
-      }));
-    }
-
-    return fallbackImages.slice(0, 4).map((image, index) => ({
-      id: `preview-${index}`,
-      title: 'Order preview',
-      subtitle: 'Your first order will appear here',
-      amount: 'No completed orders yet',
-      image,
-    }));
-  }, [ordersQuery.data]);
+  const orders = ordersQuery.data ?? [];
 
   if (error) {
     return (
@@ -99,37 +80,69 @@ export default function DashboardOrdersPage() {
           <p className="text-sm text-muted-foreground">Loading order history...</p>
         ) : ordersQuery.isError ? (
           <p className="text-sm text-red-700">We could not load your order history.</p>
+        ) : orders.length === 0 ? (
+          <div className="rounded-[28px] border border-dashed border-black/15 bg-[#f8fbff] px-6 py-12 text-center">
+            <h2 className="text-xl font-bold text-black/90">No orders yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-black/65">
+              When you place an order, it will show up here with payment status and shipping
+              details. Start from products or your cart.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link
+                href="/dashboard/products"
+                className="inline-flex rounded-full bg-[#004385] px-5 py-2.5 text-sm font-semibold text-white"
+              >
+                Browse products
+              </Link>
+              <Link
+                href="/dashboard/cart"
+                className="inline-flex rounded-full border border-black/15 px-5 py-2.5 text-sm font-semibold text-black"
+              >
+                Open cart
+              </Link>
+            </div>
+          </div>
         ) : (
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-            {cards.map((card) => (
-              <article
-                key={card.id}
-                className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
-              >
-                <div className="relative h-[260px]">
-                  <Image
-                    src={card.image}
-                    alt={card.title}
-                    fill
-                    className="object-cover"
-                    sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                  />
-                </div>
-                <div className="space-y-3 p-5">
-                  <div className="space-y-1">
-                    <p className="text-base font-bold">{card.title}</p>
-                    <p className="text-sm text-black/70">{card.subtitle}</p>
-                    <p className="text-sm font-medium text-black/85">{card.amount}</p>
+            {orders.map((order, index) => {
+              const title = order.items[0]?.productNameSnapshot ?? 'Workshop order';
+              const subtitle = `${order.items.length} item${
+                order.items.length === 1 ? '' : 's'
+              } · ${order.status.replaceAll('_', ' ')}`;
+              const image = fallbackImages[index % fallbackImages.length];
+
+              return (
+                <article
+                  key={order.id}
+                  className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
+                >
+                  <div className="relative h-[260px]">
+                    <Image
+                      src={image}
+                      alt={title}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
+                    />
                   </div>
-                  <button
-                    type="button"
-                    className="rounded-full bg-[#cfddf8] px-4 py-1.5 text-xs font-medium text-[#0f62fe]"
-                  >
-                    Order Details
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="space-y-3 p-5">
+                    <div className="space-y-1">
+                      <p className="text-base font-bold">{title}</p>
+                      <p className="text-sm text-black/70">{subtitle}</p>
+                      <p className="text-sm font-medium text-black/85">
+                        {formatCurrency(Number(order.totalAmount), order.currency)}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/dashboard/orders/${order.id}`}
+                      className="inline-flex rounded-full bg-[#cfddf8] px-4 py-1.5 text-xs font-medium text-[#0f62fe]"
+                    >
+                      Order Details
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

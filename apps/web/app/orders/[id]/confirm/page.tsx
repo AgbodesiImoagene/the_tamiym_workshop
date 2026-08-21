@@ -159,7 +159,7 @@ function OrderConfirmContent() {
   );
 
   async function handleRetryPayment() {
-    if (!order) return;
+    if (!order?.paymentRetryEligible) return;
     setRetryMessage(null);
     setIsRetrying(true);
     try {
@@ -233,8 +233,8 @@ function OrderConfirmContent() {
                 className="flex items-start justify-between gap-4 rounded-xl border border-black/10 p-4 text-sm"
               >
                 <div>
-                  <p className="font-semibold">{item.product.name}</p>
-                  <p className="text-black/60">{item.variant.name}</p>
+                  <p className="font-semibold">{item.productNameSnapshot}</p>
+                  <p className="text-black/60">{item.variantDisplaySnapshot}</p>
                 </div>
                 <p className="font-semibold">Qty {item.quantity}</p>
               </div>
@@ -251,8 +251,7 @@ function OrderConfirmContent() {
             >
               Refresh status
             </button>
-            {order.paymentStatus !== PaymentStatus.SUCCEEDED &&
-            order.status !== OrderStatus.CANCELLED ? (
+            {order.paymentRetryEligible ? (
               <button
                 type="button"
                 onClick={() => void handleRetryPayment()}
@@ -263,10 +262,10 @@ function OrderConfirmContent() {
               </button>
             ) : null}
             <Link
-              href={customerAppPath('/dashboard/orders')}
+              href={customerAppPath(`/dashboard/orders/${order.id}`)}
               className="inline-flex rounded-lg bg-tamiym-blue px-5 py-3 text-sm font-semibold text-white"
             >
-              Open account orders
+              Open order detail
             </Link>
           </div>
         </section>

@@ -102,6 +102,9 @@ const mockQuote = {
         unitFinalPrice: 5000,
       },
       variantSnapshot: [],
+      productNameSnapshot: 'Classic Tee',
+      variantDisplaySnapshot: 'Small / Red (SKU-1)',
+      optionPresentationSnapshot: [],
     },
   ],
 };
@@ -119,10 +122,17 @@ describe('OrdersService', () => {
   let service: OrdersService;
   let prisma: jest.Mocked<PrismaService>;
   let pricingService: jest.Mocked<PricingService>;
+  let orderCreateMock: jest.Mock;
 
   beforeEach(async () => {
+    orderCreateMock = jest.fn().mockResolvedValue({
+      ...mockOrder,
+      items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+    });
+
     const mockPrisma = {
       address: { findUnique: jest.fn() },
+      campaign: { findUnique: jest.fn().mockResolvedValue({ id: 'camp-1' }) },
       design: { findUnique: jest.fn() },
       productVariant: { findUnique: jest.fn() },
       productPrice: { findFirst: jest.fn() },
@@ -145,11 +155,9 @@ describe('OrdersService', () => {
       $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
           order: {
-            create: jest.fn().mockResolvedValue({
-              ...mockOrder,
-              items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
-            }),
+            create: orderCreateMock,
           },
+          orderDiscount: { create: jest.fn() },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
               trackInventory: true,
@@ -247,6 +255,51 @@ describe('OrdersService', () => {
       );
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(result.id).toBe(mockOrder.id);
+    });
+
+    it('writes PURCHASE display snapshots on create', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 10,
+        reserved: 0,
+      });
+
+      await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      });
+
+      expect(orderCreateMock).toHaveBeenCalled();
+      const createArg = orderCreateMock.mock.calls[0][0];
+      const line = createArg.data.items.create[0];
+      expect(line.productNameSnapshot).toBe('Classic Tee');
+      expect(line.variantDisplaySnapshot).toBe('Small / Red (SKU-1)');
+      expect(line.optionPresentationSnapshot).toEqual([]);
+      expect(line.snapshotSource).toBe('PURCHASE');
+      expect(line.snapshotVersion).toBe(1);
+    });
+
+    it('writes PURCHASE display snapshots on campaign create', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 10,
+        reserved: 0,
+      });
+
+      await service.createCampaignOrder('camp-1', 'user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      });
+
+      const createArg = orderCreateMock.mock.calls.at(-1)?.[0];
+      const line = createArg.data.items.create[0];
+      expect(line.campaignId).toBe('camp-1');
+      expect(line.snapshotSource).toBe('PURCHASE');
+      expect(line.productNameSnapshot).toBe('Classic Tee');
     });
 
     it('rejects unverified users with EMAIL_NOT_VERIFIED', async () => {
@@ -400,27 +453,167 @@ describe('OrdersService', () => {
   });
 
   describe('findAll', () => {
-    it('should return orders for user', async () => {
-      (prisma.order.findMany as jest.Mock).mockResolvedValue([mockOrder]);
+    it('should return customer-safe list projection for user', async () => {
+      (prisma.order.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'order-1',
+          status: OrderStatus.PENDING_PAYMENT,
+          paymentStatus: 'PENDING',
+          currency: 'NGN',
+          totalAmount: 10000,
+          createdAt: new Date('2026-08-21T00:00:00.000Z'),
+          expiresAt: null,
+          items: [
+            {
+              id: 'oi-1',
+              quantity: 2,
+              productNameSnapshot: 'Classic Tee',
+              variantDisplaySnapshot: 'Small (SKU-1)',
+              snapshotSource: 'PURCHASE',
+              unitFinalPrice: 5000,
+            },
+          ],
+        },
+      ]);
 
       const result = await service.findAll('user-1');
 
       expect(prisma.order.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
         orderBy: { createdAt: 'desc' },
-        include: expect.any(Object),
+        select: expect.any(Object),
       });
-      expect(result).toEqual([mockOrder]);
+      expect(result[0].items[0].productNameSnapshot).toBe('Classic Tee');
+      expect(result[0].totalAmount).toBe(10000);
     });
   });
 
   describe('findOne', () => {
-    it('should return order when user owns it', async () => {
-      (prisma.order.findUnique as jest.Mock).mockResolvedValue(mockOrder);
+    const ownedDetailRow = {
+      id: 'order-1',
+      userId: 'user-1',
+      status: OrderStatus.PENDING_PAYMENT,
+      paymentStatus: 'PENDING',
+      currency: 'NGN',
+      subtotalAmount: 10000,
+      shippingFee: 2500,
+      discountAmount: 0,
+      vatAmount: null,
+      totalAmount: 12500,
+      createdAt: new Date('2026-08-21T00:00:00.000Z'),
+      updatedAt: new Date('2026-08-21T00:00:00.000Z'),
+      expiresAt: new Date('2026-08-22T00:00:00.000Z'),
+      cancelledAt: null,
+      paymentReference: null,
+      shipRecipientName: 'John',
+      shipPhone: null,
+      shipLine1: '123 Main',
+      shipLine2: null,
+      shipCity: 'Lagos',
+      shipState: 'Lagos',
+      shipPostalCode: null,
+      shipCountry: 'Nigeria',
+      shipLandmark: null,
+      campaignId: null,
+      campaign: null,
+      items: [
+        {
+          id: 'oi-1',
+          productId: 'prod-1',
+          variantId: 'var-1',
+          designId: null,
+          campaignId: null,
+          quantity: 2,
+          unitFinalPrice: 5000,
+          productNameSnapshot: 'Classic Tee',
+          variantDisplaySnapshot: 'Small (SKU-1)',
+          optionPresentationSnapshot: [
+            {
+              option: 'Size',
+              optionCode: 'size',
+              value: 'Small',
+              valueCode: 'S',
+            },
+          ],
+          snapshotSource: 'PURCHASE',
+          snapshotVersion: 1,
+        },
+      ],
+      payments: [],
+      refunds: [],
+    };
+
+    it('should return customer-safe DTO when user owns it', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(ownedDetailRow);
 
       const result = await service.findOne('user-1', 'order-1');
 
-      expect(result.id).toBe(mockOrder.id);
+      expect(result.id).toBe('order-1');
+      expect(result.policyVersion).toContain('customer-order-detail');
+      expect(result.shipping.line1).toBe('123 Main');
+      expect(result.items[0].productNameSnapshot).toBe('Classic Tee');
+      expect(result.paymentRetryEligible).toBe(true);
+      expect(result.shipmentPlaceholder).toBe(
+        'Shipping updates will appear here when available',
+      );
+      expect(result).not.toHaveProperty('shippingAddress');
+      expect(result).not.toHaveProperty('idempotencyKey');
+      expect(result).not.toHaveProperty('userId');
+      expect(JSON.stringify(result)).not.toMatch(
+        /rawEvent|authorizationUrl|accessCode|organizerCostBasis/,
+      );
+    });
+
+    it('redacts provider fields and marks legacy snapshot disclosure', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...ownedDetailRow,
+        items: [
+          {
+            ...ownedDetailRow.items[0],
+            snapshotSource: 'BACKFILLED_CURRENT_CATALOG',
+          },
+        ],
+        payments: [
+          {
+            id: 'pay-1',
+            status: 'SUCCEEDED',
+            amount: 12500,
+            currency: 'NGN',
+            providerRef: 'ref-1',
+            createdAt: new Date('2026-08-21T00:00:00.000Z'),
+            expiresAt: null,
+            rawEvent: { secret: true },
+            idempotencyKey: 'idem-1',
+            authorizationUrl: 'https://checkout.paystack.com/x',
+          },
+        ],
+        refunds: [
+          {
+            id: 'ref-1',
+            status: 'SUCCEEDED',
+            amount: 2500,
+            currency: 'NGN',
+            reason: 'partial',
+            createdAt: new Date('2026-08-21T01:00:00.000Z'),
+            idempotencyKey: 'refund-idem',
+          },
+        ],
+      });
+
+      const result = await service.findOne('user-1', 'order-1');
+
+      expect(result.items[0].legacySnapshotDisclosure).toBe(true);
+      expect(result.refundedAmountConfirmed).toBe(2500);
+      expect(result.payments[0]).toEqual(
+        expect.objectContaining({
+          id: 'pay-1',
+          providerRef: 'ref-1',
+        }),
+      );
+      expect(result.payments[0]).not.toHaveProperty('rawEvent');
+      expect(result.payments[0]).not.toHaveProperty('idempotencyKey');
+      expect(result.payments[0]).not.toHaveProperty('authorizationUrl');
+      expect(result.refunds[0]).not.toHaveProperty('idempotencyKey');
     });
 
     it('should throw NotFoundException when order not found', async () => {
@@ -431,12 +624,81 @@ describe('OrdersService', () => {
       );
     });
 
-    it('should throw ForbiddenException when user does not own order', async () => {
-      (prisma.order.findUnique as jest.Mock).mockResolvedValue(mockOrder);
+    it('should throw NotFoundException when user does not own order', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(ownedDetailRow);
 
       await expect(service.findOne('other-user', 'order-1')).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
       );
+    });
+  });
+
+  describe('isPaymentRetryEligible', () => {
+    const now = new Date('2026-08-21T12:00:00.000Z');
+
+    it('returns true for unexpired PENDING_PAYMENT with no active attempt', () => {
+      expect(
+        service.isPaymentRetryEligible({
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date('2026-08-22T00:00:00.000Z'),
+          payments: [],
+          now,
+        }),
+      ).toBe(true);
+    });
+
+    it('returns false when an active attempt has no expiry', () => {
+      expect(
+        service.isPaymentRetryEligible({
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date('2026-08-22T00:00:00.000Z'),
+          payments: [
+            {
+              status: 'PENDING' as never,
+              expiresAt: null,
+            },
+          ],
+          now,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns false when an active attempt exists', () => {
+      expect(
+        service.isPaymentRetryEligible({
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date('2026-08-22T00:00:00.000Z'),
+          payments: [
+            {
+              status: 'INITIATED' as never,
+              expiresAt: new Date('2026-08-21T13:00:00.000Z'),
+            },
+          ],
+          now,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns false when order is expired', () => {
+      expect(
+        service.isPaymentRetryEligible({
+          status: OrderStatus.PENDING_PAYMENT,
+          expiresAt: new Date('2026-08-21T11:00:00.000Z'),
+          payments: [],
+          now,
+        }),
+      ).toBe(false);
+    });
+
+    it('returns false when order is not PENDING_PAYMENT', () => {
+      expect(
+        service.isPaymentRetryEligible({
+          status: OrderStatus.PAID,
+          expiresAt: null,
+          payments: [],
+          now,
+        }),
+      ).toBe(false);
     });
   });
 
