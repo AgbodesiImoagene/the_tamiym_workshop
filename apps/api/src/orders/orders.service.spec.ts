@@ -19,6 +19,8 @@ import {
   AccountPolicyService,
   ACCOUNT_POLICY_CODE,
 } from '../auth/account-policy.service';
+import { ShipmentsService } from '../shipments/shipments.service';
+import { CUSTOMER_SHIPMENT_ABSENT_MESSAGE } from '../shipments/shipments.constants';
 
 const mockAddress = {
   id: 'addr-1',
@@ -218,6 +220,12 @@ describe('OrdersService', () => {
           },
         },
         AccountPolicyService,
+        {
+          provide: ShipmentsService,
+          useValue: {
+            getCustomerSummaryForOrder: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 
@@ -553,14 +561,48 @@ describe('OrdersService', () => {
       expect(result.shipping.line1).toBe('123 Main');
       expect(result.items[0].productNameSnapshot).toBe('Classic Tee');
       expect(result.paymentRetryEligible).toBe(true);
-      expect(result.shipmentPlaceholder).toBe(
-        'Shipping updates will appear here when available.',
-      );
+      expect(result.shipment).toBeNull();
+      expect(result.shipmentPlaceholder).toBe(CUSTOMER_SHIPMENT_ABSENT_MESSAGE);
       expect(result).not.toHaveProperty('shippingAddress');
       expect(result).not.toHaveProperty('idempotencyKey');
       expect(result).not.toHaveProperty('userId');
       expect(JSON.stringify(result)).not.toMatch(
         /rawEvent|authorizationUrl|accessCode|organizerCostBasis/,
+      );
+    });
+
+    it('includes customer-safe shipment timeline when present', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(ownedDetailRow);
+      const shipments = (service as unknown as { shipments: ShipmentsService })
+        .shipments;
+      (shipments.getCustomerSummaryForOrder as jest.Mock).mockResolvedValue({
+        policyVersion: 'shipment-lifecycle/v1-interim-2026-08-21',
+        id: 'ship-1',
+        status: 'DISPATCHED',
+        carrierName: 'Manual dispatch',
+        trackingNumber: 'TRK1',
+        trackingUrl: null,
+        estimatedDeliveryAt: null,
+        exceptionCode: null,
+        exceptionMessage: null,
+        events: [
+          {
+            id: 'evt-1',
+            type: 'READY',
+            occurredAt: '2026-08-21T00:00:00.000Z',
+            customerMessage: 'Ready',
+            exceptionCode: null,
+          },
+        ],
+      });
+
+      const result = await service.findOne('user-1', 'order-1');
+
+      expect(result.shipment?.id).toBe('ship-1');
+      expect(result.shipment?.trackingNumber).toBe('TRK1');
+      expect(result.shipmentPlaceholder).toBeNull();
+      expect(JSON.stringify(result.shipment)).not.toMatch(
+        /privateNotes|actorUserId/,
       );
     });
 
@@ -767,6 +809,12 @@ describe('OrdersService', () => {
             useValue: { releaseOrderItems: release },
           },
           AccountPolicyService,
+          {
+            provide: ShipmentsService,
+            useValue: {
+              getCustomerSummaryForOrder: jest.fn().mockResolvedValue(null),
+            },
+          },
         ],
       }).compile();
 
@@ -778,6 +826,30 @@ describe('OrdersService', () => {
         expect.anything(),
         { reason: 'admin_cancel_unpaid' },
       );
+    });
+
+    it('rejects direct FULFILLED and DELIVERED bypass', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        status: OrderStatus.PROCESSING,
+        items: [],
+        user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+      });
+
+      await expect(
+        service.updateOrderStatus('order-1', OrderStatus.FULFILLED),
+      ).rejects.toThrow(BadRequestException);
+
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        status: OrderStatus.FULFILLED,
+        items: [],
+        user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+      });
+
+      await expect(
+        service.updateOrderStatus('order-1', OrderStatus.DELIVERED),
+      ).rejects.toThrow(/shipment lifecycle/);
     });
   });
 });

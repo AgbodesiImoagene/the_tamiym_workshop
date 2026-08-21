@@ -7,6 +7,8 @@ import {
   RefundStatus,
 } from '../../generated/prisma/enums';
 import { CUSTOMER_ORDER_DETAIL_POLICY_VERSION } from '../order-item-snapshot';
+import { CustomerShipmentSummaryDto } from '../../shipments/dto/customer-shipment-summary.dto';
+import { CUSTOMER_SHIPMENT_ABSENT_MESSAGE } from '../../shipments/shipments.constants';
 
 /** One option row inside optionPresentationSnapshot. */
 export class CustomerOrderOptionPresentationDto {
@@ -260,9 +262,18 @@ export class CustomerOrderDetailDto {
   paymentRetryEligible!: boolean;
 
   @ApiPropertyOptional({
+    type: CustomerShipmentSummaryDto,
     nullable: true,
     description:
-      'Shipment timeline is owned by TTW-040. Slice 1 returns a placeholder message when no shipment model exists.',
+      'Customer-safe shipment summary + timeline when an active outbound shipment exists (TTW-040)',
+  })
+  shipment?: CustomerShipmentSummaryDto | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    example: CUSTOMER_SHIPMENT_ABSENT_MESSAGE,
+    description:
+      'Honest absent-state copy when no shipment exists; null when shipment is present',
   })
   shipmentPlaceholder?: string | null;
 }

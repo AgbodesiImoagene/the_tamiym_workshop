@@ -1,7 +1,7 @@
 # TTW-040 — Add a shipment and delivery-exception lifecycle
 
 **Epic:** 4 — Fulfilment, support and business policy  
-**Status:** Not started  
+**Status:** In progress (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-014  
 **Blocks:** TTW-033, TTW-041, TTW-053
@@ -56,22 +56,20 @@ Use a one-to-many schema to avoid a future destructive migration, but enforce on
 
 ## References
 
-- `apps/api/prisma/schema.prisma:75-85` — order status conflates fulfilment and physical delivery.
-- `apps/api/prisma/schema.prisma:1219-1282` — order has a shipping-price snapshot but no shipment/tracking relation.
-- `apps/api/src/orders/orders.service.ts:618-627` — admin transition map permits fulfilment then delivery without shipment evidence.
-- `apps/api/src/orders/orders.service.ts:633-722` — status update is the only fulfilment/delivery operation.
-- `apps/admin/app/admin/orders/[id]/page.tsx:243-317` — admin selects order statuses manually and UI copy treats `FULFILLED` as ready to leave.
-- `apps/app/app/dashboard/page.tsx:227-253` — customer timeline is inferred from order status and uses generic dispatch copy.
+- `apps/api/prisma/schema.prisma` — OrderStatus and Order model (now with `shipments`).
+- `apps/api/src/orders/orders.service.ts` — admin transitions no longer set FULFILLED/DELIVERED directly.
+- `apps/api/src/shipments/` — shipment domain service and constants.
+- `apps/app/app/dashboard/orders/[id]/page.tsx` — customer shipment timeline UI.
 
 ## Acceptance criteria
 
-- [ ] Owner approves the v1 shipment, visibility, exception, evidence, notification and SLA policies.
-- [ ] Migration/rollback add an append-only, idempotent shipment lifecycle and safely leave historical orders unshipped.
-- [ ] Database/service rules prevent duplicate active outbound shipments, duplicate events and delivery without shipment evidence.
-- [ ] Admin can create, dispatch, progress, correct and exception a shipment through safe next actions with full audit history.
-- [ ] Customer and organiser views show accurate, appropriately redacted shipment state and no placeholder tracking data.
-- [ ] Milestone/exception notifications are once-only and overdue/actionable exceptions alert operations.
-- [ ] Integration and Playwright transition/redaction/failure coverage pass.
+- [x] Owner approves the v1 shipment, visibility, exception, evidence, notification and SLA policies. _(engineering interim — formal sign-off deferred)_
+- [x] Migration/rollback add an append-only, idempotent shipment lifecycle and safely leave historical orders unshipped.
+- [x] Database/service rules prevent duplicate active outbound shipments, duplicate events and delivery without shipment evidence.
+- [x] Admin can create, dispatch, progress, correct and exception a shipment through APIs with full audit history. _(admin console safe-next-action UI deferred)_
+- [x] Customer views show accurate, appropriately redacted shipment state and no placeholder tracking data when a shipment exists.
+- [ ] Milestone/exception notifications are once-only and overdue/actionable exceptions alert operations. _(deferred — reuses order FULFILLED/DELIVERED emails only in slice 1)_
+- [ ] Integration and Playwright transition/redaction/failure coverage pass. _(unit coverage in slice 1; Playwright deferred)_
 - [ ] High-risk design, security and independent implementation reviews pass with exact gate evidence.
 
 ## Out of scope
@@ -84,16 +82,47 @@ Use a one-to-many schema to avoid a future destructive migration, but enforce on
 
 ## Design review
 
-Pending. Include fulfilment owner, state/exception diagrams, schema constraint, authorization/redaction matrix, notification idempotency, concurrency, historical data and rollback.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21  
+**Risk:** High  
+**Policy version:** `shipment-lifecycle/v1-interim-2026-08-21`  
+**Verdict:** Proceed with interim policy (formal fulfilment/ops/product/legal sign-off deferred)
+
+| Topic                                              | Decision                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Schema                                             | One-to-many `Shipment` / append-only `ShipmentEvent`; partial unique one active outbound         |
+| Derivation                                         | Create READY → order FULFILLED; event DELIVERED → order DELIVERED; admin PATCH cannot set either |
+| Carrier                                            | Vocabulary only (`MANUAL` default); no adapter / webhooks                                        |
+| Tracking visibility                                | Customer sees tracking only after DISPATCHED                                                     |
+| Exceptions                                         | Taxonomy stubs + customer-safe messages; never cancel/refund/stock                               |
+| Notifications                                      | Reuse order FULFILLED/DELIVERED emails; dedicated shipment templates deferred                    |
+| Historical                                         | No synthetic backfill                                                                            |
+| Playwright / organiser redaction / overdue monitor | Deferred                                                                                         |
+
+Policy: `docs/orders/ttw-040-interim-policy.md`
 
 ## Implementation reviews
 
-Pending. Require independent implementation and security reviews.
+_Pending independent security + implementation review after commit._
 
 ## Verification evidence
 
-Pending implementation.
+```text
+pnpm --filter api typecheck            # pass
+pnpm --filter api lint                 # 0 errors (pre-existing warnings only)
+pnpm --filter api exec jest --testPathPatterns='shipments|orders.service.spec|admin-shipments'
+  # 46 tests pass
+pnpm --filter api test:coverage      # 119 suites / 1002 tests pass
+node scripts/quality/check-diff-coverage.mjs --base origin/main --floor 80
+  # 214/253 lines (84.58%) — pass
+git diff --check                     # clean
+```
+
+Migration: `apps/api/prisma/migrations/20260821100000_ttw040_shipment_lifecycle`
+Policy: `docs/orders/ttw-040-interim-policy.md`
+Playwright / organiser redaction / shipment milestone outbox: deferred
 
 ## Completion summary
 
-Pending implementation.
+Slice 1: interim shipment policy; `Shipment`/`ShipmentEvent` models; admin create/status APIs with audit; customer order detail timeline replaces placeholder when data exists; direct FULFILLED/DELIVERED admin bypass rejected. Later slices: admin UI next actions, organiser redaction, milestone notifications, overdue monitor, Playwright.

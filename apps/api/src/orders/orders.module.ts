@@ -16,6 +16,7 @@ import { MailModule } from '../mail/mail.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuthModule } from '../auth/auth.module';
+import { ShipmentsModule } from '../shipments/shipments.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminNotificationsModule,
     InventoryModule,
     AuthModule,
+    ShipmentsModule,
   ],
   controllers: [OrdersController, WebhooksController],
   providers: [

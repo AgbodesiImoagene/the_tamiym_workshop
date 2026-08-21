@@ -10,10 +10,7 @@ export const ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION = 1;
 export const CUSTOMER_ORDER_DETAIL_POLICY_VERSION =
   'customer-order-detail/v1-interim-2026-08-21';
 
-/**
- * Slice-1 shipment copy while TTW-040 owns the real timeline.
- * Returned on every customer order detail until shipment models exist.
- */
+/** @deprecated Prefer CUSTOMER_SHIPMENT_ABSENT_MESSAGE from shipments.constants (TTW-040). */
 export const CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER =
   'Shipping updates will appear here when available.';
 

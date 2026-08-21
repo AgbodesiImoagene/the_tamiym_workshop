@@ -3,12 +3,12 @@ import { IsString, IsIn } from 'class-validator';
 import { OrderStatus } from '../../generated/prisma/enums';
 
 /**
- * Statuses that admin may set via PATCH. REFUNDED is set only by the refund flow; CANCELLED only from PENDING_PAYMENT.
+ * Statuses that admin may set via PATCH.
+ * FULFILLED/DELIVERED are derived by shipment APIs (TTW-040).
+ * REFUNDED is set only by the refund flow; CANCELLED only from PENDING_PAYMENT (or PROCESSING cancel path).
  */
 const ADMIN_SETTABLE_STATUSES = [
   OrderStatus.PROCESSING,
-  OrderStatus.FULFILLED,
-  OrderStatus.DELIVERED,
   OrderStatus.CANCELLED,
 ] as const;
 
