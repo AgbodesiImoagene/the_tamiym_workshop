@@ -167,7 +167,8 @@ const PRODUCTION_STARTED_STATUSES: ReadonlySet<OrderStatus> = new Set([
 
 function asDate(value: Date | string | null | undefined): Date | null {
   if (value == null) return null;
-  return value instanceof Date ? value : new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function decision(
