@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { marketingAssets } from '@/lib/assets';
 import { Progress } from '@tamiym/ui';
 import { customerAppPath, webLoginWithNext, webRegisterWithNext } from '@/lib/site';
-import type {
-  FundraiserSelection,
-  PublicFundraiser,
-} from '@/lib/fundraisers';
+import type { FundraiserSelection, PublicFundraiser } from '@/lib/fundraisers';
 import { minorToMajor } from '@/lib/fundraisers';
 import {
   applyOptionValueSelection,
@@ -39,7 +36,6 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
     products[0] ? defaultOptionSelection(products[0]) : {}
   );
   const [shareDone, setShareDone] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
 
   const selected = products[selectedIndex] ?? products[0] ?? null;
   const returnPath = `/fundraiser/${fundraiser.slug}`;
@@ -77,18 +73,15 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
   const progressPct =
     goal != null && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : null;
 
-  useEffect(() => {
+  const statusMessage = useMemo(() => {
     if (!selected) {
-      setStatusMessage('No sellable products on this campaign.');
-      return;
+      return 'No sellable products on this campaign.';
     }
     if (!resolvedVariant) {
-      setStatusMessage('Selected options are not a valid combination.');
-      return;
+      return 'Selected options are not a valid combination.';
     }
     if (!resolvedVariant.available) {
-      setStatusMessage('That option combination is unavailable.');
-      return;
+      return 'That option combination is unavailable.';
     }
     const optionLabels = selected.options
       .map((opt) => {
@@ -98,12 +91,10 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
       })
       .filter(Boolean)
       .join(', ');
-    setStatusMessage(
-      `${selected.product.name}, ${optionLabels || 'default options'}, ${formatCurrency(
-        displayPriceMajor,
-        displayCurrency
-      )}, quantity ${quantity}.`
-    );
+    return `${selected.product.name}, ${optionLabels || 'default options'}, ${formatCurrency(
+      displayPriceMajor,
+      displayCurrency
+    )}, quantity ${quantity}.`;
   }, [selected, resolvedVariant, selectedByOptionId, displayPriceMajor, displayCurrency, quantity]);
 
   function selectProduct(index: number) {
@@ -115,9 +106,7 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
 
   function selectOptionValue(optionId: string, valueId: string) {
     if (!selected) return;
-    setSelectedByOptionId((prev) =>
-      applyOptionValueSelection(selected, prev, optionId, valueId)
-    );
+    setSelectedByOptionId((prev) => applyOptionValueSelection(selected, prev, optionId, valueId));
   }
 
   async function copyShareLink() {

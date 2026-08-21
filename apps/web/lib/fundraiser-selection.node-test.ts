@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PublicFundraiserProduct } from './fundraisers';
-import {
-  applyOptionValueSelection,
-  isOptionValueSelectable,
-} from './fundraiser-selection';
+import { applyOptionValueSelection, isOptionValueSelectable } from './fundraiser-selection';
 
 const sparseProduct: PublicFundraiserProduct = {
   campaignProductId: 'cp1',
