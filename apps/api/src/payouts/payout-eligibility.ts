@@ -251,7 +251,7 @@ export function evaluatePayoutEligibility(
     gate: input.gate,
     codes: eligible ? [PayoutEligibilityCode.ELIGIBLE] : denialCodes,
     denials: denialCodes.map((code) => ({
-      code: code as PayoutEligibilityDenial['code'],
+      code,
       message: SAFE_MESSAGES[code],
     })),
     profileId: profile?.id ?? null,
