@@ -101,11 +101,12 @@ describe('Campaign authoring (e2e)', () => {
   it('rejects foreign campaign mutation and enforces stale revision', async () => {
     const owner = await createOrganizer();
     const other = await createOrganizer();
+    const stamp = Date.now();
     const campaign = await prisma.campaign.create({
       data: {
         organizerId: owner.user.id,
         title: 'Owned Draft',
-        slug: `owned-draft-${Date.now()}`,
+        slug: `owned-draft-${stamp}`,
         status: CampaignStatus.DRAFT,
         draftRevision: 1,
       },
@@ -120,13 +121,21 @@ describe('Campaign authoring (e2e)', () => {
     await request(app.getHttpServer())
       .patch(`/v1/campaigns/${campaign.id}`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
-      .send({ expectedRevision: 1, title: 'First save' })
+      .send({
+        expectedRevision: 1,
+        title: `First save ${stamp}`,
+        slug: `owned-draft-${stamp}-v2`,
+      })
       .expect(200);
 
     const stale = await request(app.getHttpServer())
       .patch(`/v1/campaigns/${campaign.id}`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
-      .send({ expectedRevision: 1, title: 'Stale save' })
+      .send({
+        expectedRevision: 1,
+        title: `Stale save ${stamp}`,
+        slug: `owned-draft-${stamp}-stale`,
+      })
       .expect(409);
 
     const code =
