@@ -34,6 +34,11 @@ export interface RequestUser {
   firstName: string;
   lastName: string;
   phone: string | null;
+  /**
+   * Whether the account has a verified email (TTW-023 / TTW-032).
+   * Exposed as a boolean only — never the raw timestamp.
+   */
+  emailVerified: boolean;
   /** Surface this request authenticated on (from the validated JWT). */
   surface: AuthSurface;
   /** Live AuthSession id from the access JWT `sid` claim. */
@@ -166,10 +171,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    const { emailVerifiedAt: _verified, ...safeUser } = user;
-    void _verified;
+    const { emailVerifiedAt, ...safeUser } = user;
     return {
       ...safeUser,
+      emailVerified: Boolean(emailVerifiedAt),
       surface: payload.surface,
       sessionId: payload.sid,
     };

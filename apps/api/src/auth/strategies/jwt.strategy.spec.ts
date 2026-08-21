@@ -107,6 +107,7 @@ describe('JwtStrategy', () => {
       firstName: mockDbUser.firstName,
       lastName: mockDbUser.lastName,
       phone: mockDbUser.phone,
+      emailVerified: true,
       surface: AuthSurface.CUSTOMER,
       sessionId: SID,
     });
