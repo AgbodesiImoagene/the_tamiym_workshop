@@ -37,6 +37,8 @@ import { AdminReconciliationController } from './admin-reconciliation.controller
 import { MediaModule } from '../media/media.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { OrganizerModule } from '../organizer/organizer.module';
+import { ShipmentsModule } from '../shipments/shipments.module';
+import { AdminShipmentsController } from './admin-shipments.controller';
 
 @Module({
   imports: [
@@ -57,10 +59,12 @@ import { OrganizerModule } from '../organizer/organizer.module';
     MediaModule,
     ModerationModule,
     OrganizerModule,
+    ShipmentsModule,
   ],
   providers: [AdminEmailBroadcastService, AdminUsersService],
   controllers: [
     AdminOrdersController,
+    AdminShipmentsController,
     AdminCategoriesController,
     AdminProductsController,
     AdminInventoryController,

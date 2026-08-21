@@ -37,9 +37,10 @@ import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.serv
 import { AccountPolicyService } from '../auth/account-policy.service';
 import {
   CUSTOMER_ORDER_DETAIL_POLICY_VERSION,
-  CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER,
   ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION,
 } from './order-item-snapshot';
+import { CUSTOMER_SHIPMENT_ABSENT_MESSAGE } from '../shipments/shipments.constants';
+import { ShipmentsService } from '../shipments/shipments.service';
 import { isPaymentRetryEligible as computePaymentRetryEligible } from './payment-eligibility';
 import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import type { PricingLineItemOutput } from '../pricing/pricing.types';
@@ -59,6 +60,7 @@ export class OrdersService {
     private inventoryLowStockNotifier: InventoryLowStockNotifier,
     private inventoryLifecycle: InventoryLifecycleService,
     private accountPolicy: AccountPolicyService,
+    private shipments: ShipmentsService,
   ) {}
 
   /**
@@ -714,6 +716,8 @@ export class OrdersService {
       payments: order.payments,
     });
 
+    const shipment = await this.shipments.getCustomerSummaryForOrder(order.id);
+
     return {
       policyVersion: CUSTOMER_ORDER_DETAIL_POLICY_VERSION,
       id: order.id,
@@ -794,8 +798,8 @@ export class OrdersService {
           }
         : null,
       paymentRetryEligible,
-      // TTW-040 owns shipment timeline; no Shipment model in slice 1.
-      shipmentPlaceholder: CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER,
+      shipment,
+      shipmentPlaceholder: shipment ? null : CUSTOMER_SHIPMENT_ABSENT_MESSAGE,
     };
   }
 
@@ -852,6 +856,12 @@ export class OrdersService {
             updatedAt: true,
           },
         },
+        shipments: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            events: { orderBy: { occurredAt: 'asc' } },
+          },
+        },
       },
     });
     if (!order) {
@@ -863,19 +873,23 @@ export class OrdersService {
   /**
    * Allowed admin-driven order status transitions. REFUNDED is set only by refund flow.
    */
+  /**
+   * Admin-driven transitions that do not go through the shipment lifecycle.
+   * FULFILLED and DELIVERED are derived only by ShipmentsService (TTW-040).
+   */
   private static readonly ALLOWED_ADMIN_TRANSITIONS: Partial<
     Record<OrderStatus, OrderStatus[]>
   > = {
     [OrderStatus.PENDING_PAYMENT]: [OrderStatus.CANCELLED],
     [OrderStatus.PAID]: [OrderStatus.PROCESSING],
     [OrderStatus.PARTIALLY_REFUNDED]: [OrderStatus.PROCESSING],
-    [OrderStatus.PROCESSING]: [OrderStatus.FULFILLED, OrderStatus.CANCELLED],
-    [OrderStatus.FULFILLED]: [OrderStatus.DELIVERED],
+    [OrderStatus.PROCESSING]: [OrderStatus.CANCELLED],
   };
 
   /**
    * Update order status (admin). Enforces allowed state transitions; CANCELLED from PENDING_PAYMENT releases inventory (TTW-014).
    * Writes an audit log entry for the status change.
+   * FULFILLED/DELIVERED must be set via shipment APIs (TTW-040).
    */
   async updateOrderStatus(id: string, status: string, actorUserId?: string) {
     const order = await this.prisma.order.findUnique({
@@ -890,6 +904,14 @@ export class OrdersService {
     }
     const currentStatus = order.status;
     const newStatus = status as OrderStatus;
+    if (
+      newStatus === OrderStatus.FULFILLED ||
+      newStatus === OrderStatus.DELIVERED
+    ) {
+      throw new BadRequestException(
+        'FULFILLED and DELIVERED are derived from shipment lifecycle; use shipment APIs',
+      );
+    }
     const allowed = OrdersService.ALLOWED_ADMIN_TRANSITIONS[currentStatus];
     if (!allowed?.includes(newStatus)) {
       throw new BadRequestException(

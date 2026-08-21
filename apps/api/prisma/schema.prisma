@@ -111,6 +111,36 @@ enum OrderStatus {
   REFUNDED
 }
 
+/// Physical shipment direction. v1 uses OUTBOUND only; returns reserved for later tickets.
+enum ShipmentDirection {
+  OUTBOUND
+  RETURN
+}
+
+/// Physical movement lifecycle for a shipment (TTW-040). Distinct from OrderStatus.
+enum ShipmentStatus {
+  READY
+  DISPATCHED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+  CANCELLED
+}
+
+/// Append-only shipment event kinds (mirrors ShipmentStatus transitions + corrections).
+enum ShipmentEventType {
+  READY
+  DISPATCHED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+  CANCELLED
+  /// Correction that supersedes a prior event without mutating it.
+  CORRECTION
+}
+
 /// Status of a payment attempt for an order.
 enum PaymentStatus {
   PENDING
@@ -1661,6 +1691,7 @@ model Order {
   refunds        Refund[]
   orderDiscounts OrderDiscount[]
   inventoryMovements InventoryMovement[]
+  shipments      Shipment[]
 
   @@unique([userId, idempotencyKey])
   @@index([userId])
@@ -1670,6 +1701,86 @@ model Order {
   @@index([status, createdAt])
   @@index([campaignId])
   @@map("orders")
+}
+
+/**
+ * =========================
+ * Shipments (TTW-040)
+ * =========================
+ */
+
+/// Carrier-neutral outbound (or future return) shipment for an order.
+/// v1 enforces at most one active outbound shipment per order via partial unique index.
+model Shipment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  direction ShipmentDirection @default(OUTBOUND)
+  status    ShipmentStatus    @default(READY)
+
+  /// Carrier vocabulary code (MANUAL, GIG, DHL, …). No live carrier adapter in v1.
+  carrierCode String  @default("MANUAL")
+  carrierName String?
+  serviceCode String?
+
+  trackingNumber String?
+  trackingUrl    String?
+  /// Normalized `${carrierCode}|${normalizedTracking}` for uniqueness when tracking is set.
+  carrierTrackingKey String?
+
+  estimatedDeliveryAt DateTime?
+  dispatchedAt         DateTime?
+  deliveredAt          DateTime?
+
+  /// Latest exception stub (also recorded on ShipmentEvent).
+  exceptionCode            String?
+  exceptionMessageCustomer String?
+  exceptionNotesInternal   String?
+
+  policyVersion String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events ShipmentEvent[]
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([carrierTrackingKey])
+  @@map("shipments")
+}
+
+/// Append-only shipment timeline event. Corrections reference supersedesEventId.
+model ShipmentEvent {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  type       ShipmentEventType
+  occurredAt DateTime          @default(now())
+  recordedAt DateTime         @default(now())
+
+  actorUserId String?
+  source      AuditSource @default(ADMIN_API)
+
+  /// Unique per shipment — duplicate submissions return the existing row.
+  idempotencyKey String
+
+  customerMessage String?
+  privateNotes    String?
+  exceptionCode   String?
+
+  supersedesEventId String?
+  supersedesEvent    ShipmentEvent?  @relation("ShipmentEventSupersedes", fields: [supersedesEventId], references: [id], onDelete: SetNull)
+  supersededBy      ShipmentEvent[] @relation("ShipmentEventSupersedes")
+
+  metadata Json?
+
+  @@unique([shipmentId, idempotencyKey])
+  @@index([shipmentId, occurredAt])
+  @@index([type, recordedAt])
+  @@map("shipment_events")
 }
 
 /// Single line item on an order (product, variant, optional design/campaign). Stores unit pricing and optional breakdown.

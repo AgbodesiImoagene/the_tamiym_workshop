@@ -218,9 +218,63 @@ export default function DashboardOrderDetailPage() {
                 </div>
               ) : null}
 
-              <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafafa] p-4 text-sm text-black/70">
-                {order.shipmentPlaceholder}
-              </div>
+              {order.shipment ? (
+                <div className="space-y-3 rounded-2xl border border-black/10 p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="text-xl font-bold text-black/90">Shipment</h2>
+                    <p className="text-sm font-semibold text-black/70">
+                      {order.shipment.status.replaceAll('_', ' ')}
+                    </p>
+                  </div>
+                  <p className="text-sm text-black/70">{order.shipment.carrierName}</p>
+                  {order.shipment.trackingNumber ? (
+                    <p className="text-sm text-black/80">
+                      Tracking:{' '}
+                      {order.shipment.trackingUrl ? (
+                        <a
+                          href={order.shipment.trackingUrl}
+                          className="font-semibold text-[#004385] underline"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {order.shipment.trackingNumber}
+                        </a>
+                      ) : (
+                        <span className="font-semibold">{order.shipment.trackingNumber}</span>
+                      )}
+                    </p>
+                  ) : null}
+                  {order.shipment.estimatedDeliveryAt ? (
+                    <p className="text-sm text-black/60">
+                      Estimated delivery:{' '}
+                      {new Date(order.shipment.estimatedDeliveryAt).toLocaleDateString()}
+                    </p>
+                  ) : null}
+                  {order.shipment.exceptionMessage ? (
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      {order.shipment.exceptionMessage}
+                    </p>
+                  ) : null}
+                  <ol className="space-y-2 border-t border-black/10 pt-3">
+                    {order.shipment.events.map((event) => (
+                      <li key={event.id} className="text-sm text-black/75">
+                        <span className="font-semibold">{event.type.replaceAll('_', ' ')}</span>
+                        <span className="text-black/50">
+                          {' '}
+                          · {new Date(event.occurredAt).toLocaleString()}
+                        </span>
+                        {event.customerMessage ? (
+                          <p className="text-black/60">{event.customerMessage}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafafa] p-4 text-sm text-black/70">
+                  {order.shipmentPlaceholder ?? 'Shipping updates will appear here when available.'}
+                </div>
+              )}
 
               {retryMessage ? <p className="text-sm text-red-700">{retryMessage}</p> : null}
 

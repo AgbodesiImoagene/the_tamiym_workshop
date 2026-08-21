@@ -15,14 +15,14 @@ This matrix is the working source of truth for customer-owned order detail, line
 
 ## Response contract (`CustomerOrderDetailDto`)
 
-| Included                                                                  | Never included                                                                         |
-| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Order status, payment status, money totals, timestamps                    | Mutable `Address` relation                                                             |
-| `ship*` destination snapshot                                              | Provider `rawEvent`, `authorizationUrl`, `accessCode`, payment/refund idempotency keys |
-| Line display snapshots + money                                            | Organizer economics (`organizerCostBasis`, discount internals)                         |
-| Safe payment/refund summaries + `refundedAmountConfirmed` (SUCCEEDED sum) | Internal audit notes, user PII beyond shipping snapshot                                |
-| Campaign attribution `{ id, title, slug }` when present                   | Catalogue live product/variant names (use snapshots)                                   |
-| `paymentRetryEligible`, `shipmentPlaceholder`, `policyVersion`            | Invented shipment progress                                                             |
+| Included                                                                    | Never included                                                                         |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Order status, payment status, money totals, timestamps                      | Mutable `Address` relation                                                             |
+| `ship*` destination snapshot                                                | Provider `rawEvent`, `authorizationUrl`, `accessCode`, payment/refund idempotency keys |
+| Line display snapshots + money                                              | Organizer economics (`organizerCostBasis`, discount internals)                         |
+| Safe payment/refund summaries + `refundedAmountConfirmed` (SUCCEEDED sum)   | Internal audit notes, user PII beyond shipping snapshot                                |
+| Campaign attribution `{ id, title, slug }` when present                     | Catalogue live product/variant names (use snapshots)                                   |
+| `paymentRetryEligible`, `shipment` / `shipmentPlaceholder`, `policyVersion` | Invented shipment progress                                                             |
 
 ## Line display snapshots
 
@@ -44,12 +44,13 @@ Eligible only when **all** are true:
 
 UI must hide retry when `paymentRetryEligible` is false; client must not invent eligibility.
 
-## Shipment (deferred)
+## Shipment
 
-| Rule    | Value                                                                      |
-| ------- | -------------------------------------------------------------------------- |
-| Slice 1 | `shipmentPlaceholder`: `Shipping updates will appear here when available.` |
-| Owner   | TTW-040 redacted shipment/tracking timeline                                |
+| Rule    | Value                                                                           |
+| ------- | ------------------------------------------------------------------------------- |
+| Absent  | `shipment: null` + `shipmentPlaceholder` honest absent copy                     |
+| Present | Customer-safe `shipment` summary/timeline (TTW-040); `shipmentPlaceholder` null |
+| Policy  | `docs/orders/ttw-040-interim-policy.md`                                         |
 
 ## Customer app surfaces
 
@@ -62,6 +63,6 @@ UI must hide retry when `paymentRetryEligible` is false; client must not invent 
 ## Deferred
 
 - Full Playwright matrix (standard/campaign × payment/refund/shipment states)
-- Real shipment timeline and customer-safe exceptions (TTW-040)
+- Real shipment timeline and customer-safe exceptions → see `docs/orders/ttw-040-interim-policy.md`
 - Cancellation/return self-service (TTW-041)
 - Formal product/legal/T&S sign-off beyond engineering interim

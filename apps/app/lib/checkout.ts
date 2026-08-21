@@ -97,7 +97,29 @@ export interface CustomerOrderDetail {
   campaign?: { id: string; title: string; slug: string } | null;
   campaignId?: string | null;
   paymentRetryEligible: boolean;
+  shipment?: CustomerShipmentSummary | null;
   shipmentPlaceholder?: string | null;
+}
+
+export interface CustomerShipmentEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  customerMessage?: string | null;
+  exceptionCode?: string | null;
+}
+
+export interface CustomerShipmentSummary {
+  policyVersion: string;
+  id: string;
+  status: string;
+  carrierName: string;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  estimatedDeliveryAt?: string | null;
+  exceptionCode?: string | null;
+  exceptionMessage?: string | null;
+  events: CustomerShipmentEvent[];
 }
 
 export async function quoteOrder(input: { shippingAddressId: string; items: QuoteLineItem[] }) {

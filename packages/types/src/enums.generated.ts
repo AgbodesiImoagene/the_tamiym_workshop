@@ -81,6 +81,35 @@ export enum OrderStatus {
   REFUNDED = 'REFUNDED',
 }
 
+// Physical shipment direction. v1 uses OUTBOUND only; returns reserved for later tickets.
+export enum ShipmentDirection {
+  OUTBOUND = 'OUTBOUND',
+  RETURN = 'RETURN',
+}
+
+// Physical movement lifecycle for a shipment (TTW-040). Distinct from OrderStatus.
+export enum ShipmentStatus {
+  READY = 'READY',
+  DISPATCHED = 'DISPATCHED',
+  IN_TRANSIT = 'IN_TRANSIT',
+  OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
+  DELIVERED = 'DELIVERED',
+  EXCEPTION = 'EXCEPTION',
+  CANCELLED = 'CANCELLED',
+}
+
+// Append-only shipment event kinds (mirrors ShipmentStatus transitions + corrections).
+export enum ShipmentEventType {
+  READY = 'READY',
+  DISPATCHED = 'DISPATCHED',
+  IN_TRANSIT = 'IN_TRANSIT',
+  OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
+  DELIVERED = 'DELIVERED',
+  EXCEPTION = 'EXCEPTION',
+  CANCELLED = 'CANCELLED',
+  CORRECTION = 'CORRECTION',
+}
+
 // Status of a payment attempt for an order.
 export enum PaymentStatus {
   PENDING = 'PENDING',
