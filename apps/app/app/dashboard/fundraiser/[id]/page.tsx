@@ -237,7 +237,7 @@ export default function CampaignAuthoringPage() {
     const apiError = err as ApiError;
     if (apiError.statusCode === 409 || apiError.code === 'CAMPAIGN_STALE_REVISION') {
       setStaleNotice(
-        'This draft changed elsewhere. Reloading the latest version — re-apply your edits and save again.',
+        'This draft changed elsewhere. Reloading the latest version — re-apply your edits and save again.'
       );
       await queryClient.invalidateQueries({ queryKey: ['campaign-authoring', campaignId] });
       return;
@@ -254,12 +254,8 @@ export default function CampaignAuthoringPage() {
         description: values.description.trim() || null,
         story: values.story.trim() || null,
         goalAmount: values.goalAmount.trim() ? Number(values.goalAmount) : null,
-        startDate: values.startDate
-          ? new Date(values.startDate).toISOString()
-          : null,
-        endDate: values.endDate
-          ? new Date(`${values.endDate}T23:59:59.000Z`).toISOString()
-          : null,
+        startDate: values.startDate ? new Date(values.startDate).toISOString() : null,
+        endDate: values.endDate ? new Date(`${values.endDate}T23:59:59.000Z`).toISOString() : null,
       }),
     onSuccess: async (data) => {
       setFormError(null);
@@ -353,8 +349,8 @@ export default function CampaignAuthoringPage() {
               Campaign editor
             </h1>
             <p className="max-w-2xl text-sm text-black/65">
-              Explicit-save DRAFT workspace. Saves require the current revision (
-              {revision}). Artwork changes happen in the{' '}
+              Explicit-save DRAFT workspace. Saves require the current revision ({revision}).
+              Artwork changes happen in the{' '}
               <Link href="/dashboard/design" className="underline">
                 workshop
               </Link>
@@ -455,7 +451,7 @@ export default function CampaignAuthoringPage() {
                               onClick={() => {
                                 const next = window.prompt(
                                   'New selling price (NGN)',
-                                  String(offer.price ?? offer.minimumPrice),
+                                  String(offer.price ?? offer.minimumPrice)
                                 );
                                 if (!next) return;
                                 const price = Number(next);
@@ -537,9 +533,7 @@ export default function CampaignAuthoringPage() {
                   <div className="flex items-end">
                     <button
                       type="button"
-                      disabled={
-                        addOffer.isPending || !productId || !designId || !offerPrice
-                      }
+                      disabled={addOffer.isPending || !productId || !designId || !offerPrice}
                       onClick={() => {
                         setFormError(null);
                         void addOffer.mutateAsync();
@@ -552,10 +546,7 @@ export default function CampaignAuthoringPage() {
                   {guidanceQuery.data ? (
                     <p className="text-xs text-black/55 md:col-span-4">
                       {guidanceQuery.data.guidance} Minimum:{' '}
-                      {formatCurrency(
-                        guidanceQuery.data.minimumPrice,
-                        guidanceQuery.data.currency,
-                      )}
+                      {formatCurrency(guidanceQuery.data.minimumPrice, guidanceQuery.data.currency)}
                       .
                     </p>
                   ) : null}

@@ -69,7 +69,7 @@ export async function updateCampaignBasics(
     goalAmount?: number | null;
     startDate?: string | null;
     endDate?: string | null;
-  },
+  }
 ) {
   return apiClient.patch<CampaignOwnerDetail>(`/campaigns/${campaignId}`, input);
 }
@@ -81,12 +81,9 @@ export async function addCampaignOffer(
     productId: string;
     designId: string;
     price: number;
-  },
+  }
 ) {
-  return apiClient.post<CampaignOwnerDetail>(
-    `/campaigns/${campaignId}/offers`,
-    input,
-  );
+  return apiClient.post<CampaignOwnerDetail>(`/campaigns/${campaignId}/offers`, input);
 }
 
 export async function updateCampaignOffer(
@@ -96,33 +93,27 @@ export async function updateCampaignOffer(
     expectedRevision: number;
     designId?: string;
     price?: number;
-  },
+  }
 ) {
-  return apiClient.patch<CampaignOwnerDetail>(
-    `/campaigns/${campaignId}/offers/${offerId}`,
-    input,
-  );
+  return apiClient.patch<CampaignOwnerDetail>(`/campaigns/${campaignId}/offers/${offerId}`, input);
 }
 
 export async function removeCampaignOffer(
   campaignId: string,
   offerId: string,
-  input: { expectedRevision: number },
+  input: { expectedRevision: number }
 ) {
-  return apiClient.delete<CampaignOwnerDetail>(
-    `/campaigns/${campaignId}/offers/${offerId}`,
-    input,
-  );
+  return apiClient.delete<CampaignOwnerDetail>(`/campaigns/${campaignId}/offers/${offerId}`, input);
 }
 
 export async function getCampaignPriceGuidance(
   campaignId: string,
   productId: string,
-  designId: string,
+  designId: string
 ) {
   const qs = new URLSearchParams({ productId, designId });
   return apiClient.get<CampaignPriceGuidance>(
-    `/campaigns/${campaignId}/price-guidance?${qs.toString()}`,
+    `/campaigns/${campaignId}/price-guidance?${qs.toString()}`
   );
 }
 
@@ -131,7 +122,5 @@ export async function getCampaignDraftPreview(campaignId: string) {
 }
 
 export async function submitCampaignForReview(campaignId: string) {
-  return apiClient.post<CampaignOwnerDetail>(
-    `/campaigns/${campaignId}/submit-for-review`,
-  );
+  return apiClient.post<CampaignOwnerDetail>(`/campaigns/${campaignId}/submit-for-review`);
 }

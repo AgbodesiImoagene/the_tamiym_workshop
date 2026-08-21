@@ -13,10 +13,7 @@ import { test } from '../fixtures/test';
  * - [data-testid="campaign-submit-confirm"]
  */
 test.describe('Organiser campaign authoring @ttw035', () => {
-  test.skip(
-    true,
-    'Full Playwright authoring matrix deferred from TTW-035 slice 1',
-  );
+  test.skip(true, 'Full Playwright authoring matrix deferred from TTW-035 slice 1');
 
   test('DRAFT editor loads from fundraiser list @smoke', async ({ page }) => {
     await page.goto('/dashboard/fundraiser');

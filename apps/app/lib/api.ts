@@ -139,8 +139,7 @@ export class ApiClient {
         if (typeof data.message === 'string') {
           error.message = data.message;
         } else if (data.message && typeof data.message === 'object') {
-          error.message =
-            data.message.message || data.error || response.statusText;
+          error.message = data.message.message || data.error || response.statusText;
           if (typeof data.message.code === 'string') {
             error.code = data.message.code;
           }
