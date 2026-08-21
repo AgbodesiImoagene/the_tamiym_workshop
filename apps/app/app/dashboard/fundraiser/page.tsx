@@ -251,15 +251,9 @@ export default function DashboardFundraiserPage() {
                 {withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw application'}
               </button>
             </div>
-          ) : eligibilityQuery.data?.latestApplication?.status === 'REJECTED' ? (
-            <div className="mt-5 space-y-4">
-              <p className="rounded-2xl bg-[#fdecec] px-4 py-4 text-sm text-[#8a1f1f]">
-                {eligibilityQuery.data.latestApplication.customerVisibleReason ||
-                  'Your application was not approved.'}
-              </p>
-              <p className="text-sm text-black/65">You can update your details and apply again.</p>
-            </div>
-          ) : !eligibilityQuery.data?.eligible ? (
+          ) : !eligibilityQuery.data?.eligible &&
+            eligibilityQuery.data?.latestApplication?.status !== 'REJECTED' &&
+            eligibilityQuery.data?.latestApplication?.status !== 'WITHDRAWN' ? (
             <div className="mt-5 space-y-2 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
               <p>Complete these steps before applying:</p>
               <ul className="list-disc space-y-1 pl-5">
@@ -269,48 +263,80 @@ export default function DashboardFundraiserPage() {
               </ul>
             </div>
           ) : (
-            <form
-              className="mt-5 space-y-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setApplyMessage(null);
-                void applyMutation.mutateAsync({
-                  organisationName: organisationName.trim(),
-                  intendedUse: intendedUse.trim(),
-                  termsVersion: eligibilityQuery.data!.termsVersion,
-                  termsAcceptedAt: new Date().toISOString(),
-                });
-              }}
-            >
-              <input
-                className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
-                placeholder="Organisation name"
-                value={organisationName}
-                onChange={(event) => setOrganisationName(event.target.value)}
-                required
-                minLength={2}
-                maxLength={120}
-              />
-              <textarea
-                className="min-h-28 w-full rounded-xl border border-black/20 px-4 py-3 text-sm outline-none"
-                placeholder="How do you intend to use fundraising on Tamiym?"
-                value={intendedUse}
-                onChange={(event) => setIntendedUse(event.target.value)}
-                required
-                minLength={20}
-                maxLength={2000}
-              />
-              <p className="text-xs text-black/55">
-                By applying you accept organiser terms ({eligibilityQuery.data?.termsVersion}).
-              </p>
-              <button
-                type="submit"
-                disabled={applyMutation.isPending}
-                className="h-10 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
-              >
-                {applyMutation.isPending ? 'Submitting...' : 'Submit application'}
-              </button>
-            </form>
+            <div className="mt-5 space-y-4">
+              {eligibilityQuery.data?.latestApplication?.status === 'REJECTED' ? (
+                <>
+                  <p className="rounded-2xl bg-[#fdecec] px-4 py-4 text-sm text-[#8a1f1f]">
+                    {eligibilityQuery.data.latestApplication.customerVisibleReason ||
+                      'Your application was not approved.'}
+                  </p>
+                  {eligibilityQuery.data.eligible ? (
+                    <p className="text-sm text-black/65">
+                      You can update your details and apply again.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                      <p>Complete these steps before applying again:</p>
+                      <ul className="list-disc space-y-1 pl-5">
+                        {(eligibilityQuery.data?.actionableGuidance ?? []).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : null}
+              {eligibilityQuery.data?.latestApplication?.status === 'WITHDRAWN' &&
+              eligibilityQuery.data.eligible ? (
+                <p className="rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                  Your previous application was withdrawn. You can apply again.
+                </p>
+              ) : null}
+              {eligibilityQuery.data?.eligible ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setApplyMessage(null);
+                    void applyMutation.mutateAsync({
+                      organisationName: organisationName.trim(),
+                      intendedUse: intendedUse.trim(),
+                      termsVersion: eligibilityQuery.data!.termsVersion,
+                      termsAcceptedAt: new Date().toISOString(),
+                    });
+                  }}
+                >
+                  <input
+                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
+                    placeholder="Organisation name"
+                    value={organisationName}
+                    onChange={(event) => setOrganisationName(event.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={120}
+                  />
+                  <textarea
+                    className="min-h-28 w-full rounded-xl border border-black/20 px-4 py-3 text-sm outline-none"
+                    placeholder="How do you intend to use fundraising on Tamiym?"
+                    value={intendedUse}
+                    onChange={(event) => setIntendedUse(event.target.value)}
+                    required
+                    minLength={20}
+                    maxLength={2000}
+                  />
+                  <p className="text-xs text-black/55">
+                    By applying you accept organiser terms ({eligibilityQuery.data?.termsVersion}).
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={applyMutation.isPending}
+                    className="h-10 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
+                  >
+                    {applyMutation.isPending ? 'Submitting...' : 'Submit application'}
+                  </button>
+                </form>
+              ) : null}
+            </div>
           )}
           {applyMessage ? <p className="mt-3 text-sm text-black/70">{applyMessage}</p> : null}
         </section>

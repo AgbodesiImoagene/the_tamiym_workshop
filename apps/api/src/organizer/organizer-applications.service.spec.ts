@@ -201,7 +201,7 @@ describe('OrganizerApplicationsService', () => {
     const tx = {
       organizerApplication: {
         findFirst: jest.fn().mockResolvedValue(null),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn(),
       },
       user: {
@@ -225,6 +225,61 @@ describe('OrganizerApplicationsService', () => {
       targetUserId: 'cust-1',
       reason: 'Manual promotion after offline KYC review call.',
     });
+    expect(tx.organizerApplication.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'cust-1',
+        status: OrganizerApplicationStatus.PENDING,
+      },
+      data: { status: OrganizerApplicationStatus.WITHDRAWN },
+    });
     expect(tx.organizerApplication.create).toHaveBeenCalled();
+  });
+
+  it('getEligibility returns pending, latest, and organiser flag', async () => {
+    prisma.user.findUnique.mockResolvedValue(eligibleUser);
+    const pending = {
+      id: 'app-pending',
+      status: OrganizerApplicationStatus.PENDING,
+    };
+    const latest = pending;
+    prisma.organizerApplication.findFirst
+      .mockResolvedValueOnce(pending)
+      .mockResolvedValueOnce(latest);
+
+    const result = await service.getEligibility('cust-1');
+    expect(result.eligible).toBe(true);
+    expect(result.pendingApplication).toEqual(pending);
+    expect(result.latestApplication).toEqual(latest);
+    expect(result.isOrganizer).toBe(false);
+    expect(result.termsVersion).toBe(ORGANIZER_TERMS_VERSION);
+  });
+
+  it('override withdraws PENDING even when APPROVED already exists', async () => {
+    const tx = {
+      organizerApplication: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'app-approved' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn(),
+      },
+      user: {
+        findUniqueOrThrow: jest.fn(),
+      },
+    };
+
+    await service.ensureApprovedApplicationForOverride(tx as never, {
+      actorUserId: 'admin-1',
+      targetUserId: 'cust-1',
+      reason: 'Manual promotion after offline KYC review call.',
+    });
+
+    expect(tx.organizerApplication.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'cust-1',
+        status: OrganizerApplicationStatus.PENDING,
+      },
+      data: { status: OrganizerApplicationStatus.WITHDRAWN },
+    });
+    expect(tx.organizerApplication.create).not.toHaveBeenCalled();
+    expect(tx.user.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 });

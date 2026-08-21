@@ -466,6 +466,17 @@ export class OrganizerApplicationsService {
       );
     }
 
+    // Always clear PENDING rows first so a concurrent pending application
+    // cannot violate organizer_applications_one_pending_per_user when an
+    // APPROVED row already exists (or when we create one below).
+    await tx.organizerApplication.updateMany({
+      where: {
+        userId: params.targetUserId,
+        status: OrganizerApplicationStatus.PENDING,
+      },
+      data: { status: OrganizerApplicationStatus.WITHDRAWN },
+    });
+
     const existingApproved = await tx.organizerApplication.findFirst({
       where: {
         userId: params.targetUserId,
@@ -476,14 +487,6 @@ export class OrganizerApplicationsService {
     if (existingApproved) {
       return;
     }
-
-    await tx.organizerApplication.updateMany({
-      where: {
-        userId: params.targetUserId,
-        status: OrganizerApplicationStatus.PENDING,
-      },
-      data: { status: OrganizerApplicationStatus.WITHDRAWN },
-    });
 
     const target = await tx.user.findUniqueOrThrow({
       where: { id: params.targetUserId },

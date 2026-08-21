@@ -1501,6 +1501,10 @@ model ModerationAppeal {
 }
 
 /// TTW-030: admin-reviewed organiser onboarding application (immutable terminal decisions).
+/// Organiser onboarding applications (TTW-030).
+/// SQL partial unique index `organizer_applications_one_pending_per_user`
+/// enforces at most one PENDING row per userId (see migration); Prisma cannot
+/// express partial unique indexes in schema, so the constraint lives in SQL.
 model OrganizerApplication {
   id     String                     @id @default(cuid())
   userId String

@@ -8,7 +8,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import {
   AuthSurface,
   CampaignStatus,
-  CampaignStatus,
   OrganizerApplicationStatus,
   UserRole,
   UserStatus,
