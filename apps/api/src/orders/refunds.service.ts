@@ -169,27 +169,21 @@ export class RefundsService {
   private async assertRefundPolicy(
     orderId: string,
     reasonCode: RefundReasonCode,
-    tx?: {
-      order: { findUnique: (args: unknown) => Promise<unknown> };
-      shipment: { findFirst: (args: unknown) => Promise<unknown> };
-    },
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const db = tx ?? this.prisma;
-    const order = (await db.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
       select: {
         status: true,
         items: { select: { designId: true } },
       },
-    })) as {
-      status: OrderStatus;
-      items: Array<{ designId: string | null }>;
-    } | null;
+    });
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    const shipment = (await db.shipment.findFirst({
+    const shipment = await db.shipment.findFirst({
       where: {
         orderId,
         direction: ShipmentDirection.OUTBOUND,
@@ -197,10 +191,7 @@ export class RefundsService {
       },
       select: { status: true, deliveredAt: true },
       orderBy: { createdAt: 'desc' },
-    })) as {
-      status: ShipmentStatus;
-      deliveredAt: Date | null;
-    } | null;
+    });
 
     assertResolutionAllowed(
       evaluateRefundEligibility({

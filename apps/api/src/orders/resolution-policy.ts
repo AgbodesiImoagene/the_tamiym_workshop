@@ -31,8 +31,11 @@ export function calendarDateInTimeZone(date: Date, timeZone: string): string {
 
 /** Add whole calendar days to a YYYY-MM-DD string (UTC date arithmetic). */
 export function addCalendarDaysYmd(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const utc = new Date(Date.UTC(y!, m! - 1, d! + days));
+  const parts = ymd.split('-').map(Number);
+  const y = parts[0] ?? 0;
+  const m = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
+  const utc = new Date(Date.UTC(y, m - 1, d + days));
   return utc.toISOString().slice(0, 10);
 }
 
