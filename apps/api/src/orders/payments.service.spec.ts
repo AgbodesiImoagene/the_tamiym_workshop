@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -94,10 +93,20 @@ describe('PaymentsService (TTW-012)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('rejects non-owner', async () => {
+  it('rejects non-owner with NotFound (indistinguishable from missing)', async () => {
     await expect(
       service.initiatePayment('ord_1', 'other', undefined),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects expired PENDING_PAYMENT orders', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+    await expect(
+      service.initiatePayment('ord_1', 'user_1', undefined),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects non-PENDING_PAYMENT orders', async () => {

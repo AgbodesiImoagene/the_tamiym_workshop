@@ -40,6 +40,7 @@ import {
   CUSTOMER_ORDER_SHIPMENT_PLACEHOLDER,
   ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION,
 } from './order-item-snapshot';
+import { isPaymentRetryEligible as computePaymentRetryEligible } from './payment-eligibility';
 import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import type { PricingLineItemOutput } from '../pricing/pricing.types';
 import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
@@ -450,36 +451,7 @@ export class OrdersService {
     }>;
     now?: Date;
   }): boolean {
-    if (input.status !== OrderStatus.PENDING_PAYMENT) {
-      return false;
-    }
-    const now = input.now ?? new Date();
-    if (input.expiresAt != null) {
-      const expiresAt =
-        input.expiresAt instanceof Date
-          ? input.expiresAt
-          : new Date(input.expiresAt);
-      if (expiresAt.getTime() <= now.getTime()) {
-        return false;
-      }
-    }
-    const hasActiveAttempt = input.payments.some((payment) => {
-      if (
-        payment.status !== PaymentStatus.PENDING &&
-        payment.status !== PaymentStatus.INITIATED
-      ) {
-        return false;
-      }
-      if (payment.expiresAt == null) {
-        return true;
-      }
-      const attemptExpires =
-        payment.expiresAt instanceof Date
-          ? payment.expiresAt
-          : new Date(payment.expiresAt);
-      return attemptExpires.getTime() > now.getTime();
-    });
-    return !hasActiveAttempt;
+    return computePaymentRetryEligible(input);
   }
 
   /**
