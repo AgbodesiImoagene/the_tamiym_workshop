@@ -163,6 +163,15 @@ enum ModerationAppealStatus {
   ESCALATED
 }
 
+/// TTW-030 organiser onboarding application lifecycle.
+enum OrganizerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+
 /// Lifecycle status for a media asset ingestion job.
 enum MediaAssetStatus {
   PENDING
@@ -484,6 +493,8 @@ model User {
   oauthAccounts        UserOAuthAccount[]
   adminMfaCredential   AdminMfaCredential?
   privacyRequests      PrivacyRequest[]
+  organizerApplications OrganizerApplication[] @relation("OrganizerApplicationApplicant")
+  organizerApplicationsReviewed OrganizerApplication[] @relation("OrganizerApplicationReviewer")
 
   @@index([email])
   @@index([role])
@@ -1488,6 +1499,43 @@ model ModerationAppeal {
   @@index([status, createdAt])
   @@map("moderation_appeals")
 }
+
+/// TTW-030: admin-reviewed organiser onboarding application (immutable terminal decisions).
+/// Organiser onboarding applications (TTW-030).
+/// SQL partial unique index `organizer_applications_one_pending_per_user`
+/// enforces at most one PENDING row per userId (see migration); Prisma cannot
+/// express partial unique indexes in schema, so the constraint lives in SQL.
+model OrganizerApplication {
+  id     String                     @id @default(cuid())
+  userId String
+  user   User                       @relation("OrganizerApplicationApplicant", fields: [userId], references: [id], onDelete: Restrict)
+
+  organisationName String
+  intendedUse      String
+  termsVersion     String
+  termsAcceptedAt  DateTime
+
+  status OrganizerApplicationStatus @default(PENDING)
+
+  reviewedByUserId String?
+  reviewedBy       User?    @relation("OrganizerApplicationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+
+  /// Customer-safe rejection / decision copy only (never internal notes).
+  customerVisibleReason String?
+  /// Admin-only notes; never returned on customer endpoints.
+  internalNotes         String?
+
+  policyVersion String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("organizer_applications")
+}
+
 
 /// Media derivatives for an asset (original, display, thumb).
 model MediaDerivative {

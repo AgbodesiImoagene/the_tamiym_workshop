@@ -17,6 +17,9 @@ describe('AdminUsersService', () => {
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
+  let organizerApplications: {
+    ensureApprovedApplicationForOverride: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -33,12 +36,18 @@ describe('AdminUsersService', () => {
       ),
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    organizerApplications = {
+      ensureApprovedApplicationForOverride: jest
+        .fn()
+        .mockResolvedValue(undefined),
+    };
     service = new AdminUsersService(
       prisma as never,
       audit as never,
       {
         resetMfaForUser: jest.fn().mockResolvedValue({ reset: true }),
       } as never,
+      organizerApplications as never,
     );
   });
 
@@ -138,6 +147,7 @@ describe('AdminUsersService', () => {
       prisma as never,
       audit as never,
       adminMfa as never,
+      organizerApplications as never,
     );
     await expect(
       svc.resetUserMfa('actor', UserRole.ADMIN, 'target'),
@@ -146,6 +156,50 @@ describe('AdminUsersService', () => {
       'actor',
       UserRole.ADMIN,
       'target',
+    );
+  });
+
+  it('setUserRole CUSTOMER→ORGANIZER calls ensureApprovedApplicationForOverride', async () => {
+    const before = {
+      id: 'u3',
+      email: 'c@x.com',
+      firstName: 'C',
+      lastName: 'D',
+      role: UserRole.CUSTOMER,
+      status: UserStatus.ACTIVE,
+      createdAt: new Date(),
+      emailVerifiedAt: new Date(),
+    };
+    const after = { ...before, role: UserRole.ORGANIZER };
+    prisma.user.findFirst.mockResolvedValue(before);
+    prisma.user.update.mockResolvedValue(after);
+
+    const result = await service.setUserRole(
+      'admin-1',
+      UserRole.ADMIN,
+      'u3',
+      UserRole.ORGANIZER,
+      'Manual promotion after offline KYC review call.',
+    );
+
+    expect(result.role).toBe(UserRole.ORGANIZER);
+    expect(
+      organizerApplications.ensureApprovedApplicationForOverride,
+    ).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        actorUserId: 'admin-1',
+        targetUserId: 'u3',
+        reason: 'Manual promotion after offline KYC review call.',
+      }),
+    );
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'admin.user.role_updated',
+        note: 'Admin CUSTOMER→ORGANIZER override',
+        before: { role: UserRole.CUSTOMER },
+        after: { role: UserRole.ORGANIZER },
+      }),
     );
   });
 });

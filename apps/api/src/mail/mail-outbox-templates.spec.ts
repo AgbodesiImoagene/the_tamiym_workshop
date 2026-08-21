@@ -13,6 +13,8 @@ import {
   OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED,
   OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED,
   OUTBOX_EVENT_ADMIN_OPERATIONAL,
+  OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED,
+  OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED,
 } from './mail-outbox-templates';
 
 describe('resolveOutboxMail', () => {
@@ -211,6 +213,41 @@ describe('resolveOutboxMail', () => {
       template: 'admin-operational',
       subject: 'Ops alert',
       context: { subject: 'Ops alert', bodyHtml: '<p>Details</p>' },
+    });
+  });
+
+  it('maps organiser application approved', () => {
+    const r = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED, {
+      firstName: 'Chioma',
+    });
+    expect(r).toEqual({
+      template: 'organizer-application-approved',
+      subject: 'Your organiser application was approved',
+      context: { firstName: 'Chioma' },
+    });
+  });
+
+  it('maps organiser application rejected with customer-visible reason', () => {
+    const r = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED, {
+      firstName: 'Chioma',
+      customerVisibleReason: 'Please clarify your intended use.',
+    });
+    expect(r).toEqual({
+      template: 'organizer-application-rejected',
+      subject: 'Update on your organiser application',
+      context: {
+        firstName: 'Chioma',
+        customerVisibleReason: 'Please clarify your intended use.',
+      },
+    });
+  });
+
+  it('defaults organiser rejection reason when missing', () => {
+    const r = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED, {
+      firstName: 'Chioma',
+    });
+    expect(r?.context).toMatchObject({
+      customerVisibleReason: 'Your application was not approved.',
     });
   });
 

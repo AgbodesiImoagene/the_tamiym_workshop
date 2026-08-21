@@ -1,7 +1,7 @@
 # TTW-030 — Add organiser onboarding and campaign entry
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys  
-**Status:** Not started  
+**Status:** In progress — slice 1 implemented  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-023  
 **Blocks:** TTW-035, TTW-042, TTW-053
@@ -78,6 +78,11 @@ Record product/legal/security owners, date, eligibility/terms/override decisions
 
 ## Implementation reviews
 
+### Slice 1 dual review (2026-08-21) — PASS
+
+- Security: PASS
+- Implementation: PASS after remediations (`5ff649a`) — typecheck, REJECTED reapply UI, override PENDING withdraw, diff coverage ≥80%.
+
 Record security and implementation iterations, transition/authorization findings, fixes, evidence, dimension verdicts, and overall verdict.
 
 ## Verification evidence
@@ -87,3 +92,41 @@ Record migration tests, exact unit/integration/Playwright commands, concurrent t
 ## Completion summary
 
 Summarize shipped eligibility and application flow, role/session migration, campaign entry, decisions/deviations, operational notes, PR, and TTW-035 handoff.
+
+## Design review (slice 1)
+
+**Date:** 2026-08-21  
+**Risk:** High  
+**Verdict:** Proceed with interim policy (formal legal sign-off deferred)
+
+### Decisions recorded
+
+| Topic             | Decision                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
+| Eligibility       | ACTIVE CUSTOMER + verified email + first/last name + phone                   |
+| Terms             | `organiser-terms/v1-interim-2026-08-21`                                      |
+| Policy            | `organiser-onboarding-policy/v1-interim-2026-08-21`                          |
+| Open applications | At most one PENDING per user (partial unique index)                          |
+| Withdraw          | Allowed while PENDING                                                        |
+| Reject            | Requires sanitized `customerVisibleReason`; reapply after REJECTED/WITHDRAWN |
+| Approve           | Atomic APPROVED + CUSTOMER→ORGANIZER + session revoke + audit + outbox       |
+| Reviewer          | ADMIN ≠ applicant                                                            |
+| Override          | CUSTOMER→ORGANIZER requires reason + equivalent APPROVED application         |
+| Bank details      | Deferred (TTW-042)                                                           |
+| Campaign entry    | Approved ORGANIZER can create DRAFT via existing CampaignsService.create     |
+
+Policy doc: `docs/organiser/ttw-030-interim-policy.md`
+
+### Deferred
+
+- Full Playwright customer→admin→DRAFT journey (API e2e covers path)
+- Formal legal / trust-and-safety sign-off on terms copy
+- Payout KYC (TTW-042)
+
+## Implementation notes (slice 1)
+
+- Module: `apps/api/src/organizer`
+- Customer routes: `/v1/organiser/applications/*`
+- Admin routes: `/v1/admin/organiser/applications/*`
+- Migration: `20260821010000_ttw030_organiser_applications`
+- Customer app: fundraiser dashboard onboarding + draft create CTA

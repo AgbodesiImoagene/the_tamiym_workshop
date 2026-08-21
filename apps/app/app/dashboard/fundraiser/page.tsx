@@ -5,6 +5,12 @@ import { authApi, ApiError, User } from '@/lib/auth';
 import { getCustomerCampaigns } from '@/lib/dashboard';
 import { createPayoutProfile, getBanks, getPayoutProfiles } from '@/lib/fundraising';
 import {
+  createDraftCampaign,
+  getOrganizerEligibility,
+  submitOrganizerApplication,
+  withdrawOrganizerApplication,
+} from '@/lib/organizer';
+import {
   Card,
   CardContent,
   CardHeader,
@@ -39,6 +45,10 @@ export default function DashboardFundraiserPage() {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
+  const [organisationName, setOrganisationName] = useState('');
+  const [intendedUse, setIntendedUse] = useState('');
+  const [draftTitle, setDraftTitle] = useState('');
 
   const payoutForm = useForm<PayoutFormValues>({
     defaultValues: {
@@ -66,6 +76,51 @@ export default function DashboardFundraiserPage() {
 
     void fetchUser();
   }, [router]);
+
+  const eligibilityQuery = useQuery({
+    queryKey: ['organizer-eligibility'],
+    queryFn: getOrganizerEligibility,
+    enabled: !!user,
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: submitOrganizerApplication,
+    onSuccess: async () => {
+      setApplyMessage('Application submitted. We will review it shortly.');
+      setOrganisationName('');
+      setIntendedUse('');
+      await queryClient.invalidateQueries({ queryKey: ['organizer-eligibility'] });
+    },
+    onError: (mutationError) => {
+      const apiError = mutationError as ApiError;
+      setApplyMessage(apiError.message || 'Could not submit application.');
+    },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: withdrawOrganizerApplication,
+    onSuccess: async () => {
+      setApplyMessage('Application withdrawn.');
+      await queryClient.invalidateQueries({ queryKey: ['organizer-eligibility'] });
+    },
+    onError: (mutationError) => {
+      const apiError = mutationError as ApiError;
+      setApplyMessage(apiError.message || 'Could not withdraw application.');
+    },
+  });
+
+  const draftMutation = useMutation({
+    mutationFn: createDraftCampaign,
+    onSuccess: async () => {
+      setDraftTitle('');
+      setApplyMessage('Draft fundraiser created.');
+      await queryClient.invalidateQueries({ queryKey: ['customer-campaigns-fundraiser'] });
+    },
+    onError: (mutationError) => {
+      const apiError = mutationError as ApiError;
+      setApplyMessage(apiError.message || 'Could not create draft fundraiser.');
+    },
+  });
 
   const campaignsQuery = useQuery({
     queryKey: ['customer-campaigns-fundraiser'],
@@ -131,6 +186,156 @@ export default function DashboardFundraiserPage() {
             disbursements.
           </p>
         </div>
+
+        <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
+          <h2 className="text-[24px] font-bold text-black/90">Organiser access</h2>
+          <p className="mt-2 text-sm text-black/65">
+            Apply to create fundraisers. Bank payout setup remains available after approval.
+          </p>
+
+          {eligibilityQuery.isLoading ? (
+            <p className="mt-4 text-sm text-muted-foreground">Checking eligibility...</p>
+          ) : eligibilityQuery.isError ? (
+            <p className="mt-4 text-sm text-red-700">We could not load organiser eligibility.</p>
+          ) : eligibilityQuery.data?.isOrganizer ||
+            eligibilityQuery.data?.latestApplication?.status === 'APPROVED' ? (
+            <div className="mt-5 space-y-4">
+              <p className="rounded-2xl bg-[#e8f8ee] px-4 py-4 text-sm text-[#0b5c2e]">
+                You are approved to create fundraisers.
+              </p>
+              <form
+                className="flex flex-col gap-3 sm:flex-row"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setApplyMessage(null);
+                  if (!draftTitle.trim()) return;
+                  void draftMutation.mutateAsync({
+                    title: draftTitle.trim(),
+                    description: 'Draft fundraiser created from the customer dashboard.',
+                  });
+                }}
+              >
+                <input
+                  className="h-12 flex-1 rounded-xl border border-black/20 px-4 text-sm outline-none"
+                  placeholder="Draft fundraiser title"
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={draftMutation.isPending}
+                  className="h-12 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
+                >
+                  {draftMutation.isPending ? 'Creating...' : 'Create draft fundraiser'}
+                </button>
+              </form>
+            </div>
+          ) : eligibilityQuery.data?.pendingApplication ? (
+            <div className="mt-5 space-y-4">
+              <p className="rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                Your application is pending review.
+              </p>
+              <button
+                type="button"
+                disabled={withdrawMutation.isPending}
+                onClick={() => {
+                  setApplyMessage(null);
+                  void withdrawMutation.mutateAsync(eligibilityQuery.data!.pendingApplication!.id);
+                }}
+                className="h-10 rounded-lg border border-black/40 px-4 text-sm font-semibold text-black/80 disabled:opacity-60"
+              >
+                {withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw application'}
+              </button>
+            </div>
+          ) : !eligibilityQuery.data?.eligible &&
+            eligibilityQuery.data?.latestApplication?.status !== 'REJECTED' &&
+            eligibilityQuery.data?.latestApplication?.status !== 'WITHDRAWN' ? (
+            <div className="mt-5 space-y-2 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+              <p>Complete these steps before applying:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                {(eligibilityQuery.data?.actionableGuidance ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-4">
+              {eligibilityQuery.data?.latestApplication?.status === 'REJECTED' ? (
+                <>
+                  <p className="rounded-2xl bg-[#fdecec] px-4 py-4 text-sm text-[#8a1f1f]">
+                    {eligibilityQuery.data.latestApplication.customerVisibleReason ||
+                      'Your application was not approved.'}
+                  </p>
+                  {eligibilityQuery.data.eligible ? (
+                    <p className="text-sm text-black/65">
+                      You can update your details and apply again.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                      <p>Complete these steps before applying again:</p>
+                      <ul className="list-disc space-y-1 pl-5">
+                        {(eligibilityQuery.data?.actionableGuidance ?? []).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : null}
+              {eligibilityQuery.data?.latestApplication?.status === 'WITHDRAWN' &&
+              eligibilityQuery.data.eligible ? (
+                <p className="rounded-2xl bg-[#fff4d6] px-4 py-4 text-sm text-[#7a5a00]">
+                  Your previous application was withdrawn. You can apply again.
+                </p>
+              ) : null}
+              {eligibilityQuery.data?.eligible ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setApplyMessage(null);
+                    void applyMutation.mutateAsync({
+                      organisationName: organisationName.trim(),
+                      intendedUse: intendedUse.trim(),
+                      termsVersion: eligibilityQuery.data!.termsVersion,
+                      termsAcceptedAt: new Date().toISOString(),
+                    });
+                  }}
+                >
+                  <input
+                    className="h-12 w-full rounded-xl border border-black/20 px-4 text-sm outline-none"
+                    placeholder="Organisation name"
+                    value={organisationName}
+                    onChange={(event) => setOrganisationName(event.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={120}
+                  />
+                  <textarea
+                    className="min-h-28 w-full rounded-xl border border-black/20 px-4 py-3 text-sm outline-none"
+                    placeholder="How do you intend to use fundraising on Tamiym?"
+                    value={intendedUse}
+                    onChange={(event) => setIntendedUse(event.target.value)}
+                    required
+                    minLength={20}
+                    maxLength={2000}
+                  />
+                  <p className="text-xs text-black/55">
+                    By applying you accept organiser terms ({eligibilityQuery.data?.termsVersion}).
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={applyMutation.isPending}
+                    className="h-10 rounded-lg border border-black/50 bg-accent px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
+                  >
+                    {applyMutation.isPending ? 'Submitting...' : 'Submit application'}
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          )}
+          {applyMessage ? <p className="mt-3 text-sm text-black/70">{applyMessage}</p> : null}
+        </section>
 
         <section className="grid gap-6 md:grid-cols-3">
           <div className="rounded-[28px] border border-black/15 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.12)]">
