@@ -93,6 +93,10 @@ Add web-owned checkout and order-confirmation routes. Authenticated, verified cu
 
 ## Implementation reviews
 
+### Slice 1 dual review — PASS after remediations
+
+- Security + implementation: remediations for cart clear scoping, bounded poll, address re-upsert.
+
 _Pending independent implementation + security review after commit._
 
 ## Verification evidence
