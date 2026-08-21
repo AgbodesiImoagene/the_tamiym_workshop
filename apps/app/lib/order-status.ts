@@ -12,7 +12,7 @@ export interface OrderStatusPresentation {
  */
 export function getOrderStatusPresentation(
   paymentStatus?: PaymentStatus,
-  orderStatus?: OrderStatus,
+  orderStatus?: OrderStatus
 ): OrderStatusPresentation {
   if (paymentStatus === PaymentStatus.SUCCEEDED) {
     if (orderStatus === OrderStatus.DELIVERED) {

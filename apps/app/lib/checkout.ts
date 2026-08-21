@@ -100,10 +100,7 @@ export interface CustomerOrderDetail {
   shipmentPlaceholder?: string | null;
 }
 
-export async function quoteOrder(input: {
-  shippingAddressId: string;
-  items: QuoteLineItem[];
-}) {
+export async function quoteOrder(input: { shippingAddressId: string; items: QuoteLineItem[] }) {
   return apiClient.post<OrderQuote>('/orders/quote', input);
 }
 

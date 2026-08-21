@@ -41,8 +41,7 @@ export default function DashboardOrderDetailPage() {
     enabled: !!user && typeof params.id === 'string',
     refetchInterval: (query) => {
       const paymentStatus = query.state.data?.paymentStatus;
-      return paymentStatus === PaymentStatus.PENDING ||
-        paymentStatus === PaymentStatus.INITIATED
+      return paymentStatus === PaymentStatus.PENDING || paymentStatus === PaymentStatus.INITIATED
         ? 5000
         : false;
     },
@@ -108,10 +107,7 @@ export default function DashboardOrderDetailPage() {
         ) : order ? (
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section className="space-y-6 rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
-              <OrderStatusBanner
-                paymentStatus={order.paymentStatus}
-                orderStatus={order.status}
-              />
+              <OrderStatusBanner paymentStatus={order.paymentStatus} orderStatus={order.status} />
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-[#f8fbff] p-4">
@@ -151,10 +147,7 @@ export default function DashboardOrderDetailPage() {
               <div className="space-y-3">
                 <h2 className="text-xl font-bold text-black/90">Items</h2>
                 {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-black/10 p-4"
-                  >
+                  <div key={item.id} className="rounded-2xl border border-black/10 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-semibold text-black">{item.productNameSnapshot}</p>
@@ -215,9 +208,7 @@ export default function DashboardOrderDetailPage() {
                     >
                       <div>
                         <p className="font-semibold">{refund.status.replaceAll('_', ' ')}</p>
-                        {refund.reason ? (
-                          <p className="text-black/60">{refund.reason}</p>
-                        ) : null}
+                        {refund.reason ? <p className="text-black/60">{refund.reason}</p> : null}
                       </div>
                       <p className="font-semibold">
                         {formatCurrency(refund.amount, refund.currency)}

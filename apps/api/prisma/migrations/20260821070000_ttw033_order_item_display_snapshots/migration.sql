@@ -18,6 +18,7 @@ ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "snapshotSource" "OrderItemSn
 ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "snapshotVersion" INTEGER NOT NULL DEFAULT 1;
 
 -- Backfill from current catalogue. Marked BACKFILLED_CURRENT_CATALOG — not historical evidence.
+-- Postgres forbids referencing the UPDATE target alias in JOIN ON of FROM; use WHERE joins.
 UPDATE "order_items" AS oi
 SET
   "productNameSnapshot" = COALESCE(p.name, 'Unknown product'),
@@ -48,9 +49,9 @@ SET
   ),
   "snapshotSource" = 'BACKFILLED_CURRENT_CATALOG'::"OrderItemSnapshotSource",
   "snapshotVersion" = 1
-FROM products p
-JOIN product_variants pv ON pv.id = oi."variantId"
+FROM products p, product_variants pv
 WHERE p.id = oi."productId"
+  AND pv.id = oi."variantId"
   AND (
     oi."productNameSnapshot" IS NULL
     OR oi."variantDisplaySnapshot" IS NULL
