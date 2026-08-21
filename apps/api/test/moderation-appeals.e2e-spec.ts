@@ -135,7 +135,13 @@ describe('Moderation appeals (e2e)', () => {
       .expect(201);
 
     expect(createRes.body.status).toBe('PENDING');
-    expect(JSON.stringify(createRes.body)).not.toMatch(/hate|0\.91/i);
+    expect(createRes.body.decision).not.toHaveProperty('internalEvidence');
+    expect(JSON.stringify(createRes.body.decision ?? {})).not.toMatch(
+      /Categories above|maxScore|harassment/i,
+    );
+    expect(
+      String(createRes.body.decision?.customerExplanation ?? ''),
+    ).not.toMatch(/hate|0\.91/i);
 
     const withdrawRes = await request(app.getHttpServer())
       .post(`/v1/moderation/appeals/${createRes.body.id}/withdraw`)

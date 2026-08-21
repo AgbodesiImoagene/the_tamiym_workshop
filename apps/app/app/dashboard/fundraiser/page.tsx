@@ -155,7 +155,6 @@ export default function DashboardFundraiserPage() {
     },
   });
 
-
   const totalRaised = useMemo(
     () =>
       (campaignsQuery.data ?? []).reduce((sum, campaign) => sum + (campaign.currentAmount ?? 0), 0),
@@ -187,7 +186,6 @@ export default function DashboardFundraiserPage() {
             disbursements.
           </p>
         </div>
-
 
         <section className="rounded-[32px] border border-black/20 bg-white p-6 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
           <h2 className="text-[24px] font-bold text-black/90">Organiser access</h2>
@@ -242,9 +240,7 @@ export default function DashboardFundraiserPage() {
                 disabled={withdrawMutation.isPending}
                 onClick={() => {
                   setApplyMessage(null);
-                  void withdrawMutation.mutateAsync(
-                    eligibilityQuery.data!.pendingApplication!.id,
-                  );
+                  void withdrawMutation.mutateAsync(eligibilityQuery.data!.pendingApplication!.id);
                 }}
                 className="h-10 rounded-lg border border-black/40 px-4 text-sm font-semibold text-black/80 disabled:opacity-60"
               >

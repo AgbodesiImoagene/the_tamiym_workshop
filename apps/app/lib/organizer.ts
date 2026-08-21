@@ -9,11 +9,7 @@ export type OrganizerEligibilityGap =
   | 'MISSING_PHONE'
   | 'ALREADY_ORGANIZER';
 
-export type OrganizerApplicationStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'WITHDRAWN';
+export type OrganizerApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
 
 export interface OrganizerApplication {
   id: string;
@@ -45,29 +41,17 @@ export interface SubmitOrganizerApplicationInput {
 }
 
 export async function getOrganizerEligibility() {
-  return apiClient.get<OrganizerEligibilityResponse>(
-    '/organiser/applications/eligibility',
-  );
+  return apiClient.get<OrganizerEligibilityResponse>('/organiser/applications/eligibility');
 }
 
-export async function submitOrganizerApplication(
-  input: SubmitOrganizerApplicationInput,
-) {
+export async function submitOrganizerApplication(input: SubmitOrganizerApplicationInput) {
   return apiClient.post<OrganizerApplication>('/organiser/applications', input);
 }
 
 export async function withdrawOrganizerApplication(applicationId: string) {
-  return apiClient.post<OrganizerApplication>(
-    `/organiser/applications/${applicationId}/withdraw`,
-  );
+  return apiClient.post<OrganizerApplication>(`/organiser/applications/${applicationId}/withdraw`);
 }
 
-export async function createDraftCampaign(input: {
-  title: string;
-  description?: string;
-}) {
-  return apiClient.post<{ id: string; status: string; title: string }>(
-    '/campaigns',
-    input,
-  );
+export async function createDraftCampaign(input: { title: string; description?: string }) {
+  return apiClient.post<{ id: string; status: string; title: string }>('/campaigns', input);
 }
