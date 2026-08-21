@@ -97,6 +97,7 @@ describe('CampaignsService', () => {
     mockPrisma.campaignProductPrice = { create: jest.fn() };
     const mockPricingService = {
       getMinCampaignProductPrice: jest.fn().mockResolvedValue(0),
+      buildPublicCampaignOffers: jest.fn().mockReturnValue([]),
     };
     const mockAuditService = {
       log: jest.fn().mockResolvedValue(undefined),
@@ -260,22 +261,45 @@ describe('CampaignsService', () => {
   // -------------------------------------------------------------------------
 
   describe('getBySlug', () => {
-    it('returns active campaign with performance snapshot', async () => {
+    it('returns active campaign with performance snapshot and empty offers', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         status: CampaignStatus.ACTIVE,
-        organizer: {},
+        organizer: { firstName: 'Ada', lastName: 'Okeke' },
         products: [],
       });
+      pricingService.buildPublicCampaignOffers = jest.fn().mockReturnValue([]);
 
       const result = await service.getBySlug('school-fundraiser');
       expect(result.performance).toBeDefined();
       expect(result.performance.currentAmount).toBe(0);
+      expect(result.offerPolicyVersion).toBe(
+        'public-campaign-offer/v1-interim-2026-08-21',
+      );
+      expect(result.products).toEqual([]);
+      expect(result.organizer).toEqual({
+        firstName: 'Ada',
+        lastName: 'Okeke',
+      });
+      expect(JSON.stringify(result)).not.toMatch(/moderationNotes|sku/i);
     });
 
     it('throws NotFoundException when not found', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.getBySlug('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException when campaign has not started yet', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ACTIVE,
+        startDate: new Date(Date.now() + 60_000),
+        organizer: {},
+        products: [],
+      });
+      await expect(service.getBySlug('school-fundraiser')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -304,6 +328,49 @@ describe('CampaignsService', () => {
       );
       expect(auditService.log).toHaveBeenCalled();
       expect(adminNotifyService.emit).toHaveBeenCalled();
+    });
+
+    it('maps sellable offers through PricingService and omits disclosure-sensitive fields', async () => {
+      const offer = {
+        campaignProductId: 'cp-1',
+        productId: 'prod-1',
+        product: {
+          id: 'prod-1',
+          name: 'Tee',
+          slug: 'tee',
+          description: null,
+        },
+        design: { id: 'd-1', name: 'Crest', thumbnailUrl: null },
+        baseAmountMinor: 500_000,
+        currency: 'NGN',
+        priceDisclosure: 'before discounts, shipping and VAT',
+        options: [],
+        variants: [
+          {
+            id: 'var-1',
+            optionValueIds: [],
+            optionValueCodes: [],
+            available: true,
+            unitAmountMinor: 500_000,
+            currency: 'NGN',
+          },
+        ],
+      };
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ACTIVE,
+        organizer: { firstName: 'Ada', lastName: null },
+        products: [{ id: 'cp-1' }],
+      });
+      pricingService.buildPublicCampaignOffers = jest
+        .fn()
+        .mockReturnValue([offer]);
+
+      const result = await service.getBySlug('school-fundraiser');
+      expect(pricingService.buildPublicCampaignOffers).toHaveBeenCalled();
+      expect(result.products).toEqual([offer]);
+      expect(result).not.toHaveProperty('moderationNotes');
+      expect(result).not.toHaveProperty('moderationStatus');
     });
   });
 

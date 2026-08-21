@@ -24,6 +24,7 @@ import {
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
 import { PricingService } from '../pricing/pricing.service';
+import { PUBLIC_CAMPAIGN_OFFER_POLICY_VERSION } from '../pricing/campaign-line-price';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../generated/prisma/enums';
 import type { UserRole } from '../generated/prisma/client';
@@ -413,14 +414,16 @@ export class CampaignsService {
   }
 
   /**
-   * Get campaign by slug (public, read-only). Performance snapshot: currentAmount, goalAmount, etc.
+   * Get campaign by slug (public, read-only).
+   * Returns a disclosure-safe payload with sellable offers (TTW-031).
    */
   async getBySlug(slug: string) {
+    const currency = DEFAULT_CURRENCY;
     const campaign = await this.prisma.campaign.findUnique({
       where: { slug, status: CampaignStatus.ACTIVE },
       include: {
         organizer: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { firstName: true, lastName: true },
         },
         products: {
           include: {
@@ -430,10 +433,54 @@ export class CampaignsService {
                 name: true,
                 slug: true,
                 description: true,
+                status: true,
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    values: { orderBy: { sortOrder: 'asc' } },
+                  },
+                },
+                variants: {
+                  include: {
+                    inventory: {
+                      select: {
+                        trackInventory: true,
+                        stockOnHand: true,
+                        reserved: true,
+                      },
+                    },
+                    optionValues: {
+                      include: {
+                        option: {
+                          select: { id: true, code: true, sortOrder: true },
+                        },
+                        optionValue: {
+                          select: {
+                            id: true,
+                            valueCode: true,
+                            displayName: true,
+                            sortOrder: true,
+                            upcharges: {
+                              where: { currency: currency as never },
+                              take: 1,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
-            design: { select: { id: true, name: true, thumbnailUrl: true } },
-            prices: { where: { currency: DEFAULT_CURRENCY } },
+            design: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+                moderationStatus: true,
+              },
+            },
+            prices: { where: { currency: currency as never } },
           },
         },
       },
@@ -441,17 +488,45 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
-    if (this.isCampaignExpired(campaign.endDate)) {
-      await this.transitionCampaignToEnded(campaign, new Date());
+    const now = new Date();
+    if (campaign.startDate && campaign.startDate.getTime() > now.getTime()) {
       throw new NotFoundException('Campaign not found');
     }
+    if (this.isCampaignExpired(campaign.endDate, now)) {
+      await this.transitionCampaignToEnded(campaign, now);
+      throw new NotFoundException('Campaign not found');
+    }
+
+    const products = this.pricingService.buildPublicCampaignOffers(
+      campaign.products,
+      campaign.currency ?? currency,
+    );
+
     return {
-      ...campaign,
+      id: campaign.id,
+      title: campaign.title,
+      slug: campaign.slug,
+      description: campaign.description,
+      story: campaign.story,
+      status: campaign.status,
+      goalAmount: campaign.goalAmount ? Number(campaign.goalAmount) : null,
+      currentAmount: Number(campaign.currentAmount),
+      currency: campaign.currency,
+      startDate: campaign.startDate,
+      endDate: campaign.endDate,
+      organizer: campaign.organizer
+        ? {
+            firstName: campaign.organizer.firstName,
+            lastName: campaign.organizer.lastName,
+          }
+        : null,
       performance: {
         currentAmount: Number(campaign.currentAmount),
         goalAmount: campaign.goalAmount ? Number(campaign.goalAmount) : null,
         currency: campaign.currency,
       },
+      offerPolicyVersion: PUBLIC_CAMPAIGN_OFFER_POLICY_VERSION,
+      products,
     };
   }
 

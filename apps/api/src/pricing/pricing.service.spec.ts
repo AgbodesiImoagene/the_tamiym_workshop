@@ -412,4 +412,217 @@ describe('PricingService', () => {
       expect(result).toBe(5000);
     });
   });
+
+  describe('buildPublicCampaignOffers', () => {
+    const baseSource = {
+      id: 'cp-1',
+      productId: 'prod-1',
+      designId: 'design-1',
+      product: {
+        id: 'prod-1',
+        name: 'Tee',
+        slug: 'tee',
+        description: 'A tee',
+        status: 'ACTIVE' as const,
+        options: [
+          {
+            id: 'opt-size',
+            code: 'size',
+            name: 'Size',
+            sortOrder: 0,
+            values: [
+              {
+                id: 'ov-s',
+                valueCode: 'S',
+                displayName: 'Small',
+                sortOrder: 0,
+                metadata: null,
+              },
+              {
+                id: 'ov-xl',
+                valueCode: 'XL',
+                displayName: 'XL',
+                sortOrder: 1,
+                metadata: null,
+              },
+            ],
+          },
+        ],
+        variants: [
+          {
+            id: 'var-s',
+            isAvailable: true,
+            inventory: {
+              trackInventory: true,
+              stockOnHand: 5,
+              reserved: 0,
+            },
+            optionValues: [
+              {
+                optionId: 'opt-size',
+                optionValueId: 'ov-s',
+                option: { id: 'opt-size', code: 'size', sortOrder: 0 },
+                optionValue: {
+                  id: 'ov-s',
+                  valueCode: 'S',
+                  displayName: 'Small',
+                  sortOrder: 0,
+                  upcharges: [],
+                },
+              },
+            ],
+          },
+          {
+            id: 'var-xl',
+            isAvailable: true,
+            inventory: {
+              trackInventory: true,
+              stockOnHand: 2,
+              reserved: 0,
+            },
+            optionValues: [
+              {
+                optionId: 'opt-size',
+                optionValueId: 'ov-xl',
+                option: { id: 'opt-size', code: 'size', sortOrder: 0 },
+                optionValue: {
+                  id: 'ov-xl',
+                  valueCode: 'XL',
+                  displayName: 'XL',
+                  sortOrder: 1,
+                  upcharges: [{ amount: 500 }],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      design: {
+        id: 'design-1',
+        name: 'Crest',
+        thumbnailUrl: 'https://cdn.example/crest.png',
+        moderationStatus: 'APPROVED' as const,
+      },
+      prices: [{ amount: 5000, currency: 'NGN' }],
+    };
+
+    it('builds offers with base+upcharge minor amounts matching quote pre-discount', async () => {
+      const offers = service.buildPublicCampaignOffers([baseSource], 'NGN');
+      expect(offers).toHaveLength(1);
+      expect(offers[0].baseAmountMinor).toBe(500_000);
+      expect(offers[0].variants).toHaveLength(2);
+      const xl = offers[0].variants.find((v) => v.id === 'var-xl')!;
+      expect(xl.unitAmountMinor).toBe(550_000);
+      expect(xl.available).toBe(true);
+      expect(JSON.stringify(offers)).not.toMatch(
+        /moderationNotes|sku|stockOnHand/i,
+      );
+
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 5000 }],
+      });
+      (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+        ...mockVariant,
+        id: 'var-xl',
+        optionValues: [
+          {
+            option: { name: 'Size', code: 'size' },
+            optionValue: {
+              displayName: 'XL',
+              valueCode: 'XL',
+              upcharges: [{ amount: 500 }],
+            },
+          },
+        ],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([]);
+
+      const quote = await service.quoteCampaign('user-1', 'camp-1', {
+        shippingAddressId: 'addr-1',
+        items: [
+          {
+            variantId: 'var-xl',
+            designId: 'design-1',
+            quantity: 1,
+          },
+        ],
+      });
+
+      const displayMajor = xl.unitAmountMinor / 100;
+      expect(
+        quote.items[0].unitBasePrice +
+          quote.items[0].pricingBreakdown.optionValueUpcharge,
+      ).toBe(displayMajor);
+      expect(quote.items[0].unitFinalPrice).toBe(displayMajor);
+    });
+
+    it('excludes non-ACTIVE product, unapproved design, unpriced, and fully unavailable offers', () => {
+      const inactive = {
+        ...baseSource,
+        id: 'cp-inactive',
+        product: { ...baseSource.product, status: 'DRAFT' as const },
+      };
+      const unapproved = {
+        ...baseSource,
+        id: 'cp-unapproved',
+        design: {
+          id: 'design-1',
+          name: 'Crest',
+          thumbnailUrl: 'https://cdn.example/crest.png',
+          moderationStatus: 'PENDING' as const,
+        },
+      };
+      const unpriced = {
+        ...baseSource,
+        id: 'cp-unpriced',
+        prices: [],
+      };
+      const unavailable = {
+        ...baseSource,
+        id: 'cp-oos',
+        product: {
+          ...baseSource.product,
+          variants: baseSource.product.variants.map((v) => ({
+            ...v,
+            isAvailable: false,
+          })),
+        },
+      };
+
+      const offers = service.buildPublicCampaignOffers(
+        [inactive, unapproved, unpriced, unavailable, baseSource],
+        'NGN',
+      );
+      expect(offers.map((o) => o.campaignProductId)).toEqual(['cp-1']);
+    });
+
+    it('marks tracked out-of-stock variants unavailable without exposing counts', () => {
+      const oos = {
+        ...baseSource,
+        product: {
+          ...baseSource.product,
+          variants: [
+            {
+              ...baseSource.product.variants[0],
+              inventory: {
+                trackInventory: true,
+                stockOnHand: 1,
+                reserved: 1,
+              },
+            },
+            baseSource.product.variants[1],
+          ],
+        },
+      };
+      const offers = service.buildPublicCampaignOffers([oos], 'NGN');
+      expect(offers[0].variants.find((v) => v.id === 'var-s')!.available).toBe(
+        false,
+      );
+      expect(offers[0].variants.find((v) => v.id === 'var-xl')!.available).toBe(
+        true,
+      );
+      expect(JSON.stringify(offers[0])).not.toMatch(/stockOnHand|reserved/);
+    });
+  });
 });
