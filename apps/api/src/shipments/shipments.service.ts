@@ -337,18 +337,22 @@ export class ShipmentsService {
         dto.privateNotes?.trim() ?? exceptionNotesInternal,
     };
 
-    if (nextStatus === ShipmentStatus.DISPATCHED) {
-      shipmentData.dispatchedAt = existing.dispatchedAt ?? occurredAt;
+    if (nextStatus === ShipmentStatus.DISPATCHED && !existing.dispatchedAt) {
+      shipmentData.dispatchedAt = occurredAt;
     } else if (
       !existing.dispatchedAt &&
       (nextStatus === ShipmentStatus.IN_TRANSIT ||
         nextStatus === ShipmentStatus.OUT_FOR_DELIVERY ||
-        nextStatus === ShipmentStatus.DELIVERED)
+        nextStatus === ShipmentStatus.DELIVERED) &&
+      existing.status !== nextStatus
     ) {
       shipmentData.dispatchedAt = occurredAt;
     }
 
-    if (nextStatus === ShipmentStatus.DELIVERED) {
+    if (
+      nextStatus === ShipmentStatus.DELIVERED &&
+      existing.status !== ShipmentStatus.DELIVERED
+    ) {
       shipmentData.deliveredAt = occurredAt;
     }
 

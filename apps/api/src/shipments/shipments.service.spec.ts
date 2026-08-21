@@ -424,6 +424,13 @@ describe('ShipmentsService', () => {
           }),
         }),
       );
+      expect(prisma.shipment.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            deliveredAt: expect.anything(),
+          }),
+        }),
+      );
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
     });
 
