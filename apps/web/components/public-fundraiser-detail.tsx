@@ -9,10 +9,14 @@ import { customerAppPath, webLoginWithNext, webRegisterWithNext } from '@/lib/si
 import type {
   FundraiserSelection,
   PublicFundraiser,
-  PublicFundraiserProduct,
-  PublicFundraiserVariant,
 } from '@/lib/fundraisers';
 import { minorToMajor } from '@/lib/fundraisers';
+import {
+  applyOptionValueSelection,
+  defaultOptionSelection,
+  findVariantForSelection,
+  isOptionValueSelectable,
+} from '@/lib/fundraiser-selection';
 
 function formatCurrency(amountMajor: number, currency: string) {
   return new Intl.NumberFormat('en-NG', {
@@ -20,56 +24,6 @@ function formatCurrency(amountMajor: number, currency: string) {
     currency,
     maximumFractionDigits: 0,
   }).format(amountMajor);
-}
-
-function variantKey(optionValueIds: string[]): string {
-  return [...optionValueIds].sort().join('|');
-}
-
-function findVariantForSelection(
-  product: PublicFundraiserProduct,
-  selectedByOptionId: Record<string, string>
-): PublicFundraiserVariant | null {
-  const selectedIds = product.options.map((opt) => selectedByOptionId[opt.id]).filter(Boolean);
-  if (selectedIds.length !== product.options.length) return null;
-  const key = variantKey(selectedIds);
-  return product.variants.find((v) => variantKey(v.optionValueIds) === key) ?? null;
-}
-
-function optionSelectionFromVariant(
-  product: PublicFundraiserProduct,
-  variant: PublicFundraiserVariant
-): Record<string, string> {
-  const next: Record<string, string> = {};
-  for (const opt of product.options) {
-    const match = variant.optionValueIds.find((id) => opt.values.some((v) => v.id === id));
-    if (match) next[opt.id] = match;
-  }
-  return next;
-}
-
-/** Prefer first fully available combination; fall back to first variant's values. */
-function defaultOptionSelection(product: PublicFundraiserProduct): Record<string, string> {
-  const available = product.variants.find((v) => v.available) ?? product.variants[0];
-  if (!available) return {};
-  return optionSelectionFromVariant(product, available);
-}
-
-function isOptionValueSelectable(
-  product: PublicFundraiserProduct,
-  optionId: string,
-  valueId: string,
-  selectedByOptionId: Record<string, string>
-): boolean {
-  const tentative = { ...selectedByOptionId, [optionId]: valueId };
-  return product.variants.some((variant) => {
-    if (!variant.available) return false;
-    return product.options.every((opt) => {
-      const selected = tentative[opt.id];
-      if (!selected) return true;
-      return variant.optionValueIds.includes(selected);
-    });
-  });
 }
 
 interface PublicFundraiserDetailProps {
@@ -161,21 +115,9 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
 
   function selectOptionValue(optionId: string, valueId: string) {
     if (!selected) return;
-    if (!isOptionValueSelectable(selected, optionId, valueId, selectedByOptionId)) {
-      return;
-    }
-    const tentative = { ...selectedByOptionId, [optionId]: valueId };
-    const exact = findVariantForSelection(selected, tentative);
-    if (exact?.available) {
-      setSelectedByOptionId(optionSelectionFromVariant(selected, exact));
-      return;
-    }
-    const fallback = selected.variants.find(
-      (v) => v.available && v.optionValueIds.includes(valueId)
+    setSelectedByOptionId((prev) =>
+      applyOptionValueSelection(selected, prev, optionId, valueId)
     );
-    if (fallback) {
-      setSelectedByOptionId(optionSelectionFromVariant(selected, fallback));
-    }
   }
 
   async function copyShareLink() {
@@ -335,12 +277,7 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
                       <div className="flex flex-wrap gap-2" role="group" aria-label={option.name}>
                         {option.values.map((value) => {
                           const selectedValue = selectedByOptionId[option.id] === value.id;
-                          const selectable = isOptionValueSelectable(
-                            selected,
-                            option.id,
-                            value.id,
-                            selectedByOptionId
-                          );
+                          const selectable = isOptionValueSelectable(selected, value.id);
                           const hex =
                             typeof value.metadata?.hex === 'string' ? value.metadata.hex : null;
                           if (isColorish && hex) {

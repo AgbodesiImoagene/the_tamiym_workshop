@@ -92,6 +92,11 @@ Replace placeholders with option-driven controls that resolve only valid variant
 
 ## Implementation reviews
 
+### Slice 1 dual review — PASS after remediations
+
+- Security/privacy: PASS
+- Implementation: PASS after sparse-matrix selectability fix (`fundraiser-selection.ts`)
+
 _Pending independent implementation + security review after commit._
 
 ## Verification evidence
