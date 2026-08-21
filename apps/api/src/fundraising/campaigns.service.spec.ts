@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   NotFoundException,
-  ForbiddenException,
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
@@ -230,10 +229,10 @@ describe('CampaignsService', () => {
       );
     });
 
-    it('throws ForbiddenException when user does not own campaign', async () => {
+    it('throws NotFoundException when user does not own campaign', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
       await expect(service.findOne('other-user', 'camp-1')).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
       );
     });
   });
@@ -491,14 +490,14 @@ describe('CampaignsService', () => {
       );
     });
 
-    it('throws ForbiddenException when organiser does not own the campaign', async () => {
+    it('throws NotFoundException when organiser does not own the campaign', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         products: [],
       });
       await expect(
         service.submitForReview('camp-1', 'other-user'),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('returns interim blocker when no offers', async () => {
@@ -509,6 +508,26 @@ describe('CampaignsService', () => {
       await expect(service.submitForReview('camp-1', 'user-1')).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('blocks submit when offer price is below the live floor', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        products: [
+          {
+            productId: 'prod-1',
+            designId: 'design-1',
+            prices: [{ currency: 'NGN', amount: 100 }],
+          },
+        ],
+      });
+      (
+        pricingService.getMinCampaignProductPrice as jest.Mock
+      ).mockResolvedValue(5000);
+      await expect(service.submitForReview('camp-1', 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(pricingService.getMinCampaignProductPrice).toHaveBeenCalled();
     });
   });
 

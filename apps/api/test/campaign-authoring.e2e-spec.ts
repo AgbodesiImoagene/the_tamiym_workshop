@@ -115,7 +115,7 @@ describe('Campaign authoring (e2e)', () => {
       .patch(`/v1/campaigns/${campaign.id}`)
       .set('Authorization', `Bearer ${other.accessToken}`)
       .send({ expectedRevision: 1, title: 'Hijack' })
-      .expect(403);
+      .expect(404);
 
     await request(app.getHttpServer())
       .patch(`/v1/campaigns/${campaign.id}`)
@@ -129,20 +129,12 @@ describe('Campaign authoring (e2e)', () => {
       .send({ expectedRevision: 1, title: 'Stale save' })
       .expect(409);
 
-    expect(stale.body.code || stale.body.message).toBeTruthy();
-    const bodyCode =
-      typeof stale.body === 'object' && stale.body !== null
-        ? (stale.body.code ?? stale.body.message?.code)
-        : undefined;
-    // Nest may nest code under message object depending on exception filter.
     const code =
-      bodyCode ??
-      (typeof stale.body.message === 'object'
+      stale.body?.code ??
+      (typeof stale.body?.message === 'object'
         ? stale.body.message?.code
         : undefined);
-    expect(code === 'CAMPAIGN_STALE_REVISION' || stale.status === 409).toBe(
-      true,
-    );
+    expect(code).toBe('CAMPAIGN_STALE_REVISION');
   });
 
   it('adds offer atomically with floor check and rolls back on below-floor', async () => {

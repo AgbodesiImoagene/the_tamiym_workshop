@@ -12,7 +12,7 @@ This matrix is the working source of truth for owned DRAFT campaign authoring, o
 | Actor      | Active `ORGANIZER` (or `ADMIN` acting as themselves via organiser routes)                |
 | Ownership  | Campaign `organizerId` must equal authenticated user id; no client-supplied organiser id |
 | Mutability | Basics and offers: `DRAFT` only                                                          |
-| Foreign    | Another user’s campaign → 403/404 per existing ownership pattern; never mutate           |
+| Foreign    | Another user’s campaign → same `404 Campaign not found` as missing; never mutate         |
 
 ## Explicit save + draft revision
 
@@ -48,22 +48,23 @@ This matrix is the working source of truth for owned DRAFT campaign authoring, o
 
 ## Owner detail + draft preview
 
-| Surface         | Value                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| Owner detail    | Full owned campaign + offers, design moderation labels, price guidance fields, revision     |
-| Draft preview   | Owner-authenticated; reuses TTW-031 offer projection with `purchasable: false` + DRAFT mark |
-| Preview filters | No foreign/deleted/unsafe media; REJECTED designs excluded from preview offers              |
-| Public GET      | Unchanged — ACTIVE + APPROVED only (TTW-031)                                                |
+| Surface         | Value                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| Owner detail    | Full owned campaign + offers, design moderation labels, price guidance fields, revision                    |
+| Draft preview   | Owner-authenticated **DRAFT only**; reuses TTW-031 offer projection with `purchasable: false` + DRAFT mark |
+| Design lookup   | Missing and foreign designs share `CAMPAIGN_DESIGN_NOT_FOUND` (no existence oracle)                        |
+| Preview filters | No foreign/deleted/unsafe media; REJECTED designs excluded from preview offers                             |
+| Public GET      | Unchanged — ACTIVE + APPROVED only (TTW-031)                                                               |
 
 ## Submission (interim blockers)
 
 Submission uses existing `POST /campaigns/:id/submit-for-review`. Slice 1 surfaces stable interim blocker codes when the DRAFT is not ready enough to attempt review. **TTW-034** owns the final readiness matrix and transition authority.
 
-| Interim blocker (examples)        | Code                                  |
-| --------------------------------- | ------------------------------------- |
-| Missing title                     | `CAMPAIGN_SUBMIT_MISSING_TITLE`       |
-| No priced offers                  | `CAMPAIGN_SUBMIT_NO_OFFERS`           |
-| Offer below floor / invalid price | `CAMPAIGN_SUBMIT_OFFER_PRICE_INVALID` |
+| Interim blocker (examples)             | Code                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| Missing title                          | `CAMPAIGN_SUBMIT_MISSING_TITLE`                                                        |
+| No priced offers                       | `CAMPAIGN_SUBMIT_NO_OFFERS`                                                            |
+| Offer below live floor / invalid price | `CAMPAIGN_SUBMIT_OFFER_PRICE_INVALID` (re-checks current `getMinCampaignProductPrice`) |
 
 ## Rollback (migration)
 

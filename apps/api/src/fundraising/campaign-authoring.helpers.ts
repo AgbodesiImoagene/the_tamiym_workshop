@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { CampaignStatus } from '../generated/prisma/enums';
@@ -48,12 +47,15 @@ export function assertDraftMutable(status: CampaignStatus): void {
   }
 }
 
+/**
+ * Foreign campaigns are indistinguishable from missing (TTW-035 security).
+ */
 export function assertOwned(
   organizerId: string,
   campaignOrganizerId: string,
 ): void {
   if (campaignOrganizerId !== organizerId) {
-    throw new ForbiddenException('Access denied');
+    throw new NotFoundException('Campaign not found');
   }
 }
 

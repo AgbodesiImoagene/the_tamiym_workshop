@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   ConflictException,
   BadRequestException,
   Logger,
@@ -296,6 +295,7 @@ export class CampaignsService {
     });
     assertCampaignFound(campaign);
     assertOwned(organizerId, campaign.organizerId);
+    assertDraftMutable(campaign.status);
 
     const products = this.pricingService.buildOwnerDraftPreviewOffers(
       campaign.products,
@@ -888,7 +888,6 @@ export class CampaignsService {
       if (
         err instanceof ConflictException ||
         err instanceof BadRequestException ||
-        err instanceof ForbiddenException ||
         err instanceof NotFoundException
       ) {
         throw err;
@@ -932,16 +931,10 @@ export class CampaignsService {
     const design = await tx.design.findUnique({
       where: { id: args.designId },
     });
-    if (!design) {
+    if (!design || design.userId !== organizerId) {
       throw authoringBadRequest(
         CampaignAuthoringErrorCode.DESIGN_NOT_FOUND,
         'Design not found',
-      );
-    }
-    if (design.userId !== organizerId) {
-      throw authoringBadRequest(
-        CampaignAuthoringErrorCode.DESIGN_NOT_OWNED,
-        'Design does not belong to this organiser',
       );
     }
     if (design.productId !== args.productId) {
@@ -983,16 +976,10 @@ export class CampaignsService {
     const design = await this.prisma.design.findUnique({
       where: { id: designId },
     });
-    if (!design) {
+    if (!design || design.userId !== organizerId) {
       throw authoringBadRequest(
         CampaignAuthoringErrorCode.DESIGN_NOT_FOUND,
         'Design not found',
-      );
-    }
-    if (design.userId !== organizerId) {
-      throw authoringBadRequest(
-        CampaignAuthoringErrorCode.DESIGN_NOT_OWNED,
-        'Design does not belong to this organiser',
       );
     }
     if (design.productId !== productId) {
@@ -1174,9 +1161,8 @@ export class CampaignsService {
         },
       },
     });
-    if (!campaign) throw new NotFoundException('Campaign not found');
-    if (campaign.organizerId !== organizerId) {
-      throw new ForbiddenException('Access denied');
+    if (!campaign || campaign.organizerId !== organizerId) {
+      throw new NotFoundException('Campaign not found');
     }
     if (campaign.status !== CampaignStatus.DRAFT) {
       throw authoringBadRequest(
@@ -1210,7 +1196,29 @@ export class CampaignsService {
           blockers.push({
             code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
             message:
-              'Every offer must include an owned design and a positive NGN price',
+              'Every offer must include an owned design and a positive NGN price at or above the current platform minimum',
+          });
+          break;
+        }
+        try {
+          const minimumPrice =
+            await this.pricingService.getMinCampaignProductPrice(
+              cp.productId,
+              cp.designId,
+              currency,
+            );
+          if (amount < minimumPrice) {
+            blockers.push({
+              code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
+              message: `Offer price must be at least ${minimumPrice} ${currency} (current platform minimum)`,
+            });
+            break;
+          }
+        } catch {
+          blockers.push({
+            code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
+            message:
+              'Every offer must include an owned design and a positive NGN price at or above the current platform minimum',
           });
           break;
         }

@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { CampaignStatus } from '../generated/prisma/enums';
@@ -25,8 +24,8 @@ describe('campaign-authoring.helpers', () => {
     expect(() => assertCampaignFound(null)).toThrow(NotFoundException);
   });
 
-  it('assertOwned throws Forbidden', () => {
-    expect(() => assertOwned('a', 'b')).toThrow(ForbiddenException);
+  it('assertOwned throws NotFound for foreign organiser (indistinguishable)', () => {
+    expect(() => assertOwned('a', 'b')).toThrow(NotFoundException);
   });
 
   it('assertDraftMutable rejects non-draft', () => {
