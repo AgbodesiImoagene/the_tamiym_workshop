@@ -11,13 +11,35 @@ import { apiClient } from './api';
 
 export type AdminCampaignStatus = CampaignStatus | 'REVIEW';
 
+export interface AdminAnalyticsMeta {
+  definitionVersion: string;
+  generatedAt: string;
+  dataCutoffAt: string;
+  timezone: string;
+  currency: string;
+  appliedFilters: Record<string, unknown>;
+  freshness: {
+    status: 'OK' | 'STALE' | 'UNKNOWN';
+    sloMs: number;
+    lastReconciliationFinishedAt: string | null;
+  };
+}
+
 export interface AdminOverview {
   ordersCount: number;
   ordersPaidCount: number;
+  /** Settled revenue (TTW-036 catalogue); not PAID-order gross. */
   totalRevenue: number;
   currency: string;
   campaignsCount: number;
   campaignsActiveCount: number;
+  meta?: AdminAnalyticsMeta;
+  metrics?: {
+    settledRevenue: number;
+    refundedValue: number;
+    netRevenue: number;
+    grossOrderValue: number;
+  };
 }
 
 export interface AdminOrder {
@@ -244,10 +266,19 @@ export interface UpdateSiteSettingsInput {
   autoRetryFailedPayouts?: boolean;
 }
 
-export async function getAdminOverview(opts?: { dateFrom?: string; dateTo?: string }) {
+export async function getAdminOverview(opts?: {
+  dateFrom?: string;
+  dateTo?: string;
+  campaignId?: string;
+  productId?: string;
+  channel?: 'STORE' | 'FUNDRAISER';
+}) {
   const params = new URLSearchParams();
   if (opts?.dateFrom) params.set('dateFrom', opts.dateFrom);
   if (opts?.dateTo) params.set('dateTo', opts.dateTo);
+  if (opts?.campaignId) params.set('campaignId', opts.campaignId);
+  if (opts?.productId) params.set('productId', opts.productId);
+  if (opts?.channel) params.set('channel', opts.channel);
   const q = params.toString();
   const suffix = q ? `?${q}` : '';
   return apiClient.get<AdminOverview>(`/admin/analytics/overview${suffix}`);
@@ -258,10 +289,14 @@ export async function downloadAdminAnalyticsCsv(opts: {
   entity: 'orders' | 'campaigns';
   dateFrom?: string;
   dateTo?: string;
+  campaignId?: string;
+  productId?: string;
 }) {
   const params = new URLSearchParams({ entity: opts.entity });
   if (opts.dateFrom) params.set('dateFrom', opts.dateFrom);
   if (opts.dateTo) params.set('dateTo', opts.dateTo);
+  if (opts.campaignId) params.set('campaignId', opts.campaignId);
+  if (opts.productId) params.set('productId', opts.productId);
   const blob = await apiClient.getBlob(`/admin/analytics/export?${params.toString()}`);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

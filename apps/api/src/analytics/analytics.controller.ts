@@ -6,7 +6,6 @@ import {
   Res,
   UseGuards,
   StreamableFile,
-  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,7 +13,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiCookieAuth,
-  ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -23,7 +21,10 @@ import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
 import { UserRole } from '../generated/prisma/enums';
+import { ANALYTICS_KPI_POLICY_VERSION } from './analytics-contract';
 
 @ApiTags('Admin')
 @Controller('admin/analytics')
@@ -33,28 +34,21 @@ export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('overview')
-  @ApiOperation({ summary: 'Get analytics overview (admin)' })
+  @ApiOperation({
+    summary: 'Get analytics overview (admin)',
+    description: `Versioned KPI overview (${ANALYTICS_KPI_POLICY_VERSION}). Filters: Lagos date window, campaign, product, order/payment status, channel, currency. Returns catalogue metrics + meta (definitionVersion, cutoff, freshness).`,
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiQuery({
-    name: 'dateFrom',
-    required: false,
-    description: 'Start date (ISO)',
+  @ApiResponse({ status: 200, description: 'Overview metrics with meta' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid filters / reversed window',
   })
-  @ApiQuery({ name: 'dateTo', required: false, description: 'End date (ISO)' })
-  @ApiResponse({ status: 200, description: 'Overview metrics' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async getOverview(@Query() query: AnalyticsQueryDto) {
-    const dateFrom = query.dateFrom ? new Date(query.dateFrom) : undefined;
-    const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
-    if (dateFrom && !isFinite(dateFrom.getTime())) {
-      throw new BadRequestException('dateFrom is not a valid date');
-    }
-    if (dateTo && !isFinite(dateTo.getTime())) {
-      throw new BadRequestException('dateTo is not a valid date');
-    }
-    return this.analyticsService.getOverview(dateFrom, dateTo);
+    return this.analyticsService.getOverview(query);
   }
 
   @Get('payouts')
@@ -74,20 +68,20 @@ export class AnalyticsController {
   @ApiOperation({
     summary: 'Money-truth metrics (admin)',
     description:
-      'Payout pipeline breakdowns, manual-adjustment backlog, sum of campaign gross cache vs ledger-eligible total.',
+      'Payout pipeline, gross cache vs ledger-eligible, paid-out value. Includes TTW-036 meta. Optional campaign/date filters apply to gross/paid-out/ledger slices.',
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiResponse({ status: 200, description: 'Money metrics' })
-  async getMoneyMetrics() {
-    return this.analyticsService.getMoneyMetrics();
+  @ApiResponse({ status: 200, description: 'Money metrics with meta' })
+  async getMoneyMetrics(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.getMoneyMetrics(query);
   }
 
   @Get('campaigns/:campaignId/snapshot')
   @ApiOperation({
     summary: 'Campaign fundraising snapshot (admin)',
     description:
-      'Goal, gross currentAmount, ledger eligible balance, paid orders, last payout.',
+      'Goal, gross currentAmount cache, ledger eligible balance, paid orders, last payout + meta.',
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -98,40 +92,79 @@ export class AnalyticsController {
     return this.analyticsService.getCampaignFundraisingSnapshot(campaignId);
   }
 
-  @Get('export')
+  @Get('drilldowns/orders')
   @ApiOperation({
-    summary: 'Export CSV (admin). Use ?entity=orders or ?entity=campaigns',
+    summary: 'Drill-down: orders matching analytics filters (admin)',
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiQuery({
-    name: 'entity',
-    enum: ['orders', 'campaigns'],
-    description: 'Entity to export',
+  @ApiResponse({ status: 200, description: 'Paginated order rows + meta' })
+  async drilldownOrders(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.drilldownOrders(query);
+  }
+
+  @Get('drilldowns/settlements')
+  @ApiOperation({
+    summary: 'Drill-down: succeeded payment settlements (admin)',
   })
-  @ApiQuery({ name: 'dateFrom', required: false })
-  @ApiQuery({ name: 'dateTo', required: false })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  async drilldownSettlements(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.drilldownSettlements(query);
+  }
+
+  @Get('drilldowns/refunds')
+  @ApiOperation({
+    summary: 'Drill-down: succeeded refunds (admin)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  async drilldownRefunds(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.drilldownRefunds(query);
+  }
+
+  @Get('drilldowns/payouts')
+  @ApiOperation({
+    summary: 'Drill-down: succeeded payouts (admin)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  async drilldownPayouts(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.drilldownPayouts(query);
+  }
+
+  @Get('drilldowns/reconciliation')
+  @ApiOperation({
+    summary: 'Drill-down: open/acknowledged reconciliation findings (admin)',
+    description: 'Masked TTW-015 findings for KPI discrepancy investigation.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  async drilldownReconciliation(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.drilldownReconciliation(query);
+  }
+
+  @Get('export')
+  @ApiOperation({
+    summary: 'Export CSV (admin)',
+    description:
+      'entity=orders|campaigns required vocabulary; unknown entities rejected. Same filters as overview. Max 10_000 rows. Audited.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
   @ApiResponse({ status: 200, description: 'CSV file' })
+  @ApiResponse({ status: 400, description: 'Unknown entity / limit / filters' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async exportCsv(
-    @Query() query: AnalyticsQueryDto & { entity?: string },
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: RequestUser,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const dateFrom = query.dateFrom ? new Date(query.dateFrom) : undefined;
-    const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
-    if (dateFrom && !isFinite(dateFrom.getTime())) {
-      throw new BadRequestException('dateFrom is not a valid date');
-    }
-    if (dateTo && !isFinite(dateTo.getTime())) {
-      throw new BadRequestException('dateTo is not a valid date');
-    }
-    const entity = query.entity ?? 'orders';
-
-    const csv =
-      entity === 'campaigns'
-        ? await this.analyticsService.exportCampaignsCsv(dateFrom, dateTo)
-        : await this.analyticsService.exportOrdersCsv(dateFrom, dateTo);
+    const { entity, csv } = await this.analyticsService.exportCsv(
+      query,
+      user.id,
+    );
 
     const filename = `${entity}-export-${new Date().toISOString().slice(0, 10)}.csv`;
     res.set({

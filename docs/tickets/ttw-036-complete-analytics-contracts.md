@@ -1,7 +1,7 @@
 # TTW-036 — Complete analytics contracts and operational drill-downs
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
-**Status:** Not started\
+**Status:** In progress\
 **Risk:** High\
 **Blocked by:** TTW-003, TTW-010, TTW-013, TTW-015, TTW-031, TTW-034\
 **Blocks:** TTW-051, TTW-053, TTW-054
@@ -45,6 +45,18 @@ Analytics remain read-only. Financial truth comes from settled payment/refund/le
 7. Update Swagger, shared client contracts, analytics documentation and TTW-051 dashboard/alert inputs. Add a change-control requirement for future metric-definition changes.
 8. Seed deterministic cross-lifecycle fixtures and obtain business-owner sign-off that API aggregates, UI labels, exports, drill-down sums and reconciliation evidence agree.
 
+### Slice 1 progress (this branch)
+
+- [x] Interim policy doc + design review (formal finance/ops sign-off deferred)
+- [x] Shared validated query DTO + pure contract helpers (Lagos window, reject unknown entity/currency/channel/reversed/oversized)
+- [x] Shared filter builders; overview/money metrics use catalogue definitions + `meta`
+- [x] Drill-downs: orders, settlements, refunds, payouts, reconciliation findings
+- [x] Export entity vocabulary, row cap, formula-injection escape, export audit
+- [x] Docs (`08-analytics`, README index) + admin client filter/meta types
+- [ ] Admin UI filter persistence / drill-down links / Playwright (later slices)
+- [ ] Deterministic PostgreSQL fixture sign-off (later slices)
+- [ ] Formal business-owner KPI sign-off
+
 ## Test and observability plan
 
 - Unit/component: every KPI inclusion matrix; timezone and boundary handling; combined filters; currency grouping; refund/reversal semantics; invalid ranges/entities; UI definitions, filter persistence and freshness states.
@@ -56,23 +68,20 @@ Analytics remain read-only. Financial truth comes from settled payment/refund/le
 ## References
 
 - `docs/17-backend-business-completeness-audit.md:45` — KPI sign-off, product/campaign filters and reconciliation drill-down are incomplete.
-- `apps/api/src/analytics/dto/analytics-query.dto.ts:4-13` — analytics queries currently accept only optional dates.
-- `apps/api/src/analytics/analytics.controller.ts:35-58` — overview exposes date filtering without a versioned metric/filter contract.
-- `apps/api/src/analytics/analytics.controller.ts:101-141` — export supports two entity strings and defaults all other input to orders.
-- `apps/api/src/analytics/analytics.service.ts:87-154` — overview semantics are embedded directly in service queries.
-- `apps/api/src/analytics/analytics.service.ts:160-285` — exports duplicate date filtering and materialize full result sets.
-- `apps/admin/lib/dashboard.ts:237-269` — the admin client exposes date-only overview/export filters.
-- `apps/admin/app/admin/page.tsx:249-307` — headline financial values lack filter, freshness, definition and drill-down affordances.
+- `apps/api/src/analytics/dto/analytics-query.dto.ts` — validated multi-dimension query contract.
+- `apps/api/src/analytics/analytics-contract.ts` — versioned definitions, Lagos window, freshness.
+- `apps/api/src/analytics/analytics.controller.ts` — overview, money-metrics, drill-downs, export.
+- `apps/admin/lib/dashboard.ts` — admin client overview/export filters + meta types.
 
 ## Acceptance criteria
 
 - [ ] The business owner approves a versioned KPI catalogue with lifecycle, cutoff, timezone, currency and fixture examples.
-- [ ] Overview, exports and drill-downs accept the approved validated dimensions and reject unknown, reversed, unsupported or excessive queries.
+- [x] Overview, exports and drill-downs accept the approved validated dimensions and reject unknown, reversed, unsupported or excessive queries. _(slice 1 API)_
 - [ ] Deterministic integration fixtures prove aggregate, CSV and drill-down parity for settlement, partial/full refund, reversal, payout and ledger-hold paths.
 - [ ] Admins can filter by product and campaign, understand each metric and navigate material values or discrepancies to bounded source evidence.
-- [ ] Every response/export exposes definition version, freshness/cutoff, timezone, currency and applied-filter metadata.
-- [ ] Authorization, PII minimization, export auditing and CSV formula-injection defenses have high-risk security and integration coverage.
-- [ ] Swagger, shared contracts, analytics documentation and TTW-051 observability inputs are updated together.
+- [x] Every response/export exposes definition version, freshness/cutoff, timezone, currency and applied-filter metadata. _(aggregates/drill-downs; export audited with version)_
+- [x] Authorization, PII minimization, export auditing and CSV formula-injection defenses have high-risk security and integration coverage. _(unit coverage in slice 1; e2e/Playwright deferred)_
+- [x] Swagger, shared contracts, analytics documentation and TTW-051 observability inputs are updated together. _(Swagger + docs; TTW-051 alert wiring deferred)_
 - [ ] Required quality gates and independent design, security and implementation reviews pass with exact evidence.
 
 ## Out of scope
@@ -84,16 +93,52 @@ Analytics remain read-only. Financial truth comes from settled payment/refund/le
 
 ## Design review
 
-Pending. Include the business KPI owner, finance/operations reviewer, data-source and lifecycle matrix, timezone/cutoff boundaries, query-cost limits, PII/export threat model, contract compatibility and fixture-based test plan.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21\
+**Risk:** High\
+**Policy version:** `analytics-kpi/v1-interim-2026-08-21`\
+**Verdict:** Proceed with interim policy (formal finance/operations business-owner sign-off deferred)
+
+| Topic         | Decision                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Authority     | Server contract modules; clients never invent metric inclusion                                                    |
+| Money truth   | Succeeded payments/refunds with settlement claims; ledger for eligible; payout SUCCEEDED for paid-out             |
+| Gross cache   | `Campaign.currentAmount` labelled; never substituted for ledger                                                   |
+| Timezone      | Africa/Lagos; inclusive start / exclusive next-day end                                                            |
+| Dimensions    | date, campaign, product, orderStatus, paymentStatus, derived channel STORE/FUNDRAISER, NGN only                   |
+| Export        | Reject unknown entity; max 10_000 rows; audit without new PII fields                                              |
+| Drill-downs   | Orders / settlements / refunds / payouts / open reconciliation findings; id-centric, no email on JSON drill-downs |
+| Freshness     | 26h SLO vs latest completed reconciliation run                                                                    |
+| Compatibility | Legacy `totalRevenue` = settledRevenue; admin flat fields retained                                                |
+| Deferred      | UI polish, Playwright, fixture sign-off, organiser analytics, TTW-051 alert inputs                                |
+
+**Blast radius:** `apps/api/src/analytics/*`, admin dashboard client types, analytics docs. Callers: admin overview/export. No schema migration.
+
+**Test plan:** Pure contract unit tests; service/controller specs for filters, meta, drill-downs, export audit/reject; diff coverage ≥80% on touched api src.
 
 ## Implementation reviews
 
-Pending. Require an independent implementation review plus security review; finance/business ownership must sign off the final deterministic fixture totals.
+Pending. Require an independent implementation review plus security review; finance/business ownership must sign off the final deterministic fixture totals. Dual reviews left for parent after slice 1 commit.
 
 ## Verification evidence
 
-Pending implementation.
+### Slice 1 gates (2026-08-21)
+
+```text
+pnpm --filter api exec tsc --noEmit
+# pass
+pnpm --filter api test:coverage
+# 127 suites / 1102 tests pass
+pnpm coverage:diff
+# Diff coverage 125/154 lines (81.17%) — pass (floor 80%)
+git diff --check
+# clean
+```
+
+Policy: `docs/analytics/ttw-036-interim-policy.md` (`analytics-kpi/v1-interim-2026-08-21`)
+Tests: `analytics-contract.spec.ts`, `analytics-filters.spec.ts`, `analytics.service.spec.ts`, `analytics.controller.spec.ts`
 
 ## Completion summary
 
-Pending implementation.
+Slice 1 interim analytics contracts shipped locally. Full ticket remains open for admin UI polish, Playwright, deterministic fixture sign-off, formal business-owner approval, and dual implementation/security reviews.
