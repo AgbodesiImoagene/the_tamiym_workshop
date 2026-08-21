@@ -59,10 +59,53 @@ describe('analytics-filters', () => {
     expect(PAID_LIFECYCLE_STATUSES).not.toContain('PENDING_PAYMENT');
   });
 
-  it('activeCampaignWhere respects window bounds', () => {
+  it('propagates paymentStatus into settlement and refund order filters', () => {
+    const resolved = resolveAnalyticsQuery({
+      paymentStatus: 'SUCCEEDED',
+    });
+    expect(resolved.orderWhere.paymentStatus).toBe('SUCCEEDED');
+    expect(resolved.paymentWhere.order).toEqual({
+      is: expect.objectContaining({ paymentStatus: 'SUCCEEDED' }),
+    });
+    expect(resolved.refundWhere.order).toEqual({
+      is: expect.objectContaining({ paymentStatus: 'SUCCEEDED' }),
+    });
+  });
+
+  it('always constrains money queries to resolved NGN currency', () => {
+    const resolved = resolveAnalyticsQuery({});
+    expect(resolved.filters.currency).toBe('NGN');
+    expect(resolved.orderWhere.currency).toBe('NGN');
+    expect(resolved.paymentWhere.currency).toBe('NGN');
+    expect(resolved.refundWhere.currency).toBe('NGN');
+    expect(resolved.payoutWhere.currency).toBe('NGN');
+    expect(resolved.campaignWhere.currency).toBe('NGN');
+  });
+
+  it('STORE channel yields no campaign payouts; productId scopes payouts', () => {
+    const store = resolveAnalyticsQuery({
+      channel: AnalyticsSalesChannel.STORE,
+    });
+    expect(store.payoutWhere.campaignId).toEqual({ in: [] });
+
+    const byProduct = resolveAnalyticsQuery({ productId: 'prod-1' });
+    expect(byProduct.payoutWhere.campaign).toEqual({
+      is: { products: { some: { productId: 'prod-1' } } },
+    });
+  });
+
+  it('activeCampaignWhere respects campaignId and currency', () => {
     const window = resolveAnalyticsWindow('2026-08-01', '2026-08-31');
-    const where = activeCampaignWhere(window);
-    expect(where.status).toBe('ACTIVE');
-    expect(where.AND).toBeDefined();
+    const where = activeCampaignWhere(window, {
+      campaignId: 'camp-1',
+      currency: 'NGN',
+    });
+    expect(where).toEqual(
+      expect.objectContaining({
+        status: 'ACTIVE',
+        id: 'camp-1',
+        currency: 'NGN',
+      }),
+    );
   });
 });

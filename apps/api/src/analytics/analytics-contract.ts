@@ -102,7 +102,7 @@ export type AppliedAnalyticsFilters = {
   orderStatus?: string;
   paymentStatus?: string;
   channel?: AnalyticsSalesChannel;
-  currency: string;
+  currency: 'NGN';
   entity?: AnalyticsExportEntity;
 };
 
@@ -111,7 +111,7 @@ export type AnalyticsResponseMeta = {
   generatedAt: string;
   dataCutoffAt: string;
   timezone: string;
-  currency: string;
+  currency: 'NGN';
   appliedFilters: AppliedAnalyticsFilters;
   freshness: {
     status: AnalyticsFreshnessStatus;
@@ -263,7 +263,7 @@ export function parseSalesChannel(
   );
 }
 
-export function assertSupportedCurrency(currency?: string): string {
+export function assertSupportedCurrency(currency?: string): 'NGN' {
   if (currency === undefined || currency === '' || currency === 'NGN') {
     return 'NGN';
   }
@@ -304,7 +304,7 @@ export function evaluateFreshness(input: {
 
 export function buildAnalyticsMeta(input: {
   now: Date;
-  currency: string;
+  currency: 'NGN';
   filters: AppliedAnalyticsFilters;
   lastReconciliationFinishedAt: Date | null;
 }): AnalyticsResponseMeta {

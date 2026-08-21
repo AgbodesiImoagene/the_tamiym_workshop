@@ -72,7 +72,7 @@ export function resolveAnalyticsQuery(
     ...(createdAt ? { createdAt } : {}),
     ...(query.orderStatus ? { status: query.orderStatus } : {}),
     ...(query.paymentStatus ? { paymentStatus: query.paymentStatus } : {}),
-    ...(query.currency ? { currency: query.currency } : {}),
+    currency,
     // Exact campaignId wins; derived channel only when campaignId omitted.
     ...(query.campaignId
       ? { campaignId: query.campaignId }
@@ -90,7 +90,7 @@ export function resolveAnalyticsQuery(
   const campaignWhere: Prisma.CampaignWhereInput = {
     ...(createdAt ? { createdAt } : {}),
     ...(query.campaignId ? { id: query.campaignId } : {}),
-    ...(query.currency ? { currency: query.currency } : {}),
+    currency,
   };
 
   const orderRelationFilter: Prisma.OrderWhereInput = {
@@ -98,6 +98,7 @@ export function resolveAnalyticsQuery(
       ? { campaignId: query.campaignId }
       : (channelWhere(channel) ?? {})),
     ...(query.orderStatus ? { status: query.orderStatus } : {}),
+    ...(query.paymentStatus ? { paymentStatus: query.paymentStatus } : {}),
     ...(query.productId
       ? { items: { some: { productId: query.productId } } }
       : {}),
@@ -105,7 +106,7 @@ export function resolveAnalyticsQuery(
 
   const paymentWhere: Prisma.PaymentWhereInput = {
     status: 'SUCCEEDED',
-    ...(query.currency ? { currency: query.currency } : {}),
+    currency,
     settlementClaim: createdAt ? { is: { createdAt } } : { isNot: null },
     order: {
       is: orderRelationFilter,
@@ -114,18 +115,33 @@ export function resolveAnalyticsQuery(
 
   const refundWhere: Prisma.RefundWhereInput = {
     status: 'SUCCEEDED',
-    ...(query.currency ? { currency: query.currency } : {}),
+    currency,
     settlementClaim: createdAt ? { is: { createdAt } } : { isNot: null },
     order: {
       is: orderRelationFilter,
     },
   };
 
+  // Payouts are campaign-scoped. STORE channel has no campaign payouts;
+  // productId scopes via campaigns that list that product.
   const payoutWhere: Prisma.PayoutWhereInput = {
     status: 'SUCCEEDED',
+    currency,
     ...(createdAt ? { createdAt } : {}),
-    ...(query.campaignId ? { campaignId: query.campaignId } : {}),
-    ...(query.currency ? { currency: query.currency } : {}),
+    ...(query.campaignId
+      ? { campaignId: query.campaignId }
+      : channel === AnalyticsSalesChannel.STORE
+        ? { campaignId: { in: [] } }
+        : {}),
+    ...(query.productId
+      ? {
+          campaign: {
+            is: {
+              products: { some: { productId: query.productId } },
+            },
+          },
+        }
+      : {}),
   };
 
   return {
@@ -141,9 +157,12 @@ export function resolveAnalyticsQuery(
 
 export function activeCampaignWhere(
   window: AnalyticsWindow,
+  opts?: { campaignId?: string; currency?: 'NGN' },
 ): Prisma.CampaignWhereInput {
   return {
     status: 'ACTIVE',
+    ...(opts?.campaignId ? { id: opts.campaignId } : {}),
+    ...(opts?.currency ? { currency: opts.currency } : {}),
     ...(window.toExclusive || window.fromInclusive
       ? {
           AND: [

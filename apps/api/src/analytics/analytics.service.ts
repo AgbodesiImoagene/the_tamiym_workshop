@@ -206,7 +206,10 @@ export class AnalyticsService {
         }),
         this.prisma.campaign.count({ where: resolved.campaignWhere }),
         this.prisma.campaign.count({
-          where: activeCampaignWhere(resolved.window),
+          where: activeCampaignWhere(resolved.window, {
+            campaignId: resolved.filters.campaignId,
+            currency: resolved.filters.currency,
+          }),
         }),
         this.metaFor(now, resolved.filters),
       ]);
@@ -513,6 +516,13 @@ export class AnalyticsService {
           where: {
             availableAt: { lte: now },
             ...(query.campaignId ? { campaignId: query.campaignId } : {}),
+            ...(resolved.filters.currency
+              ? {
+                  campaign: {
+                    is: { currency: resolved.filters.currency },
+                  },
+                }
+              : {}),
           },
           _sum: { amount: true },
         }),
