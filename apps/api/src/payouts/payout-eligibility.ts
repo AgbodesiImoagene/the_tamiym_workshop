@@ -168,11 +168,25 @@ export function resolvePayoutBankResolutionMode(
   raw: string | undefined | null,
   nodeEnv: string | undefined | null = process.env.NODE_ENV,
 ): 'stub' | 'live' {
-  const mode = (raw ?? (nodeEnv === 'production' ? 'live' : 'stub'))
-    .trim()
-    .toLowerCase();
+  const isProd = nodeEnv === 'production';
+  const mode = (raw ?? '').trim().toLowerCase();
+  // Production is fail-closed: never stub, even on typos/empty/off.
+  if (isProd) {
+    return 'live';
+  }
   if (mode === 'live') return 'live';
   return 'stub';
+}
+
+/**
+ * Deterministic stub recipient for non-production snapshots so execute never
+ * falls back to a live profile after bank edits.
+ */
+export function stubRecipientCodeForProfile(
+  profileId: string,
+  destinationVersion: number,
+): string {
+  return `STUB_RCP_${profileId}_v${destinationVersion}`;
 }
 
 export function evaluatePayoutEligibility(

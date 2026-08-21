@@ -4,10 +4,11 @@ import { PayoutProfilesService } from '../fundraising/payout-profiles.service';
 import { AdminPayoutProfilesController } from './admin-payout-profiles.controller';
 
 describe('AdminPayoutProfilesController', () => {
-  it('delegates status updates', async () => {
+  it('delegates status updates and returns a masked profile', async () => {
     const adminSetStatus = jest.fn().mockResolvedValue({
       id: 'p1',
       status: PayoutProfileStatus.VERIFIED,
+      accountNumberMasked: '***6789',
     });
     const module = await Test.createTestingModule({
       controllers: [AdminPayoutProfilesController],
@@ -21,7 +22,11 @@ describe('AdminPayoutProfilesController', () => {
     const controller = module.get(AdminPayoutProfilesController);
     await expect(
       controller.setStatus('p1', { status: PayoutProfileStatus.VERIFIED }),
-    ).resolves.toEqual({ id: 'p1', status: PayoutProfileStatus.VERIFIED });
+    ).resolves.toEqual({
+      id: 'p1',
+      status: PayoutProfileStatus.VERIFIED,
+      accountNumberMasked: '***6789',
+    });
     expect(adminSetStatus).toHaveBeenCalledWith(
       'p1',
       PayoutProfileStatus.VERIFIED,

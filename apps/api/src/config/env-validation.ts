@@ -149,9 +149,9 @@ export function validateEnv(
     )
       .trim()
       .toLowerCase();
-    if (bankResolution === 'stub') {
+    if (bankResolution && bankResolution !== 'live') {
       throw new Error(
-        'PAYOUT_BANK_RESOLUTION_MODE=stub is forbidden in production; use live',
+        'PAYOUT_BANK_RESOLUTION_MODE must be live (or unset) in production; stub and other values are forbidden',
       );
     }
   }

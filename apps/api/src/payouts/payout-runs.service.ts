@@ -22,6 +22,8 @@ import {
   maskAccountNumber,
   PAYOUT_ELIGIBILITY_POLICY_VERSION,
   PayoutEligibilityGate,
+  resolvePayoutBankResolutionMode,
+  stubRecipientCodeForProfile,
 } from './payout-eligibility';
 import {
   assertPayoutEligible,
@@ -91,6 +93,31 @@ export class PayoutRunsService {
 
   private assertAutoExecuteAllowed(mode: PayoutMode): void {
     assertAutoExecuteModeAllowed(mode, readAutoExecuteEnabled(this.config));
+  }
+
+  /**
+   * Bind a transfer recipient onto the payout snapshot at create time.
+   * Execute must never call resolveRecipient(profileId) — bank edits must not redirect.
+   */
+  private async recipientCodeForSnapshot(profile: {
+    id: string;
+    recipientCode: string | null;
+    destinationVersion: number;
+  }): Promise<string> {
+    if (profile.recipientCode) {
+      return profile.recipientCode;
+    }
+    const mode = resolvePayoutBankResolutionMode(
+      this.config.get<string>('PAYOUT_BANK_RESOLUTION_MODE'),
+      this.config.get<string>('NODE_ENV') ?? process.env.NODE_ENV,
+    );
+    if (mode === 'stub') {
+      return stubRecipientCodeForProfile(
+        profile.id,
+        profile.destinationVersion,
+      );
+    }
+    return this.payoutsService.resolveRecipient(profile.id);
   }
 
   /**
@@ -216,6 +243,34 @@ export class PayoutRunsService {
       );
     }
 
+    // Resolve recipients outside the create transaction so Paystack is not
+    // called under a long DB lock; snapshots then freeze these codes.
+    const snapshotRecipientByProfileId = new Map<string, string>();
+    for (const item of eligibleItems) {
+      const campaign = await this.prisma.campaign.findUnique({
+        where: { id: item.campaignId },
+        include: {
+          payoutProfile: { select: PROFILE_SELECT },
+          organizer: {
+            select: {
+              payoutProfiles: {
+                where: { isDefault: true },
+                take: 1,
+                select: PROFILE_SELECT,
+              },
+            },
+          },
+        },
+      });
+      const profile =
+        campaign?.payoutProfile ?? campaign?.organizer.payoutProfiles?.[0];
+      if (!profile || snapshotRecipientByProfileId.has(profile.id)) continue;
+      snapshotRecipientByProfileId.set(
+        profile.id,
+        await this.recipientCodeForSnapshot(profile),
+      );
+    }
+
     const run = await this.prisma.$transaction(async (tx) => {
       const runRow = await tx.payoutRun.create({
         data: {
@@ -275,6 +330,12 @@ export class PayoutRunsService {
         });
         if (!eligibility.eligible) continue;
 
+        const snapshotRecipientCode =
+          snapshotRecipientByProfileId.get(profile.id) ?? profile.recipientCode;
+        if (!snapshotRecipientCode) {
+          continue;
+        }
+
         await tx.payout.create({
           data: {
             campaignId: item.campaignId,
@@ -286,7 +347,7 @@ export class PayoutRunsService {
             snapshotBankCode: profile.bankCode,
             snapshotAccountName: profile.accountName,
             snapshotAccountMask: maskAccountNumber(profile.accountNumber),
-            snapshotRecipientCode: profile.recipientCode,
+            snapshotRecipientCode,
             snapshotProfileId: profile.id,
             snapshotDestinationVersion: profile.destinationVersion,
             policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
@@ -543,6 +604,11 @@ export class PayoutRunsService {
         'Payout is missing immutable destination snapshot',
       );
     }
+    if (!payout.snapshotRecipientCode) {
+      throw new BadRequestException(
+        'Payout is missing snapshotted transfer recipient; refusing live profile resolution',
+      );
+    }
 
     const amount = Number(payout.amount);
     const currency = payout.currency;
@@ -560,13 +626,7 @@ export class PayoutRunsService {
     );
 
     try {
-      let recipientCode = payout.snapshotRecipientCode;
-      if (!recipientCode) {
-        if (!profileId) {
-          throw new BadRequestException('No snapshotted payout profile');
-        }
-        recipientCode = await this.payoutsService.resolveRecipient(profileId);
-      }
+      const recipientCode = payout.snapshotRecipientCode;
       const idempotencyKey = payout.idempotencyKey ?? `payout-${payoutId}`;
 
       const result = await this.payoutsService.initiateTransfer(

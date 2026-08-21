@@ -47,6 +47,8 @@ import {
   maskAccountNumber,
   PAYOUT_ELIGIBILITY_POLICY_VERSION,
   PayoutEligibilityGate,
+  resolvePayoutBankResolutionMode,
+  stubRecipientCodeForProfile,
 } from './payout-eligibility';
 import {
   assertPayoutEligible,
@@ -249,6 +251,21 @@ export class PayoutsService {
 
         const currency = (campaign.currency as 'NGN') ?? DEFAULT_CURRENCY;
 
+        let snapshotRecipientCode = profile.recipientCode;
+        if (!snapshotRecipientCode) {
+          const mode = resolvePayoutBankResolutionMode(
+            this.config.get<string>('PAYOUT_BANK_RESOLUTION_MODE'),
+            this.config.get<string>('NODE_ENV') ?? process.env.NODE_ENV,
+          );
+          snapshotRecipientCode =
+            mode === 'stub'
+              ? stubRecipientCodeForProfile(
+                  profile.id,
+                  profile.destinationVersion,
+                )
+              : await this.resolveRecipient(profile.id);
+        }
+
         // Create the payout row in PROCESSING so it is visible before hitting Paystack.
         const payout = await this.prisma.payout.create({
           data: {
@@ -261,7 +278,7 @@ export class PayoutsService {
             snapshotBankCode: profile.bankCode,
             snapshotAccountName: profile.accountName,
             snapshotAccountMask: maskAccountNumber(profile.accountNumber),
-            snapshotRecipientCode: profile.recipientCode,
+            snapshotRecipientCode,
             snapshotProfileId: profile.id,
             snapshotDestinationVersion: profile.destinationVersion,
             policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
@@ -283,10 +300,9 @@ export class PayoutsService {
         );
 
         try {
-          const recipientCode = await this.resolveRecipient(profile.id);
           const idempotencyKey = `payout-${payout.id}`;
           const result = await this.initiateTransfer(
-            recipientCode,
+            snapshotRecipientCode,
             amount,
             currency,
             reason ?? 'Campaign payout',
@@ -299,7 +315,7 @@ export class PayoutsService {
               status: PayoutStatus.INITIATED,
               providerRef: result.reference,
               idempotencyKey,
-              snapshotRecipientCode: recipientCode,
+              snapshotRecipientCode,
             },
           });
 

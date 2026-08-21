@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,7 +11,11 @@ import { CreatePayoutProfileDto } from './dto/create-payout-profile.dto';
 import { UpdatePayoutProfileDto } from './dto/update-payout-profile.dto';
 import { AccountPolicyService } from '../auth/account-policy.service';
 import { PayoutProfileStatus } from '../generated/prisma/enums';
-import { resolvePayoutBankResolutionMode } from '../payouts/payout-eligibility';
+import { Prisma } from '../generated/prisma/client';
+import {
+  maskAccountNumber,
+  resolvePayoutBankResolutionMode,
+} from '../payouts/payout-eligibility';
 
 @Injectable()
 export class PayoutProfilesService {
@@ -87,36 +92,48 @@ export class PayoutProfilesService {
     await this.assertVerifiedForMutate(userId);
     const resolution = this.resolveBankOnCreate(dto);
 
-    return this.prisma.$transaction(async (tx) => {
-      const existingCount = await tx.userPayoutProfile.count({
-        where: { userId },
-      });
-      const makeDefault = existingCount === 0;
-
-      if (makeDefault) {
-        // Clear any stray defaults before insert (partial unique index).
-        await tx.userPayoutProfile.updateMany({
-          where: { userId, isDefault: true },
-          data: { isDefault: false },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const existingCount = await tx.userPayoutProfile.count({
+          where: { userId },
         });
-      }
+        const makeDefault = existingCount === 0;
 
-      return tx.userPayoutProfile.create({
-        data: {
-          userId,
-          label: dto.label ?? null,
-          bankCode: dto.bankCode,
-          bankName: dto.bankName ?? null,
-          accountName: dto.accountName,
-          accountNumber: dto.accountNumber,
-          isDefault: makeDefault,
-          status: resolution.status,
-          bankResolutionStatus: resolution.bankResolutionStatus,
-          verifiedAt: resolution.verifiedAt,
-          destinationVersion: 1,
-        },
+        if (makeDefault) {
+          // Clear any stray defaults before insert (partial unique index).
+          await tx.userPayoutProfile.updateMany({
+            where: { userId, isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+
+        return tx.userPayoutProfile.create({
+          data: {
+            userId,
+            label: dto.label ?? null,
+            bankCode: dto.bankCode,
+            bankName: dto.bankName ?? null,
+            accountName: dto.accountName,
+            accountNumber: dto.accountNumber,
+            isDefault: makeDefault,
+            status: resolution.status,
+            bankResolutionStatus: resolution.bankResolutionStatus,
+            verifiedAt: resolution.verifiedAt,
+            destinationVersion: 1,
+          },
+        });
       });
-    });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'A default payout profile already exists for this user',
+        );
+      }
+      throw err;
+    }
   }
 
   async update(userId: string, id: string, dto: UpdatePayoutProfileDto) {
@@ -186,19 +203,29 @@ export class PayoutProfilesService {
   }
 
   /**
+   * Safe API projection: never return full account numbers.
+   */
+  toPublicProfile<T extends { accountNumber: string }>(
+    profile: T,
+  ): Omit<T, 'accountNumber'> & { accountNumberMasked: string | null } {
+    const { accountNumber, ...rest } = profile;
+    return {
+      ...rest,
+      accountNumberMasked: maskAccountNumber(accountNumber),
+    };
+  }
+
+  /**
    * Admin / ops: mark a pending destination verified (interim until live provider).
    */
-  async adminSetStatus(
-    id: string,
-    status: PayoutProfileStatus,
-  ): Promise<unknown> {
+  async adminSetStatus(id: string, status: PayoutProfileStatus) {
     const profile = await this.prisma.userPayoutProfile.findUnique({
       where: { id },
     });
     if (!profile) throw new NotFoundException('Payout profile not found');
 
     const now = new Date();
-    return this.prisma.userPayoutProfile.update({
+    const updated = await this.prisma.userPayoutProfile.update({
       where: { id },
       data: {
         status,
@@ -214,6 +241,7 @@ export class PayoutProfilesService {
             : profile.bankResolutionStatus,
       },
     });
+    return this.toPublicProfile(updated);
   }
 
   async remove(userId: string, id: string) {

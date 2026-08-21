@@ -40,7 +40,13 @@ const eligibleOrganizer = {
 };
 
 describe('PayoutRunsService eligibility gates', () => {
-  async function build(prisma: Record<string, unknown>, configGet?: unknown) {
+  async function build(
+    prisma: Record<string, unknown>,
+    options?: { configGet?: unknown; resolveRecipient?: jest.Mock },
+  ) {
+    const configGet = options?.configGet;
+    const resolveRecipient =
+      options?.resolveRecipient ?? jest.fn().mockResolvedValue('RCP_1');
     const module = await Test.createTestingModule({
       providers: [
         PayoutRunsService,
@@ -61,7 +67,7 @@ describe('PayoutRunsService eligibility gates', () => {
             initiateTransfer: jest
               .fn()
               .mockResolvedValue({ reference: 'tr_1' }),
-            resolveRecipient: jest.fn().mockResolvedValue('RCP_1'),
+            resolveRecipient,
           },
         },
         { provide: AuditService, useValue: { log: jest.fn() } },
@@ -217,6 +223,7 @@ describe('PayoutRunsService eligibility gates', () => {
           snapshotProfileId: 'prof-1',
           snapshotDestinationVersion: 1,
           snapshotAccountMask: '***6789',
+          snapshotRecipientCode: 'RCP_1',
           policyVersion: expect.stringContaining('payout-eligibility'),
         }),
       }),
@@ -310,6 +317,7 @@ describe('PayoutRunsService eligibility gates', () => {
 
   it('executeSinglePayout initiates transfer from snapshot recipient', async () => {
     const payoutUpdate = jest.fn();
+    const resolveRecipient = jest.fn();
     const prisma = {
       payout: {
         findUnique: jest.fn().mockResolvedValue({
@@ -341,12 +349,53 @@ describe('PayoutRunsService eligibility gates', () => {
         findUnique: jest.fn().mockResolvedValue(verifiedProfile),
       },
     };
-    const service = await build(prisma);
+    const service = await build(prisma, { resolveRecipient });
     await service.executeSinglePayout('pay-1');
+    expect(resolveRecipient).not.toHaveBeenCalled();
     expect(payoutUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: PayoutStatus.INITIATED }),
       }),
     );
+  });
+
+  it('executeSinglePayout refuses when snapshot recipient is missing', async () => {
+    const resolveRecipient = jest.fn().mockResolvedValue('RCP_LIVE');
+    const prisma = {
+      payout: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'pay-1',
+          status: PayoutStatus.QUEUED,
+          campaignId: 'camp-1',
+          recipientUserId: 'org-1',
+          amount: 1000,
+          currency: 'NGN',
+          snapshotBankCode: '058',
+          snapshotAccountName: 'Org One',
+          snapshotRecipientCode: null,
+          snapshotProfileId: 'prof-1',
+          idempotencyKey: null,
+        }),
+        update: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'org-1',
+          role: UserRole.ORGANIZER,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date(),
+          phone: '080',
+          organizerApplications: [{ termsVersion: ORGANIZER_TERMS_VERSION }],
+        }),
+      },
+      userPayoutProfile: {
+        findUnique: jest.fn().mockResolvedValue(verifiedProfile),
+      },
+    };
+    const service = await build(prisma, { resolveRecipient });
+    await expect(service.executeSinglePayout('pay-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(resolveRecipient).not.toHaveBeenCalled();
   });
 });

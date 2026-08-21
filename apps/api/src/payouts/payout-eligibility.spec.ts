@@ -202,4 +202,12 @@ describe('payout-eligibility', () => {
     expect(JSON.stringify(snap)).not.toMatch(/0123456789/);
     expect(snap.organiserId).toBe('org-1');
   });
+
+  it('fail-closes bank resolution to live in production', () => {
+    expect(resolvePayoutBankResolutionMode('stub', 'production')).toBe('live');
+    expect(resolvePayoutBankResolutionMode('off', 'production')).toBe('live');
+    expect(resolvePayoutBankResolutionMode('', 'production')).toBe('live');
+    expect(resolvePayoutBankResolutionMode(undefined, 'test')).toBe('stub');
+    expect(resolvePayoutBankResolutionMode('live', 'test')).toBe('live');
+  });
 });
