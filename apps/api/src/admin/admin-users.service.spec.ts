@@ -17,6 +17,9 @@ describe('AdminUsersService', () => {
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
+  let organizerApplications: {
+    ensureApprovedApplicationForOverride: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -33,12 +36,18 @@ describe('AdminUsersService', () => {
       ),
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    organizerApplications = {
+      ensureApprovedApplicationForOverride: jest
+        .fn()
+        .mockResolvedValue(undefined),
+    };
     service = new AdminUsersService(
       prisma as never,
       audit as never,
       {
         resetMfaForUser: jest.fn().mockResolvedValue({ reset: true }),
       } as never,
+      organizerApplications as never,
     );
   });
 

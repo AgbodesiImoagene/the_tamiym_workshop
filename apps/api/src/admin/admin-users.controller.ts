@@ -68,7 +68,13 @@ export class AdminUsersController {
     @Body() dto: UpdateAdminUserRoleDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.adminUsers.setUserRole(user.id, user.role, id, dto.role);
+    return this.adminUsers.setUserRole(
+      user.id,
+      user.role,
+      id,
+      dto.role,
+      dto.reason,
+    );
   }
 
   @Post(':id/mfa/reset')

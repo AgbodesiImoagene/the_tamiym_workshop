@@ -45,6 +45,7 @@ import { getRequestContext } from './request-context/request-context.store';
 import { validateEnv } from './config/env-validation';
 import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
 import { PrivacyModule } from './privacy/privacy.module';
+import { OrganizerModule } from './organizer/organizer.module';
 import { redactPublicDesignShareUrl } from './designs/design-share.redact';
 
 @Module({
@@ -162,6 +163,7 @@ import { redactPublicDesignShareUrl } from './designs/design-share.redact';
     OrdersModule,
     PayoutsModule,
     PrivacyModule,
+    OrganizerModule,
     ProductsModule,
     ShippingModule,
     ObservabilityModule,

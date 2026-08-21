@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AdminMfaService } from '../auth/admin-mfa.service';
+import { OrganizerApplicationsService } from '../organizer/organizer-applications.service';
 import {
   AuditAction,
   AuditSource,
@@ -42,6 +43,7 @@ export class AdminUsersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adminMfa: AdminMfaService,
+    private readonly organizerApplications: OrganizerApplicationsService,
   ) {}
 
   async searchUsers(q?: string, take = 50): Promise<AdminUserListRow[]> {
@@ -72,6 +74,7 @@ export class AdminUsersService {
     actorRole: UserRole,
     targetUserId: string,
     newRole: UserRole,
+    reason?: string,
   ): Promise<AdminUserListRow> {
     const target = await this.prisma.user.findFirst({
       where: { id: targetUserId, status: { not: UserStatus.DELETED } },
@@ -101,6 +104,17 @@ export class AdminUsersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (target.role === UserRole.CUSTOMER && newRole === UserRole.ORGANIZER) {
+        await this.organizerApplications.ensureApprovedApplicationForOverride(
+          tx,
+          {
+            actorUserId,
+            targetUserId,
+            reason: reason ?? '',
+          },
+        );
+      }
+
       const row = await tx.user.update({
         where: { id: targetUserId },
         data: { role: newRole },
@@ -130,7 +144,10 @@ export class AdminUsersService {
       targetId: targetUserId,
       before: { role: target.role },
       after: { role: newRole },
-      note: 'Admin changed user role',
+      note:
+        target.role === UserRole.CUSTOMER && newRole === UserRole.ORGANIZER
+          ? 'Admin CUSTOMER→ORGANIZER override'
+          : 'Admin changed user role',
       source: AuditSource.ADMIN_API,
     });
 

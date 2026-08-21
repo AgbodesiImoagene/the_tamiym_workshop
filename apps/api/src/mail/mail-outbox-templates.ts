@@ -14,6 +14,10 @@ export const OUTBOX_EVENT_DESIGN_MODERATION_APPROVED =
   'DesignModerationApproved';
 export const OUTBOX_EVENT_DESIGN_MODERATION_REJECTED =
   'DesignModerationRejected';
+export const OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED =
+  'organiser.application.approved';
+export const OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED =
+  'organiser.application.rejected';
 export const OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED =
   'OrganizerPayoutSucceeded';
 export const OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED = 'OrganizerPayoutFailed';
@@ -187,6 +191,27 @@ export function resolveOutboxMail(
         context: { subject, bodyHtml },
       };
     }
+    case OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED: {
+      const firstName = asScalarString(p.firstName);
+      return {
+        template: 'organizer-application-approved',
+        subject: 'Your organiser application was approved',
+        context: { firstName },
+      };
+    }
+    case OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED: {
+      const firstName = asScalarString(p.firstName);
+      const customerVisibleReason = asScalarString(
+        p.customerVisibleReason,
+        'Your application was not approved.',
+      );
+      return {
+        template: 'organizer-application-rejected',
+        subject: 'Update on your organiser application',
+        context: { firstName, customerVisibleReason },
+      };
+    }
+
     default:
       return null;
   }
