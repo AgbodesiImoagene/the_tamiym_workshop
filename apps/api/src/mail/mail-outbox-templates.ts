@@ -18,6 +18,12 @@ export const OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED =
   'organiser.application.approved';
 export const OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED =
   'organiser.application.rejected';
+export const OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED =
+  'organiser.campaign.approved';
+export const OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED =
+  'organiser.campaign.rejected';
+export const OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED =
+  'organiser.campaign.resumed';
 export const OUTBOX_EVENT_ORGANIZER_PAYOUT_SUCCEEDED =
   'OrganizerPayoutSucceeded';
 export const OUTBOX_EVENT_ORGANIZER_PAYOUT_FAILED = 'OrganizerPayoutFailed';
@@ -209,6 +215,44 @@ export function resolveOutboxMail(
         template: 'organizer-application-rejected',
         subject: 'Update on your organiser application',
         context: { firstName, customerVisibleReason },
+      };
+    }
+    case OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED: {
+      const firstName = asScalarString(p.firstName);
+      const campaignTitle = asScalarString(p.campaignTitle, 'Your campaign');
+      const mode = asScalarString(p.mode, 'live');
+      const startDate = asScalarString(p.startDate);
+      const scheduled = mode === 'scheduled';
+      return {
+        template: scheduled
+          ? 'organizer-campaign-approved-scheduled'
+          : 'organizer-campaign-approved-live',
+        subject: scheduled
+          ? 'Your campaign was approved and is scheduled'
+          : 'Your campaign was approved and is live',
+        context: { firstName, campaignTitle, startDate, mode },
+      };
+    }
+    case OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED: {
+      const firstName = asScalarString(p.firstName);
+      const campaignTitle = asScalarString(p.campaignTitle, 'Your campaign');
+      const customerVisibleReason = asScalarString(
+        p.customerVisibleReason,
+        'Your campaign was not approved. Please update it and resubmit.',
+      );
+      return {
+        template: 'organizer-campaign-rejected',
+        subject: 'Update on your campaign review',
+        context: { firstName, campaignTitle, customerVisibleReason },
+      };
+    }
+    case OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED: {
+      const firstName = asScalarString(p.firstName);
+      const campaignTitle = asScalarString(p.campaignTitle, 'Your campaign');
+      return {
+        template: 'organizer-campaign-resumed',
+        subject: 'Your campaign was resumed',
+        context: { firstName, campaignTitle },
       };
     }
 

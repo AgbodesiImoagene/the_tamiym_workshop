@@ -5,6 +5,7 @@ import { PayoutProfilesController } from './payout-profiles.controller';
 import { BanksController } from './banks.controller';
 import { CampaignsService } from './campaigns.service';
 import { CampaignExpiryService } from './campaign-expiry.service';
+import { CampaignReadinessService } from './campaign-readiness.service';
 import { PayoutProfilesService } from './payout-profiles.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -13,6 +14,7 @@ import { PayoutsModule } from '../payouts/payouts.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { AuthModule } from '../auth/auth.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { AuthModule } from '../auth/auth.module';
     ModerationModule,
     AdminNotificationsModule,
     AuthModule,
+    MailModule,
   ],
   controllers: [
     CampaignsController,
@@ -30,7 +33,12 @@ import { AuthModule } from '../auth/auth.module';
     PayoutProfilesController,
     BanksController,
   ],
-  providers: [CampaignsService, CampaignExpiryService, PayoutProfilesService],
-  exports: [CampaignsService, PayoutProfilesService],
+  providers: [
+    CampaignsService,
+    CampaignExpiryService,
+    CampaignReadinessService,
+    PayoutProfilesService,
+  ],
+  exports: [CampaignsService, PayoutProfilesService, CampaignReadinessService],
 })
 export class FundraisingModule {}

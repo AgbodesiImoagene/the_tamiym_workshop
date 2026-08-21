@@ -17,11 +17,26 @@ import {
   PayoutMode,
 } from '../generated/prisma/enums';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { CampaignReadinessService } from './campaign-readiness.service';
+import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import {
+  CAMPAIGN_READINESS_POLICY_VERSION,
+  CampaignReadinessPhase,
+} from './campaign-readiness.constants';
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const READY_RESULT = {
+  policyVersion: CAMPAIGN_READINESS_POLICY_VERSION,
+  phase: CampaignReadinessPhase.SUBMIT,
+  draftRevision: 1,
+  approvedRevision: null,
+  blockers: [],
+  warnings: [],
+  ready: true,
+};
 const APPROVED_RESULT = {
   status: ModerationStatus.APPROVED,
   notes: 'No categories above threshold',
@@ -55,6 +70,7 @@ const mockCampaign = {
   goalAmount: 500000,
   currentAmount: 0,
   draftRevision: 1,
+  approvedRevision: null,
   startDate: null,
   endDate: null,
   createdAt: new Date(),
@@ -74,6 +90,8 @@ describe('CampaignsService', () => {
   let moderationService: jest.Mocked<ModerationService>;
   let auditService: jest.Mocked<AuditService>;
   let adminNotifyService: jest.Mocked<AdminNotifyService>;
+  let readinessService: { evaluate: jest.Mock };
+  let outboxDelivery: { enqueueDelivery: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma: Record<string, unknown> = {};
@@ -91,6 +109,16 @@ describe('CampaignsService', () => {
     };
     mockPrisma.product = { findUnique: jest.fn() };
     mockPrisma.design = { findUnique: jest.fn() };
+    mockPrisma.user = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'user-1',
+        email: 'org@example.com',
+        firstName: 'Ada',
+      }),
+    };
+    mockPrisma.notificationOutbox = {
+      create: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+    };
     mockPrisma.campaignProduct = {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -122,6 +150,12 @@ describe('CampaignsService', () => {
       recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
       recordAdminDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
     };
+    readinessService = {
+      evaluate: jest.fn().mockResolvedValue({ ...READY_RESULT }),
+    };
+    outboxDelivery = {
+      enqueueDelivery: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,6 +171,11 @@ describe('CampaignsService', () => {
         {
           provide: AdminNotifyService,
           useValue: { emit: jest.fn().mockResolvedValue(undefined) },
+        },
+        { provide: CampaignReadinessService, useValue: readinessService },
+        {
+          provide: NotificationOutboxDeliveryService,
+          useValue: outboxDelivery,
         },
       ],
     }).compile();
@@ -220,6 +259,12 @@ describe('CampaignsService', () => {
       expect(result.id).toBe('camp-1');
       expect(result.draftRevision).toBe(1);
       expect(result.offers).toEqual([]);
+      expect(result.readiness).toEqual(
+        expect.objectContaining({ ready: true }),
+      );
+      expect(result.readinessPolicyVersion).toBe(
+        CAMPAIGN_READINESS_POLICY_VERSION,
+      );
     });
 
     it('throws NotFoundException when campaign not found', async () => {
@@ -417,6 +462,10 @@ describe('CampaignsService', () => {
 
       const result = await service.submitForReview('camp-1', 'user-1');
 
+      expect(readinessService.evaluate).toHaveBeenCalledWith(
+        'camp-1',
+        CampaignReadinessPhase.SUBMIT,
+      );
       expect(moderationService.moderateText).toHaveBeenCalled();
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -453,7 +502,7 @@ describe('CampaignsService', () => {
       );
     });
 
-    it('auto-rejects (back to DRAFT) when AI rejects content', async () => {
+    it('auto-rejects (back to DRAFT) when AI rejects content and notifies organiser', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         products: [pricedOffer],
@@ -474,9 +523,14 @@ describe('CampaignsService', () => {
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { status: CampaignStatus.DRAFT },
+          data: expect.objectContaining({
+            status: CampaignStatus.DRAFT,
+            approvedRevision: null,
+          }),
         }),
       );
+      expect(prisma.notificationOutbox.create).toHaveBeenCalled();
+      expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
     });
 
     it('throws BadRequestException when campaign is not in DRAFT', async () => {
@@ -500,34 +554,25 @@ describe('CampaignsService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('returns interim blocker when no offers', async () => {
+    it('returns readiness blockers from the evaluator', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         products: [],
       });
-      await expect(service.submitForReview('camp-1', 'user-1')).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('blocks submit when offer price is below the live floor', async () => {
-      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
-        ...mockCampaign,
-        products: [
+      readinessService.evaluate.mockResolvedValue({
+        ...READY_RESULT,
+        ready: false,
+        blockers: [
           {
-            productId: 'prod-1',
-            designId: 'design-1',
-            prices: [{ currency: 'NGN', amount: 100 }],
+            code: 'CAMPAIGN_READINESS_NO_OFFERS',
+            message: 'Add at least one product offer with a design and price.',
           },
         ],
       });
-      (
-        pricingService.getMinCampaignProductPrice as jest.Mock
-      ).mockResolvedValue(5000);
       await expect(service.submitForReview('camp-1', 'user-1')).rejects.toThrow(
         BadRequestException,
       );
-      expect(pricingService.getMinCampaignProductPrice).toHaveBeenCalled();
+      expect(moderationService.moderateText).not.toHaveBeenCalled();
     });
   });
 
@@ -536,48 +581,59 @@ describe('CampaignsService', () => {
   // -------------------------------------------------------------------------
 
   describe('activateForAdmin', () => {
-    it('activates a REVIEW campaign with all designs APPROVED', async () => {
+    it('activates a REVIEW campaign, stamps approvedRevision, and notifies organiser', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
         ...mockReviewCampaign,
-        products: [
-          {
-            design: {
-              id: 'd-1',
-              name: 'Logo Tee',
-              moderationStatus: ModerationStatus.APPROVED,
-            },
-          },
-        ],
+        draftRevision: 3,
       });
       (prisma.campaign.update as jest.Mock).mockResolvedValue({
         ...mockReviewCampaign,
         status: CampaignStatus.ACTIVE,
+        approvedRevision: 3,
       });
       (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockReviewCampaign,
         status: CampaignStatus.ACTIVE,
+        approvedRevision: 3,
+      });
+      readinessService.evaluate.mockResolvedValue({
+        ...READY_RESULT,
+        phase: CampaignReadinessPhase.ACTIVATE,
+        draftRevision: 3,
+        ready: true,
       });
 
       const result = await service.activateForAdmin('camp-1', 'admin-1');
 
+      expect(readinessService.evaluate).toHaveBeenCalledWith(
+        'camp-1',
+        CampaignReadinessPhase.ACTIVATE,
+      );
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { status: CampaignStatus.ACTIVE },
+          data: expect.objectContaining({
+            status: CampaignStatus.ACTIVE,
+            approvedRevision: 3,
+          }),
         }),
       );
+      expect(prisma.notificationOutbox.create).toHaveBeenCalled();
+      expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
       expect(result.status).toBe(CampaignStatus.ACTIVE);
     });
 
-    it('throws BadRequestException if a design is not APPROVED', async () => {
-      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
-        ...mockReviewCampaign,
-        products: [
+    it('throws BadRequestException when readiness blocks activation', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(
+        mockReviewCampaign,
+      );
+      readinessService.evaluate.mockResolvedValue({
+        ...READY_RESULT,
+        phase: CampaignReadinessPhase.ACTIVATE,
+        ready: false,
+        blockers: [
           {
-            design: {
-              id: 'd-1',
-              name: 'Logo Tee',
-              moderationStatus: ModerationStatus.PENDING,
-            },
+            code: 'CAMPAIGN_READINESS_DESIGN_NOT_APPROVED',
+            message: 'All attached designs must be approved before activation.',
           },
         ],
       });
@@ -598,38 +654,78 @@ describe('CampaignsService', () => {
     });
   });
 
+  describe('resumeForAdmin', () => {
+    it('resumes a PAUSED campaign when revision matches', async () => {
+      const paused = {
+        ...mockCampaign,
+        status: CampaignStatus.PAUSED,
+        draftRevision: 2,
+        approvedRevision: 2,
+      };
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(paused);
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...paused,
+        status: CampaignStatus.ACTIVE,
+      });
+      readinessService.evaluate.mockResolvedValue({
+        ...READY_RESULT,
+        phase: CampaignReadinessPhase.RESUME,
+        draftRevision: 2,
+        approvedRevision: 2,
+        ready: true,
+      });
+
+      const result = await service.resumeForAdmin('camp-1', 'admin-1');
+      expect(result.status).toBe(CampaignStatus.ACTIVE);
+      expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
+    });
+  });
+
   // -------------------------------------------------------------------------
   // rejectForAdmin
   // -------------------------------------------------------------------------
 
   describe('rejectForAdmin', () => {
-    it('rejects a REVIEW campaign back to DRAFT with a reason', async () => {
+    it('rejects a REVIEW campaign back to DRAFT with a reason and notifies organiser', async () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(
         mockReviewCampaign,
       );
       (prisma.campaign.update as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         moderationStatus: ModerationStatus.REJECTED,
-        rejectionReason: 'Misleading content',
       });
       (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         moderationStatus: ModerationStatus.REJECTED,
-        rejectionReason: 'Misleading content',
       });
 
-      await service.rejectForAdmin(
+      const result = await service.rejectForAdmin(
         'camp-1',
-        'Misleading content',
-        undefined,
+        'Please clarify the fundraising story',
+        'internal note',
         'admin-1',
       );
 
       expect(prisma.campaign.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { status: CampaignStatus.DRAFT },
+          data: expect.objectContaining({
+            status: CampaignStatus.DRAFT,
+            approvedRevision: null,
+          }),
         }),
       );
+      expect(prisma.notificationOutbox.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: expect.objectContaining({
+              customerVisibleReason: 'Please clarify the fundraising story',
+            }),
+          }),
+        }),
+      );
+      expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
+      expect(result.status).toBe(CampaignStatus.DRAFT);
     });
 
     it('throws BadRequestException when campaign is not in REVIEW', async () => {
