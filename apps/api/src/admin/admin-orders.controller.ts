@@ -104,7 +104,8 @@ export class AdminOrdersController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid amount or order not refundable',
+    description:
+      'Invalid amount, missing/illegal reasonCode, or order not refundable (stable TTW-041 code)',
   })
   @ApiResponse({
     status: 409,
@@ -121,6 +122,7 @@ export class AdminOrdersController {
     return this.refundsService.initiateRefund(
       id,
       dto.amount,
+      dto.reasonCode,
       dto.reason,
       user.id,
       dto.idempotencyKey,

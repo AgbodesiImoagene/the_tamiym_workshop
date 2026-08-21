@@ -1,3 +1,4 @@
+import { RefundReasonCode } from '../src/orders/resolution-policy';
 import { INestApplication } from '@nestjs/common';
 import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
@@ -141,6 +142,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
     const initiated = await refunds.initiateRefund(
       order.id,
       totalAmount,
+      RefundReasonCode.ADMIN_GOODWILL,
       'full refund',
       undefined,
       `idem-${suffix}`,
@@ -228,7 +230,12 @@ describe('Paystack refund lifecycle (e2e)', () => {
       currency: 'NGN',
     });
 
-    const initiated = await refunds.initiateRefund(order.id, 2500, 'partial');
+    const initiated = await refunds.initiateRefund(
+      order.id,
+      2500,
+      RefundReasonCode.ADMIN_GOODWILL,
+      'partial',
+    );
     await refunds.applyRefundWebhookEvent({
       event: 'refund.processed',
       data: {
@@ -260,9 +267,19 @@ describe('Paystack refund lifecycle (e2e)', () => {
       currency: 'NGN',
     });
 
-    await refunds.initiateRefund(order.id, 4000, 'first');
+    await refunds.initiateRefund(
+      order.id,
+      4000,
+      RefundReasonCode.ADMIN_GOODWILL,
+      'first',
+    );
     await expect(
-      refunds.initiateRefund(order.id, 2000, 'over'),
+      refunds.initiateRefund(
+        order.id,
+        2000,
+        RefundReasonCode.ADMIN_GOODWILL,
+        'over',
+      ),
     ).rejects.toThrow(/exceed captured value|between 0/i);
   });
 
@@ -294,6 +311,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
         refunds.initiateRefund(
           order.id,
           totalAmount,
+          RefundReasonCode.ADMIN_GOODWILL,
           `race-${i}`,
           undefined,
           `idem-race-${suffix}-${i}`,
@@ -350,7 +368,14 @@ describe('Paystack refund lifecycle (e2e)', () => {
     const key = `idem-same-${suffix}`;
     const results = await Promise.allSettled(
       Array.from({ length: 6 }, () =>
-        refunds.initiateRefund(order.id, totalAmount, 'same', undefined, key),
+        refunds.initiateRefund(
+          order.id,
+          totalAmount,
+          RefundReasonCode.ADMIN_GOODWILL,
+          'same',
+          undefined,
+          key,
+        ),
       ),
     );
 
