@@ -1,0 +1,26 @@
+# Temporary-validation overlay (hostnames + ClamAV).
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tmpval.yml --env-file .env up -d
+
+services:
+  proxy:
+    environment:
+      WEB_HOSTNAME: ${WEB_HOSTNAME:-www.tmpval.thetamiymworkshop.com}
+      APP_HOSTNAME: ${APP_HOSTNAME:-app.tmpval.thetamiymworkshop.com}
+      ADMIN_HOSTNAME: ${ADMIN_HOSTNAME:-admin.tmpval.thetamiymworkshop.com}
+      API_HOSTNAME: ${API_HOSTNAME:-api.tmpval.thetamiymworkshop.com}
+      APEX_HOSTNAME: ${APEX_HOSTNAME:-tmpval.thetamiymworkshop.com}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-ops@thetamiymworkshop.com}
+
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    networks:
+      - tamiym_internal
+    mem_limit: 768m
+    healthcheck:
+      test: ['CMD-SHELL', 'echo PING | nc -w 2 127.0.0.1 3310 | grep -q PONG']
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 120s

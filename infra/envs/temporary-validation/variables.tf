@@ -85,43 +85,43 @@ variable "ssh_source_cidrs" {
 variable "root_domain" {
   description = "Validation DNS zone under Namecheap (subzone of production apex)."
   type        = string
-  default     = "tmpval.tamiym.com"
+  default     = "tmpval.thetamiymworkshop.com"
 }
 
 variable "web_hostname" {
   description = "Temporary-validation public marketing hostname."
   type        = string
-  default     = "www.tmpval.tamiym.com"
+  default     = "www.tmpval.thetamiymworkshop.com"
 }
 
 variable "app_hostname" {
   description = "Temporary-validation customer app hostname."
   type        = string
-  default     = "app.tmpval.tamiym.com"
+  default     = "app.tmpval.thetamiymworkshop.com"
 }
 
 variable "admin_hostname" {
   description = "Temporary-validation admin hostname."
   type        = string
-  default     = "admin.tmpval.tamiym.com"
+  default     = "admin.tmpval.thetamiymworkshop.com"
 }
 
 variable "api_hostname" {
   description = "Temporary-validation API hostname."
   type        = string
-  default     = "api.tmpval.tamiym.com"
+  default     = "api.tmpval.thetamiymworkshop.com"
 }
 
 variable "customer_cookie_domain" {
   description = "Customer cookie scope for temporary-validation hosts."
   type        = string
-  default     = ".tmpval.tamiym.com"
+  default     = ".tmpval.thetamiymworkshop.com"
 }
 
 variable "admin_cookie_domain" {
   description = "Isolated admin cookie host for temporary-validation."
   type        = string
-  default     = "admin.tmpval.tamiym.com"
+  default     = "admin.tmpval.thetamiymworkshop.com"
 }
 
 variable "postgres_name" {

@@ -22,6 +22,8 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 ARG APP_NAME=web
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY . .
 # Dummy DATABASE_URL for workspace packages that may touch Prisma tooling.
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?schema=public

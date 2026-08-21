@@ -86,43 +86,43 @@ variable "ssh_source_cidrs" {
 variable "root_domain" {
   description = "Apex domain registered at Namecheap."
   type        = string
-  default     = "tamiym.com"
+  default     = "thetamiymworkshop.com"
 }
 
 variable "web_hostname" {
   description = "Public marketing hostname."
   type        = string
-  default     = "www.tamiym.com"
+  default     = "www.thetamiymworkshop.com"
 }
 
 variable "app_hostname" {
   description = "Customer app hostname."
   type        = string
-  default     = "app.tamiym.com"
+  default     = "app.thetamiymworkshop.com"
 }
 
 variable "admin_hostname" {
   description = "Admin app hostname."
   type        = string
-  default     = "admin.tamiym.com"
+  default     = "admin.thetamiymworkshop.com"
 }
 
 variable "api_hostname" {
   description = "API hostname."
   type        = string
-  default     = "api.tamiym.com"
+  default     = "api.thetamiymworkshop.com"
 }
 
 variable "customer_cookie_domain" {
   description = "Parent-domain cookie scope for shared customer session (web + app)."
   type        = string
-  default     = ".tamiym.com"
+  default     = ".thetamiymworkshop.com"
 }
 
 variable "admin_cookie_domain" {
   description = "Isolated admin cookie host (no parent-domain sharing with customers)."
   type        = string
-  default     = "admin.tamiym.com"
+  default     = "admin.thetamiymworkshop.com"
 }
 
 variable "postgres_name" {

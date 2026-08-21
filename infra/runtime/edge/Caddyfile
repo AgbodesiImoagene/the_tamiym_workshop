@@ -1,10 +1,10 @@
 # TTW-063 — Droplet edge Caddyfile (ACME HTTP-01).
 # Hostnames default to production; override via Caddy env or fork for tmpval.
 {
-	email {$CADDY_ACME_EMAIL:ops@tamiym.com}
+	email {$CADDY_ACME_EMAIL:ops@thetamiymworkshop.com}
 }
 
-{$WEB_HOSTNAME:www.tamiym.com} {
+{$WEB_HOSTNAME:www.thetamiymworkshop.com} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -15,7 +15,7 @@
 	reverse_proxy web:3000
 }
 
-{$APP_HOSTNAME:app.tamiym.com} {
+{$APP_HOSTNAME:app.thetamiymworkshop.com} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -26,7 +26,7 @@
 	reverse_proxy app:3002
 }
 
-{$ADMIN_HOSTNAME:admin.tamiym.com} {
+{$ADMIN_HOSTNAME:admin.thetamiymworkshop.com} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -37,7 +37,7 @@
 	reverse_proxy admin:3003
 }
 
-{$API_HOSTNAME:api.tamiym.com} {
+{$API_HOSTNAME:api.thetamiymworkshop.com} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -52,6 +52,6 @@
 	reverse_proxy api:3001
 }
 
-{$APEX_HOSTNAME:tamiym.com} {
-	redir https://{$WEB_HOSTNAME:www.tamiym.com}{uri} permanent
+{$APEX_HOSTNAME:thetamiymworkshop.com} {
+	redir https://{$WEB_HOSTNAME:www.thetamiymworkshop.com}{uri} permanent
 }

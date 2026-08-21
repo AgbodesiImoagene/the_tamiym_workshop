@@ -15,14 +15,14 @@ reserved IP is provisioned.
 | Item                      | Value                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registrar                 | Namecheap (owner account; 2FA required)                                                                                                                 |
-| Apex (production)         | `tamiym.com`                                                                                                                                            |
-| Temporary-validation zone | `tmpval.tamiym.com` (NS or records under the apex)                                                                                                      |
+| Apex (production)         | `thetamiymworkshop.com`                                                                                                                                 |
+| Temporary-validation zone | `tmpval.thetamiymworkshop.com` (NS or records under the apex)                                                                                           |
 | Change control            | Document who/when in the apply ticket; prefer TTL ≥ 300s during cutover                                                                                 |
 | Recovery                  | Keep registrar login + recovery codes off-provider; snapshot current records before edits; roll back A/CNAME to previous reserved IP or last known good |
 
 Do **not** transfer the domain as part of TTW-062. Do **not** commit Namecheap API tokens.
 
-## Production records (`tamiym.com`)
+## Production records (`thetamiymworkshop.com`)
 
 Point every public surface at the production reserved IP (OpenTofu output
 `reserved_ip`). Replace `<RESERVED_IP>` after apply.
@@ -39,11 +39,11 @@ Point every public surface at the production reserved IP (OpenTofu output
 
 Recommended canonical layout (matches OpenTofu hostname defaults):
 
-- `www.tamiym.com` → A → `<RESERVED_IP>`
-- `app.tamiym.com` → A → `<RESERVED_IP>`
-- `admin.tamiym.com` → A → `<RESERVED_IP>`
-- `api.tamiym.com` → A → `<RESERVED_IP>`
-- Apex `tamiym.com` → A → `<RESERVED_IP>` **or** URL redirect to `https://www.tamiym.com`
+- `www.thetamiymworkshop.com` → A → `<RESERVED_IP>`
+- `app.thetamiymworkshop.com` → A → `<RESERVED_IP>`
+- `admin.thetamiymworkshop.com` → A → `<RESERVED_IP>`
+- `api.thetamiymworkshop.com` → A → `<RESERVED_IP>`
+- Apex `thetamiymworkshop.com` → A → `<RESERVED_IP>` **or** URL redirect to `https://www.thetamiymworkshop.com`
 
 Optional TXT (owner policy):
 
@@ -53,18 +53,18 @@ Optional TXT (owner policy):
 | `_dmarc`                 | TXT  | `v=DMARC1; …`       | DMARC                                |
 | `@` or provider-specific | TXT  | domain verification | Paystack / Google / etc. as required |
 
-## Temporary-validation records (`tmpval.tamiym.com`)
+## Temporary-validation records (`tmpval.thetamiymworkshop.com`)
 
 Use the temporary-validation reserved IP (separate from production).
 
-| Host                      | Type | Value                  |
-| ------------------------- | ---- | ---------------------- |
-| `www.tmpval.tamiym.com`   | A    | `<TMPVAL_RESERVED_IP>` |
-| `app.tmpval.tamiym.com`   | A    | `<TMPVAL_RESERVED_IP>` |
-| `admin.tmpval.tamiym.com` | A    | `<TMPVAL_RESERVED_IP>` |
-| `api.tmpval.tamiym.com`   | A    | `<TMPVAL_RESERVED_IP>` |
+| Host                                 | Type | Value                  |
+| ------------------------------------ | ---- | ---------------------- |
+| `www.tmpval.thetamiymworkshop.com`   | A    | `<TMPVAL_RESERVED_IP>` |
+| `app.tmpval.thetamiymworkshop.com`   | A    | `<TMPVAL_RESERVED_IP>` |
+| `admin.tmpval.thetamiymworkshop.com` | A    | `<TMPVAL_RESERVED_IP>` |
+| `api.tmpval.thetamiymworkshop.com`   | A    | `<TMPVAL_RESERVED_IP>` |
 
-Cookie/CORS contracts for this zone use `.tmpval.tamiym.com` (see env outputs).
+Cookie/CORS contracts for this zone use `.tmpval.thetamiymworkshop.com` (see env outputs).
 
 ## Paystack webhook DNS dependency
 
@@ -72,8 +72,8 @@ Paystack must reach:
 
 `https://api.<zone>/v1/webhooks/paystack`
 
-Production default: `https://api.tamiym.com/v1/webhooks/paystack`  
-Temporary-validation default: `https://api.tmpval.tamiym.com/v1/webhooks/paystack`
+Production default: `https://api.thetamiymworkshop.com/v1/webhooks/paystack`  
+Temporary-validation default: `https://api.tmpval.thetamiymworkshop.com/v1/webhooks/paystack`
 
 DNS for `api` must resolve before webhook registration. Application-layer HMAC
 verification remains mandatory (never open the path without signature checks).
@@ -88,7 +88,7 @@ verification remains mandatory (never open the path without signature checks).
 
 1. Apply OpenTofu env; capture `reserved_ip` and `public_hostnames`.
 2. Create/update Namecheap A records as above.
-3. Wait for propagation (`dig +short www.tamiym.com`).
+3. Wait for propagation (`dig +short www.thetamiymworkshop.com`).
 4. Issue/renew certificates on the edge (TTW-063 Caddy).
 5. Register Paystack webhook URL; send a test event.
 6. Record the change (operator, time, previous records) for recovery.
