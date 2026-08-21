@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { DesignsService } from './designs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { S3Service } from '../storage/s3.service';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
@@ -47,6 +48,12 @@ describe('DesignsService', () => {
   let service: DesignsService;
   let prisma: jest.Mocked<PrismaService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let moderationDecisions: {
+    recordAiDecision: jest.Mock;
+    recordAiDecisionInTx: jest.Mock;
+    recordAdminDecision: jest.Mock;
+    recordDecisionInTx: jest.Mock;
+  };
   let s3: jest.Mocked<S3Service>;
   let config: { get: jest.Mock };
 
@@ -57,6 +64,7 @@ describe('DesignsService', () => {
     );
     mockPrisma.design = {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -87,6 +95,13 @@ describe('DesignsService', () => {
       moderateImage: jest.fn().mockResolvedValue(APPROVED_RESULT),
     };
 
+    moderationDecisions = {
+      recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAiDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
+
     const mockS3 = {
       uploadObject: jest.fn().mockResolvedValue({
         key: 'thumbnails/design-1/thumb.png',
@@ -109,6 +124,10 @@ describe('DesignsService', () => {
         DesignsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ModerationService, useValue: mockModeration },
+        {
+          provide: ModerationDecisionService,
+          useValue: moderationDecisions,
+        },
         { provide: S3Service, useValue: mockS3 },
         {
           provide: AdminNotifyService,
@@ -142,6 +161,9 @@ describe('DesignsService', () => {
         status: 'ACTIVE',
       });
       (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
       (prisma.design.findUnique as jest.Mock).mockResolvedValue({
         productId: 'prod-1',
       });
@@ -152,7 +174,7 @@ describe('DesignsService', () => {
         designData: { version: 1, views: {} },
         thumbnailUrl: 'https://cdn.example.com/thumb.png',
       };
-      await service.create('user-1', dto);
+      const result = await service.create('user-1', dto);
 
       expect(moderationService.moderate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -165,10 +187,12 @@ describe('DesignsService', () => {
           productId: 'prod-1',
           name: 'My Design',
           moderationStatus: ModerationStatus.APPROVED,
-          moderationNotes: APPROVED_RESULT.notes,
         }),
         include: expect.any(Object),
       });
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalled();
+      expect(result).not.toHaveProperty('moderationNotes');
+      expect(result.moderationStatus).toBe(ModerationStatus.APPROVED);
     });
 
     it('falls back to PENDING when no text layers and no thumbnail', async () => {
@@ -176,7 +200,14 @@ describe('DesignsService', () => {
         id: 'prod-1',
         status: 'ACTIVE',
       });
-      (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.create as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        moderationStatus: ModerationStatus.PENDING,
+      });
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        moderationStatus: ModerationStatus.PENDING,
+      });
       (prisma.design.findUnique as jest.Mock).mockResolvedValue({
         productId: 'prod-1',
       });
@@ -195,6 +226,7 @@ describe('DesignsService', () => {
           }),
         }),
       );
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalled();
     });
 
     it('rejects if product not found', async () => {
@@ -224,6 +256,9 @@ describe('DesignsService', () => {
         status: 'ACTIVE',
       });
       (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
       (prisma.design.findUnique as jest.Mock).mockResolvedValue({
         productId: 'prod-1',
       });
@@ -261,10 +296,12 @@ describe('DesignsService', () => {
   // -------------------------------------------------------------------------
 
   describe('findAll', () => {
-    it('returns designs for a user', async () => {
+    it('returns designs for a user without moderationNotes', async () => {
       (prisma.design.findMany as jest.Mock).mockResolvedValue([mockDesign]);
       const result = await service.findAll('user-1');
-      expect(result).toEqual([mockDesign]);
+      expect(result).toHaveLength(1);
+      expect(result[0]).not.toHaveProperty('moderationNotes');
+      expect(result[0].moderationStatus).toBe(ModerationStatus.APPROVED);
     });
   });
 
@@ -273,10 +310,11 @@ describe('DesignsService', () => {
   // -------------------------------------------------------------------------
 
   describe('findOne', () => {
-    it('returns a design owned by the user', async () => {
+    it('returns a design owned by the user without moderationNotes', async () => {
       (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
       const result = await service.findOne('user-1', 'design-1');
-      expect(result).toEqual(mockDesign);
+      expect(result).not.toHaveProperty('moderationNotes');
+      expect(result.id).toBe('design-1');
     });
 
     it('throws NotFoundException when design does not exist', async () => {
@@ -326,6 +364,9 @@ describe('DesignsService', () => {
         productId: 'prod-1',
       });
       (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
       (prisma.productView.findMany as jest.Mock).mockResolvedValue([
         { id: 'pv-1' },
       ]);
@@ -341,11 +382,13 @@ describe('DesignsService', () => {
           },
         },
       };
-      await service.update('user-1', 'design-1', dto);
+      const result = await service.update('user-1', 'design-1', dto);
 
       expect(moderationService.moderate).toHaveBeenCalledWith(
         expect.objectContaining({ text: 'Updated text' }),
       );
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalled();
+      expect(result).not.toHaveProperty('moderationNotes');
     });
 
     it('throws ForbiddenException when user does not own the design', async () => {
@@ -391,24 +434,27 @@ describe('DesignsService', () => {
   describe('updateModeration', () => {
     it('updates moderation status with optional notes', async () => {
       (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
-      (prisma.design.update as jest.Mock).mockResolvedValue({
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockDesign,
         moderationStatus: ModerationStatus.REJECTED,
         moderationNotes: 'admin note',
+        user: { id: 'user-1', email: 'a@example.com' },
+        product: { id: 'prod-1', name: 'P', slug: 'p' },
       });
 
       await service.updateModeration(
         'design-1',
         ModerationStatus.REJECTED,
         'admin note',
+        'admin-1',
       );
 
-      expect(prisma.design.update).toHaveBeenCalledWith(
+      expect(moderationDecisions.recordAdminDecision).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            moderationStatus: ModerationStatus.REJECTED,
-            moderationNotes: 'admin note',
-          }),
+          subjectId: 'design-1',
+          outcome: ModerationStatus.REJECTED,
+          actorUserId: 'admin-1',
+          notes: 'admin note',
         }),
       );
     });
@@ -561,6 +607,12 @@ describe('DesignsService', () => {
         name: 'Copy of My Design',
         moderationStatus: ModerationStatus.PENDING,
       });
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        id: 'design-2',
+        name: 'Copy of My Design',
+        moderationStatus: ModerationStatus.PENDING,
+      });
 
       const result = await service.duplicate('user-1', 'design-1');
 
@@ -572,8 +624,16 @@ describe('DesignsService', () => {
           }),
         }),
       );
+      expect(moderationDecisions.recordDecisionInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          outcome: ModerationStatus.PENDING,
+          withdrawPendingAppeals: false,
+        }),
+      );
       expect(prisma.designView.createMany).toHaveBeenCalled();
       expect(result.id).toBe('design-2');
+      expect(result).not.toHaveProperty('moderationNotes');
     });
 
     it('throws NotFoundException when original design does not exist', async () => {

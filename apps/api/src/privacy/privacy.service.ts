@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthSessionService } from '../auth/auth-session.service';
 import { AuditService } from '../audit/audit.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
   AuditAction,
   AuditSource,
@@ -60,6 +61,7 @@ export class PrivacyService {
     private readonly prisma: PrismaService,
     private readonly authSessions: AuthSessionService,
     private readonly audit: AuditService,
+    private readonly moderationDecisions: ModerationDecisionService,
   ) {}
 
   listForUser(userId: string) {
@@ -498,6 +500,19 @@ export class PrivacyService {
         cleared: shareCleared.count,
         revokedLinks: digestedRevoked.count,
       });
+
+      const appealsWithdrawn =
+        await this.moderationDecisions.withdrawPendingAppealsForOwnerInTx(
+          tx,
+          userId,
+        );
+      await this.recordActionTx(
+        tx,
+        requestId,
+        'postgres.moderation_appeals',
+        'OK',
+        { withdrawnPending: appealsWithdrawn },
+      );
 
       await this.recordActionTx(
         tx,

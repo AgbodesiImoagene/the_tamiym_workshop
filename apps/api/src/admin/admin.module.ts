@@ -29,10 +29,12 @@ import { AdminEmailBroadcastService } from './admin-email-broadcast.service';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 import { AdminMediaController } from './admin-media.controller';
+import { AdminModerationAppealsController } from './admin-moderation-appeals.controller';
 import { ShippingModule } from '../shipping/shipping.module';
 import { ReconciliationModule } from '../reconciliation/reconciliation.module';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
 import { MediaModule } from '../media/media.module';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
   imports: [
@@ -51,6 +53,7 @@ import { MediaModule } from '../media/media.module';
     ShippingModule,
     ReconciliationModule,
     MediaModule,
+    ModerationModule,
   ],
   providers: [AdminEmailBroadcastService, AdminUsersService],
   controllers: [
@@ -61,6 +64,7 @@ import { MediaModule } from '../media/media.module';
     AdminDesignsController,
     AdminCampaignsController,
     AdminMediaController,
+    AdminModerationAppealsController,
     AdminSiteSettingsController,
     AdminShippingController,
     AdminPayoutsController,

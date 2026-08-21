@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
 import { VirusScanService } from './virus-scan.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { ObservabilityService } from '../observability/observability.service';
 import { SafeRemoteMediaFetcher } from './safe-remote-fetch';
 import {
@@ -67,12 +68,19 @@ describe('MediaProcessor', () => {
   let s3Service: jest.Mocked<S3Service>;
   let virusScanService: jest.Mocked<VirusScanService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let moderationDecisions: {
+    recordAiDecision: jest.Mock;
+    recordAiDecisionInTx: jest.Mock;
+  };
   let observability: jest.Mocked<ObservabilityService>;
   let safeRemoteFetcher: jest.Mocked<SafeRemoteMediaFetcher>;
 
   beforeEach(() => {
     (global as { __mediaSharpFormat?: string }).__mediaSharpFormat = 'png';
     prisma = {
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(prisma),
+      ),
       mediaAsset: {
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -93,6 +101,10 @@ describe('MediaProcessor', () => {
       moderateText: jest.fn(),
       moderateImage: jest.fn(),
     } as unknown as jest.Mocked<ModerationService>;
+    moderationDecisions = {
+      recordAiDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+      recordAiDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
     observability = {
       recordQueueJob: jest.fn(),
     } as unknown as jest.Mocked<ObservabilityService>;
@@ -105,6 +117,7 @@ describe('MediaProcessor', () => {
       s3Service,
       virusScanService,
       moderationService,
+      moderationDecisions as unknown as ModerationDecisionService,
       observability,
       safeRemoteFetcher,
     );
@@ -175,11 +188,16 @@ describe('MediaProcessor', () => {
     expect(prisma.mediaAsset.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'asset-1' },
-        data: expect.objectContaining({
-          moderationStatus: ModerationStatus.REJECTED,
-          moderationNotes: REJECTED_RESULT.notes,
+        data: {
           status: MediaAssetStatus.FAILED,
-        }),
+          errorMessage: 'Asset rejected by content moderation',
+        },
+      }),
+    );
+    expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        outcome: ModerationStatus.REJECTED,
       }),
     );
     expect(s3Service.uploadObject).not.toHaveBeenCalled();
@@ -240,8 +258,13 @@ describe('MediaProcessor', () => {
         where: { id: 'asset-1' },
         data: expect.objectContaining({
           status: MediaAssetStatus.READY,
-          moderationStatus: ModerationStatus.APPROVED,
         }),
+      }),
+    );
+    expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        outcome: ModerationStatus.APPROVED,
       }),
     );
   });
@@ -266,15 +289,19 @@ describe('MediaProcessor', () => {
 
     await processor.process({ data: { assetId: 'asset-1' } } as never);
 
-    // FLAGGED assets are READY (not blocked) but carry the FLAGGED moderation status
+    // FLAGGED assets are READY (not blocked); projection comes from recordAiDecisionInTx
     expect(prisma.mediaAsset.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'asset-1' },
         data: expect.objectContaining({
           status: MediaAssetStatus.READY,
-          moderationStatus: ModerationStatus.FLAGGED,
-          moderationNotes: FLAGGED_RESULT.notes,
         }),
+      }),
+    );
+    expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        outcome: ModerationStatus.FLAGGED,
       }),
     );
   });

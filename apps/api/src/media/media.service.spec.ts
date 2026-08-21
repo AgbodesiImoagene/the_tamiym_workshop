@@ -4,6 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import { MEDIA_QUEUE } from './media.constants';
 import {
   MediaAssetStatus,
@@ -24,6 +25,8 @@ describe('MediaService', () => {
       mediaAsset: {
         create: jest.fn(),
         update: jest.fn(),
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       mediaDerivative: {
         create: jest.fn(),
@@ -35,12 +38,16 @@ describe('MediaService', () => {
     const mockQueue = {
       add: jest.fn(),
     };
+    const mockDecisions = {
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MediaService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: S3Service, useValue: mockS3 },
+        { provide: ModerationDecisionService, useValue: mockDecisions },
         { provide: getQueueToken(MEDIA_QUEUE), useValue: mockQueue },
       ],
     }).compile();
@@ -138,6 +145,49 @@ describe('MediaService', () => {
       'process',
       { assetId: 'asset-2' },
       expect.any(Object),
+    );
+  });
+
+  it('adminUpdateModeration records an ADMIN decision', async () => {
+    const decisions = {
+      recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-9' }),
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        MediaService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: S3Service, useValue: s3Service },
+        { provide: ModerationDecisionService, useValue: decisions },
+        { provide: getQueueToken(MEDIA_QUEUE), useValue: queue },
+      ],
+    }).compile();
+    const media = module.get(MediaService);
+
+    (prisma.mediaAsset.findUnique as jest.Mock).mockResolvedValue({
+      id: 'asset-1',
+      checksum: 'abc',
+      originalKey: 'k',
+    });
+    (prisma.mediaAsset.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      id: 'asset-1',
+      moderationStatus: ModerationStatus.APPROVED,
+    });
+
+    await media.adminUpdateModeration(
+      'asset-1',
+      ModerationStatus.APPROVED,
+      'looks fine',
+      'admin-1',
+    );
+
+    expect(decisions.recordAdminDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subjectType: 'MEDIA',
+        subjectId: 'asset-1',
+        outcome: ModerationStatus.APPROVED,
+        actorUserId: 'admin-1',
+        notes: 'looks fine',
+      }),
     );
   });
 });

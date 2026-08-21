@@ -8,12 +8,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { ModerationDecisionService } from '../moderation/moderation-decision.service';
+import {
+  aiReasonCodesForOutcome,
+  hashRevision,
+} from '../moderation/moderation.constants';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { AddCampaignProductDto } from './dto/add-campaign-product.dto';
 import {
   CampaignStatus,
   ModerationStatus,
+  ModerationSubjectType,
   PayoutMode,
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
@@ -45,6 +51,7 @@ export class CampaignsService {
     private pricingService: PricingService,
     private audit: AuditService,
     private moderationService: ModerationService,
+    private moderationDecisions: ModerationDecisionService,
     private adminNotify: AdminNotifyService,
   ) {}
 
@@ -122,7 +129,7 @@ export class CampaignsService {
       );
     }
     this.assertDateOrder(dto.startDate, dto.endDate);
-    return this.prisma.campaign.create({
+    const created = await this.prisma.campaign.create({
       data: {
         organizerId,
         title: dto.title,
@@ -136,13 +143,25 @@ export class CampaignsService {
         endDate: dto.endDate ? new Date(dto.endDate) : null,
       },
     });
+    return this.toOrganizerCampaign(created);
+  }
+
+  /**
+   * Organizer API view: keep moderationStatus / rejectionReason, never expose notes.
+   */
+  private toOrganizerCampaign<T extends { moderationNotes?: string | null }>(
+    campaign: T,
+  ): Omit<T, 'moderationNotes'> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- strip internal notes
+    const { moderationNotes, ...rest } = campaign;
+    return rest;
   }
 
   /**
    * List campaigns for organizer
    */
   async findAll(organizerId: string) {
-    return this.prisma.campaign.findMany({
+    const campaigns = await this.prisma.campaign.findMany({
       where: { organizerId },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -153,6 +172,7 @@ export class CampaignsService {
         },
       },
     });
+    return campaigns.map((c) => this.toOrganizerCampaign(c));
   }
 
   /**
@@ -176,7 +196,7 @@ export class CampaignsService {
     if (campaign.organizerId !== organizerId) {
       throw new ForbiddenException('Access denied');
     }
-    return campaign;
+    return this.toOrganizerCampaign(campaign);
   }
 
   /**
@@ -248,22 +268,26 @@ export class CampaignsService {
           : (current?.endDate?.toISOString() ?? null);
       this.assertDateOrder(effectiveStart, effectiveEnd);
     }
-    return this.prisma.campaign.update({
-      where: { id },
-      data: {
-        ...(dto.title && { title: dto.title }),
-        ...(slug && { slug }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.story !== undefined && { story: dto.story }),
-        ...(dto.goalAmount !== undefined && { goalAmount: dto.goalAmount }),
-        ...(dto.startDate !== undefined && {
-          startDate: dto.startDate ? new Date(dto.startDate) : null,
-        }),
-        ...(dto.endDate !== undefined && {
-          endDate: dto.endDate ? new Date(dto.endDate) : null,
-        }),
-      },
-    });
+    return this.toOrganizerCampaign(
+      await this.prisma.campaign.update({
+        where: { id },
+        data: {
+          ...(dto.title && { title: dto.title }),
+          ...(slug && { slug }),
+          ...(dto.description !== undefined && {
+            description: dto.description,
+          }),
+          ...(dto.story !== undefined && { story: dto.story }),
+          ...(dto.goalAmount !== undefined && { goalAmount: dto.goalAmount }),
+          ...(dto.startDate !== undefined && {
+            startDate: dto.startDate ? new Date(dto.startDate) : null,
+          }),
+          ...(dto.endDate !== undefined && {
+            endDate: dto.endDate ? new Date(dto.endDate) : null,
+          }),
+        },
+      }),
+    );
   }
 
   /**
@@ -513,16 +537,35 @@ export class CampaignsService {
 
     // AI auto-reject: push back to DRAFT immediately so the organiser can fix.
     if (moderationResult.status === ModerationStatus.REJECTED) {
-      const updated = await this.prisma.campaign.update({
-        where: { id },
-        data: {
-          status: CampaignStatus.DRAFT,
-          moderationStatus: ModerationStatus.REJECTED,
-          moderationNotes: moderationResult.notes,
-          rejectionReason:
-            'Your campaign content was automatically rejected by our moderation system. ' +
-            'Please review and update your campaign title, description, and story, then resubmit.',
-        },
+      const rejectionReason =
+        'Your campaign content was automatically rejected by our moderation system. ' +
+        'Please review and update your campaign title, description, and story, then resubmit.';
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await tx.campaign.update({
+          where: { id },
+          data: {
+            status: CampaignStatus.DRAFT,
+          },
+        });
+        await this.moderationDecisions.recordAiDecisionInTx(tx, {
+          subjectType: ModerationSubjectType.CAMPAIGN,
+          subjectId: id,
+          outcome: ModerationStatus.REJECTED,
+          notes: moderationResult.notes,
+          maxScore: moderationResult.maxScore,
+          customerExplanation: rejectionReason,
+          revisionHash: hashRevision({
+            title: campaign.title,
+            description: campaign.description,
+            story: campaign.story,
+          }),
+          reasonCodes: aiReasonCodesForOutcome(
+            ModerationStatus.REJECTED,
+            moderationResult.notes,
+          ),
+          withdrawPendingAppeals: true,
+        });
+        return tx.campaign.findUniqueOrThrow({ where: { id } });
       });
       await this.audit.log({
         eventName: 'campaign.review.auto_rejected',
@@ -544,18 +587,35 @@ export class CampaignsService {
         organizerId,
         moderationNotes: moderationResult.notes,
       });
-      return updated;
+      return this.toOrganizerCampaign(updated);
     }
 
     // FLAGGED or APPROVED: move to REVIEW for human inspection.
-    const updated = await this.prisma.campaign.update({
-      where: { id },
-      data: {
-        status: CampaignStatus.REVIEW,
-        moderationStatus: moderationResult.status,
-        moderationNotes: moderationResult.notes,
-        rejectionReason: null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.campaign.update({
+        where: { id },
+        data: {
+          status: CampaignStatus.REVIEW,
+        },
+      });
+      await this.moderationDecisions.recordAiDecisionInTx(tx, {
+        subjectType: ModerationSubjectType.CAMPAIGN,
+        subjectId: id,
+        outcome: moderationResult.status,
+        notes: moderationResult.notes,
+        maxScore: moderationResult.maxScore,
+        revisionHash: hashRevision({
+          title: campaign.title,
+          description: campaign.description,
+          story: campaign.story,
+        }),
+        reasonCodes: aiReasonCodesForOutcome(
+          moderationResult.status,
+          moderationResult.notes,
+        ),
+        withdrawPendingAppeals: true,
+      });
+      return tx.campaign.findUniqueOrThrow({ where: { id } });
     });
     await this.audit.log({
       eventName: 'campaign.review.submitted',
@@ -577,7 +637,7 @@ export class CampaignsService {
       organizerId,
       aiModerationStatus: moderationResult.status,
     });
-    return updated;
+    return this.toOrganizerCampaign(updated);
   }
 
   /**
@@ -624,13 +684,27 @@ export class CampaignsService {
       );
     }
 
-    const updated = await this.prisma.campaign.update({
-      where: { id },
-      data: {
-        status: CampaignStatus.ACTIVE,
-        moderationStatus: ModerationStatus.APPROVED,
-        rejectionReason: null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.campaign.update({
+        where: { id },
+        data: {
+          status: CampaignStatus.ACTIVE,
+        },
+      });
+      await this.moderationDecisions.recordAdminDecisionInTx(tx, {
+        subjectType: ModerationSubjectType.CAMPAIGN,
+        subjectId: id,
+        outcome: ModerationStatus.APPROVED,
+        actorUserId: actorUserId ?? null,
+        notes: 'Admin activated campaign',
+        revisionHash: hashRevision({
+          title: campaign.title,
+          description: campaign.description,
+          story: campaign.story,
+        }),
+        withdrawPendingAppeals: true,
+      });
+      return tx.campaign.findUniqueOrThrow({ where: { id } });
     });
     await this.audit.log({
       eventName: 'admin.campaign.activated',
@@ -672,14 +746,28 @@ export class CampaignsService {
       );
     }
 
-    const updated = await this.prisma.campaign.update({
-      where: { id },
-      data: {
-        status: CampaignStatus.DRAFT,
-        moderationStatus: ModerationStatus.REJECTED,
-        rejectionReason,
-        ...(notes !== undefined && { moderationNotes: notes }),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.campaign.update({
+        where: { id },
+        data: {
+          status: CampaignStatus.DRAFT,
+        },
+      });
+      await this.moderationDecisions.recordAdminDecisionInTx(tx, {
+        subjectType: ModerationSubjectType.CAMPAIGN,
+        subjectId: id,
+        outcome: ModerationStatus.REJECTED,
+        actorUserId: actorUserId ?? null,
+        notes: notes ?? null,
+        customerExplanation: rejectionReason,
+        revisionHash: hashRevision({
+          title: campaign.title,
+          description: campaign.description,
+          story: campaign.story,
+        }),
+        withdrawPendingAppeals: true,
+      });
+      return tx.campaign.findUniqueOrThrow({ where: { id } });
     });
     await this.audit.log({
       eventName: 'admin.campaign.rejected',

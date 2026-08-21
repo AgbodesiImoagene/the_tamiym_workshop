@@ -21,6 +21,8 @@ import { ModerationActionDto } from '../designs/dto/moderation-action.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { RequestUser } from '../auth/strategies/jwt.strategy';
 import { UserRole, ModerationStatus } from '../generated/prisma/enums';
 
 @ApiTags('Admin')
@@ -64,9 +66,15 @@ export class AdminMediaController {
   @ApiResponse({ status: 200, description: 'Moderation status updated' })
   @ApiResponse({ status: 404, description: 'Not found' })
   async updateModeration(
+    @CurrentUser() actor: RequestUser,
     @Param('id') id: string,
     @Body() dto: ModerationActionDto,
   ) {
-    return this.mediaService.adminUpdateModeration(id, dto.status, dto.notes);
+    return this.mediaService.adminUpdateModeration(
+      id,
+      dto.status,
+      dto.notes,
+      actor.id,
+    );
   }
 }

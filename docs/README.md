@@ -63,10 +63,12 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 22. `backend-production-readiness.md` — repo-state backend gaps, todos, and production checklist
 23. `tickets/README.md` — prioritized epics, deferred work, and implementation-ticket backlog
 24. `privacy/ttw-025-data-inventory.md` — interim privacy / DSAR inventory and retention matrix (TTW-025)
+25. `moderation/ttw-027-interim-policy.md` — interim content moderation & appeals matrix (TTW-027)
 
 ## Deep Dives
 
 - `dependency-security-policy.md` — production audit bar, Dependabot, and allowed remediation paths (TTW-022)
+- `moderation/ttw-027-interim-policy.md` — interim content moderation appeals matrix (TTW-027)
 - `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
 - `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
 - `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout

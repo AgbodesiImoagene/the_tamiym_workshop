@@ -139,6 +139,30 @@ enum ModerationStatus {
   FLAGGED
 }
 
+/// Polymorphic subject for an immutable moderation decision (TTW-027).
+enum ModerationSubjectType {
+  DESIGN
+  MEDIA
+  CAMPAIGN
+}
+
+/// Who produced a moderation decision.
+enum ModerationActorKind {
+  AI
+  ADMIN
+  SYSTEM
+  APPEAL_RESOLUTION
+}
+
+/// Owner appeal lifecycle for a challenged moderation decision.
+enum ModerationAppealStatus {
+  PENDING
+  WITHDRAWN
+  UPHELD
+  OVERTURNED
+  ESCALATED
+}
+
 /// Lifecycle status for a media asset ingestion job.
 enum MediaAssetStatus {
   PENDING
@@ -1394,6 +1418,75 @@ model MediaAsset {
   @@index([scanStatus])
   @@index([moderationStatus])
   @@map("media_assets")
+}
+
+/**
+ * Immutable moderation decision for a design, media asset, or campaign (TTW-027).
+ * Current Design/MediaAsset/Campaign moderation fields are projections of the latest row.
+ * No FK to subject tables — polymorphic subjectId.
+ */
+model ModerationDecision {
+  id           String                @id @default(cuid())
+  subjectType  ModerationSubjectType
+  subjectId    String
+  /// Optional content fingerprint (sha256 hex) of the moderated revision.
+  revisionHash String?
+
+  outcome ModerationStatus
+
+  actorKind   ModerationActorKind
+  actorUserId String?
+
+  policyVersion String
+  modelVersion  String?
+
+  reasonCodes String[]
+
+  /// Customer-safe explanation only (never AI scores or internal notes).
+  customerExplanation String?
+  /// Internal evidence (scores, notes); admin-only in APIs.
+  internalEvidence    Json?
+
+  /// Prior decision this row supersedes (appeal resolution / resubmit), if any.
+  supersedesDecisionId String?
+
+  createdAt DateTime @default(now())
+
+  appeals ModerationAppeal[]
+
+  @@index([subjectType, subjectId, createdAt])
+  @@map("moderation_decisions")
+}
+
+/**
+ * Owner appeal against an eligible moderation decision (TTW-027).
+ * At most one PENDING appeal per decision (partial unique index in migration).
+ */
+model ModerationAppeal {
+  id         String             @id @default(cuid())
+  decisionId String
+  decision   ModerationDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+
+  ownerUserId String
+  status      ModerationAppealStatus @default(PENDING)
+
+  statement     String
+  policyVersion String
+
+  /// Decision appended when the appeal was resolved (UPHELD / OVERTURNED).
+  resolutionDecisionId String?
+
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  withdrawnAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId, status])
+  @@index([decisionId])
+  @@index([status, createdAt])
+  @@map("moderation_appeals")
 }
 
 /// Media derivatives for an asset (original, display, thumb).
