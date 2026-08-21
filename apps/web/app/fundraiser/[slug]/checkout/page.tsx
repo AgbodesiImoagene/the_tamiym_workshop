@@ -143,7 +143,6 @@ export default function FundraiserCheckoutPage() {
         if (cancelled) return;
         const address = addresses.find((item) => item.isDefault) ?? addresses[0];
         if (address) {
-          setSavedAddressId(address.id);
           setForm(addressToForm(address));
         }
       } catch {
@@ -172,7 +171,6 @@ export default function FundraiserCheckoutPage() {
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
     });
-    setSavedAddressId(address.id);
     return address.id;
   }
 
@@ -206,7 +204,6 @@ export default function FundraiserCheckoutPage() {
     setIsSubmitting(true);
     try {
       const shippingAddressId = await ensureAddress();
-      setSavedAddressId(shippingAddressId);
       const createdOrder = await createCampaignOrder(cart.campaignId, {
         shippingAddressId,
         items: cartLinesToQuoteItems(cart.lines),
