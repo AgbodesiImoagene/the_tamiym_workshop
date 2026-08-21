@@ -1,7 +1,7 @@
 # TTW-035 — Build organiser campaign authoring
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys  
-**Status:** Not started  
+**Status:** In progress (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-021, TTW-030, TTW-031  
 **Blocks:** TTW-034, TTW-053
@@ -77,6 +77,57 @@ Expose server-derived currency/minimum-price guidance without leaking costs or p
 - Buyer selection/checkout → TTW-031, TTW-032.
 
 ## Design review
+
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21  
+**Risk:** High  
+**Policy version:** `organiser-campaign-authoring/v1-interim-2026-08-21`  
+**Verdict:** Proceed with interim policy (formal product/T&S sign-off deferred)
+
+| Topic          | Decision                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| Editor         | Explicit-save DRAFT workspace at `/dashboard/fundraiser/[id]`; list links in                           |
+| Revision       | Monotonic `draftRevision`; mutations require `expectedRevision`; stale → 409 `CAMPAIGN_STALE_REVISION` |
+| Mutability     | Owned DRAFT only for basics + offers                                                                   |
+| Offers         | Transactional add/update/remove; owned design matching product; positive NGN ≥ floor; uniqueness       |
+| Price guidance | Currency + minimumPrice + non-promising copy; never cost/basis                                         |
+| Preview        | Owner-only TTW-031 projection + `purchasable:false` + DRAFT watermark; pending designs allowed         |
+| Submit         | Existing endpoint + interim blocker codes; TTW-034 owns final readiness matrix                         |
+| Artwork        | Link to workshop; no embedded editor                                                                   |
+| Playwright     | Hooks/`test.skip` only in slice 1                                                                      |
+
+Policy: `docs/fundraising/ttw-035-interim-policy.md`
+
+## Implementation reviews
+
+_Pending independent security + implementation review after commit._
+
+## Verification evidence
+
+```text
+pnpm --filter api lint                 # 0 errors (pre-existing warnings only)
+pnpm --filter api typecheck            # pass
+pnpm --filter app lint                 # pass
+pnpm --filter app typecheck            # pass
+pnpm --filter api exec jest --testPathPatterns='campaigns|campaign-authoring|pricing.service.spec'
+  # unit suites green (incl. revision/floor/preview/helpers)
+NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules \
+  pnpm --filter api exec jest --config ./test/jest-e2e.json --runInBand --testPathPatterns=campaign-authoring
+  # 2 passed (authz/stale revision; floor atomic rollback + preview)
+node scripts/quality/check-diff-coverage.mjs --base origin/main --floor 80
+  # 219/272 lines (80.51%) — pass
+```
+
+Migration: `apps/api/prisma/migrations/20260821080000_ttw035_campaign_draft_revision`
+Policy: `docs/fundraising/ttw-035-interim-policy.md`
+Playwright: `tests/e2e/app/campaign-authoring.spec.ts` (skipped hooks; matrix deferred)
+
+## Completion summary
+
+Slice 1: owned DRAFT authoring APIs with `draftRevision`, transactional offers, price guidance (no cost leak), owner DRAFT preview via TTW-031 presenter, customer editor at `/dashboard/fundraiser/[id]`, interim submit blockers. TTW-034 readiness matrix and full Playwright matrix remain out of scope.
+
+## Design review (placeholder retained)
 
 Record product/design/security reviewers, date, editor structure, mutation/revision interfaces, price guidance, authorization/redaction, preview threat model, failure UX, tests, and verdict.
 

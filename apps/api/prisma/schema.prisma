@@ -1880,6 +1880,11 @@ model Campaign {
   /// Do NOT use for financial calculations or payout eligibility — use the CampaignBalanceLedger instead.
   currentAmount Decimal      @default(0) @db.Decimal(10, 2)
 
+  /// Monotonic draft revision for optimistic concurrency (TTW-035).
+  /// Every successful owned DRAFT mutation increments once; clients send expectedRevision.
+  /// TTW-034 reuses this value as the reviewed/approved revision candidate.
+  draftRevision Int @default(1)
+
   startDate DateTime?
   endDate   DateTime?
 

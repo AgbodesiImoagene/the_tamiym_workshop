@@ -4,7 +4,9 @@ import {
   Post,
   Body,
   Patch,
+  Delete,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -17,12 +19,18 @@ import {
   ApiCookieAuth,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CampaignsService } from './campaigns.service';
 import { OrdersService } from '../orders/orders.service';
 import { PricingService } from '../pricing/pricing.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
-import { UpdateCampaignDto } from './dto/update-campaign.dto';
+import { UpdateCampaignBasicsDto } from './dto/update-campaign-basics.dto';
+import {
+  AddCampaignOfferDto,
+  UpdateCampaignOfferDto,
+  RemoveCampaignOfferDto,
+} from './dto/campaign-offer.dto';
 import { AddCampaignProductDto } from './dto/add-campaign-product.dto';
 import { CreateOrderDto } from '../orders/dto/create-order.dto';
 import { QuoteRequestDto } from '../pricing/dto/quote-request.dto';
@@ -76,12 +84,65 @@ export class CampaignsController {
     return this.campaignsService.findAll(user.id);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get campaign by ID' })
+  @Get(':id/preview')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'Owner DRAFT preview (TTW-031 shape, watermarked, non-purchasable)',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Campaign ID' })
-  @ApiResponse({ status: 200, description: 'Campaign' })
+  @ApiResponse({ status: 200, description: 'Draft preview payload' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async preview(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.campaignsService.getOwnerDraftPreview(user.id, id);
+  }
+
+  @Get(':id/price-guidance')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Minimum selling-price guidance (no cost leak)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiQuery({ name: 'productId', required: true })
+  @ApiQuery({ name: 'designId', required: true })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency + minimumPrice + guidance',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid product/design' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async priceGuidance(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Query('productId') productId: string,
+    @Query('designId') designId: string,
+  ) {
+    return this.campaignsService.getPriceGuidance(
+      user.id,
+      id,
+      productId,
+      designId,
+    );
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get owned campaign detail (offers + price guidance + revision)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiResponse({ status: 200, description: 'Owner campaign detail' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
@@ -93,29 +154,134 @@ export class CampaignsController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard)
   @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update campaign' })
+  @ApiOperation({
+    summary: 'Update owned DRAFT campaign basics (expectedRevision required)',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Campaign ID' })
-  @ApiBody({ type: UpdateCampaignDto })
+  @ApiBody({ type: UpdateCampaignBasicsDto })
   @ApiResponse({ status: 200, description: 'Campaign updated' })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 400, description: 'Invalid input / not DRAFT' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Stale revision (CAMPAIGN_STALE_REVISION) or slug taken',
+  })
   async update(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
-    @Body() updateCampaignDto: UpdateCampaignDto,
+    @Body() updateCampaignDto: UpdateCampaignBasicsDto,
   ) {
     return this.campaignsService.update(user.id, id, updateCampaignDto);
   }
 
+  @Post(':id/offers')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Add campaign offer (product + owned design + price) atomically',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiBody({ type: AddCampaignOfferDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Offer added; returns owner detail',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation / floor / ownership failure',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Stale revision or duplicate offer',
+  })
+  async addOffer(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: AddCampaignOfferDto,
+  ) {
+    return this.campaignsService.addOffer(id, user.id, dto);
+  }
+
+  @Patch(':id/offers/:offerId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update campaign offer atomically' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiParam({ name: 'offerId', description: 'Campaign product (offer) ID' })
+  @ApiBody({ type: UpdateCampaignOfferDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Offer updated; returns owner detail',
+  })
+  @ApiResponse({ status: 400, description: 'Validation failure' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  @ApiResponse({
+    status: 409,
+    description: 'Stale revision or duplicate offer',
+  })
+  async updateOffer(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('offerId') offerId: string,
+    @Body() dto: UpdateCampaignOfferDto,
+  ) {
+    return this.campaignsService.updateOffer(id, offerId, user.id, dto);
+  }
+
+  @Delete(':id/offers/:offerId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Remove campaign offer atomically' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiParam({ name: 'offerId', description: 'Campaign product (offer) ID' })
+  @ApiBody({ type: RemoveCampaignOfferDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Offer removed; returns owner detail',
+  })
+  @ApiResponse({ status: 400, description: 'Offer not found / not DRAFT' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  @ApiResponse({ status: 409, description: 'Stale revision' })
+  async removeOffer(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('offerId') offerId: string,
+    @Body() dto: RemoveCampaignOfferDto,
+  ) {
+    return this.campaignsService.removeOffer(id, offerId, user.id, dto);
+  }
+
+  /**
+   * @deprecated Prefer POST /campaigns/:id/offers
+   */
   @Post(':id/products')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(RolesGuard)
   @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Add product to campaign' })
+  @ApiOperation({
+    summary: 'Add product to campaign (deprecated — use POST :id/offers)',
+    deprecated: true,
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Campaign ID' })
@@ -229,7 +395,7 @@ export class CampaignsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Not in DRAFT status or missing required fields',
+    description: 'Not in DRAFT status, missing fields, or interim blockers',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
