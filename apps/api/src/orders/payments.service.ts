@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
   ConflictException,
   Logger,
@@ -21,7 +20,7 @@ import {
   PaystackTransactionClient,
   PaystackTransientError,
 } from './paystack-transaction.client';
-
+import { canInitiatePaymentForOrder } from './payment-eligibility';
 export type PaymentInitiationOutcome =
   | 'created'
   | 'reused'
@@ -197,15 +196,19 @@ export class PaymentsService {
           where: { id: orderId },
           include: { user: { select: { email: true } } },
         });
-        if (!order) {
+        if (!order || order.userId !== userId) {
           throw new NotFoundException('Order not found');
         }
-        if (order.userId !== userId) {
-          throw new ForbiddenException('Access denied');
-        }
-        if (order.status !== OrderStatus.PENDING_PAYMENT) {
+        if (
+          !canInitiatePaymentForOrder({
+            status: order.status,
+            expiresAt: order.expiresAt,
+          })
+        ) {
           throw new BadRequestException(
-            'Order is not in PENDING_PAYMENT status',
+            order.status !== OrderStatus.PENDING_PAYMENT
+              ? 'Order is not in PENDING_PAYMENT status'
+              : 'Order payment window has expired',
           );
         }
         const amountKobo = Math.round(Number(order.totalAmount) * 100);

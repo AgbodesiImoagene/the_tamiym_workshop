@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { CustomerOrder } from './dashboard';
+import type { OrderStatus, PaymentStatus } from '@tamiym/types';
 
 export interface QuoteLineItem {
   variantId: string;
@@ -17,22 +17,87 @@ export interface OrderQuote {
   totalAmount: number;
 }
 
-export interface CustomerOrderDetail extends CustomerOrder {
+export interface CustomerOrderOptionPresentation {
+  option: string;
+  optionCode: string;
+  value: string;
+  valueCode: string;
+}
+
+export interface CustomerOrderItemDetail {
+  id: string;
+  productId: string;
+  variantId: string;
+  designId?: string | null;
+  campaignId?: string | null;
+  quantity: number;
+  unitFinalPrice: number;
+  lineTotal: number;
+  productNameSnapshot: string;
+  variantDisplaySnapshot: string;
+  optionPresentationSnapshot?: CustomerOrderOptionPresentation[] | null;
+  snapshotSource: string;
+  snapshotVersion: number;
+  legacySnapshotDisclosure?: boolean;
+}
+
+export interface CustomerOrderShippingSnapshot {
+  recipientName?: string | null;
+  phone?: string | null;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  state: string;
+  postalCode?: string | null;
+  country: string;
+  landmark?: string | null;
+}
+
+export interface CustomerOrderPaymentSummary {
+  id: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  providerRef?: string | null;
+  createdAt: string;
+  expiresAt?: string | null;
+}
+
+export interface CustomerOrderRefundSummary {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
+/** Explicit customer order-detail contract (TTW-033). */
+export interface CustomerOrderDetail {
+  policyVersion: string;
+  id: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  currency: string;
   subtotalAmount: number;
   shippingFee: number;
   discountAmount: number;
+  vatAmount?: number | null;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
   expiresAt?: string | null;
+  cancelledAt?: string | null;
   paymentReference?: string | null;
-  shippingAddress?: {
-    id: string;
-    addressLine1: string;
-    addressLine2?: string | null;
-    city: string;
-    state: string;
-    country?: string | null;
-    phone?: string | null;
-    recipientName?: string | null;
-  } | null;
+  items: CustomerOrderItemDetail[];
+  shipping: CustomerOrderShippingSnapshot;
+  payments: CustomerOrderPaymentSummary[];
+  refunds: CustomerOrderRefundSummary[];
+  refundedAmountConfirmed: number;
+  campaign?: { id: string; title: string; slug: string } | null;
+  campaignId?: string | null;
+  paymentRetryEligible: boolean;
+  shipmentPlaceholder?: string | null;
 }
 
 export async function quoteOrder(input: { shippingAddressId: string; items: QuoteLineItem[] }) {
@@ -44,7 +109,7 @@ export async function createOrder(input: {
   items: QuoteLineItem[];
   idempotencyKey?: string;
 }) {
-  return apiClient.post<CustomerOrderDetail>('/orders', input);
+  return apiClient.post<{ id: string }>('/orders', input);
 }
 
 export async function initiateOrderPayment(orderId: string, customerEmail?: string) {

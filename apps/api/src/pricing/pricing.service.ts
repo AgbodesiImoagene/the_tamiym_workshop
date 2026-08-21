@@ -36,6 +36,7 @@ import type {
   ShipmentSummary,
   ShipmentSummaryLine,
 } from '../shipping/shipping.types';
+import { formatVariantDisplaySnapshot } from '../orders/order-item-snapshot';
 
 /** Sellable public campaign product offer (TTW-031). */
 export type PublicCampaignOffer = {
@@ -422,6 +423,11 @@ export class PricingService {
       value: vov.optionValue.displayName,
       valueCode: vov.optionValue.valueCode,
     }));
+    const productNameSnapshot = variant.product.name;
+    const variantDisplaySnapshot = formatVariantDisplaySnapshot(
+      variant.name,
+      variant.sku,
+    );
 
     let unitBasePrice: number;
     let organizerCostBasis: number | null = null;
@@ -553,6 +559,9 @@ export class PricingService {
         appliedDiscountId: appliedDiscountId ?? undefined,
         pricingBreakdown,
         variantSnapshot,
+        productNameSnapshot,
+        variantDisplaySnapshot,
+        optionPresentationSnapshot: variantSnapshot,
       },
       shipment: {
         productId,

@@ -23,6 +23,7 @@ export interface CampaignOrderQuote {
 }
 
 export interface CustomerOrderDetail {
+  policyVersion?: string;
   id: string;
   status: string;
   paymentStatus: string;
@@ -34,11 +35,12 @@ export interface CustomerOrderDetail {
   campaignId?: string | null;
   expiresAt?: string | null;
   paymentReference?: string | null;
+  paymentRetryEligible?: boolean;
   items: Array<{
     id: string;
     quantity: number;
-    product: { name: string };
-    variant: { name: string };
+    productNameSnapshot: string;
+    variantDisplaySnapshot: string;
   }>;
 }
 

@@ -107,6 +107,38 @@ export enum ModerationStatus {
   FLAGGED = 'FLAGGED',
 }
 
+// Polymorphic subject for an immutable moderation decision (TTW-027).
+export enum ModerationSubjectType {
+  DESIGN = 'DESIGN',
+  MEDIA = 'MEDIA',
+  CAMPAIGN = 'CAMPAIGN',
+}
+
+// Who produced a moderation decision.
+export enum ModerationActorKind {
+  AI = 'AI',
+  ADMIN = 'ADMIN',
+  SYSTEM = 'SYSTEM',
+  APPEAL_RESOLUTION = 'APPEAL_RESOLUTION',
+}
+
+// Owner appeal lifecycle for a challenged moderation decision.
+export enum ModerationAppealStatus {
+  PENDING = 'PENDING',
+  WITHDRAWN = 'WITHDRAWN',
+  UPHELD = 'UPHELD',
+  OVERTURNED = 'OVERTURNED',
+  ESCALATED = 'ESCALATED',
+}
+
+// TTW-030 organiser onboarding application lifecycle.
+export enum OrganizerApplicationStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+}
+
 // Lifecycle status for a media asset ingestion job.
 export enum MediaAssetStatus {
   PENDING = 'PENDING',
@@ -297,6 +329,12 @@ export enum InventoryMovementKind {
   RESERVE = 'RESERVE',
   RELEASE = 'RELEASE',
   CONSUME = 'CONSUME',
+}
+
+// catalogue at backfill time (not historical evidence of what the buyer saw).
+export enum OrderItemSnapshotSource {
+  PURCHASE = 'PURCHASE',
+  BACKFILLED_CURRENT_CATALOG = 'BACKFILLED_CURRENT_CATALOG',
 }
 
 // Type of layer in a workshop template (base, mask, outline, etc.).

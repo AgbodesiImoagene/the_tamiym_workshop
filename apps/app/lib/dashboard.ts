@@ -1,28 +1,26 @@
 import { CampaignStatus, OrderStatus, PaymentStatus } from '@tamiym/types';
 import { apiClient } from './api';
 
-export interface CustomerOrder {
+export interface CustomerOrderListItem {
   id: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   totalAmount: number;
   currency: string;
   createdAt: string;
+  expiresAt?: string | null;
   items: Array<{
     id: string;
     quantity: number;
-    product: {
-      id: string;
-      name: string;
-      slug: string;
-    };
-    variant: {
-      id: string;
-      name: string;
-      sku: string;
-    };
+    productNameSnapshot: string;
+    variantDisplaySnapshot: string;
+    snapshotSource: string;
+    unitFinalPrice: number;
   }>;
 }
+
+/** @deprecated Prefer CustomerOrderListItem — kept for transitional imports. */
+export type CustomerOrder = CustomerOrderListItem;
 
 export interface CustomerCampaign {
   id: string;
@@ -36,7 +34,7 @@ export interface CustomerCampaign {
 }
 
 export async function getCustomerOrders() {
-  return apiClient.get<CustomerOrder[]>('/orders');
+  return apiClient.get<CustomerOrderListItem[]>('/orders');
 }
 
 export async function getCustomerCampaigns() {

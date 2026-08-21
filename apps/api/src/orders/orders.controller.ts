@@ -23,6 +23,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiatePaymentResponseDto } from './dto/initiate-payment-response.dto';
+import { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import { QuoteRequestDto } from '../pricing/dto/quote-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -98,16 +99,23 @@ export class OrdersController {
   }
 
   /**
-   * Get an order by ID (own only)
+   * Get an order by ID (own only). Unauthorized and missing → same 404.
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Get order by ID' })
+  @ApiOperation({
+    summary: 'Get my order detail (customer-safe projection)',
+    description:
+      'Returns the TTW-033 customer order detail DTO. Other-user and missing ids both yield 404. Does not expose provider raw events, idempotency keys, internal notes, or the mutable address relation.',
+  })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Order ID' })
-  @ApiResponse({ status: 200, description: 'Order' })
+  @ApiResponse({
+    status: 200,
+    description: 'Customer-safe order detail',
+    type: CustomerOrderDetailDto,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async findOne(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.ordersService.findOne(user.id, id);

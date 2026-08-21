@@ -7,6 +7,7 @@ import { PaystackWebhookService } from '../src/orders/paystack-webhook.service';
 import { InventoryLifecycleService } from '../src/inventory/inventory-lifecycle.service';
 import { OrdersService } from '../src/orders/orders.service';
 import {
+  OrderItemSnapshotSource,
   InventoryMovementKind,
   OrderStatus,
   PaymentProvider,
@@ -120,6 +121,11 @@ describe('Inventory lifecycle (e2e)', () => {
             quantity: qty,
             unitBasePrice: 1000,
             unitFinalPrice: 1000,
+            productNameSnapshot: seeded.product.name,
+            variantDisplaySnapshot: seeded.variant.name,
+            optionPresentationSnapshot: [],
+            snapshotSource: OrderItemSnapshotSource.PURCHASE,
+            snapshotVersion: 1,
           },
         },
       },
