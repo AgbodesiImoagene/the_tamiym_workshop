@@ -39,7 +39,7 @@ Canonical matrix: [`docs/orders/ttw-033-interim-policy.md`](../orders/ttw-033-in
 3. Replace broad `findOne` includes with an ownership-scoped explicit select/projection for order, line, payment, refund, campaign, and shipping snapshots; normalize unauthorized to not found.
 4. Add the customer detail route and shared status/amount/address/item/refund components; update real list cards and remove fake previews.
 5. Restrict retry UI/API eligibility to a reusable server decision and link confirmation/web-checkout success to the account detail.
-6. **Slice 1 deviation:** do not render TTW-040 shipment timeline; return/show placeholder “Shipping updates will appear here when available”.
+6. **Slice 1 deviation:** do not render TTW-040 shipment timeline; return/show placeholder “Shipping updates will appear here when available.”.
 7. Update Swagger/shared contracts, support documentation, and unit coverage (Playwright matrix deferred).
 
 ## Test and observability plan

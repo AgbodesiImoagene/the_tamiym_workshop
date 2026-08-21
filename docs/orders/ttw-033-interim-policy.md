@@ -46,10 +46,10 @@ UI must hide retry when `paymentRetryEligible` is false; client must not invent 
 
 ## Shipment (deferred)
 
-| Rule    | Value                                                                     |
-| ------- | ------------------------------------------------------------------------- |
-| Slice 1 | `shipmentPlaceholder`: `Shipping updates will appear here when available` |
-| Owner   | TTW-040 redacted shipment/tracking timeline                               |
+| Rule    | Value                                                                      |
+| ------- | -------------------------------------------------------------------------- |
+| Slice 1 | `shipmentPlaceholder`: `Shipping updates will appear here when available.` |
+| Owner   | TTW-040 redacted shipment/tracking timeline                                |
 
 ## Customer app surfaces
 

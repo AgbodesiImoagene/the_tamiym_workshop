@@ -554,7 +554,7 @@ describe('OrdersService', () => {
       expect(result.items[0].productNameSnapshot).toBe('Classic Tee');
       expect(result.paymentRetryEligible).toBe(true);
       expect(result.shipmentPlaceholder).toBe(
-        'Shipping updates will appear here when available',
+        'Shipping updates will appear here when available.',
       );
       expect(result).not.toHaveProperty('shippingAddress');
       expect(result).not.toHaveProperty('idempotencyKey');
