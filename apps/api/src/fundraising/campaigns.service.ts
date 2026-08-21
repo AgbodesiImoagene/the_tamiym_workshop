@@ -1430,13 +1430,21 @@ export class CampaignsService {
     const mode = scheduled ? 'scheduled' : 'live';
 
     const { updated, outboxId } = await this.prisma.$transaction(async (tx) => {
-      await tx.campaign.update({
-        where: { id },
+      const claimed = await tx.campaign.updateMany({
+        where: {
+          id,
+          status: CampaignStatus.REVIEW,
+        },
         data: {
           status: CampaignStatus.ACTIVE,
           approvedRevision: campaign.draftRevision,
         },
       });
+      if (claimed.count !== 1) {
+        throw new BadRequestException(
+          'Campaign could not be activated (status changed)',
+        );
+      }
       await this.moderationDecisions.recordAdminDecisionInTx(tx, {
         subjectType: ModerationSubjectType.CAMPAIGN,
         subjectId: id,
@@ -1590,13 +1598,21 @@ export class CampaignsService {
     }
 
     const { updated, outboxId } = await this.prisma.$transaction(async (tx) => {
-      await tx.campaign.update({
-        where: { id },
+      const claimed = await tx.campaign.updateMany({
+        where: {
+          id,
+          status: CampaignStatus.REVIEW,
+        },
         data: {
           status: CampaignStatus.DRAFT,
           approvedRevision: null,
         },
       });
+      if (claimed.count !== 1) {
+        throw new BadRequestException(
+          'Campaign could not be rejected (status changed)',
+        );
+      }
       await this.moderationDecisions.recordAdminDecisionInTx(tx, {
         subjectType: ModerationSubjectType.CAMPAIGN,
         subjectId: id,

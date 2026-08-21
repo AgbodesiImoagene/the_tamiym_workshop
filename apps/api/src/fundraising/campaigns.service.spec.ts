@@ -586,11 +586,7 @@ describe('CampaignsService', () => {
         ...mockReviewCampaign,
         draftRevision: 3,
       });
-      (prisma.campaign.update as jest.Mock).mockResolvedValue({
-        ...mockReviewCampaign,
-        status: CampaignStatus.ACTIVE,
-        approvedRevision: 3,
-      });
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
       (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockReviewCampaign,
         status: CampaignStatus.ACTIVE,
@@ -609,8 +605,12 @@ describe('CampaignsService', () => {
         'camp-1',
         CampaignReadinessPhase.ACTIVATE,
       );
-      expect(prisma.campaign.update).toHaveBeenCalledWith(
+      expect(prisma.campaign.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'camp-1',
+            status: CampaignStatus.REVIEW,
+          }),
           data: expect.objectContaining({
             status: CampaignStatus.ACTIVE,
             approvedRevision: 3,
@@ -620,6 +620,25 @@ describe('CampaignsService', () => {
       expect(prisma.notificationOutbox.create).toHaveBeenCalled();
       expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
       expect(result.status).toBe(CampaignStatus.ACTIVE);
+    });
+
+    it('fails activation when concurrent reject clears REVIEW claim', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockReviewCampaign,
+        draftRevision: 3,
+      });
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      readinessService.evaluate.mockResolvedValue({
+        ...READY_RESULT,
+        phase: CampaignReadinessPhase.ACTIVATE,
+        draftRevision: 3,
+        ready: true,
+      });
+
+      await expect(
+        service.activateForAdmin('camp-1', 'admin-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when readiness blocks activation', async () => {
@@ -691,10 +710,7 @@ describe('CampaignsService', () => {
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(
         mockReviewCampaign,
       );
-      (prisma.campaign.update as jest.Mock).mockResolvedValue({
-        ...mockCampaign,
-        moderationStatus: ModerationStatus.REJECTED,
-      });
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
       (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         moderationStatus: ModerationStatus.REJECTED,
@@ -707,8 +723,12 @@ describe('CampaignsService', () => {
         'admin-1',
       );
 
-      expect(prisma.campaign.update).toHaveBeenCalledWith(
+      expect(prisma.campaign.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'camp-1',
+            status: CampaignStatus.REVIEW,
+          }),
           data: expect.objectContaining({
             status: CampaignStatus.DRAFT,
             approvedRevision: null,
@@ -724,8 +744,24 @@ describe('CampaignsService', () => {
           }),
         }),
       );
+      const outboxCall = (prisma.notificationOutbox.create as jest.Mock).mock
+        .calls[0][0];
+      expect(JSON.stringify(outboxCall.data.payload)).not.toMatch(
+        /internal note|moderationNotes|"notes"/i,
+      );
       expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
       expect(result.status).toBe(CampaignStatus.DRAFT);
+    });
+
+    it('fails rejection when concurrent activate clears REVIEW claim', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(
+        mockReviewCampaign,
+      );
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      await expect(
+        service.rejectForAdmin('camp-1', 'Too late', undefined, 'admin-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when campaign is not in REVIEW', async () => {
