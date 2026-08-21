@@ -206,7 +206,8 @@ export default function FundraiserCheckoutPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const shippingAddressId = savedAddressId || (await ensureAddress());
+      const shippingAddressId = await ensureAddress();
+      setSavedAddressId(shippingAddressId);
       const createdOrder = await createCampaignOrder(cart.campaignId, {
         shippingAddressId,
         items: cartLinesToQuoteItems(cart.lines),

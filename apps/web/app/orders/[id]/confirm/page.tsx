@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, User, authApi } from '@/lib/auth';
 import {
   clearCampaignCart,
@@ -62,18 +62,28 @@ function OrderConfirmContent() {
   const [error, setError] = useState<string | null>(null);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const pollAttemptsRef = useRef(0);
+  const MAX_POLL_ATTEMPTS = 40; // ~2 minutes at 3s
 
   const refreshOrder = useCallback(async () => {
     if (!orderId) return;
     const next = await getOwnedOrder(orderId);
     setOrder(next);
+    const cart = loadCampaignCart();
+    if (!cart) return next;
+
+    const cartMatchesThisOrder =
+      cart.pendingOrderId === next.id ||
+      (!cart.pendingOrderId && Boolean(next.campaignId) && cart.campaignId === next.campaignId);
+
     if (next.paymentStatus === PaymentStatus.SUCCEEDED) {
-      clearCampaignCart();
-    } else {
-      const cart = loadCampaignCart();
-      if (cart && cart.pendingOrderId !== next.id) {
-        saveCampaignCart(setPendingOrderId(cart, next.id));
+      if (cart.pendingOrderId === next.id) {
+        clearCampaignCart();
       }
+    } else if (!cart.pendingOrderId && next.campaignId && cart.campaignId === next.campaignId) {
+      saveCampaignCart(setPendingOrderId(cart, next.id));
+    } else if (!cartMatchesThisOrder) {
+      // Different owned order — do not clear or rebind the active campaign cart.
     }
     return next;
   }, [orderId]);
@@ -117,9 +127,16 @@ function OrderConfirmContent() {
           next.paymentStatus === PaymentStatus.FAILED ||
           next.status === OrderStatus.CANCELLED;
         if (pending && !terminal) {
-          timer = setTimeout(() => {
-            void poll();
-          }, 3000);
+          pollAttemptsRef.current += 1;
+          if (pollAttemptsRef.current < MAX_POLL_ATTEMPTS) {
+            timer = setTimeout(() => {
+              void poll();
+            }, 3000);
+          } else if (!cancelled) {
+            setError(
+              'We are still waiting for payment confirmation. You can refresh this page or retry payment from checkout.'
+            );
+          }
         }
       } catch (err) {
         if (!cancelled) {
