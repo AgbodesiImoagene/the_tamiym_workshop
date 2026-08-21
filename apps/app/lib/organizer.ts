@@ -53,5 +53,8 @@ export async function withdrawOrganizerApplication(applicationId: string) {
 }
 
 export async function createDraftCampaign(input: { title: string; description?: string }) {
-  return apiClient.post<{ id: string; status: string; title: string }>('/campaigns', input);
+  return apiClient.post<{ id: string; status: string; title: string; slug?: string }>(
+    '/campaigns',
+    input,
+  );
 }

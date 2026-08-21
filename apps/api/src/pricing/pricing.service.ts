@@ -79,6 +79,15 @@ export type PublicCampaignOffer = {
   }>;
 };
 
+/** Owner-only DRAFT preview offer (TTW-035) — TTW-031 shape + non-purchasable watermark. */
+export type OwnerDraftPreviewOffer = PublicCampaignOffer & {
+  purchasable: false;
+  previewWatermark: 'DRAFT';
+  design: PublicCampaignOffer['design'] & {
+    moderationStatus: ModerationStatus;
+  };
+};
+
 type CampaignProductOfferSource = {
   id: string;
   productId: string;
@@ -769,6 +778,108 @@ export class PricingService {
         priceDisclosure: PUBLIC_CAMPAIGN_PRICE_DISCLOSURE,
         options,
         variants,
+      });
+    }
+    return offers;
+  }
+
+  /**
+   * Owner DRAFT preview offers (TTW-035).
+   * Reuses the TTW-031 projection but allows pending/flagged designs, never marks
+   * purchasable, and watermarks DRAFT. REJECTED / missing designs are excluded.
+   * Does not leak cost basis or moderation notes.
+   */
+  buildOwnerDraftPreviewOffers(
+    campaignProducts: CampaignProductOfferSource[],
+    currency: string,
+  ): OwnerDraftPreviewOffer[] {
+    const offers: OwnerDraftPreviewOffer[] = [];
+    for (const cp of campaignProducts) {
+      if (cp.product.status !== ProductStatus.ACTIVE) continue;
+      if (
+        !cp.design ||
+        cp.design.moderationStatus === ModerationStatus.REJECTED
+      ) {
+        continue;
+      }
+      const priceRow =
+        cp.prices.find((p) => p.currency === currency) ?? cp.prices[0];
+      if (!priceRow) continue;
+      const unitBasePrice = Number(priceRow.amount);
+      if (!(unitBasePrice > 0)) continue;
+
+      const options = [...cp.product.options]
+        .sort(
+          (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code),
+        )
+        .map((opt) => ({
+          id: opt.id,
+          code: opt.code,
+          name: opt.name,
+          sortOrder: opt.sortOrder,
+          values: [...opt.values]
+            .sort(
+              (a, b) =>
+                a.sortOrder - b.sortOrder ||
+                a.valueCode.localeCompare(b.valueCode),
+            )
+            .map((v) => ({
+              id: v.id,
+              valueCode: v.valueCode,
+              displayName: v.displayName,
+              sortOrder: v.sortOrder,
+              metadata: this.sanitizeOptionMetadata(v.metadata),
+            })),
+        }));
+
+      const variants: OwnerDraftPreviewOffer['variants'] = [];
+      for (const variant of cp.product.variants) {
+        const available = this.isVariantPubliclyAvailable(variant);
+        const optionUpcharge = this.sumOptionValueUpcharges(variant, currency);
+        const line = resolveCampaignLinePrice(
+          unitBasePrice,
+          optionUpcharge,
+          currency,
+        );
+        const orderedOptionValues = [...variant.optionValues].sort(
+          (a, b) =>
+            a.option.sortOrder - b.option.sortOrder ||
+            a.option.code.localeCompare(b.option.code),
+        );
+        variants.push({
+          id: variant.id,
+          optionValueIds: orderedOptionValues.map((ov) => ov.optionValueId),
+          optionValueCodes: orderedOptionValues.map(
+            (ov) => ov.optionValue.valueCode,
+          ),
+          available,
+          unitAmountMinor: toMinorUnits(line.unitBeforeDiscount, currency),
+          currency,
+        });
+      }
+
+      offers.push({
+        campaignProductId: cp.id,
+        productId: cp.productId,
+        product: {
+          id: cp.product.id,
+          name: cp.product.name,
+          slug: cp.product.slug,
+          description: cp.product.description,
+        },
+        design: {
+          id: cp.design.id,
+          name: cp.design.name,
+          thumbnailUrl: cp.design.thumbnailUrl,
+          moderationStatus: cp.design.moderationStatus,
+        },
+        baseAmountMinor: toMinorUnits(unitBasePrice, currency),
+        currency,
+        priceDisclosure: PUBLIC_CAMPAIGN_PRICE_DISCLOSURE,
+        options,
+        variants,
+        purchasable: false,
+        previewWatermark: 'DRAFT',
       });
     }
     return offers;

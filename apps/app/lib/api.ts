@@ -91,6 +91,8 @@ export function csrfHeaders(): Record<string, string> {
 export interface ApiError {
   message: string;
   statusCode?: number;
+  code?: string;
+  blockers?: Array<{ code: string; message: string }>;
 }
 
 export class ApiClient {
@@ -134,7 +136,26 @@ export class ApiClient {
 
       try {
         const data = await response.json();
-        error.message = data.message || data.error || response.statusText;
+        if (typeof data.message === 'string') {
+          error.message = data.message;
+        } else if (data.message && typeof data.message === 'object') {
+          error.message =
+            data.message.message || data.error || response.statusText;
+          if (typeof data.message.code === 'string') {
+            error.code = data.message.code;
+          }
+          if (Array.isArray(data.message.blockers)) {
+            error.blockers = data.message.blockers;
+          }
+        } else {
+          error.message = data.error || response.statusText;
+        }
+        if (typeof data.code === 'string') {
+          error.code = data.code;
+        }
+        if (Array.isArray(data.blockers)) {
+          error.blockers = data.blockers;
+        }
       } catch {
         // If response is not JSON, use statusText
       }
@@ -175,8 +196,11 @@ export class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+  async delete<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 }
 

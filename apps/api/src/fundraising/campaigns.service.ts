@@ -14,7 +14,12 @@ import {
   hashRevision,
 } from '../moderation/moderation.constants';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
-import { UpdateCampaignDto } from './dto/update-campaign.dto';
+import { UpdateCampaignBasicsDto } from './dto/update-campaign-basics.dto';
+import {
+  AddCampaignOfferDto,
+  UpdateCampaignOfferDto,
+  RemoveCampaignOfferDto,
+} from './dto/campaign-offer.dto';
 import { AddCampaignProductDto } from './dto/add-campaign-product.dto';
 import {
   CampaignStatus,
@@ -25,6 +30,25 @@ import {
 import { DEFAULT_CURRENCY } from '../constants';
 import { PricingService } from '../pricing/pricing.service';
 import { PUBLIC_CAMPAIGN_OFFER_POLICY_VERSION } from '../pricing/campaign-line-price';
+import {
+  ORGANISER_CAMPAIGN_AUTHORING_POLICY_VERSION,
+  CampaignAuthoringErrorCode,
+  CAMPAIGN_PRICE_FLOOR_GUIDANCE,
+} from './campaign-authoring.constants';
+import {
+  assertCampaignFound,
+  assertDraftMutable,
+  assertOwned,
+  authoringBadRequest,
+  authoringConflict,
+  priceGuidancePayload,
+  staleRevisionConflict,
+  validateDateOrder,
+  validateGoalAmount,
+  validateOfferPrice,
+  validateSlug,
+  validateTitle,
+} from './campaign-authoring.helpers';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../generated/prisma/enums';
 import type { UserRole } from '../generated/prisma/client';
@@ -37,11 +61,24 @@ import {
   ADMIN_NOTIF_CAMPAIGN_SUBMITTED_FOR_REVIEW,
 } from '../admin-notifications/admin-notification-events';
 
-/** Campaign statuses that allow mutation (products/designs can be added/removed). */
+/** Legacy mutable statuses for deprecated addProduct path (pre-TTW-035). Prefer DRAFT-only offer APIs. */
 const MUTABLE_STATUSES = new Set<CampaignStatus>([
   CampaignStatus.DRAFT,
   CampaignStatus.PAUSED,
 ]);
+
+const OWNER_OFFER_INCLUDE = {
+  product: { select: { id: true, name: true, slug: true, status: true } },
+  design: {
+    select: {
+      id: true,
+      name: true,
+      thumbnailUrl: true,
+      moderationStatus: true,
+    },
+  },
+  prices: true,
+} as const;
 
 @Injectable()
 export class CampaignsService {
@@ -69,12 +106,7 @@ export class CampaignsService {
     startDate?: string | null,
     endDate?: string | null,
   ): void {
-    if (!startDate || !endDate) return;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
-      throw new BadRequestException('endDate must be after startDate');
-    }
+    validateDateOrder(startDate, endDate);
   }
 
   private isCampaignExpired(
@@ -177,27 +209,237 @@ export class CampaignsService {
   }
 
   /**
-   * Get campaign by ID (organizer, own only)
+   * Get campaign by ID (organizer, own only) — owner detail DTO with offers + price guidance.
    */
   async findOne(organizerId: string, id: string) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id },
       include: {
         products: {
+          include: OWNER_OFFER_INCLUDE,
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    assertCampaignFound(campaign);
+    assertOwned(organizerId, campaign.organizerId);
+    return this.toOwnerDetailDto(campaign);
+  }
+
+  /**
+   * Owner-only DRAFT preview via TTW-031 presenter (watermarked, non-purchasable).
+   */
+  async getOwnerDraftPreview(organizerId: string, id: string) {
+    const currency = DEFAULT_CURRENCY;
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+      include: {
+        products: {
           include: {
-            product: { select: { id: true, name: true, slug: true } },
-            design: { select: { id: true, name: true } },
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                status: true,
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    values: { orderBy: { sortOrder: 'asc' } },
+                  },
+                },
+                variants: {
+                  include: {
+                    inventory: {
+                      select: {
+                        trackInventory: true,
+                        stockOnHand: true,
+                        reserved: true,
+                      },
+                    },
+                    optionValues: {
+                      include: {
+                        option: {
+                          select: { id: true, code: true, sortOrder: true },
+                        },
+                        optionValue: {
+                          select: {
+                            id: true,
+                            valueCode: true,
+                            displayName: true,
+                            sortOrder: true,
+                            upcharges: {
+                              where: { currency: currency as never },
+                              take: 1,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            design: {
+              select: {
+                id: true,
+                name: true,
+                thumbnailUrl: true,
+                moderationStatus: true,
+              },
+            },
+            prices: { where: { currency: currency as never } },
           },
         },
       },
     });
-    if (!campaign) {
-      throw new NotFoundException('Campaign not found');
-    }
-    if (campaign.organizerId !== organizerId) {
-      throw new ForbiddenException('Access denied');
-    }
-    return this.toOrganizerCampaign(campaign);
+    assertCampaignFound(campaign);
+    assertOwned(organizerId, campaign.organizerId);
+
+    const products = this.pricingService.buildOwnerDraftPreviewOffers(
+      campaign.products,
+      campaign.currency ?? currency,
+    );
+
+    return {
+      id: campaign.id,
+      title: campaign.title,
+      slug: campaign.slug,
+      description: campaign.description,
+      story: campaign.story,
+      status: campaign.status,
+      draftRevision: campaign.draftRevision,
+      goalAmount: campaign.goalAmount ? Number(campaign.goalAmount) : null,
+      currentAmount: Number(campaign.currentAmount),
+      currency: campaign.currency,
+      startDate: campaign.startDate,
+      endDate: campaign.endDate,
+      purchasable: false as const,
+      previewWatermark: 'DRAFT' as const,
+      authoringPolicyVersion: ORGANISER_CAMPAIGN_AUTHORING_POLICY_VERSION,
+      offerPolicyVersion: PUBLIC_CAMPAIGN_OFFER_POLICY_VERSION,
+      products,
+    };
+  }
+
+  /**
+   * Server floor guidance for a product+design without leaking cost basis.
+   */
+  async getPriceGuidance(
+    organizerId: string,
+    campaignId: string,
+    productId: string,
+    designId: string,
+  ) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { id: true, organizerId: true, currency: true },
+    });
+    assertCampaignFound(campaign);
+    assertOwned(organizerId, campaign.organizerId);
+    await this.assertOwnedDesignForProduct(organizerId, productId, designId);
+    const currency = campaign.currency ?? DEFAULT_CURRENCY;
+    const minimumPrice = await this.pricingService.getMinCampaignProductPrice(
+      productId,
+      designId,
+      currency,
+    );
+    return priceGuidancePayload(minimumPrice, currency);
+  }
+
+  private async toOwnerDetailDto(campaign: {
+    id: string;
+    organizerId: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    story: string | null;
+    status: CampaignStatus;
+    moderationStatus: ModerationStatus;
+    rejectionReason: string | null;
+    moderationNotes?: string | null;
+    currency: string;
+    goalAmount: unknown;
+    currentAmount: unknown;
+    draftRevision: number;
+    startDate: Date | null;
+    endDate: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    products: Array<{
+      id: string;
+      productId: string;
+      designId: string | null;
+      product: {
+        id: string;
+        name: string;
+        slug: string;
+        status: string;
+      };
+      design: {
+        id: string;
+        name: string;
+        thumbnailUrl: string | null;
+        moderationStatus: ModerationStatus;
+      } | null;
+      prices: Array<{ currency: string; amount: unknown }>;
+    }>;
+  }) {
+    const currency = campaign.currency ?? DEFAULT_CURRENCY;
+    const offers = await Promise.all(
+      campaign.products.map(async (cp) => {
+        const priceRow =
+          cp.prices.find((p) => p.currency === currency) ?? cp.prices[0];
+        const price = priceRow ? Number(priceRow.amount) : null;
+        const minimumPrice =
+          await this.pricingService.getMinCampaignProductPrice(
+            cp.productId,
+            cp.designId,
+            currency,
+          );
+        return {
+          id: cp.id,
+          productId: cp.productId,
+          designId: cp.designId,
+          product: cp.product,
+          design: cp.design
+            ? {
+                id: cp.design.id,
+                name: cp.design.name,
+                thumbnailUrl: cp.design.thumbnailUrl,
+                moderationStatus: cp.design.moderationStatus,
+              }
+            : null,
+          price,
+          currency,
+          minimumPrice,
+          priceGuidance: CAMPAIGN_PRICE_FLOOR_GUIDANCE,
+        };
+      }),
+    );
+
+    const base = this.toOrganizerCampaign(campaign);
+    return {
+      ...base,
+      goalAmount: campaign.goalAmount ? Number(campaign.goalAmount) : null,
+      currentAmount: Number(campaign.currentAmount),
+      draftRevision: campaign.draftRevision,
+      authoringPolicyVersion: ORGANISER_CAMPAIGN_AUTHORING_POLICY_VERSION,
+      offers,
+      // Keep products for transitional clients; prefer offers.
+      products: campaign.products.map((cp) => ({
+        id: cp.id,
+        productId: cp.productId,
+        designId: cp.designId,
+        product: {
+          id: cp.product.id,
+          name: cp.product.name,
+          slug: cp.product.slug,
+        },
+        design: cp.design ? { id: cp.design.id, name: cp.design.name } : null,
+      })),
+    };
   }
 
   /**
@@ -236,59 +478,87 @@ export class CampaignsService {
   }
 
   /**
-   * Update campaign (organizer, own only)
+   * Update campaign basics (organizer, owned DRAFT only) with expectedRevision.
    */
-  async update(organizerId: string, id: string, dto: UpdateCampaignDto) {
-    await this.findOne(organizerId, id);
-    const slug = dto.slug ?? (dto.title ? this.slugify(dto.title) : undefined);
-    if (slug) {
+  async update(organizerId: string, id: string, dto: UpdateCampaignBasicsDto) {
+    const campaign = await this.prisma.campaign.findUnique({ where: { id } });
+    assertCampaignFound(campaign);
+    assertOwned(organizerId, campaign.organizerId);
+    assertDraftMutable(campaign.status);
+
+    if (dto.title !== undefined) validateTitle(dto.title);
+    if (dto.goalAmount !== undefined) validateGoalAmount(dto.goalAmount);
+
+    const slug =
+      dto.slug !== undefined
+        ? dto.slug.trim()
+        : dto.title
+          ? this.slugify(dto.title)
+          : undefined;
+    if (slug !== undefined) {
+      validateSlug(slug);
       const existing = await this.prisma.campaign.findFirst({
         where: { slug, id: { not: id } },
       });
       if (existing) {
-        throw new ConflictException(
+        throw authoringConflict(
+          CampaignAuthoringErrorCode.SLUG_TAKEN,
           `Campaign with slug "${slug}" already exists`,
         );
       }
     }
-    // Validate date ordering when either date is being changed.
-    // Fetch current values so a partial update (only startDate or only endDate)
-    // is also checked against the persisted counterpart.
+
     if (dto.startDate !== undefined || dto.endDate !== undefined) {
-      const current = await this.prisma.campaign.findUnique({
-        where: { id },
-        select: { startDate: true, endDate: true },
-      });
       const effectiveStart =
         dto.startDate !== undefined
           ? dto.startDate
-          : (current?.startDate?.toISOString() ?? null);
+          : (campaign.startDate?.toISOString() ?? null);
       const effectiveEnd =
         dto.endDate !== undefined
           ? dto.endDate
-          : (current?.endDate?.toISOString() ?? null);
-      this.assertDateOrder(effectiveStart, effectiveEnd);
+          : (campaign.endDate?.toISOString() ?? null);
+      validateDateOrder(effectiveStart, effectiveEnd);
     }
-    return this.toOrganizerCampaign(
-      await this.prisma.campaign.update({
+
+    const updated = await this.prisma.campaign.updateMany({
+      where: {
+        id,
+        organizerId,
+        status: CampaignStatus.DRAFT,
+        draftRevision: dto.expectedRevision,
+      },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title.trim() }),
+        ...(slug !== undefined && { slug }),
+        ...(dto.description !== undefined && {
+          description: dto.description,
+        }),
+        ...(dto.story !== undefined && { story: dto.story }),
+        ...(dto.goalAmount !== undefined && { goalAmount: dto.goalAmount }),
+        ...(dto.startDate !== undefined && {
+          startDate: dto.startDate ? new Date(dto.startDate) : null,
+        }),
+        ...(dto.endDate !== undefined && {
+          endDate: dto.endDate ? new Date(dto.endDate) : null,
+        }),
+        draftRevision: { increment: 1 },
+      },
+    });
+    if (updated.count === 0) {
+      const latest = await this.prisma.campaign.findUnique({
         where: { id },
-        data: {
-          ...(dto.title && { title: dto.title }),
-          ...(slug && { slug }),
-          ...(dto.description !== undefined && {
-            description: dto.description,
-          }),
-          ...(dto.story !== undefined && { story: dto.story }),
-          ...(dto.goalAmount !== undefined && { goalAmount: dto.goalAmount }),
-          ...(dto.startDate !== undefined && {
-            startDate: dto.startDate ? new Date(dto.startDate) : null,
-          }),
-          ...(dto.endDate !== undefined && {
-            endDate: dto.endDate ? new Date(dto.endDate) : null,
-          }),
-        },
-      }),
-    );
+        select: { draftRevision: true, status: true, organizerId: true },
+      });
+      if (!latest || latest.organizerId !== organizerId) {
+        throw new NotFoundException('Campaign not found');
+      }
+      if (latest.status !== CampaignStatus.DRAFT) {
+        assertDraftMutable(latest.status);
+      }
+      throw staleRevisionConflict(latest.draftRevision);
+    }
+
+    return this.findOne(organizerId, id);
   }
 
   /**
@@ -329,7 +599,202 @@ export class CampaignsService {
   }
 
   /**
-   * Add product to campaign (organizer)
+   * Add offer to campaign (owned DRAFT): product + owned design + price atomically.
+   */
+  async addOffer(
+    campaignId: string,
+    organizerId: string,
+    dto: AddCampaignOfferDto,
+  ) {
+    return this.mutateOwnedDraftOffer(
+      campaignId,
+      organizerId,
+      dto.expectedRevision,
+      async (tx, campaign) => {
+        await this.assertOfferWritable(tx, organizerId, campaignId, {
+          productId: dto.productId,
+          designId: dto.designId,
+          excludeOfferId: null,
+        });
+        const currency = campaign.currency ?? DEFAULT_CURRENCY;
+        const minimumPrice =
+          await this.pricingService.getMinCampaignProductPrice(
+            dto.productId,
+            dto.designId,
+            currency,
+          );
+        validateOfferPrice(dto.price, minimumPrice, currency);
+
+        try {
+          const cp = await tx.campaignProduct.create({
+            data: {
+              campaignId,
+              productId: dto.productId,
+              designId: dto.designId,
+            },
+          });
+          await tx.campaignProductPrice.create({
+            data: {
+              campaignProductId: cp.id,
+              currency: DEFAULT_CURRENCY,
+              amount: dto.price,
+            },
+          });
+        } catch (err) {
+          if (
+            err &&
+            typeof err === 'object' &&
+            'code' in err &&
+            (err as { code: string }).code === 'P2002'
+          ) {
+            throw authoringConflict(
+              CampaignAuthoringErrorCode.OFFER_DUPLICATE,
+              'This product and design are already offered on the campaign',
+            );
+          }
+          throw err;
+        }
+      },
+    );
+  }
+
+  /**
+   * Update an existing offer (design and/or price) atomically on owned DRAFT.
+   */
+  async updateOffer(
+    campaignId: string,
+    offerId: string,
+    organizerId: string,
+    dto: UpdateCampaignOfferDto,
+  ) {
+    if (dto.designId === undefined && dto.price === undefined) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.PRICE_INVALID,
+        'Provide designId and/or price to update',
+      );
+    }
+    return this.mutateOwnedDraftOffer(
+      campaignId,
+      organizerId,
+      dto.expectedRevision,
+      async (tx, campaign) => {
+        const existing = await tx.campaignProduct.findFirst({
+          where: { id: offerId, campaignId },
+          include: { prices: true },
+        });
+        if (!existing) {
+          throw authoringBadRequest(
+            CampaignAuthoringErrorCode.OFFER_NOT_FOUND,
+            'Campaign offer not found',
+          );
+        }
+        const nextDesignId = dto.designId ?? existing.designId;
+        if (!nextDesignId) {
+          throw authoringBadRequest(
+            CampaignAuthoringErrorCode.DESIGN_NOT_FOUND,
+            'Offer must have a design',
+          );
+        }
+        await this.assertOfferWritable(tx, organizerId, campaignId, {
+          productId: existing.productId,
+          designId: nextDesignId,
+          excludeOfferId: offerId,
+        });
+
+        const currency = campaign.currency ?? DEFAULT_CURRENCY;
+        const nextPrice =
+          dto.price !== undefined
+            ? dto.price
+            : Number(
+                existing.prices.find((p) => p.currency === currency)?.amount ??
+                  existing.prices[0]?.amount,
+              );
+        if (!Number.isFinite(nextPrice)) {
+          throw authoringBadRequest(
+            CampaignAuthoringErrorCode.PRICE_INVALID,
+            'Offer must have a positive NGN price',
+          );
+        }
+        const minimumPrice =
+          await this.pricingService.getMinCampaignProductPrice(
+            existing.productId,
+            nextDesignId,
+            currency,
+          );
+        validateOfferPrice(nextPrice, minimumPrice, currency);
+
+        try {
+          await tx.campaignProduct.update({
+            where: { id: offerId },
+            data: { designId: nextDesignId },
+          });
+        } catch (err) {
+          if (
+            err &&
+            typeof err === 'object' &&
+            'code' in err &&
+            (err as { code: string }).code === 'P2002'
+          ) {
+            throw authoringConflict(
+              CampaignAuthoringErrorCode.OFFER_DUPLICATE,
+              'This product and design are already offered on the campaign',
+            );
+          }
+          throw err;
+        }
+
+        const priceRow = existing.prices.find((p) => p.currency === currency);
+        if (priceRow) {
+          await tx.campaignProductPrice.update({
+            where: { id: priceRow.id },
+            data: { amount: nextPrice },
+          });
+        } else {
+          await tx.campaignProductPrice.create({
+            data: {
+              campaignProductId: offerId,
+              currency: DEFAULT_CURRENCY,
+              amount: nextPrice,
+            },
+          });
+        }
+      },
+    );
+  }
+
+  /**
+   * Remove an offer atomically on owned DRAFT.
+   */
+  async removeOffer(
+    campaignId: string,
+    offerId: string,
+    organizerId: string,
+    dto: RemoveCampaignOfferDto,
+  ) {
+    return this.mutateOwnedDraftOffer(
+      campaignId,
+      organizerId,
+      dto.expectedRevision,
+      async (tx) => {
+        const existing = await tx.campaignProduct.findFirst({
+          where: { id: offerId, campaignId },
+        });
+        if (!existing) {
+          throw authoringBadRequest(
+            CampaignAuthoringErrorCode.OFFER_NOT_FOUND,
+            'Campaign offer not found',
+          );
+        }
+        await tx.campaignProductPrice.deleteMany({
+          where: { campaignProductId: offerId },
+        });
+        await tx.campaignProduct.delete({ where: { id: offerId } });
+      },
+    );
+  }
+
+  /**
+   * @deprecated Prefer addOffer. Legacy path kept for transitional callers; still validates design ownership when designId set and requires price ≥ floor when price set. Not revision-safe.
    */
   async addProduct(
     campaignId: string,
@@ -339,78 +804,203 @@ export class CampaignsService {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id: campaignId },
     });
-    if (!campaign) {
-      throw new NotFoundException('Campaign not found');
-    }
-    if (campaign.organizerId !== organizerId) {
-      throw new ForbiddenException('Access denied');
-    }
+    assertCampaignFound(campaign);
+    assertOwned(organizerId, campaign.organizerId);
     if (!MUTABLE_STATUSES.has(campaign.status)) {
       throw new BadRequestException(
         `Cannot modify products on a campaign in ${campaign.status} status. ` +
           `Products can only be added or removed while the campaign is DRAFT or PAUSED.`,
       );
     }
-    const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
+    if (!dto.designId || dto.price == null) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.PRICE_INVALID,
+        'designId and price are required; use POST /campaigns/:id/offers',
+      );
+    }
+    // Bridge to revision-safe offer API using current revision.
+    return this.addOffer(campaignId, organizerId, {
+      expectedRevision: campaign.draftRevision,
+      productId: dto.productId,
+      designId: dto.designId,
+      price: dto.price,
+    }).then(async () => {
+      const detail = await this.findOne(organizerId, campaignId);
+      const offer = detail.offers.find(
+        (o) => o.productId === dto.productId && o.designId === dto.designId,
+      );
+      return offer
+        ? {
+            id: offer.id,
+            campaignId,
+            productId: offer.productId,
+            designId: offer.designId,
+            product: offer.product,
+            design: offer.design
+              ? { id: offer.design.id, name: offer.design.name }
+              : null,
+            prices:
+              offer.price != null
+                ? [{ currency: offer.currency, amount: offer.price }]
+                : [],
+          }
+        : null;
+    });
+  }
+
+  private async mutateOwnedDraftOffer(
+    campaignId: string,
+    organizerId: string,
+    expectedRevision: number,
+    work: (
+      tx: PrismaService,
+      campaign: { id: string; currency: string; draftRevision: number },
+    ) => Promise<void>,
+  ) {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+        });
+        assertCampaignFound(campaign);
+        assertOwned(organizerId, campaign.organizerId);
+        assertDraftMutable(campaign.status);
+        if (campaign.draftRevision !== expectedRevision) {
+          throw staleRevisionConflict(campaign.draftRevision);
+        }
+
+        await work(tx as unknown as PrismaService, campaign);
+
+        const bumped = await tx.campaign.updateMany({
+          where: {
+            id: campaignId,
+            organizerId,
+            status: CampaignStatus.DRAFT,
+            draftRevision: expectedRevision,
+          },
+          data: { draftRevision: { increment: 1 } },
+        });
+        if (bumped.count === 0) {
+          throw staleRevisionConflict();
+        }
+      });
+    } catch (err) {
+      if (
+        err instanceof ConflictException ||
+        err instanceof BadRequestException ||
+        err instanceof ForbiddenException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+      throw err;
+    }
+    return this.findOne(organizerId, campaignId);
+  }
+
+  private async assertOfferWritable(
+    tx: {
+      product: { findUnique: (args: any) => Promise<{ id: string } | null> };
+      design: {
+        findUnique: (args: any) => Promise<{
+          id: string;
+          userId: string;
+          productId: string;
+        } | null>;
+      };
+      campaignProduct: {
+        findFirst: (args: any) => Promise<{ id: string } | null>;
+      };
+    },
+    organizerId: string,
+    campaignId: string,
+    args: {
+      productId: string;
+      designId: string;
+      excludeOfferId: string | null;
+    },
+  ) {
+    const product = await tx.product.findUnique({
+      where: { id: args.productId },
     });
     if (!product) {
-      throw new BadRequestException('Product not found');
-    }
-    const designId = dto.designId ?? null;
-    if (designId) {
-      const design = await this.prisma.design.findUnique({
-        where: { id: designId },
-      });
-      if (!design) {
-        throw new BadRequestException('Design not found');
-      }
-      if (design.productId !== dto.productId) {
-        throw new BadRequestException('Design does not belong to this product');
-      }
-    }
-
-    const cp = await this.prisma.campaignProduct.create({
-      data: {
-        campaignId,
-        productId: dto.productId,
-        designId,
-      },
-      include: {
-        product: { select: { id: true, name: true, slug: true } },
-        design: { select: { id: true, name: true } },
-      },
-    });
-
-    if (dto.price != null && dto.price > 0) {
-      const currency = campaign.currency ?? DEFAULT_CURRENCY;
-      const minPrice = await this.pricingService.getMinCampaignProductPrice(
-        dto.productId,
-        designId,
-        currency,
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.PRODUCT_NOT_FOUND,
+        'Product not found',
       );
-      if (dto.price < minPrice) {
-        throw new BadRequestException(
-          `Campaign price must be at least ${minPrice} ${currency} (max organizer cost across variants for this product${designId ? ' and design' : ''}).`,
-        );
-      }
-      await this.prisma.campaignProductPrice.create({
-        data: {
-          campaignProductId: cp.id,
-          currency: DEFAULT_CURRENCY,
-          amount: dto.price,
-        },
-      });
     }
-
-    return this.prisma.campaignProduct.findUnique({
-      where: { id: cp.id },
-      include: {
-        product: { select: { id: true, name: true, slug: true } },
-        design: { select: { id: true, name: true } },
-        prices: true,
+    const design = await tx.design.findUnique({
+      where: { id: args.designId },
+    });
+    if (!design) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_NOT_FOUND,
+        'Design not found',
+      );
+    }
+    if (design.userId !== organizerId) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_NOT_OWNED,
+        'Design does not belong to this organiser',
+      );
+    }
+    if (design.productId !== args.productId) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_PRODUCT_MISMATCH,
+        'Design does not belong to this product',
+      );
+    }
+    const duplicate = await tx.campaignProduct.findFirst({
+      where: {
+        campaignId,
+        productId: args.productId,
+        designId: args.designId,
+        ...(args.excludeOfferId ? { id: { not: args.excludeOfferId } } : {}),
       },
     });
+    if (duplicate) {
+      throw authoringConflict(
+        CampaignAuthoringErrorCode.OFFER_DUPLICATE,
+        'This product and design are already offered on the campaign',
+      );
+    }
+  }
+
+  private async assertOwnedDesignForProduct(
+    organizerId: string,
+    productId: string,
+    designId: string,
+  ) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.PRODUCT_NOT_FOUND,
+        'Product not found',
+      );
+    }
+    const design = await this.prisma.design.findUnique({
+      where: { id: designId },
+    });
+    if (!design) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_NOT_FOUND,
+        'Design not found',
+      );
+    }
+    if (design.userId !== organizerId) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_NOT_OWNED,
+        'Design does not belong to this organiser',
+      );
+    }
+    if (design.productId !== productId) {
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.DESIGN_PRODUCT_MISMATCH,
+        'Design does not belong to this product',
+      );
+    }
   }
 
   /**
@@ -579,6 +1169,7 @@ export class CampaignsService {
         products: {
           include: {
             design: { select: { id: true, moderationStatus: true } },
+            prices: true,
           },
         },
       },
@@ -588,14 +1179,48 @@ export class CampaignsService {
       throw new ForbiddenException('Access denied');
     }
     if (campaign.status !== CampaignStatus.DRAFT) {
-      throw new BadRequestException(
+      throw authoringBadRequest(
+        CampaignAuthoringErrorCode.NOT_DRAFT,
         `Only DRAFT campaigns can be submitted for review (current status: ${campaign.status})`,
       );
     }
+
+    const blockers: Array<{
+      code: CampaignAuthoringErrorCode;
+      message: string;
+    }> = [];
     if (!campaign.title?.trim()) {
-      throw new BadRequestException(
-        'Campaign must have a title before submitting for review',
-      );
+      blockers.push({
+        code: CampaignAuthoringErrorCode.SUBMIT_MISSING_TITLE,
+        message: 'Campaign must have a title before submitting for review',
+      });
+    }
+    if (campaign.products.length === 0) {
+      blockers.push({
+        code: CampaignAuthoringErrorCode.SUBMIT_NO_OFFERS,
+        message: 'Add at least one product offer with a design and price',
+      });
+    } else {
+      const currency = campaign.currency ?? DEFAULT_CURRENCY;
+      for (const cp of campaign.products) {
+        const priceRow =
+          cp.prices.find((p) => p.currency === currency) ?? cp.prices[0];
+        const amount = priceRow ? Number(priceRow.amount) : NaN;
+        if (!cp.designId || !Number.isFinite(amount) || amount <= 0) {
+          blockers.push({
+            code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
+            message:
+              'Every offer must include an owned design and a positive NGN price',
+          });
+          break;
+        }
+      }
+    }
+    if (blockers.length > 0) {
+      const first = blockers[0];
+      if (first) {
+        throw authoringBadRequest(first.code, first.message, { blockers });
+      }
     }
 
     // Build the text content to screen (title + description + story).

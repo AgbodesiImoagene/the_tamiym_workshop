@@ -630,5 +630,36 @@ describe('PricingService', () => {
       );
       expect(JSON.stringify(offers[0])).not.toMatch(/stockOnHand|reserved/);
     });
+
+    it('buildOwnerDraftPreviewOffers allows pending designs and watermarks DRAFT', () => {
+      const pending = {
+        ...baseSource,
+        design: {
+          ...baseSource.design,
+          moderationStatus: 'PENDING' as const,
+        },
+      };
+      const offers = service.buildOwnerDraftPreviewOffers([pending], 'NGN');
+      expect(offers).toHaveLength(1);
+      expect(offers[0].purchasable).toBe(false);
+      expect(offers[0].previewWatermark).toBe('DRAFT');
+      expect(offers[0].design.moderationStatus).toBe('PENDING');
+      expect(JSON.stringify(offers[0])).not.toMatch(
+        /organizerCost|costBasis|moderationNotes/,
+      );
+    });
+
+    it('buildOwnerDraftPreviewOffers excludes REJECTED designs', () => {
+      const rejected = {
+        ...baseSource,
+        design: {
+          ...baseSource.design,
+          moderationStatus: 'REJECTED' as const,
+        },
+      };
+      expect(service.buildOwnerDraftPreviewOffers([rejected], 'NGN')).toEqual(
+        [],
+      );
+    });
   });
 });

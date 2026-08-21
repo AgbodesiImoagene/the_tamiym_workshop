@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -111,10 +112,13 @@ export default function DashboardFundraiserPage() {
 
   const draftMutation = useMutation({
     mutationFn: createDraftCampaign,
-    onSuccess: async () => {
+    onSuccess: async (created) => {
       setDraftTitle('');
       setApplyMessage('Draft fundraiser created.');
       await queryClient.invalidateQueries({ queryKey: ['customer-campaigns-fundraiser'] });
+      if (created?.id) {
+        router.push(`/dashboard/fundraiser/${created.id}`);
+      }
     },
     onError: (mutationError) => {
       const apiError = mutationError as ApiError;
@@ -384,9 +388,18 @@ export default function DashboardFundraiserPage() {
                             {campaign.status.replaceAll('_', ' ')}
                           </p>
                         </div>
-                        <span className="rounded-full bg-[#cfddf8] px-3 py-1 text-xs font-medium text-[#004385]">
-                          {campaign.slug}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-[#cfddf8] px-3 py-1 text-xs font-medium text-[#004385]">
+                            {campaign.slug}
+                          </span>
+                          <Link
+                            href={`/dashboard/fundraiser/${campaign.id}`}
+                            className="rounded-lg border border-black/40 px-3 py-1 text-xs font-semibold text-[#004385]"
+                            data-testid="campaign-open-editor"
+                          >
+                            {campaign.status === 'DRAFT' ? 'Edit draft' : 'Open'}
+                          </Link>
+                        </div>
                       </div>
                       <Progress value={progress} className="mt-4 h-3 [&>div]:bg-[#00cb2f]" />
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-black/70">
