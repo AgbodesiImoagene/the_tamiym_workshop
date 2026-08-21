@@ -72,6 +72,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 31. `fundraising/ttw-035-interim-policy.md` — interim organiser campaign authoring, draft revision & offer mutations (TTW-035)
 32. `orders/ttw-040-interim-policy.md` — interim shipment lifecycle, exceptions & customer-safe timeline (TTW-040)
 33. `orders/ttw-041-interim-policy.md` — interim cancellation / refund / return eligibility matrix (TTW-041)
+34. `payouts/ttw-042-interim-policy.md` — interim payout eligibility, KYC destination lifecycle & AUTO_EXECUTE gate (TTW-042)
 
 ## Deep Dives
 
@@ -85,6 +86,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 - `fundraising/ttw-035-interim-policy.md` — organiser DRAFT authoring, revision concurrency, offer atomicity, draft preview (TTW-035)
 - `orders/ttw-040-interim-policy.md` — shipment state machine, exception taxonomy, redaction (TTW-040)
 - `orders/ttw-041-interim-policy.md` — cancellation/refund/return eligibility codes and TTW-040 coupling (TTW-041)
+- `payouts/ttw-042-interim-policy.md` — payout eligibility codes, destination lifecycle, automation gate (TTW-042)
 - `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
 - `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
 - `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout

@@ -180,6 +180,28 @@ describe('env-validation', () => {
         ).toThrow(/unavailable is forbidden in production/);
       });
 
+      it('throws when PAYOUT_BANK_RESOLUTION_MODE=stub in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            PAYOUT_BANK_RESOLUTION_MODE: 'stub',
+          }),
+        ).toThrow(
+          /PAYOUT_BANK_RESOLUTION_MODE must be live \(or unset\) in production/,
+        );
+      });
+
+      it('throws when PAYOUT_BANK_RESOLUTION_MODE is a non-live typo in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            PAYOUT_BANK_RESOLUTION_MODE: 'off',
+          }),
+        ).toThrow(
+          /PAYOUT_BANK_RESOLUTION_MODE must be live \(or unset\) in production/,
+        );
+      });
+
       it('throws when AUTH_ADMIN_ORIGINS is missing', () => {
         expect(() =>
           validateEnv(omit(validProductionConfig, 'AUTH_ADMIN_ORIGINS')),

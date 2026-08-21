@@ -16,10 +16,11 @@ import {
   AuditSource,
   NotificationChannel,
   PayoutRunStatus,
+  OrganizerApplicationStatus,
+  AuditAction,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
 import { DEFAULT_CURRENCY } from '../constants';
-import { AuditAction } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
@@ -42,6 +43,19 @@ import {
   transferEventToStatus,
 } from './payout-transfer-transitions';
 import { toPaystackTransferReference } from './paystack-transfer-reference';
+import {
+  maskAccountNumber,
+  PAYOUT_ELIGIBILITY_POLICY_VERSION,
+  PayoutEligibilityGate,
+  resolvePayoutBankResolutionMode,
+  stubRecipientCodeForProfile,
+} from './payout-eligibility';
+import {
+  assertPayoutEligible,
+  evaluateForGate,
+  snapshotFromResult,
+  toEligibilityProfile,
+} from './payout-eligibility.helpers';
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -66,8 +80,18 @@ export class PayoutsService {
 
   /**
    * Resolve or create Paystack transfer recipient for a payout profile. Returns recipient_code.
+   * When `expected` is provided, bank identity must still match that tuple (CAS) so a
+   * concurrent destination edit cannot bind a recipient to a desynced snapshot.
    */
-  async resolveRecipient(profileId: string): Promise<string> {
+  async resolveRecipient(
+    profileId: string,
+    expected?: {
+      destinationVersion: number;
+      bankCode: string;
+      accountNumber: string;
+      accountName: string;
+    },
+  ): Promise<string> {
     return this.observability.startSpan(
       'payouts.resolve_recipient',
       { 'payout.profile_id': profileId },
@@ -76,6 +100,18 @@ export class PayoutsService {
           where: { id: profileId },
         });
         if (!profile) throw new NotFoundException('Payout profile not found');
+        if (expected) {
+          if (
+            profile.destinationVersion !== expected.destinationVersion ||
+            profile.bankCode !== expected.bankCode ||
+            profile.accountNumber !== expected.accountNumber ||
+            profile.accountName !== expected.accountName
+          ) {
+            throw new BadRequestException(
+              'Payout destination changed while resolving transfer recipient',
+            );
+          }
+        }
         if (profile.recipientCode) return profile.recipientCode;
 
         const secretKey = this.config.get<string>('PAYSTACK_SECRET_KEY');
@@ -105,11 +141,37 @@ export class PayoutsService {
             data.message ?? 'Failed to create transfer recipient',
           );
         }
-        await this.prisma.userPayoutProfile.update({
-          where: { id: profileId },
-          data: { recipientCode: data.data.recipient_code },
+        const recipientCode = data.data.recipient_code;
+        const claimed = await this.prisma.userPayoutProfile.updateMany({
+          where: {
+            id: profileId,
+            destinationVersion: profile.destinationVersion,
+            bankCode: profile.bankCode,
+            accountNumber: profile.accountNumber,
+            accountName: profile.accountName,
+            recipientCode: null,
+          },
+          data: { recipientCode },
         });
-        return data.data.recipient_code;
+        if (claimed.count === 0) {
+          const again = await this.prisma.userPayoutProfile.findUnique({
+            where: { id: profileId },
+          });
+          if (
+            again?.recipientCode &&
+            (!expected ||
+              (again.destinationVersion === expected.destinationVersion &&
+                again.bankCode === expected.bankCode &&
+                again.accountNumber === expected.accountNumber &&
+                again.accountName === expected.accountName))
+          ) {
+            return again.recipientCode;
+          }
+          throw new BadRequestException(
+            'Payout destination changed while resolving transfer recipient',
+          );
+        }
+        return recipientCode;
       },
     );
   }
@@ -196,6 +258,12 @@ export class PayoutsService {
             payoutProfile: true,
             organizer: {
               include: {
+                organizerApplications: {
+                  where: { status: OrganizerApplicationStatus.APPROVED },
+                  orderBy: { reviewedAt: 'desc' },
+                  take: 1,
+                  select: { termsVersion: true },
+                },
                 payoutProfiles: {
                   where: { isDefault: true },
                   take: 1,
@@ -214,7 +282,42 @@ export class PayoutsService {
           );
         }
 
+        const eligibility = evaluateForGate({
+          gate: PayoutEligibilityGate.PROVIDER_INITIATE,
+          organiser: {
+            id: campaign.organizer.id,
+            role: campaign.organizer.role,
+            status: campaign.organizer.status,
+            emailVerifiedAt: campaign.organizer.emailVerifiedAt,
+            phone: campaign.organizer.phone,
+            termsVersion:
+              campaign.organizer.organizerApplications[0]?.termsVersion ?? null,
+          },
+          profile: toEligibilityProfile(profile),
+        });
+        assertPayoutEligible(eligibility);
+
         const currency = (campaign.currency as 'NGN') ?? DEFAULT_CURRENCY;
+
+        let snapshotRecipientCode = profile.recipientCode;
+        if (!snapshotRecipientCode) {
+          const mode = resolvePayoutBankResolutionMode(
+            this.config.get<string>('PAYOUT_BANK_RESOLUTION_MODE'),
+            this.config.get<string>('NODE_ENV') ?? process.env.NODE_ENV,
+          );
+          snapshotRecipientCode =
+            mode === 'stub'
+              ? stubRecipientCodeForProfile(
+                  profile.id,
+                  profile.destinationVersion,
+                )
+              : await this.resolveRecipient(profile.id, {
+                  destinationVersion: profile.destinationVersion,
+                  bankCode: profile.bankCode,
+                  accountNumber: profile.accountNumber,
+                  accountName: profile.accountName,
+                });
+        }
 
         // Create the payout row in PROCESSING so it is visible before hitting Paystack.
         const payout = await this.prisma.payout.create({
@@ -225,6 +328,17 @@ export class PayoutsService {
             status: PayoutStatus.PROCESSING,
             currency,
             amount,
+            snapshotBankCode: profile.bankCode,
+            snapshotAccountName: profile.accountName,
+            snapshotAccountMask: maskAccountNumber(profile.accountNumber),
+            snapshotRecipientCode,
+            snapshotProfileId: profile.id,
+            snapshotDestinationVersion: profile.destinationVersion,
+            policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
+            eligibilitySnapshot: snapshotFromResult(
+              eligibility,
+              campaign.organizerId,
+            ),
           },
         });
 
@@ -239,10 +353,9 @@ export class PayoutsService {
         );
 
         try {
-          const recipientCode = await this.resolveRecipient(profile.id);
           const idempotencyKey = `payout-${payout.id}`;
           const result = await this.initiateTransfer(
-            recipientCode,
+            snapshotRecipientCode,
             amount,
             currency,
             reason ?? 'Campaign payout',
@@ -255,7 +368,7 @@ export class PayoutsService {
               status: PayoutStatus.INITIATED,
               providerRef: result.reference,
               idempotencyKey,
-              snapshotRecipientCode: recipientCode,
+              snapshotRecipientCode,
             },
           });
 

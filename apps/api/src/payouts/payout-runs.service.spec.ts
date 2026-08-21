@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PayoutRunsService } from './payout-runs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CampaignLedgerService } from './campaign-ledger.service';
@@ -57,6 +58,10 @@ describe('PayoutRunsService.retryPayout', () => {
         {
           provide: ObservabilityService,
           useValue: { recordPayoutRun: jest.fn(), startSpan: jest.fn() },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: () => undefined },
         },
       ],
     }).compile();
@@ -221,5 +226,50 @@ describe('PayoutRunsService.retryPayout', () => {
       BadRequestException,
     );
     expect(tx.payout.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('PayoutRunsService.createPayoutRun AUTO_EXECUTE gate', () => {
+  it('rejects AUTO_EXECUTE when env gate is off', async () => {
+    const prisma = {
+      siteSettings: { findUnique: jest.fn() },
+      campaign: { findMany: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const module = await Test.createTestingModule({
+      providers: [
+        PayoutRunsService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: CampaignLedgerService,
+          useValue: { getEligibleBalancesByCampaign: jest.fn() },
+        },
+        {
+          provide: PayoutsService,
+          useValue: {
+            initiateTransfer: jest.fn(),
+            resolveRecipient: jest.fn(),
+          },
+        },
+        { provide: AuditService, useValue: { log: jest.fn() } },
+        {
+          provide: ObservabilityService,
+          useValue: { recordPayoutRun: jest.fn(), startSpan: jest.fn() },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: () => undefined },
+        },
+      ],
+    }).compile();
+    const service = module.get(PayoutRunsService);
+    await expect(
+      service.createPayoutRun(
+        new Date(),
+        new Date(),
+        'AUTO_EXECUTE' as never,
+        'admin-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

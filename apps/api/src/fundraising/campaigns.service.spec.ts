@@ -1006,22 +1006,49 @@ describe('CampaignsService', () => {
       expect(result.payoutModeOverride).toBeNull();
     });
 
-    it('sets override to AUTO_EXECUTE', async () => {
+    it('sets override to AUTO_EXECUTE when env gate is enabled', async () => {
+      const prev = process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+      process.env.PAYOUT_AUTO_EXECUTE_ENABLED = 'true';
       (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
       (prisma.campaign.update as jest.Mock).mockResolvedValue({
         ...mockCampaign,
         payoutModeOverride: PayoutMode.AUTO_EXECUTE,
       });
 
-      await service.updatePayoutPolicyForAdmin(
-        'camp-1',
-        PayoutMode.AUTO_EXECUTE,
-      );
+      try {
+        await service.updatePayoutPolicyForAdmin(
+          'camp-1',
+          PayoutMode.AUTO_EXECUTE,
+        );
 
-      expect(prisma.campaign.update).toHaveBeenCalledWith({
-        where: { id: 'camp-1' },
-        data: { payoutModeOverride: PayoutMode.AUTO_EXECUTE },
-      });
+        expect(prisma.campaign.update).toHaveBeenCalledWith({
+          where: { id: 'camp-1' },
+          data: { payoutModeOverride: PayoutMode.AUTO_EXECUTE },
+        });
+      } finally {
+        if (prev === undefined) {
+          delete process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+        } else {
+          process.env.PAYOUT_AUTO_EXECUTE_ENABLED = prev;
+        }
+      }
+    });
+
+    it('rejects AUTO_EXECUTE when env gate is off', async () => {
+      const prev = process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+      delete process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+      try {
+        await expect(
+          service.updatePayoutPolicyForAdmin('camp-1', PayoutMode.AUTO_EXECUTE),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.campaign.update).not.toHaveBeenCalled();
+      } finally {
+        if (prev === undefined) {
+          delete process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+        } else {
+          process.env.PAYOUT_AUTO_EXECUTE_ENABLED = prev;
+        }
+      }
     });
   });
 

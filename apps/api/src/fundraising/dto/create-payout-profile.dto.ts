@@ -7,7 +7,11 @@ export class CreatePayoutProfileDto {
   @IsString()
   label?: string;
 
-  @ApiProperty({ example: '058' })
+  @ApiProperty({
+    example: '058',
+    description:
+      'Nigerian bank code. Slice 1 stub resolution may auto-verify; live mode leaves PENDING_VERIFICATION (TTW-042).',
+  })
   @IsString()
   @IsNotEmpty()
   bankCode!: string;

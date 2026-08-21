@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
+import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { PayoutRunsService } from './payout-runs.service';
@@ -8,10 +9,15 @@ import { PayoutMode } from '../generated/prisma/enums';
 import { PAYOUT_QUEUE_NAME, JOB_EXECUTE_PAYOUT_RUN } from '../constants';
 import { ObservabilityService } from '../observability/observability.service';
 import { runWithRequestContext } from '../request-context/request-context.store';
+import {
+  isPayoutAutoExecuteEnabled,
+  resolveSchedulerPayoutMode,
+} from './payout-eligibility';
 
 /**
  * Cron: create due payout runs from site policy.
- * When mode is AUTO_EXECUTE, also approves the run and queues it for execution.
+ * When mode is AUTO_EXECUTE **and** PAYOUT_AUTO_EXECUTE_ENABLED, also approves
+ * the run and queues it for execution (TTW-042).
  */
 @Injectable()
 export class PayoutRunSchedulerService {
@@ -21,6 +27,7 @@ export class PayoutRunSchedulerService {
     private readonly prisma: PrismaService,
     private readonly payoutRunsService: PayoutRunsService,
     private readonly observability: ObservabilityService,
+    private readonly config: ConfigService,
     @InjectQueue(PAYOUT_QUEUE_NAME) private readonly payoutQueue: Queue,
   ) {}
 
@@ -47,6 +54,22 @@ export class PayoutRunSchedulerService {
               return;
             }
 
+            const autoExecuteEnabled = isPayoutAutoExecuteEnabled(
+              this.config.get<string>('PAYOUT_AUTO_EXECUTE_ENABLED'),
+            );
+            const runMode = resolveSchedulerPayoutMode(
+              site.payoutMode,
+              autoExecuteEnabled,
+            ) as PayoutMode;
+            if (
+              site.payoutMode === PayoutMode.AUTO_EXECUTE &&
+              runMode !== PayoutMode.AUTO_EXECUTE
+            ) {
+              this.logger.warn(
+                'Site payoutMode is AUTO_EXECUTE but PAYOUT_AUTO_EXECUTE_ENABLED is off; scheduling as AUTO_APPROVAL_REQUIRED',
+              );
+            }
+
             const cadenceDays = site.payoutCadenceDays ?? 7;
             const cutoffAt = new Date(now);
             cutoffAt.setDate(cutoffAt.getDate() - cadenceDays);
@@ -65,14 +88,14 @@ export class PayoutRunSchedulerService {
                 await this.payoutRunsService.createPayoutRun(
                   scheduledFor,
                   cutoffAt,
-                  site.payoutMode as PayoutMode,
+                  runMode,
                   systemUserId,
                 );
               this.logger.log(
                 `Created payout run ${id} (${payoutCount} payouts)`,
               );
 
-              if (site.payoutMode === PayoutMode.AUTO_EXECUTE) {
+              if (runMode === PayoutMode.AUTO_EXECUTE && autoExecuteEnabled) {
                 await this.payoutRunsService.approvePayoutRun(id, systemUserId);
                 await this.payoutQueue.add(
                   JOB_EXECUTE_PAYOUT_RUN,

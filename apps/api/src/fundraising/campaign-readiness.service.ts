@@ -22,6 +22,13 @@ import {
   isVariantSellable,
   issue,
 } from './campaign-readiness.helpers';
+import {
+  evaluatePayoutEligibility,
+  messageForPayoutEligibilityCode,
+  PayoutEligibilityCode,
+  PayoutEligibilityGate,
+} from '../payouts/payout-eligibility';
+import { toEligibilityProfile } from '../payouts/payout-eligibility.helpers';
 
 const OFFER_INCLUDE = {
   product: {
@@ -49,8 +56,35 @@ const OFFER_INCLUDE = {
   prices: true,
 } as const;
 
+const PAYOUT_CODE_TO_READINESS: Partial<
+  Record<PayoutEligibilityCode, CampaignReadinessCode>
+> = {
+  [PayoutEligibilityCode.ORGANISER_NOT_ACTIVE]:
+    CampaignReadinessCode.PAYOUT_ORGANISER_NOT_ACTIVE,
+  [PayoutEligibilityCode.ORGANISER_ROLE_INVALID]:
+    CampaignReadinessCode.PAYOUT_ORGANISER_ROLE_INVALID,
+  [PayoutEligibilityCode.EMAIL_UNVERIFIED]:
+    CampaignReadinessCode.PAYOUT_EMAIL_UNVERIFIED,
+  [PayoutEligibilityCode.PHONE_MISSING]:
+    CampaignReadinessCode.PAYOUT_PHONE_MISSING,
+  [PayoutEligibilityCode.TERMS_NOT_CURRENT]:
+    CampaignReadinessCode.PAYOUT_TERMS_NOT_CURRENT,
+  [PayoutEligibilityCode.PROFILE_MISSING]:
+    CampaignReadinessCode.PAYOUT_PROFILE_MISSING,
+  [PayoutEligibilityCode.PROFILE_NOT_OWNED]:
+    CampaignReadinessCode.PAYOUT_PROFILE_NOT_OWNED,
+  [PayoutEligibilityCode.PROFILE_NOT_VERIFIED]:
+    CampaignReadinessCode.PAYOUT_PROFILE_NOT_VERIFIED,
+  [PayoutEligibilityCode.PROFILE_SUSPENDED]:
+    CampaignReadinessCode.PAYOUT_PROFILE_SUSPENDED,
+  [PayoutEligibilityCode.PROFILE_REJECTED]:
+    CampaignReadinessCode.PAYOUT_PROFILE_REJECTED,
+  [PayoutEligibilityCode.BANK_UNRESOLVED]:
+    CampaignReadinessCode.PAYOUT_BANK_UNRESOLVED,
+};
+
 /**
- * Server-side campaign readiness authority (TTW-034).
+ * Server-side campaign readiness authority (TTW-034 / TTW-042 payout gate).
  * Clients must never invent or trust readiness; always re-evaluate here.
  */
 @Injectable()
@@ -69,16 +103,23 @@ export class CampaignReadinessService {
       where: { id: campaignId },
       include: {
         products: { include: OFFER_INCLUDE },
+        payoutProfile: true,
         organizer: {
           select: {
             id: true,
             role: true,
             status: true,
+            emailVerifiedAt: true,
+            phone: true,
             organizerApplications: {
               where: { status: OrganizerApplicationStatus.APPROVED },
               orderBy: { reviewedAt: 'desc' },
               take: 1,
               select: { termsVersion: true },
+            },
+            payoutProfiles: {
+              where: { isDefault: true },
+              take: 1,
             },
           },
         },
@@ -107,6 +148,7 @@ export class CampaignReadinessService {
     this.evaluateCopyAndDates(campaign, result, phase, now);
     await this.evaluateOffers(campaign, result, phase);
     this.evaluateOrganiser(campaign.organizer, result);
+    this.evaluatePayoutEligibility(campaign, result, phase);
 
     if (
       phase === CampaignReadinessPhase.RESUME &&
@@ -131,17 +173,79 @@ export class CampaignReadinessService {
       );
     }
 
-    // TTW-042 owns hard payout gates; slice 1 records deferred warning only.
-    result.warnings.push(
-      issue(
-        CampaignReadinessCode.PAYOUT_DEFERRED,
-        'Payout eligibility checks are deferred until payout KYC policy is enforced.',
-      ),
-    );
-
     result.ready = result.blockers.length === 0;
     result.policyVersion = CAMPAIGN_READINESS_POLICY_VERSION;
     return result;
+  }
+
+  private evaluatePayoutEligibility(
+    campaign: {
+      organizer: {
+        id: string;
+        role: UserRole;
+        status: UserStatus;
+        emailVerifiedAt: Date | null;
+        phone: string | null;
+        organizerApplications: Array<{ termsVersion: string }>;
+        payoutProfiles: Array<{
+          id: string;
+          userId: string;
+          status: import('../generated/prisma/enums').PayoutProfileStatus;
+          bankResolutionStatus: string | null;
+          destinationVersion: number;
+        }>;
+      };
+      payoutProfile: {
+        id: string;
+        userId: string;
+        status: import('../generated/prisma/enums').PayoutProfileStatus;
+        bankResolutionStatus: string | null;
+        destinationVersion: number;
+      } | null;
+    },
+    result: CampaignReadinessResult,
+    phase: ReadinessPhase,
+  ): void {
+    const profile =
+      campaign.payoutProfile ?? campaign.organizer.payoutProfiles?.[0] ?? null;
+    const gate =
+      phase === CampaignReadinessPhase.RESUME
+        ? PayoutEligibilityGate.CAMPAIGN_RESUME
+        : PayoutEligibilityGate.CAMPAIGN_ACTIVATE;
+    const eligibility = evaluatePayoutEligibility({
+      gate,
+      organiser: {
+        id: campaign.organizer.id,
+        role: campaign.organizer.role,
+        status: campaign.organizer.status,
+        emailVerifiedAt: campaign.organizer.emailVerifiedAt,
+        phone: campaign.organizer.phone,
+        termsVersion:
+          campaign.organizer.organizerApplications[0]?.termsVersion ?? null,
+      },
+      profile: profile ? toEligibilityProfile(profile) : null,
+    });
+
+    if (eligibility.eligible) return;
+
+    const hardGate =
+      phase === CampaignReadinessPhase.ACTIVATE ||
+      phase === CampaignReadinessPhase.RESUME;
+
+    for (const denial of eligibility.denials) {
+      const readinessCode =
+        PAYOUT_CODE_TO_READINESS[denial.code] ??
+        CampaignReadinessCode.PAYOUT_PROFILE_MISSING;
+      const item = issue(
+        readinessCode,
+        denial.message || messageForPayoutEligibilityCode(denial.code),
+      );
+      if (hardGate) {
+        result.blockers.push(item);
+      } else {
+        result.warnings.push(item);
+      }
+    }
   }
 
   private evaluateCopyAndDates(

@@ -141,6 +141,19 @@ export function validateEnv(
         `VIRUS_SCANNER=${virusScanner} is forbidden in production; use clamav`,
       );
     }
+
+    const bankResolution = String(
+      typeof config.PAYOUT_BANK_RESOLUTION_MODE === 'string'
+        ? config.PAYOUT_BANK_RESOLUTION_MODE
+        : '',
+    )
+      .trim()
+      .toLowerCase();
+    if (bankResolution && bankResolution !== 'live') {
+      throw new Error(
+        'PAYOUT_BANK_RESOLUTION_MODE must be live (or unset) in production; stub and other values are forbidden',
+      );
+    }
   }
   return config;
 }
