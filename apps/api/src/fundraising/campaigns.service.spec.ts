@@ -1047,5 +1047,210 @@ describe('CampaignsService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('updateOffer rejects empty patch and missing offer', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
+      await expect(
+        service.updateOffer('camp-1', 'cp-1', 'user-1', {
+          expectedRevision: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.updateOffer('camp-1', 'missing', 'user-1', {
+          expectedRevision: 1,
+          price: 7000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('updateOffer rejects offer without design or finite price', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        productId: 'prod-1',
+        designId: null,
+        prices: [],
+      });
+      await expect(
+        service.updateOffer('camp-1', 'cp-1', 'user-1', {
+          expectedRevision: 1,
+          price: 7000,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      (prisma.campaignProduct.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: 'cp-1',
+          productId: 'prod-1',
+          designId: 'design-1',
+          prices: [{ currency: 'NGN', amount: 'not-a-number' }],
+        })
+        .mockResolvedValueOnce(null);
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prod-1',
+      });
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        id: 'design-1',
+        userId: 'user-1',
+        productId: 'prod-1',
+      });
+      await expect(
+        service.updateOffer('camp-1', 'cp-1', 'user-1', {
+          expectedRevision: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('addOffer maps unique constraint races to OFFER_DUPLICATE', async () => {
+      (prisma.campaign.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockCampaign)
+        .mockResolvedValueOnce({ ...mockCampaign, products: [] });
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prod-1',
+      });
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        id: 'design-1',
+        userId: 'user-1',
+        productId: 'prod-1',
+      });
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue(null);
+      (
+        pricingService.getMinCampaignProductPrice as jest.Mock
+      ).mockResolvedValue(5000);
+      const dup = Object.assign(new Error('Unique'), { code: 'P2002' });
+      (prisma.campaignProduct.create as jest.Mock).mockRejectedValue(dup);
+
+      await expect(
+        service.addOffer('camp-1', 'user-1', {
+          expectedRevision: 1,
+          productId: 'prod-1',
+          designId: 'design-1',
+          price: 6000,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('update basics + owner detail offers', () => {
+    it('findOne projects offers with live minimumPrice guidance', async () => {
+      (
+        pricingService.getMinCampaignProductPrice as jest.Mock
+      ).mockResolvedValue(4500);
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        products: [
+          {
+            id: 'cp-1',
+            productId: 'prod-1',
+            designId: 'design-1',
+            product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
+            design: {
+              id: 'design-1',
+              name: 'Logo',
+              thumbnailUrl: null,
+              moderationStatus: ModerationStatus.PENDING,
+            },
+            prices: [{ currency: 'NGN', amount: 6000 }],
+          },
+        ],
+      });
+      const result = await service.findOne('user-1', 'camp-1');
+      expect(result.offers[0]).toEqual(
+        expect.objectContaining({
+          id: 'cp-1',
+          price: 6000,
+          minimumPrice: 4500,
+        }),
+      );
+      expect(result.products).toHaveLength(1);
+    });
+
+    it('update rejects taken slug and invalid date order', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue(mockCampaign);
+      (prisma.campaign.findFirst as jest.Mock).mockResolvedValue({
+        id: 'other',
+        slug: 'taken',
+      });
+      await expect(
+        service.update('user-1', 'camp-1', {
+          expectedRevision: 1,
+          slug: 'taken',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      (prisma.campaign.findFirst as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.update('user-1', 'camp-1', {
+          expectedRevision: 1,
+          startDate: '2026-08-10T00:00:00.000Z',
+          endDate: '2026-08-01T00:00:00.000Z',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('update returns stale conflict when revision races', async () => {
+      (prisma.campaign.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockCampaign)
+        .mockResolvedValueOnce({
+          draftRevision: 3,
+          status: CampaignStatus.DRAFT,
+          organizerId: 'user-1',
+        })
+        .mockResolvedValueOnce({ ...mockCampaign, products: [] });
+      (prisma.campaign.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      await expect(
+        service.update('user-1', 'camp-1', {
+          expectedRevision: 1,
+          title: 'Race',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('update treats vanished campaign after race as not found', async () => {
+      (prisma.campaign.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockCampaign)
+        .mockResolvedValueOnce(null);
+      (prisma.campaign.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      await expect(
+        service.update('user-1', 'camp-1', {
+          expectedRevision: 1,
+          title: 'Gone',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('update rejects when campaign left DRAFT during race', async () => {
+      (prisma.campaign.findUnique as jest.Mock)
+        .mockResolvedValueOnce(mockCampaign)
+        .mockResolvedValueOnce({
+          draftRevision: 1,
+          status: CampaignStatus.REVIEW,
+          organizerId: 'user-1',
+        });
+      (prisma.campaign.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.campaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      await expect(
+        service.update('user-1', 'camp-1', {
+          expectedRevision: 1,
+          title: 'Locked',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('getOwnerDraftPreview rejects non-DRAFT owned campaigns', async () => {
+      (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+        ...mockCampaign,
+        status: CampaignStatus.ACTIVE,
+        products: [],
+      });
+      await expect(
+        service.getOwnerDraftPreview('user-1', 'camp-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 });
