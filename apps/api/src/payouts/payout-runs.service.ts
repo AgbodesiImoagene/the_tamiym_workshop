@@ -243,9 +243,18 @@ export class PayoutRunsService {
       );
     }
 
-    // Resolve recipients outside the create transaction so Paystack is not
-    // called under a long DB lock; snapshots then freeze these codes.
-    const snapshotRecipientByProfileId = new Map<string, string>();
+    // Freeze the full destination tuple outside the create transaction so
+    // bank edits cannot desync recipient vs mask/name/version, and Paystack
+    // is not called under a long DB lock.
+    type FrozenDestination = {
+      profileId: string;
+      bankCode: string;
+      accountName: string;
+      accountNumber: string;
+      destinationVersion: number;
+      recipientCode: string;
+    };
+    const frozenByCampaignId = new Map<string, FrozenDestination>();
     for (const item of eligibleItems) {
       const campaign = await this.prisma.campaign.findUnique({
         where: { id: item.campaignId },
@@ -264,11 +273,25 @@ export class PayoutRunsService {
       });
       const profile =
         campaign?.payoutProfile ?? campaign?.organizer.payoutProfiles?.[0];
-      if (!profile || snapshotRecipientByProfileId.has(profile.id)) continue;
-      snapshotRecipientByProfileId.set(
-        profile.id,
-        await this.recipientCodeForSnapshot(profile),
-      );
+      if (!profile) {
+        throw new BadRequestException(
+          `Campaign ${item.campaignId} is missing a payout profile at run create`,
+        );
+      }
+      const recipientCode = await this.recipientCodeForSnapshot(profile);
+      if (!recipientCode) {
+        throw new BadRequestException(
+          `Campaign ${item.campaignId} could not snapshot a transfer recipient`,
+        );
+      }
+      frozenByCampaignId.set(item.campaignId, {
+        profileId: profile.id,
+        bankCode: profile.bankCode,
+        accountName: profile.accountName,
+        accountNumber: profile.accountNumber,
+        destinationVersion: profile.destinationVersion,
+        recipientCode,
+      });
     }
 
     const run = await this.prisma.$transaction(async (tx) => {
@@ -284,6 +307,13 @@ export class PayoutRunsService {
       });
 
       for (const item of eligibleItems) {
+        const frozen = frozenByCampaignId.get(item.campaignId);
+        if (!frozen) {
+          throw new BadRequestException(
+            `Campaign ${item.campaignId} is missing a frozen payout destination`,
+          );
+        }
+
         const campaign = await tx.campaign.findUnique({
           where: { id: item.campaignId },
           include: {
@@ -310,10 +340,18 @@ export class PayoutRunsService {
             },
           },
         });
-        if (!campaign) continue;
+        if (!campaign) {
+          throw new BadRequestException(
+            `Campaign ${item.campaignId} disappeared during payout run create`,
+          );
+        }
         const profile =
           campaign.payoutProfile ?? campaign.organizer.payoutProfiles?.[0];
-        if (!profile) continue;
+        if (!profile || profile.id !== frozen.profileId) {
+          throw new BadRequestException(
+            `Campaign ${item.campaignId} payout destination changed during run create`,
+          );
+        }
 
         const eligibility = evaluateForGate({
           gate: PayoutEligibilityGate.RUN_CREATE,
@@ -328,12 +366,13 @@ export class PayoutRunsService {
           },
           profile: toEligibilityProfile(profile),
         });
-        if (!eligibility.eligible) continue;
-
-        const snapshotRecipientCode =
-          snapshotRecipientByProfileId.get(profile.id) ?? profile.recipientCode;
-        if (!snapshotRecipientCode) {
-          continue;
+        if (!eligibility.eligible) {
+          throw new BadRequestException({
+            message: 'Campaign became ineligible during payout run create',
+            code: eligibility.codes[0],
+            campaignId: item.campaignId,
+            policyVersion: eligibility.policyVersion,
+          });
         }
 
         await tx.payout.create({
@@ -344,12 +383,12 @@ export class PayoutRunsService {
             status: PayoutStatus.DRAFT,
             currency: item.currency as 'NGN',
             amount: item.eligibleBalance,
-            snapshotBankCode: profile.bankCode,
-            snapshotAccountName: profile.accountName,
-            snapshotAccountMask: maskAccountNumber(profile.accountNumber),
-            snapshotRecipientCode,
-            snapshotProfileId: profile.id,
-            snapshotDestinationVersion: profile.destinationVersion,
+            snapshotBankCode: frozen.bankCode,
+            snapshotAccountName: frozen.accountName,
+            snapshotAccountMask: maskAccountNumber(frozen.accountNumber),
+            snapshotRecipientCode: frozen.recipientCode,
+            snapshotProfileId: frozen.profileId,
+            snapshotDestinationVersion: frozen.destinationVersion,
             policyVersion: PAYOUT_ELIGIBILITY_POLICY_VERSION,
             eligibilitySnapshot: snapshotFromResult(
               eligibility,
@@ -359,6 +398,7 @@ export class PayoutRunsService {
         });
       }
 
+      return runRow;
       return runRow;
     });
 
