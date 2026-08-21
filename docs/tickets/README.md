@@ -56,12 +56,12 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 4 — Fulfilment, support and business policy
 
-| Ticket                                                         | Priority | Risk     | State       | Outcome                                                                |
-| -------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------- |
-| [TTW-040](ttw-040-add-shipment-lifecycle.md)                   | P1       | High     | Complete    | Add shipment/tracking and delivery-exception lifecycle                 |
-| [TTW-041](ttw-041-encode-cancellation-refund-return-policy.md) | P1       | Critical | Complete    | Cancellation/refund/return eligibility encoded (slice 1)               |
-| [TTW-042](ttw-042-enforce-payout-policy-and-kyc.md)            | P1       | Critical | In progress | Approve and enforce payout/KYC/cadence/minimum/reversal policy         |
-| [TTW-043](ttw-043-operationalize-notification-delivery.md)     | P2       | High     | Scoped      | Add notification preferences, dead-letter operations and delivery SLOs |
+| Ticket                                                         | Priority | Risk     | State    | Outcome                                                                |
+| -------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------- |
+| [TTW-040](ttw-040-add-shipment-lifecycle.md)                   | P1       | High     | Complete | Add shipment/tracking and delivery-exception lifecycle                 |
+| [TTW-041](ttw-041-encode-cancellation-refund-return-policy.md) | P1       | Critical | Complete | Cancellation/refund/return eligibility encoded (slice 1)               |
+| [TTW-042](ttw-042-enforce-payout-policy-and-kyc.md)            | P1       | Critical | Complete | Interim payout eligibility/KYC gates encoded (slice 1)                 |
+| [TTW-043](ttw-043-operationalize-notification-delivery.md)     | P2       | High     | Scoped   | Add notification preferences, dead-letter operations and delivery SLOs |
 
 ## Epic 5 — Contracts, observability and release proof
 
