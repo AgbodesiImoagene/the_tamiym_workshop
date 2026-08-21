@@ -50,8 +50,8 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | [TTW-031](ttw-031-render-real-fundraiser-offers.md)               | P1       | High | Complete    | Replace placeholder public options with sellable API-backed offers |
 | [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)            | P1       | High | Complete    | Preserve supporter intent through auth and complete web checkout   |
 | [TTW-033](ttw-033-add-customer-order-detail.md)                   | P1       | High | Complete    | Add immutable, redacted customer order detail and honest states    |
-| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)    | P1       | High | Scoped      | Enforce activation readiness and notify organisers of decisions    |
-| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)          | P1       | High | In progress | Complete organiser product, design, price and submission authoring |
+| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)    | P1       | High | In progress | Enforce activation readiness and notify organisers of decisions    |
+| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)          | P1       | High | Complete    | Complete organiser product, design, price and submission authoring |
 | [TTW-036](ttw-036-complete-analytics-contracts.md)                | P1       | High | Scoped      | Approve KPI contracts, filters and reconciliation drill-downs      |
 
 ## Epic 4 — Fulfilment, support and business policy

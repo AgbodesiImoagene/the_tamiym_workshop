@@ -395,7 +395,8 @@ export class CampaignsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Not in DRAFT status, missing fields, or interim blockers',
+    description:
+      'Not in DRAFT status, or readiness blockers (stable CAMPAIGN_READINESS_* codes)',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })

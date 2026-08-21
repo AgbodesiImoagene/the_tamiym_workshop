@@ -15,6 +15,9 @@ import {
   OUTBOX_EVENT_ADMIN_OPERATIONAL,
   OUTBOX_EVENT_ORGANIZER_APPLICATION_APPROVED,
   OUTBOX_EVENT_ORGANIZER_APPLICATION_REJECTED,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED,
 } from './mail-outbox-templates';
 
 describe('resolveOutboxMail', () => {
@@ -240,6 +243,52 @@ describe('resolveOutboxMail', () => {
         customerVisibleReason: 'Please clarify your intended use.',
       },
     });
+  });
+
+  it('maps organiser campaign approved live vs scheduled', () => {
+    const live = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED, {
+      firstName: 'Ada',
+      campaignTitle: 'School Drive',
+      mode: 'live',
+    });
+    expect(live?.template).toBe('organizer-campaign-approved-live');
+    expect(live?.subject).toMatch(/live/i);
+
+    const scheduled = resolveOutboxMail(
+      OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+      {
+        firstName: 'Ada',
+        campaignTitle: 'School Drive',
+        mode: 'scheduled',
+        startDate: '2026-09-01T00:00:00.000Z',
+      },
+    );
+    expect(scheduled?.template).toBe('organizer-campaign-approved-scheduled');
+    expect(scheduled?.context).toMatchObject({
+      startDate: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it('maps organiser campaign rejected without internal notes', () => {
+    const r = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED, {
+      firstName: 'Ada',
+      campaignTitle: 'School Drive',
+      customerVisibleReason: 'Please clarify your story.',
+      internalNotes: 'should not appear',
+    });
+    expect(r?.template).toBe('organizer-campaign-rejected');
+    expect(JSON.stringify(r)).not.toMatch(/internalNotes|should not appear/);
+    expect(r?.context).toMatchObject({
+      customerVisibleReason: 'Please clarify your story.',
+    });
+  });
+
+  it('maps organiser campaign resumed', () => {
+    const r = resolveOutboxMail(OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED, {
+      firstName: 'Ada',
+      campaignTitle: 'School Drive',
+    });
+    expect(r?.template).toBe('organizer-campaign-resumed');
   });
 
   it('defaults organiser rejection reason when missing', () => {

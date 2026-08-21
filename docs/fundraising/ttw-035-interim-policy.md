@@ -75,6 +75,7 @@ Submission uses existing `POST /campaigns/:id/submit-for-review`. Slice 1 surfac
 ## Deferred
 
 - Full Playwright authoring matrix (hooks only in slice 1)
-- Final readiness / activation / decision notifications → TTW-034
 - Artwork editing → workshop; media hardening → TTW-021
 - Payout KYC → TTW-042
+
+TTW-034 now owns the final readiness matrix, `approvedRevision`, activate/resume gates, and organiser decision notifications (see `docs/fundraising/ttw-034-interim-policy.md`).

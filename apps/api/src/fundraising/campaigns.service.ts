@@ -21,9 +21,11 @@ import {
 } from './dto/campaign-offer.dto';
 import { AddCampaignProductDto } from './dto/add-campaign-product.dto';
 import {
+  AuditAction,
   CampaignStatus,
   ModerationStatus,
   ModerationSubjectType,
+  NotificationChannel,
   PayoutMode,
 } from '../generated/prisma/enums';
 import { DEFAULT_CURRENCY } from '../constants';
@@ -48,9 +50,17 @@ import {
   validateSlug,
   validateTitle,
 } from './campaign-authoring.helpers';
+import {
+  CAMPAIGN_READINESS_POLICY_VERSION,
+  CampaignReadinessPhase,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED,
+} from './campaign-readiness.constants';
+import { readinessBadRequest } from './campaign-readiness.helpers';
+import { CampaignReadinessService } from './campaign-readiness.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditAction } from '../generated/prisma/enums';
-import type { UserRole } from '../generated/prisma/client';
+import type { Prisma, UserRole } from '../generated/prisma/client';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import {
   ADMIN_NOTIF_CAMPAIGN_ACTIVATED,
@@ -59,6 +69,9 @@ import {
   ADMIN_NOTIF_CAMPAIGN_STATUS_CHANGED,
   ADMIN_NOTIF_CAMPAIGN_SUBMITTED_FOR_REVIEW,
 } from '../admin-notifications/admin-notification-events';
+import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+
+type Tx = Prisma.TransactionClient;
 
 /** Legacy mutable statuses for deprecated addProduct path (pre-TTW-035). Prefer DRAFT-only offer APIs. */
 const MUTABLE_STATUSES = new Set<CampaignStatus>([
@@ -90,7 +103,39 @@ export class CampaignsService {
     private moderationService: ModerationService,
     private moderationDecisions: ModerationDecisionService,
     private adminNotify: AdminNotifyService,
+    private readiness: CampaignReadinessService,
+    private outboxDelivery: NotificationOutboxDeliveryService,
   ) {}
+
+  private async enqueueOrganiserCampaignMail(
+    tx: Tx,
+    args: {
+      eventName: string;
+      dedupeKey: string;
+      organizerId: string;
+      payload: Record<string, unknown>;
+    },
+  ): Promise<string | null> {
+    const organizer = await tx.user.findUnique({
+      where: { id: args.organizerId },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (!organizer?.email) return null;
+    const row = await tx.notificationOutbox.create({
+      data: {
+        eventName: args.eventName,
+        channel: NotificationChannel.EMAIL,
+        recipient: organizer.email,
+        recipientUserId: organizer.id,
+        dedupeKey: args.dedupeKey,
+        payload: {
+          ...args.payload,
+          firstName: organizer.firstName,
+        },
+      },
+    });
+    return row.id;
+  }
 
   private slugify(title: string): string {
     return title
@@ -363,6 +408,7 @@ export class CampaignsService {
     goalAmount: unknown;
     currentAmount: unknown;
     draftRevision: number;
+    approvedRevision?: number | null;
     startDate: Date | null;
     endDate: Date | null;
     createdAt: Date;
@@ -420,12 +466,26 @@ export class CampaignsService {
     );
 
     const base = this.toOrganizerCampaign(campaign);
+    const readiness = await this.readiness.evaluate(
+      campaign.id,
+      campaign.status === CampaignStatus.DRAFT
+        ? CampaignReadinessPhase.SUBMIT
+        : CampaignReadinessPhase.ACTIVATE,
+    );
     return {
       ...base,
       goalAmount: campaign.goalAmount ? Number(campaign.goalAmount) : null,
       currentAmount: Number(campaign.currentAmount),
       draftRevision: campaign.draftRevision,
+      approvedRevision: campaign.approvedRevision ?? null,
       authoringPolicyVersion: ORGANISER_CAMPAIGN_AUTHORING_POLICY_VERSION,
+      readinessPolicyVersion: CAMPAIGN_READINESS_POLICY_VERSION,
+      readiness: {
+        ready: readiness.ready,
+        phase: readiness.phase,
+        blockers: readiness.blockers,
+        warnings: readiness.warnings,
+      },
       offers,
       // Keep products for transitional clients; prefer offers.
       products: campaign.products.map((cp) => ({
@@ -474,7 +534,26 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
-    return campaign;
+    const phase =
+      campaign.status === CampaignStatus.PAUSED
+        ? CampaignReadinessPhase.RESUME
+        : campaign.status === CampaignStatus.REVIEW
+          ? CampaignReadinessPhase.ACTIVATE
+          : CampaignReadinessPhase.SUBMIT;
+    const readiness = await this.readiness.evaluate(id, phase);
+    return {
+      ...campaign,
+      approvedRevision: campaign.approvedRevision ?? null,
+      readinessPolicyVersion: CAMPAIGN_READINESS_POLICY_VERSION,
+      readiness: {
+        ready: readiness.ready,
+        phase: readiness.phase,
+        blockers: readiness.blockers,
+        warnings: readiness.warnings,
+        draftRevision: readiness.draftRevision,
+        approvedRevision: readiness.approvedRevision,
+      },
+    };
   }
 
   /**
@@ -1171,64 +1250,12 @@ export class CampaignsService {
       );
     }
 
-    const blockers: Array<{
-      code: CampaignAuthoringErrorCode;
-      message: string;
-    }> = [];
-    if (!campaign.title?.trim()) {
-      blockers.push({
-        code: CampaignAuthoringErrorCode.SUBMIT_MISSING_TITLE,
-        message: 'Campaign must have a title before submitting for review',
-      });
-    }
-    if (campaign.products.length === 0) {
-      blockers.push({
-        code: CampaignAuthoringErrorCode.SUBMIT_NO_OFFERS,
-        message: 'Add at least one product offer with a design and price',
-      });
-    } else {
-      const currency = campaign.currency ?? DEFAULT_CURRENCY;
-      for (const cp of campaign.products) {
-        const priceRow =
-          cp.prices.find((p) => p.currency === currency) ?? cp.prices[0];
-        const amount = priceRow ? Number(priceRow.amount) : NaN;
-        if (!cp.designId || !Number.isFinite(amount) || amount <= 0) {
-          blockers.push({
-            code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
-            message:
-              'Every offer must include an owned design and a positive NGN price at or above the current platform minimum',
-          });
-          break;
-        }
-        try {
-          const minimumPrice =
-            await this.pricingService.getMinCampaignProductPrice(
-              cp.productId,
-              cp.designId,
-              currency,
-            );
-          if (amount < minimumPrice) {
-            blockers.push({
-              code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
-              message: `Offer price must be at least ${minimumPrice} ${currency} (current platform minimum)`,
-            });
-            break;
-          }
-        } catch {
-          blockers.push({
-            code: CampaignAuthoringErrorCode.SUBMIT_OFFER_PRICE_INVALID,
-            message:
-              'Every offer must include an owned design and a positive NGN price at or above the current platform minimum',
-          });
-          break;
-        }
-      }
-    }
-    if (blockers.length > 0) {
-      const first = blockers[0];
-      if (first) {
-        throw authoringBadRequest(first.code, first.message, { blockers });
-      }
+    const readiness = await this.readiness.evaluate(
+      id,
+      CampaignReadinessPhase.SUBMIT,
+    );
+    if (!readiness.ready) {
+      throw readinessBadRequest(readiness);
     }
 
     // Build the text content to screen (title + description + story).
@@ -1248,33 +1275,50 @@ export class CampaignsService {
       const rejectionReason =
         'Your campaign content was automatically rejected by our moderation system. ' +
         'Please review and update your campaign title, description, and story, then resubmit.';
-      const updated = await this.prisma.$transaction(async (tx) => {
-        await tx.campaign.update({
-          where: { id },
-          data: {
-            status: CampaignStatus.DRAFT,
-          },
-        });
-        await this.moderationDecisions.recordAiDecisionInTx(tx, {
-          subjectType: ModerationSubjectType.CAMPAIGN,
-          subjectId: id,
-          outcome: ModerationStatus.REJECTED,
-          notes: moderationResult.notes,
-          maxScore: moderationResult.maxScore,
-          customerExplanation: rejectionReason,
-          revisionHash: hashRevision({
-            title: campaign.title,
-            description: campaign.description,
-            story: campaign.story,
-          }),
-          reasonCodes: aiReasonCodesForOutcome(
-            ModerationStatus.REJECTED,
-            moderationResult.notes,
-          ),
-          withdrawPendingAppeals: true,
-        });
-        return tx.campaign.findUniqueOrThrow({ where: { id } });
-      });
+      const { updated, outboxId } = await this.prisma.$transaction(
+        async (tx) => {
+          await tx.campaign.update({
+            where: { id },
+            data: {
+              status: CampaignStatus.DRAFT,
+              approvedRevision: null,
+            },
+          });
+          await this.moderationDecisions.recordAiDecisionInTx(tx, {
+            subjectType: ModerationSubjectType.CAMPAIGN,
+            subjectId: id,
+            outcome: ModerationStatus.REJECTED,
+            notes: moderationResult.notes,
+            maxScore: moderationResult.maxScore,
+            customerExplanation: rejectionReason,
+            revisionHash: hashRevision({
+              title: campaign.title,
+              description: campaign.description,
+              story: campaign.story,
+            }),
+            reasonCodes: aiReasonCodesForOutcome(
+              ModerationStatus.REJECTED,
+              moderationResult.notes,
+            ),
+            withdrawPendingAppeals: true,
+          });
+          const outboxId = await this.enqueueOrganiserCampaignMail(tx, {
+            eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED,
+            dedupeKey: `${OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED}:${id}:ai:${campaign.draftRevision}`,
+            organizerId,
+            payload: {
+              campaignId: id,
+              campaignTitle: campaign.title,
+              customerVisibleReason: rejectionReason,
+              source: 'ai',
+            },
+          });
+          const updated = await tx.campaign.findUniqueOrThrow({
+            where: { id },
+          });
+          return { updated, outboxId };
+        },
+      );
       await this.audit.log({
         eventName: 'campaign.review.auto_rejected',
         action: AuditAction.STATUS_CHANGE,
@@ -1295,6 +1339,9 @@ export class CampaignsService {
         organizerId,
         moderationNotes: moderationResult.notes,
       });
+      if (outboxId) {
+        await this.outboxDelivery.enqueueDelivery(outboxId);
+      }
       return this.toOrganizerCampaign(updated);
     }
 
@@ -1351,8 +1398,8 @@ export class CampaignsService {
   /**
    * Activate a campaign (admin, REVIEW → ACTIVE).
    *
-   * Validates that all attached designs are APPROVED before activating.
-   * Once ACTIVE, the campaign is live and accepting orders.
+   * Requires zero activate-phase readiness blockers. Stamps approvedRevision
+   * from draftRevision. Future startDate yields ACTIVE but scheduled public go-live.
    */
   async activateForAdmin(
     id: string,
@@ -1361,15 +1408,6 @@ export class CampaignsService {
   ) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id },
-      include: {
-        products: {
-          include: {
-            design: {
-              select: { id: true, name: true, moderationStatus: true },
-            },
-          },
-        },
-      },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
     if (campaign.status !== CampaignStatus.REVIEW) {
@@ -1378,27 +1416,35 @@ export class CampaignsService {
       );
     }
 
-    // All attached designs must be APPROVED.
-    const blockedDesigns = campaign.products
-      .filter(
-        (cp) =>
-          cp.design && cp.design.moderationStatus !== ModerationStatus.APPROVED,
-      )
-      .map((cp) => `${cp.design!.name} (${cp.design!.moderationStatus})`);
-
-    if (blockedDesigns.length > 0) {
-      throw new BadRequestException(
-        `Cannot activate: the following designs are not yet approved: ${blockedDesigns.join(', ')}`,
-      );
+    const readiness = await this.readiness.evaluate(
+      id,
+      CampaignReadinessPhase.ACTIVATE,
+    );
+    if (!readiness.ready) {
+      throw readinessBadRequest(readiness);
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.campaign.update({
-        where: { id },
+    const now = new Date();
+    const scheduled =
+      !!campaign.startDate && campaign.startDate.getTime() > now.getTime();
+    const mode = scheduled ? 'scheduled' : 'live';
+
+    const { updated, outboxId } = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.campaign.updateMany({
+        where: {
+          id,
+          status: CampaignStatus.REVIEW,
+        },
         data: {
           status: CampaignStatus.ACTIVE,
+          approvedRevision: campaign.draftRevision,
         },
       });
+      if (claimed.count !== 1) {
+        throw new BadRequestException(
+          'Campaign could not be activated (status changed)',
+        );
+      }
       await this.moderationDecisions.recordAdminDecisionInTx(tx, {
         subjectType: ModerationSubjectType.CAMPAIGN,
         subjectId: id,
@@ -1412,7 +1458,21 @@ export class CampaignsService {
         }),
         withdrawPendingAppeals: true,
       });
-      return tx.campaign.findUniqueOrThrow({ where: { id } });
+      const outboxId = await this.enqueueOrganiserCampaignMail(tx, {
+        eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+        dedupeKey: `${OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED}:${id}:rev:${campaign.draftRevision}`,
+        organizerId: campaign.organizerId,
+        payload: {
+          campaignId: id,
+          campaignTitle: campaign.title,
+          mode,
+          startDate: campaign.startDate?.toISOString() ?? null,
+          readinessPolicyVersion: CAMPAIGN_READINESS_POLICY_VERSION,
+          approvedRevision: campaign.draftRevision,
+        },
+      });
+      const updated = await tx.campaign.findUniqueOrThrow({ where: { id } });
+      return { updated, outboxId };
     });
     await this.audit.log({
       eventName: 'admin.campaign.activated',
@@ -1422,14 +1482,97 @@ export class CampaignsService {
       actorUserId: actorUserId ?? null,
       actorRole: actorRole ?? null,
       before: { status: CampaignStatus.REVIEW },
-      after: { status: CampaignStatus.ACTIVE },
-      note: 'Admin activated campaign',
+      after: {
+        status: CampaignStatus.ACTIVE,
+        approvedRevision: campaign.draftRevision,
+        mode,
+      },
+      note: `Admin activated campaign (${mode})`,
     });
     await this.adminNotify.emit(ADMIN_NOTIF_CAMPAIGN_ACTIVATED, {
       campaignId: id,
       campaignTitle: updated.title,
       actorUserId: actorUserId ?? '',
     });
+    if (outboxId) {
+      await this.outboxDelivery.enqueueDelivery(outboxId);
+    }
+    return updated;
+  }
+
+  /**
+   * Resume a paused campaign (admin, PAUSED → ACTIVE).
+   * Requires approvedRevision === draftRevision and activate-equivalent readiness.
+   */
+  async resumeForAdmin(id: string, actorUserId?: string, actorRole?: UserRole) {
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    if (campaign.status !== CampaignStatus.PAUSED) {
+      throw new BadRequestException(
+        `Only PAUSED campaigns can be resumed (current: ${campaign.status})`,
+      );
+    }
+
+    const readiness = await this.readiness.evaluate(
+      id,
+      CampaignReadinessPhase.RESUME,
+    );
+    if (!readiness.ready) {
+      throw readinessBadRequest(readiness);
+    }
+
+    const { updated, outboxId } = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.campaign.updateMany({
+        where: {
+          id,
+          status: CampaignStatus.PAUSED,
+          approvedRevision: campaign.draftRevision,
+        },
+        data: { status: CampaignStatus.ACTIVE },
+      });
+      if (claimed.count !== 1) {
+        throw new BadRequestException(
+          'Campaign could not be resumed (status or revision changed)',
+        );
+      }
+      const outboxId = await this.enqueueOrganiserCampaignMail(tx, {
+        eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED,
+        dedupeKey: `${OUTBOX_EVENT_ORGANIZER_CAMPAIGN_RESUMED}:${id}:rev:${campaign.draftRevision}:pausedAt:${campaign.updatedAt.toISOString()}`,
+        organizerId: campaign.organizerId,
+        payload: {
+          campaignId: id,
+          campaignTitle: campaign.title,
+          readinessPolicyVersion: CAMPAIGN_READINESS_POLICY_VERSION,
+          approvedRevision: campaign.approvedRevision,
+        },
+      });
+      const updated = await tx.campaign.findUniqueOrThrow({ where: { id } });
+      return { updated, outboxId };
+    });
+
+    await this.audit.log({
+      eventName: 'admin.campaign.resumed',
+      action: AuditAction.STATUS_CHANGE,
+      entityType: 'Campaign',
+      entityId: id,
+      actorUserId: actorUserId ?? null,
+      actorRole: actorRole ?? null,
+      before: { status: CampaignStatus.PAUSED },
+      after: { status: CampaignStatus.ACTIVE },
+      note: 'Admin resumed paused campaign',
+    });
+    await this.adminNotify.emit(ADMIN_NOTIF_CAMPAIGN_STATUS_CHANGED, {
+      campaignId: id,
+      campaignTitle: campaign.title,
+      previousStatus: CampaignStatus.PAUSED,
+      newStatus: CampaignStatus.ACTIVE,
+      actorUserId: actorUserId ?? '',
+    });
+    if (outboxId) {
+      await this.outboxDelivery.enqueueDelivery(outboxId);
+    }
     return updated;
   }
 
@@ -1454,13 +1597,22 @@ export class CampaignsService {
       );
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.campaign.update({
-        where: { id },
+    const { updated, outboxId } = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.campaign.updateMany({
+        where: {
+          id,
+          status: CampaignStatus.REVIEW,
+        },
         data: {
           status: CampaignStatus.DRAFT,
+          approvedRevision: null,
         },
       });
+      if (claimed.count !== 1) {
+        throw new BadRequestException(
+          'Campaign could not be rejected (status changed)',
+        );
+      }
       await this.moderationDecisions.recordAdminDecisionInTx(tx, {
         subjectType: ModerationSubjectType.CAMPAIGN,
         subjectId: id,
@@ -1475,7 +1627,19 @@ export class CampaignsService {
         }),
         withdrawPendingAppeals: true,
       });
-      return tx.campaign.findUniqueOrThrow({ where: { id } });
+      const outboxId = await this.enqueueOrganiserCampaignMail(tx, {
+        eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED,
+        dedupeKey: `${OUTBOX_EVENT_ORGANIZER_CAMPAIGN_REJECTED}:${id}:admin:${campaign.draftRevision}`,
+        organizerId: campaign.organizerId,
+        payload: {
+          campaignId: id,
+          campaignTitle: campaign.title,
+          customerVisibleReason: rejectionReason,
+          source: 'admin',
+        },
+      });
+      const updated = await tx.campaign.findUniqueOrThrow({ where: { id } });
+      return { updated, outboxId };
     });
     await this.audit.log({
       eventName: 'admin.campaign.rejected',
@@ -1498,6 +1662,9 @@ export class CampaignsService {
       notes: notes ?? '',
       actorUserId: actorUserId ?? '',
     });
+    if (outboxId) {
+      await this.outboxDelivery.enqueueDelivery(outboxId);
+    }
     return updated;
   }
 

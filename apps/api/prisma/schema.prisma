@@ -1885,6 +1885,9 @@ model Campaign {
   /// TTW-034 reuses this value as the reviewed/approved revision candidate.
   draftRevision Int @default(1)
 
+  /// Revision stamped on successful activate (TTW-034). Resume requires equality with draftRevision.
+  approvedRevision Int?
+
   startDate DateTime?
   endDate   DateTime?
 

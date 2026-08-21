@@ -1,7 +1,7 @@
 # TTW-034 — Enforce campaign readiness and notify organisers
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys  
-**Status:** Not started  
+**Status:** In progress (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004, TTW-031, TTW-035, TTW-042, TTW-043  
 **Blocks:** TTW-053, TTW-054
@@ -79,16 +79,46 @@ Persist each transition with actor, reason, revision, readiness snapshot/policy 
 
 ## Design review
 
-Record product/operations/moderation/finance/security reviewers, date, readiness matrix, transition/revision model, scheduling and recovery decisions, migration invalid-row report, interfaces, notification taxonomy, tests, and verdict.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21  
+**Risk:** High  
+**Policy version:** `campaign-readiness/v1-interim-2026-08-21`  
+**Verdict:** Proceed with interim policy (formal product/ops/moderation/finance sign-off deferred)
+
+| Topic           | Decision                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| Authority       | One server readiness evaluator; clients never invent readiness                               |
+| Revision        | TTW-035 `draftRevision` stamped to `approvedRevision` on activate; resume requires equality  |
+| Submit blockers | Copy, dates, offers/price/floor, organiser ACTIVE + current terms; designs may be pending    |
+| Activate gates  | + designs APPROVED, products ACTIVE, ≥1 sellable variant, future endDate                     |
+| Scheduled start | Future `startDate` allowed; status ACTIVE; warning `CAMPAIGN_READINESS_SCHEDULED_START`      |
+| Payout          | Warning-only deferred (`CAMPAIGN_READINESS_PAYOUT_DEFERRED`) until TTW-042                   |
+| Notifications   | Organiser outbox: approved (live/scheduled), rejected (admin/AI), resumed; no internal notes |
+| Ownership       | Missing/foreign campaigns share `404 Campaign not found`                                     |
+| Playwright      | Full lifecycle matrix deferred                                                               |
+
+Policy: `docs/fundraising/ttw-034-interim-policy.md`
 
 ## Implementation reviews
 
-Record security and implementation iterations, state/readiness/atomicity findings, fixes, evidence, dimension verdicts, and overall verdict.
+_Pending independent security + implementation review after commit._
 
 ## Verification evidence
 
-Record migration/quarantine output, exact unit/integration/Playwright commands, concurrent transition and rollback test names, readiness matrices, outbox/audit samples, and scheduled boundary evidence.
+```text
+pnpm --filter api typecheck            # pass
+pnpm --filter api lint                 # 0 errors (pre-existing warnings only)
+pnpm --filter api exec jest --testPathPatterns='campaign-readiness|campaigns.service.spec|campaigns.controller.spec|mail-outbox-templates.spec'
+  # suites green
+node scripts/quality/check-diff-coverage.mjs --base origin/main --floor 80
+  # 154/174 lines (88.51%) — pass
+```
+
+Migration: `apps/api/prisma/migrations/20260821090000_ttw034_campaign_approved_revision`
+Policy: `docs/fundraising/ttw-034-interim-policy.md`
+Playwright: deferred (full matrix)
 
 ## Completion summary
 
-Summarize readiness/transition model, migrated campaign disposition, notifications, scheduling behavior, deviations, operational notes, PR, and follow-ups.
+Slice 1: readiness evaluator as submit/activate/resume authority; `approvedRevision`; organiser decision emails for approve/reject/resume; stable `CAMPAIGN_READINESS_*` codes. Later slices: transition/snapshot schema, pause-edit invalidation, invalid ACTIVE quarantine, Playwright lifecycle, hard payout gate.

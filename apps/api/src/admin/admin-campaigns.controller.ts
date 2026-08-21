@@ -80,14 +80,14 @@ export class AdminCampaignsController {
 
   /**
    * Activate a campaign from REVIEW → ACTIVE.
-   * Validates all attached designs are APPROVED before making the campaign live.
+   * Server readiness matrix must return zero activate blockers; designs APPROVED, products ACTIVE, etc.
    */
   @Post(':id/activate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Activate campaign after review (REVIEW → ACTIVE)',
     description:
-      'Requires all attached designs to be APPROVED. Campaign becomes publicly live after this call.',
+      'Requires TTW-034 activate readiness (approved designs, active products, sellable variants, future end date, valid priced offers). Stamps approvedRevision from draftRevision. Future startDate yields ACTIVE scheduled (not yet public until start).',
   })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -95,13 +95,40 @@ export class AdminCampaignsController {
   @ApiResponse({ status: 200, description: 'Campaign activated' })
   @ApiResponse({
     status: 400,
-    description: 'Not in REVIEW status, or attached designs not yet approved',
+    description:
+      'Not in REVIEW status, or readiness blockers (stable CAMPAIGN_READINESS_* codes)',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Campaign not found' })
   async activate(@Param('id') id: string, @CurrentUser() user: RequestUser) {
     return this.campaignsService.activateForAdmin(id, user.id, user.role);
+  }
+
+  /**
+   * Resume a paused campaign (PAUSED → ACTIVE) when approved revision still matches.
+   */
+  @Post(':id/resume')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resume paused campaign (PAUSED → ACTIVE)',
+    description:
+      'Requires approvedRevision === draftRevision and zero activate-equivalent readiness blockers. Notifies the organiser.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Campaign ID' })
+  @ApiResponse({ status: 200, description: 'Campaign resumed' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Not PAUSED, revision mismatch, or readiness blockers (stable CAMPAIGN_READINESS_* codes)',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Campaign not found' })
+  async resume(@Param('id') id: string, @CurrentUser() user: RequestUser) {
+    return this.campaignsService.resumeForAdmin(id, user.id, user.role);
   }
 
   /**
