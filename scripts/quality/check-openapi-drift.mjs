@@ -8,22 +8,13 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const repoRoot = process.cwd();
 const committedOpenApi = resolve(repoRoot, 'docs/openapi/openapi.json');
-const committedTypes = resolve(
-  repoRoot,
-  'packages/types/src/openapi.generated.ts',
-);
+const committedTypes = resolve(repoRoot, 'packages/types/src/openapi.generated.ts');
 
 function sha256(filePath) {
   const content = readFileSync(filePath);
@@ -54,14 +45,7 @@ const tempTypes = join(tempDir, 'openapi.generated.ts');
 
 try {
   console.log('Regenerating OpenAPI JSON into temp directory...');
-  run('pnpm', [
-    '--filter',
-    'api',
-    'generate:openapi',
-    '--',
-    '--output',
-    tempOpenApi,
-  ]);
+  run('pnpm', ['--filter', 'api', 'generate:openapi', '--', '--output', tempOpenApi]);
 
   console.log('Regenerating OpenAPI TypeScript types into temp directory...');
   run('pnpm', [

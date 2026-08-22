@@ -26,7 +26,7 @@
     "test:e2e": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:detect-handles": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand --detectOpenHandles",
     "cleanup:tokens": "ts-node -r dotenv/config scripts/cleanup-expired-tokens.ts",
-    "generate:openapi": "DOTENV_CONFIG_PATH=.env.test ts-node -r dotenv/config -r tsconfig-paths/register scripts/generate-openapi.ts"
+    "generate:openapi": "ts-node -r ./scripts/load-openapi-generation-env.ts -r tsconfig-paths/register scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

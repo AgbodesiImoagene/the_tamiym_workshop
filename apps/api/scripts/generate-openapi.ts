@@ -1,7 +1,6 @@
 import 'reflect-metadata';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { config as loadEnv } from 'dotenv';
 import { createApiApplication } from '../src/openapi/application.factory';
 import { serializeOpenApiDocument } from '../src/openapi/normalize-openapi-document';
 import { createOpenApiDocument } from '../src/openapi/swagger-document';
@@ -11,22 +10,6 @@ const scriptDir = __dirname;
 const apiRoot = resolve(scriptDir, '..');
 const repoRoot = resolve(apiRoot, '../..');
 const defaultOutput = resolve(repoRoot, 'docs/openapi/openapi.json');
-
-function loadGenerationEnv(): void {
-  process.env.NODE_ENV = 'test';
-  process.env.OTEL_SDK_DISABLED = 'true';
-  process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';
-
-  const envCandidates = [
-    resolve(apiRoot, '.env.test'),
-    resolve(apiRoot, '.env.test.example'),
-  ];
-  for (const envPath of envCandidates) {
-    if (existsSync(envPath)) {
-      loadEnv({ path: envPath, override: false, quiet: true });
-    }
-  }
-}
 
 function parseOutputPath(argv: string[]): string {
   const flagIndex = argv.indexOf('--output');
@@ -41,8 +24,6 @@ function parseOutputPath(argv: string[]): string {
 export async function generateOpenApiArtifact(
   outputPath: string = defaultOutput,
 ): Promise<string> {
-  loadGenerationEnv();
-
   const app = await createApiApplication();
   app.enableShutdownHooks();
 
