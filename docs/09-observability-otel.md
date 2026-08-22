@@ -85,6 +85,12 @@ Start the stack with `docker compose --profile observability up -d`. Grafana (`h
 
 Alert receiver credentials are environment-managed; committed files document the receiver contract only (see interim policy).
 
+## Related docs
+
+- `docs/00-package-state.md` — monorepo inventory snapshot
+- `docs/tickets/ttw-051-operationalize-observability.md` — observability operationalization ticket
+- `docs/tickets/README.md` — delivery backlog and dependencies
+
 ## Export
 
 Use the OpenTelemetry Collector in Docker for routing. With `docker compose --profile observability up -d`, traces land in **Jaeger** (`http://localhost:16686`), metrics are scraped by **Prometheus** from the collector’s `:8889/metrics`, and **Grafana** (`http://localhost:3333`) is pre-provisioned with Prometheus and Jaeger datasources.
