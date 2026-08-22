@@ -19,7 +19,7 @@ test('loadMetricsManifest includes core API metrics', () => {
 
 test('extractMetricTokens finds prefixed and native metrics', () => {
   const tokens = extractMetricTokens(
-    'sum(rate(tamiym_http_server_requests_total[5m])) and up{job="otel-collector"}',
+    'sum(rate(tamiym_http_server_requests_total[5m])) and up{job="otel-collector"}'
   );
   assert.ok(tokens.includes('tamiym_http_server_requests_total'));
   assert.ok(tokens.includes('up'));
@@ -29,7 +29,7 @@ test('validateExpressionMetrics accepts known metrics and recording rules', () =
   const manifest = loadMetricsManifest();
   const unknown = validateExpressionMetrics(
     'tamiym:http_5xx_rate:ratio5m > 0.05 or up{job="otel-collector"} == 0',
-    manifest,
+    manifest
   );
   assert.deepEqual(unknown, []);
 });
@@ -43,7 +43,7 @@ test('validateExpressionMetrics rejects unknown metrics', () => {
 test('normalizeMetricToken strips histogram suffixes', () => {
   assert.equal(
     normalizeMetricToken('tamiym_http_server_request_duration_ms_bucket'),
-    'tamiym_http_server_request_duration_ms',
+    'tamiym_http_server_request_duration_ms'
   );
 });
 
