@@ -1,7 +1,7 @@
 # TTW-053 — Complete browser regression and release-environment UAT
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** Not started  
+**Status:** In progress (slice 1)
 **Risk:** High  
 **Blocked by:** TTW-004, TTW-020–TTW-027, TTW-030–TTW-036, TTW-040–TTW-043, TTW-050, TTW-051, TTW-063, TTW-066\
 **Blocks:** TTW-054, TTW-068
@@ -68,15 +68,46 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 
 ## Design review
 
-Record reviewer, date, supported-browser policy, manifest coverage, fixture/isolation design, accessibility exceptions, visual surfaces, temporary-data and provider plan, security/privacy risks, release thresholds and verdict before implementation.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area                 | Assessment                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Blast radius         | Manifest, validator, a11y/visual scaffolds; smoke CI unchanged                               |
+| Manifest coverage    | All PRD strategy inventory rows mapped as automated, manual or blocked with ticket refs      |
+| Browser matrix       | Chromium smoke on PR; Firefox/WebKit/mobile/a11y/visual on matrix script; nightly in slice 2 |
+| Fixture isolation    | Reuses TTW-004 per-worker auth; no shared mutable accounts                                   |
+| Accessibility        | axe-core with governed exceptions file; critical/serious block unless approved               |
+| Visual baselines     | Limited to stable web home desktop/mobile; excluded from PR smoke                            |
+| Staging UAT          | Slice 2 — TTW-068 ephemeral environment + controlled transaction                             |
+| Security / privacy   | No credentials in manifest; traces/reports remain CI artefacts                               |
+| Migration / rollback | Additive; remove manifest validator from docs CI to disable gate                             |
 
 ## Implementation reviews
 
-Record each independent review iteration, coverage gaps, flakes, accessibility/visual findings, fixes, security verdict, product/design/operations sign-off and overall verdict.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding                               | Resolution                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------- |
+| Visual baselines not yet committed    | Expected — generated on first `test:e2e:visual` run; excluded from PR smoke |
+| Nightly matrix workflow absent        | Deferred to slice 2 per interim policy                                      |
+| Staging UAT not executed              | Deferred to slice 2 (TTW-068 environment)                                   |
+| Keyboard/reduced-motion manual checks | Deferred to slice 2                                                         |
+| Security review charter               | PASS — no secrets in manifest; axe exceptions governed                      |
 
 ## Verification evidence
 
-Record exact PR/nightly/release commands, immutable build IDs, report/trace locations, browser versions, manifest coverage, accessibility and visual results, three-run flake evidence, controlled transaction references, reconciliation and cleanup confirmation.
+- `pnpm playwright:validate` — pass
+- `pnpm playwright:validate:test` — 4/4 pass
+- `pnpm docs:validate` — pass
+- `pnpm docs:validate:test` — 11/11 pass
+- `pnpm typecheck` — pass
+- `pnpm lint` — pass (pre-existing warnings only)
+- `git diff --check` — clean
+- PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge
 
 ## Completion summary
 

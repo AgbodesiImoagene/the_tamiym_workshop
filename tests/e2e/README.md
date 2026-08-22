@@ -29,10 +29,19 @@ pnpm exec playwright install chromium
 # Smoke (Chromium; starts built servers unless already running)
 pnpm test:e2e:smoke
 
-# Full-matrix script (also selects Firefox/WebKit web projects; install those browsers first)
+# Full-matrix script (also selects Firefox/WebKit/mobile/a11y/visual; install browsers first)
 pnpm exec playwright install
 pnpm test:e2e:matrix
+
+# Accessibility or visual only (not on PR smoke)
+pnpm test:e2e:a11y
+pnpm test:e2e:visual
+
+# Validate PRD-to-test manifest
+pnpm playwright:validate
 ```
+
+PRD-to-test traceability: `docs/playwright/prd-test-manifest.json` (validated in CI via `pnpm playwright:validate`). Interim browser UAT policy: `docs/playwright/ttw-053-interim-policy.md`.
 
 Local tip: export the same env as API Integration (or use `apps/api/.env.test`) before migrate/seed/start.
 

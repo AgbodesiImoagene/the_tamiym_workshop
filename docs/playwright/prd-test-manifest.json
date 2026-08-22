@@ -1,0 +1,272 @@
+{
+  "manifest_version": "playwright-uat/v1-interim-2026-08-22",
+  "ticket": "TTW-053",
+  "document_date": "2026-08-22",
+  "strategy_ref": "docs/16-playwright-regression-strategy.md",
+  "entries": [
+    {
+      "id": "WEB-HEALTH",
+      "surface": "web",
+      "feature": "API health reachable from browser context",
+      "prd_ref": "Non-functional — observability",
+      "automation": "automated",
+      "tests": ["tests/e2e/web/anonymous.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@web"]
+    },
+    {
+      "id": "WEB-HOME",
+      "surface": "web",
+      "feature": "Home marketing hero and primary CTAs",
+      "prd_ref": "Public Website — Home",
+      "automation": "automated",
+      "tests": [
+        "tests/e2e/web/anonymous.smoke.spec.ts",
+        "tests/e2e/visual/web-home.visual.spec.ts",
+        "tests/e2e/visual/web-home-mobile.visual.spec.ts"
+      ],
+      "browser_tiers": ["smoke", "matrix", "mobile", "visual"],
+      "tags": ["@smoke", "@web", "@visual"]
+    },
+    {
+      "id": "WEB-FUNDRAISER-LIST",
+      "surface": "web",
+      "feature": "Fundraiser listing states",
+      "prd_ref": "Public Website — Fundraising pages",
+      "automation": "automated",
+      "tests": ["tests/e2e/web/anonymous.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@web"]
+    },
+    {
+      "id": "WEB-FUNDRAISER-DETAIL",
+      "surface": "web",
+      "feature": "Active/ended/missing fundraiser detail and product selection",
+      "prd_ref": "Fundraising — shareable pages",
+      "automation": "blocked",
+      "blocked_by": "TTW-031",
+      "browser_tiers": ["matrix"],
+      "tags": ["@web", "@critical"]
+    },
+    {
+      "id": "WEB-CHECKOUT",
+      "surface": "web",
+      "feature": "Supporter checkout and payment confirmation",
+      "prd_ref": "Checkout & Orders",
+      "automation": "blocked",
+      "blocked_by": "TTW-032",
+      "browser_tiers": ["matrix", "journey"],
+      "tags": ["@web", "@journey", "@critical"]
+    },
+    {
+      "id": "WEB-A11Y-HOME",
+      "surface": "web",
+      "feature": "Home template automated accessibility scan",
+      "prd_ref": "Non-functional — accessibility",
+      "automation": "automated",
+      "tests": ["tests/e2e/accessibility/a11y.smoke.spec.ts"],
+      "browser_tiers": ["matrix", "a11y"],
+      "tags": ["@a11y", "@web"]
+    },
+    {
+      "id": "APP-LANDING",
+      "surface": "app",
+      "feature": "Customer app public landing and sign-in entry",
+      "prd_ref": "Customer Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/customer.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@app"]
+    },
+    {
+      "id": "APP-CUSTOMER-DASH",
+      "surface": "app",
+      "feature": "Authenticated customer dashboard",
+      "prd_ref": "Customer Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/customer.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@app"]
+    },
+    {
+      "id": "APP-ORGANISER-DASH",
+      "surface": "app",
+      "feature": "Authenticated organiser dashboard entry",
+      "prd_ref": "Fundraising — campaign creation",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/customer.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@app"]
+    },
+    {
+      "id": "APP-CAMPAIGN-AUTHOR",
+      "surface": "app",
+      "feature": "Organiser campaign authoring workflow",
+      "prd_ref": "Fundraising — campaign creation workflow",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/campaign-authoring.spec.ts"],
+      "browser_tiers": ["matrix"],
+      "tags": ["@app", "@critical"]
+    },
+    {
+      "id": "APP-WORKSHOP",
+      "surface": "app",
+      "feature": "Design workshop create/save/share flows",
+      "prd_ref": "Design Workshop",
+      "automation": "blocked",
+      "blocked_by": "TTW-055",
+      "browser_tiers": ["matrix"],
+      "tags": ["@app", "@critical"]
+    },
+    {
+      "id": "APP-CHECKOUT",
+      "surface": "app",
+      "feature": "Customer checkout address, quote and payment",
+      "prd_ref": "Checkout & Orders",
+      "automation": "blocked",
+      "blocked_by": "TTW-032",
+      "browser_tiers": ["matrix", "journey"],
+      "tags": ["@app", "@journey", "@critical"]
+    },
+    {
+      "id": "APP-ORDERS",
+      "surface": "app",
+      "feature": "Customer order list and detail states",
+      "prd_ref": "Checkout & Orders — order history",
+      "automation": "blocked",
+      "blocked_by": "TTW-033",
+      "browser_tiers": ["matrix"],
+      "tags": ["@app"]
+    },
+    {
+      "id": "ADMIN-LANDING",
+      "surface": "admin",
+      "feature": "Admin console public landing",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/admin.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@admin"]
+    },
+    {
+      "id": "ADMIN-OVERVIEW",
+      "surface": "admin",
+      "feature": "Authenticated admin operations overview",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/admin.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@admin"]
+    },
+    {
+      "id": "ADMIN-MFA",
+      "surface": "admin",
+      "feature": "Privileged admin MFA login",
+      "prd_ref": "Security — privileged auth",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/admin-mfa.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@admin", "@critical"]
+    },
+    {
+      "id": "ADMIN-COMMERCE",
+      "surface": "admin",
+      "feature": "Order search, detail and refund operations",
+      "prd_ref": "Admin Dashboard — orders",
+      "automation": "blocked",
+      "blocked_by": "TTW-041",
+      "browser_tiers": ["matrix"],
+      "tags": ["@admin", "@critical"]
+    },
+    {
+      "id": "JOURNEY-SESSION-BOUND",
+      "surface": "journey",
+      "feature": "Admin/customer session isolation and cross-surface denial",
+      "prd_ref": "Security separation",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/session-boundaries.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-AUTH-MFA",
+      "surface": "journey",
+      "feature": "Account MFA, sessions and revocation",
+      "prd_ref": "Security — account policy",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/auth-mfa-sessions.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-PAYMENT-INIT",
+      "surface": "journey",
+      "feature": "Single active payment attempt per order",
+      "prd_ref": "Checkout & Orders — payment",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/payment-initiation.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-INVENTORY",
+      "surface": "journey",
+      "feature": "Paid reservation to consumed stock lifecycle",
+      "prd_ref": "Inventory integrity",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/inventory-lifecycle.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-REFUND",
+      "surface": "journey",
+      "feature": "Refund lifecycle and duplicate provider events",
+      "prd_ref": "Checkout & Orders — refunds",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/refund-lifecycle.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-RECONCILE",
+      "surface": "journey",
+      "feature": "Money and inventory reconciliation visibility",
+      "prd_ref": "Financial integrity",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/reconciliation.smoke.spec.ts"],
+      "browser_tiers": ["smoke", "matrix"],
+      "tags": ["@smoke", "@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-CAMPAIGN-LIFECYCLE",
+      "surface": "journey",
+      "feature": "Admin publish → organiser campaign → public purchase",
+      "prd_ref": "Fundraising end-to-end",
+      "automation": "manual",
+      "notes": "Partial coverage via campaign-authoring + web listing; full cross-surface journey deferred to slice 2",
+      "browser_tiers": ["matrix", "journey"],
+      "tags": ["@journey", "@critical"]
+    },
+    {
+      "id": "JOURNEY-PAYOUT",
+      "surface": "journey",
+      "feature": "Campaign payout run approval and execution",
+      "prd_ref": "Fundraising — payouts",
+      "automation": "blocked",
+      "blocked_by": "TTW-042",
+      "browser_tiers": ["matrix", "journey"],
+      "tags": ["@journey", "@critical"]
+    },
+    {
+      "id": "STAGING-UAT",
+      "surface": "release",
+      "feature": "Temporary-environment controlled transaction UAT",
+      "prd_ref": "Release proof",
+      "automation": "manual",
+      "notes": "Slice 2 — execute against TTW-068 ephemeral validation environment",
+      "browser_tiers": ["staging"],
+      "tags": ["@journey", "@critical"]
+    }
+  ]
+}
