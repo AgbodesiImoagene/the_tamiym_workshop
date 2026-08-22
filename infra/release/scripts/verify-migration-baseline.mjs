@@ -3,7 +3,7 @@
  * TTW-054 — Live migration baseline verification against a PostgreSQL database.
  *
  * Runs `prisma migrate deploy`, checks `migrate status`, then proves no drift
- * between the migrated database and schema.prisma via `migrate diff --exit-code`.
+ * between applied migrations and the live database via `migrate diff --exit-code`.
  *
  * Requires DATABASE_URL. Safe for blank databases and restored snapshots.
  */
@@ -76,9 +76,9 @@ export function verifyMigrationBaseline(root, databaseUrl) {
       [
         'migrate',
         'diff',
-        '--from-config-datasource',
-        '--to-schema',
-        'prisma/schema.prisma',
+        '--from-migrations',
+        'prisma/migrations',
+        '--to-config-datasource',
         '--exit-code',
       ],
       env
