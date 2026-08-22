@@ -1,7 +1,7 @@
 # TTW-043 — Add notification preferences and dead-letter operations
 
 **Epic:** 4 — Fulfilment, support and business policy  
-**Status:** In progress  
+**Status:** Complete (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004  
 **Blocks:** TTW-051, TTW-053, TTW-054
@@ -122,26 +122,37 @@ Policy: `docs/notifications/ttw-043-interim-policy.md`
 
 ## Implementation reviews
 
-Pending independent dual review (delivery/concurrency + security/privacy) after commit — parent agent owns.
+### Charter A — security/privacy (PASS after remediation)
+
+- Uniform unsubscribe success for missing users; throttle on public endpoint; `NOTIFICATION_UNSUBSCRIBE_SECRET` required in production; log/`lastError`/dead-letter payload redaction.
+- Evidence: `notification-preference.service.spec.ts`, `notification-redaction.helpers.spec.ts`, `env-validation.spec.ts`, commits `2a6afa5` / `3000525`.
+
+### Charter B — delivery/concurrency (PASS slice 1 with documented deferrals)
+
+- Replay requires prior acknowledgement; suppressed dispatch idempotency; replay denied when next generation already `SENT`.
+- **Deferred (non-blocking slice 1):** Postgres integration/e2e for duplicate dispatch, replay concurrency, preference ownership (B3); stale `PROCESSING` reset double-delivery risk documented in `notification-outbox-backfill.service.ts` (B4).
+- Evidence: `notification-dead-letter.service.spec.ts`, `notification-dispatch.service.spec.ts`, PR #51 CI green (`3129505`).
 
 ## Verification evidence
 
-### Slice 1 gates (2026-08-21)
+### Slice 1 gates (2026-08-21, post-merge)
 
 ```text
 pnpm --filter api exec tsc --noEmit
 # pass
 pnpm --filter api test:coverage
-# 137 suites / 1134 tests pass
+# 138 suites / 1164 tests pass
 pnpm coverage:diff
-# Diff coverage 43/47 lines (91.49%) — pass (floor 80%)
+# Diff coverage 347/398 lines (87.19%) — pass (floor 80%)
 git diff --check
 # clean
 ```
 
+PR #51 CI: all checks pass (merge `3129505`).
+
 Policy: `docs/notifications/ttw-043-interim-policy.md` (`notification-delivery/v1-interim-2026-08-21`)  
-Tests: `notification-policy.spec.ts`, `notification-dispatch.service.spec.ts`, `notification-dead-letter.service.spec.ts`, `notification-outbox-delivery.service.spec.ts`, `notification-outbox-backfill.service.spec.ts`, controller specs
+Tests: `notification-policy.spec.ts`, `notification-dispatch.service.spec.ts`, `notification-dead-letter.service.spec.ts`, `notification-outbox-delivery.service.spec.ts`, `notification-unsubscribe.controller.spec.ts`, `admin-notification-dead-letters.controller.spec.ts`
 
 ## Completion summary
 
-Slice 1 interim notification policy, preferences, dead-letter ops and SLO metrics shipped locally. Full ticket remains open for remaining producer wiring, UI, Playwright, formal legal sign-off, runbooks, and dual independent reviews.
+Slice 1 interim notification policy, preferences, dead-letter ops and SLO metrics merged in #51 (`3129505`). Follow-on work (remaining producers on dispatch, customer/admin UI, Playwright, formal legal sign-off, SLO dashboards/runbooks) tracked in later slices / TTW-051.
