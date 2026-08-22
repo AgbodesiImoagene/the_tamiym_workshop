@@ -123,6 +123,7 @@ interface StatsStripProps {
   items: Array<{
     value: string;
     label: string;
+    evidenceOwner?: string;
   }>;
 }
 
@@ -133,7 +134,13 @@ export function StatsStrip({ items }: StatsStripProps) {
         <p className="text-center text-xl font-bold">Take a look at these numbers</p>
         <div className="mt-8 grid gap-8 text-center md:grid-cols-3">
           {items.map((item) => (
-            <div key={item.label} className="space-y-3">
+            <div
+              key={item.label}
+              className="space-y-3"
+              {...(item.evidenceOwner
+                ? { 'data-evidence-owner': item.evidenceOwner }
+                : undefined)}
+            >
               <p className="font-heading text-5xl uppercase tracking-headline">{item.value}</p>
               <p className="text-sm font-bold">{item.label}</p>
             </div>

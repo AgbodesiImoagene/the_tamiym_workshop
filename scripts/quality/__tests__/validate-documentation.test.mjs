@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import test from 'node:test';
 import {
   ALLOWED_TICKET_STATES,
@@ -66,15 +66,23 @@ function createFixture() {
     ].join('\n')
   );
   writeFileSync(join(discoveryDir, 'ttw-071-interim-policy.md'), '# TTW-071 interim policy\n');
+  writeFileSync(join(discoveryDir, 'ttw-072-interim-policy.md'), '# TTW-072 interim policy\n');
   for (const rel of [
     'apps/web/app/robots.ts',
     'apps/web/app/sitemap.ts',
     'apps/web/lib/metadata.ts',
     'apps/web/lib/site.ts',
+    'apps/web/lib/public-ia.ts',
+    'apps/web/lib/content/registry.ts',
+    'apps/web/lib/content/types.ts',
+    'apps/web/components/marketing-breadcrumbs.tsx',
+    'apps/web/app/solutions/bulk/page.tsx',
     'apps/web/app/auth/layout.tsx',
     'apps/web/app/orders/layout.tsx',
   ]) {
-    writeFileSync(join(root, rel), 'export {};\n');
+    const abs = join(root, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, 'export {};\n');
   }
 
   return root;
