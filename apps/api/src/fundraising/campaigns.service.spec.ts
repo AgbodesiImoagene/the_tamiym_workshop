@@ -1422,4 +1422,27 @@ describe('CampaignsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('listPublicIndexableSlugs', () => {
+    it('returns ACTIVE in-window campaign slugs with ISO updatedAt', async () => {
+      const updatedAt = new Date('2026-08-22T12:00:00.000Z');
+      (prisma.campaign.findMany as jest.Mock).mockResolvedValue([
+        { slug: 'school-fundraiser', updatedAt },
+      ]);
+
+      await expect(service.listPublicIndexableSlugs()).resolves.toEqual([
+        { slug: 'school-fundraiser', updatedAt: updatedAt.toISOString() },
+      ]);
+
+      expect(prisma.campaign.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: CampaignStatus.ACTIVE,
+          }),
+          select: { slug: true, updatedAt: true },
+          orderBy: { updatedAt: 'desc' },
+        }),
+      );
+    });
+  });
 });

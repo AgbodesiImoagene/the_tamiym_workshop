@@ -74,7 +74,8 @@ function listChangedFiles(base, rootPrefix) {
     .filter((file) => file.startsWith(`${rootPrefix}/`))
     .filter((file) => /\.(ts|js)$/.test(file))
     .filter((file) => !file.endsWith('.spec.ts'))
-    .filter((file) => !file.includes('/generated/'));
+    .filter((file) => !file.includes('/generated/'))
+    .filter((file) => !file.includes('/dto/'));
 }
 
 function changedLinesByFile(base, files) {
