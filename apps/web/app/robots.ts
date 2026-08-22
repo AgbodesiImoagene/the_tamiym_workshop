@@ -1,13 +1,10 @@
 import type { MetadataRoute } from 'next';
+import { buildRobotsRules } from '@/lib/crawler-policy/matrix';
 import { absoluteWebUrl } from '@/lib/site';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: '*',
-      allow: ['/', '/about', '/fundraiser', '/solutions/bulk', '/guides/'],
-      disallow: ['/auth/', '/orders/', '/verify-email', '/policies/'],
-    },
+    rules: buildRobotsRules(),
     sitemap: absoluteWebUrl('/sitemap.xml'),
   };
 }

@@ -1,7 +1,7 @@
 # TTW-074 — Publish answer-ready authoritative content
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-070, TTW-072\
 **Blocks:** TTW-078
@@ -85,7 +85,7 @@ Create an initial answer library embedded in useful service, guide and policy pa
 - `pnpm answer-content:validate:test`
 - `pnpm docs:validate`
 - `pnpm --filter web build`
-- PR CI — pending
+- PR CI — #72 merged (`2429b8e`), 17 checks green
 
 ## Completion summary
 

@@ -99,8 +99,8 @@ See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 | [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete    | Crawl/index/canonical/robots/sitemap foundations (slice 1)               |
 | [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Complete    | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)             |
 | [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Complete    | Organization/WebSite/Breadcrumb JSON-LD foundations (slice 1)            |
-| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | In progress | Answer library, corrected claims, FAQ markup (slice 1)                   |
-| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Scoped      | Govern AI crawlers, content rights and generative discovery              |
+| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Complete    | Answer library, corrected claims, FAQ markup (slice 1)                   |
+| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | In progress | Govern AI crawlers, content rights and generative discovery (slice 1)    |
 | [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Scoped      | Improve Core Web Vitals and public-media discoverability                 |
 | [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Scoped      | Measure privacy-safe organic and answer-engine outcomes                  |
 | [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Scoped      | Gate metadata, schema, crawlability, performance and privacy regressions |
