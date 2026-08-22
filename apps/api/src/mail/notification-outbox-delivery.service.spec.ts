@@ -5,6 +5,7 @@ import { NotificationOutboxDeliveryService } from './notification-outbox-deliver
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from './mail.service';
 import { SmsService } from './sms.service';
+import { ObservabilityService } from '../observability/observability.service';
 import { MAIL_QUEUE_NAME } from '../constants';
 import {
   NotificationChannel,
@@ -21,10 +22,13 @@ describe('NotificationOutboxDeliveryService', () => {
       updateMany: jest.Mock;
       update: jest.Mock;
     };
+    notificationDeliveryAttempt: { create: jest.Mock };
+    $transaction: jest.Mock;
   };
   let mailService: { sendTemplatedEmail: jest.Mock };
   let smsService: { send: jest.Mock };
   let mailQueue: { add: jest.Mock };
+  let observability: { recordNotificationDeliveryAttempt: jest.Mock };
   const fetchMock = jest.fn();
 
   beforeEach(async () => {
@@ -35,12 +39,17 @@ describe('NotificationOutboxDeliveryService', () => {
         updateMany: jest.fn(),
         update: jest.fn(),
       },
+      notificationDeliveryAttempt: { create: jest.fn() },
+      $transaction: jest.fn(async (ops: unknown[]) => {
+        for (const op of ops) await op;
+      }),
     };
     mailService = {
       sendTemplatedEmail: jest.fn().mockResolvedValue(undefined),
     };
     smsService = { send: jest.fn().mockResolvedValue(undefined) };
     mailQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    observability = { recordNotificationDeliveryAttempt: jest.fn() };
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -50,6 +59,7 @@ describe('NotificationOutboxDeliveryService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: MailService, useValue: mailService },
         { provide: SmsService, useValue: smsService },
+        { provide: ObservabilityService, useValue: observability },
         {
           provide: ConfigService,
           useValue: {
@@ -70,12 +80,15 @@ describe('NotificationOutboxDeliveryService', () => {
       recipient: string;
       payload: unknown;
       attempts: number;
+      suppressed: boolean;
     }> = {},
   ) {
     return {
       id: 'out-1',
       status: NotificationStatus.PENDING,
       attempts: 0,
+      suppressed: false,
+      category: null,
       channel: NotificationChannel.EMAIL,
       eventName: OUTBOX_EVENT_ORDER_PLACED,
       recipient: 'a@x.com',
@@ -95,7 +108,7 @@ describe('NotificationOutboxDeliveryService', () => {
     });
   }
 
-  it('dispatches EMAIL via templated mail', async () => {
+  it('dispatches EMAIL via templated mail and records attempt', async () => {
     claimAndLoad(pendingRow());
     await service.deliverOutbox('out-1');
     expect(mailService.sendTemplatedEmail).toHaveBeenCalledWith(
@@ -104,6 +117,18 @@ describe('NotificationOutboxDeliveryService', () => {
         template: 'order-placed',
       }),
     );
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(
+      observability.recordNotificationDeliveryAttempt,
+    ).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'success' }));
+  });
+
+  it('skips suppressed rows', async () => {
+    prisma.notificationOutbox.findUnique.mockResolvedValue(
+      pendingRow({ suppressed: true }),
+    );
+    await service.deliverOutbox('out-1');
+    expect(mailService.sendTemplatedEmail).not.toHaveBeenCalled();
   });
 
   it('dispatches SMS with truncated scalar text', async () => {

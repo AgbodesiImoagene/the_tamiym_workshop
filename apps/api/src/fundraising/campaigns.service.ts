@@ -72,6 +72,7 @@ import {
   ADMIN_NOTIF_CAMPAIGN_SUBMITTED_FOR_REVIEW,
 } from '../admin-notifications/admin-notification-events';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -107,6 +108,7 @@ export class CampaignsService {
     private adminNotify: AdminNotifyService,
     private readiness: CampaignReadinessService,
     private outboxDelivery: NotificationOutboxDeliveryService,
+    private notificationDispatch: NotificationDispatchService,
   ) {}
 
   private async enqueueOrganiserCampaignMail(
@@ -123,20 +125,21 @@ export class CampaignsService {
       select: { id: true, email: true, firstName: true },
     });
     if (!organizer?.email) return null;
-    const row = await tx.notificationOutbox.create({
-      data: {
-        eventName: args.eventName,
-        channel: NotificationChannel.EMAIL,
-        recipient: organizer.email,
-        recipientUserId: organizer.id,
-        dedupeKey: args.dedupeKey,
-        payload: {
-          ...args.payload,
-          firstName: organizer.firstName,
-        },
+    const result = await this.notificationDispatch.dispatch({
+      tx,
+      eventName: args.eventName,
+      channel: NotificationChannel.EMAIL,
+      recipient: organizer.email,
+      recipientUserId: organizer.id,
+      dedupeKey: args.dedupeKey,
+      payload: {
+        ...args.payload,
+        firstName: organizer.firstName,
       },
+      enqueue: false,
     });
-    return row.id;
+    if (result.suppressed) return null;
+    return result.outboxId;
   }
 
   private slugify(title: string): string {

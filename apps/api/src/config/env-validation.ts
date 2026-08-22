@@ -19,6 +19,7 @@ export const requiredProductionEnvVars = [
   'AUTH_CUSTOMER_ORIGINS',
   'CLAMAV_HOST',
   'DESIGN_SHARE_PUBLIC_ORIGIN',
+  'NOTIFICATION_UNSUBSCRIBE_SECRET',
 ] as const;
 
 export const forbiddenPlaceholders = new Set([

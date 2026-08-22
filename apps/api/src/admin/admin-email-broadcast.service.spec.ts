@@ -5,36 +5,31 @@ import { AdminEmailBroadcastService } from './admin-email-broadcast.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import {
   AdminBroadcastEmailDto,
   AdminEmailAudience,
 } from './dto/admin-broadcast-email.dto';
-import { OUTBOX_EVENT_ADMIN_BROADCAST } from '../mail/mail-outbox-templates';
 
 describe('AdminEmailBroadcastService', () => {
   let service: AdminEmailBroadcastService;
   let prisma: {
     user: { findMany: jest.Mock };
-    notificationOutbox: { create: jest.Mock };
-    $transaction: jest.Mock;
   };
-  let delivery: { enqueueDelivery: jest.Mock };
+  let dispatch: { dispatch: jest.Mock };
   let audit: { log: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       user: { findMany: jest.fn() },
-      notificationOutbox: {
-        create: jest.fn().mockResolvedValue({ id: 'out-1' }),
-      },
-      $transaction: jest.fn(async (callbackOrSteps: unknown) => {
-        if (Array.isArray(callbackOrSteps)) {
-          return Promise.all(callbackOrSteps);
-        }
-        return (callbackOrSteps as (tx: unknown) => Promise<unknown>)(prisma);
+    };
+    dispatch = {
+      dispatch: jest.fn().mockResolvedValue({
+        outboxId: 'out-1',
+        queued: true,
+        suppressed: false,
       }),
     };
-    delivery = { enqueueDelivery: jest.fn().mockResolvedValue(undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -48,8 +43,9 @@ describe('AdminEmailBroadcastService', () => {
         { provide: AuditService, useValue: audit },
         {
           provide: NotificationOutboxDeliveryService,
-          useValue: delivery,
+          useValue: { enqueueDelivery: jest.fn() },
         },
+        { provide: NotificationDispatchService, useValue: dispatch },
       ],
     }).compile();
 
@@ -73,7 +69,7 @@ describe('AdminEmailBroadcastService', () => {
       recipientCount: 2,
       sampleEmails: ['a@x.com', 'b@x.com'],
     });
-    expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    expect(dispatch.dispatch).not.toHaveBeenCalled();
   });
 
   it('throws when USER_IDS without ids', async () => {
@@ -87,7 +83,7 @@ describe('AdminEmailBroadcastService', () => {
     );
   });
 
-  it('queues one outbox row per recipient', async () => {
+  it('dispatches through notification policy service', async () => {
     prisma.user.findMany.mockResolvedValue([
       { id: 'u1', email: 'a@x.com', firstName: 'A' },
     ]);
@@ -102,19 +98,13 @@ describe('AdminEmailBroadcastService', () => {
       recipientCount: 1,
       queued: 1,
     });
-    expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        eventName: OUTBOX_EVENT_ADMIN_BROADCAST,
+    expect(dispatch.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'AdminBroadcast',
         recipient: 'a@x.com',
         recipientUserId: 'u1',
-        payload: expect.objectContaining({
-          subject: 'Hello',
-          firstName: 'A',
-          bodyHtml: '<p>Body</p>',
-        }),
       }),
-    });
-    expect(delivery.enqueueDelivery).toHaveBeenCalledWith('out-1');
+    );
     expect(audit.log).toHaveBeenCalled();
   });
 });

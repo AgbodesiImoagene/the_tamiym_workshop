@@ -4,6 +4,7 @@ import sanitizeHtml from 'sanitize-html';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import {
   AuditAction,
   NotificationChannel,
@@ -63,6 +64,7 @@ export class AdminEmailBroadcastService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly notificationOutboxDelivery: NotificationOutboxDeliveryService,
+    private readonly notificationDispatch: NotificationDispatchService,
   ) {}
 
   async execute(
@@ -95,33 +97,21 @@ export class AdminEmailBroadcastService {
       );
     }
 
-    // Batch-insert all outbox rows in a single transaction, then bulk-enqueue.
-    // Doing N sequential create+enqueue calls for large audiences risks HTTP
-    // timeouts and leaves partial progress on failure.
-    const rows = await this.prisma.$transaction(
-      recipients.map((user) =>
-        this.prisma.notificationOutbox.create({
-          data: {
-            eventName: OUTBOX_EVENT_ADMIN_BROADCAST,
-            channel: NotificationChannel.EMAIL,
-            recipient: user.email,
-            recipientUserId: user.id,
-            payload: {
-              subject: dto.subject,
-              bodyHtml,
-              firstName: user.firstName,
-            },
-          },
-        }),
-      ),
-    );
-
-    await Promise.all(
-      rows.map((row) =>
-        this.notificationOutboxDelivery.enqueueDelivery(row.id),
-      ),
-    );
-    const queued = rows.length;
+    let queued = 0;
+    for (const user of recipients) {
+      const result = await this.notificationDispatch.dispatch({
+        eventName: OUTBOX_EVENT_ADMIN_BROADCAST,
+        channel: NotificationChannel.EMAIL,
+        recipient: user.email,
+        recipientUserId: user.id,
+        payload: {
+          subject: dto.subject,
+          bodyHtml,
+          firstName: user.firstName,
+        },
+      });
+      if (result.queued) queued += 1;
+    }
 
     await this.audit.log({
       eventName: 'admin.notifications.email.broadcast',

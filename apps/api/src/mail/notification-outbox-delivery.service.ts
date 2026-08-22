@@ -4,8 +4,10 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  NotificationAttemptOutcome,
   NotificationChannel,
   NotificationStatus,
+  DeadLetterAckStatus,
 } from '../generated/prisma/enums';
 import { JOB_NOTIFICATION_OUTBOX, MAIL_QUEUE_NAME } from '../constants';
 import { MailService } from './mail.service';
@@ -15,6 +17,11 @@ import {
   asScalarString,
   payloadAsRecord,
 } from './notification-outbox-delivery.helpers';
+import { ObservabilityService } from '../observability/observability.service';
+import {
+  classifyDeliveryError,
+  redactAttemptErrorMessage,
+} from '../notifications/notification-redaction.helpers';
 
 @Injectable()
 export class NotificationOutboxDeliveryService {
@@ -25,6 +32,7 @@ export class NotificationOutboxDeliveryService {
     private readonly mailService: MailService,
     private readonly smsService: SmsService,
     private readonly config: ConfigService,
+    private readonly observability: ObservabilityService,
     @InjectQueue(MAIL_QUEUE_NAME) private readonly mailQueue: Queue,
   ) {}
 
@@ -55,6 +63,9 @@ export class NotificationOutboxDeliveryService {
     if (!row) {
       throw new Error(`NotificationOutbox not found: ${outboxId}`);
     }
+    if (row.suppressed) {
+      return;
+    }
     if (
       row.status === NotificationStatus.SENT ||
       row.status === NotificationStatus.FAILED
@@ -81,34 +92,76 @@ export class NotificationOutboxDeliveryService {
       'NOTIFICATION_OUTBOX_MAX_ATTEMPTS',
       8,
     );
+    const attemptNumber = current.attempts + 1;
+    const startedAt = new Date();
 
     try {
       await this.dispatchChannel(current);
-      await this.prisma.notificationOutbox.updateMany({
-        where: { id: outboxId, status: NotificationStatus.PROCESSING },
-        data: {
-          status: NotificationStatus.SENT,
-          sentAt: new Date(),
-          lastError: null,
-        },
+      const finishedAt = new Date();
+      await this.prisma.$transaction([
+        this.prisma.notificationDeliveryAttempt.create({
+          data: {
+            outboxId,
+            attemptNumber,
+            outcome: NotificationAttemptOutcome.SUCCESS,
+            durationMs: finishedAt.getTime() - startedAt.getTime(),
+            startedAt,
+            finishedAt,
+          },
+        }),
+        this.prisma.notificationOutbox.update({
+          where: { id: outboxId },
+          data: {
+            status: NotificationStatus.SENT,
+            sentAt: finishedAt,
+            lastError: null,
+          },
+        }),
+      ]);
+      this.observability.recordNotificationDeliveryAttempt({
+        category: current.category ?? undefined,
+        channel: current.channel,
+        outcome: 'success',
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const nextAttempts = current.attempts + 1;
-      const failed = nextAttempts >= maxAttempts;
-      await this.prisma.notificationOutbox.update({
-        where: { id: outboxId },
-        data: {
-          attempts: nextAttempts,
-          lastError: message.slice(0, 2000),
-          status: failed
-            ? NotificationStatus.FAILED
-            : NotificationStatus.PENDING,
-        },
+      const failed = attemptNumber >= maxAttempts;
+      const finishedAt = new Date();
+      await this.prisma.$transaction([
+        this.prisma.notificationDeliveryAttempt.create({
+          data: {
+            outboxId,
+            attemptNumber,
+            outcome: failed
+              ? NotificationAttemptOutcome.FAILURE
+              : NotificationAttemptOutcome.RETRY_SCHEDULED,
+            errorClass: classifyDeliveryError(message),
+            errorMessage: redactAttemptErrorMessage(message),
+            durationMs: finishedAt.getTime() - startedAt.getTime(),
+            startedAt,
+            finishedAt,
+          },
+        }),
+        this.prisma.notificationOutbox.update({
+          where: { id: outboxId },
+          data: {
+            attempts: attemptNumber,
+            lastError: redactAttemptErrorMessage(message),
+            status: failed
+              ? NotificationStatus.FAILED
+              : NotificationStatus.PENDING,
+            deadLetterAckStatus: failed ? DeadLetterAckStatus.OPEN : null,
+          },
+        }),
+      ]);
+      this.observability.recordNotificationDeliveryAttempt({
+        category: current.category ?? undefined,
+        channel: current.channel,
+        outcome: failed ? 'failure' : 'retry',
       });
       if (failed) {
         this.logger.error(
-          `Outbox ${outboxId} permanently failed after ${nextAttempts} attempts: ${message}`,
+          `Outbox ${outboxId} permanently failed after ${attemptNumber} attempts: ${classifyDeliveryError(message)}`,
         );
         return;
       }

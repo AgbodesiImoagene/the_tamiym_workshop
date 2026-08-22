@@ -9,11 +9,13 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationOutboxDeliveryService } from './notification-outbox-delivery.service';
 import { NotificationOutboxBackfillService } from './notification-outbox-backfill.service';
 import { SmsService } from './sms.service';
+import { ObservabilityModule } from '../observability/observability.module';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
+    ObservabilityModule,
     BullModule.registerQueue({
       name: MAIL_QUEUE_NAME,
       defaultJobOptions: {

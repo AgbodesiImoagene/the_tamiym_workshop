@@ -46,6 +46,7 @@ import { validateEnv } from './config/env-validation';
 import { SchedulerRoleBootstrap } from './runtime/scheduler-role.bootstrap';
 import { PrivacyModule } from './privacy/privacy.module';
 import { OrganizerModule } from './organizer/organizer.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { redactPublicDesignShareUrl } from './designs/design-share.redact';
 
 @Module({
@@ -164,6 +165,7 @@ import { redactPublicDesignShareUrl } from './designs/design-share.redact';
     PayoutsModule,
     PrivacyModule,
     OrganizerModule,
+    NotificationsModule,
     ProductsModule,
     ShippingModule,
     ObservabilityModule,

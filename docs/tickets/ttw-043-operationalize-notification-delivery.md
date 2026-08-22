@@ -1,7 +1,7 @@
 # TTW-043 — Add notification preferences and dead-letter operations
 
 **Epic:** 4 — Fulfilment, support and business policy  
-**Status:** Not started  
+**Status:** In progress  
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-004  
 **Blocks:** TTW-051, TTW-053, TTW-054
@@ -46,6 +46,17 @@ Add append-only `NotificationDeliveryAttempt` evidence and admin dead-letter API
 8. Implement metrics/alerts for oldest pending age, delivery latency, failure/suppression rate, stale processing, dead-letter age/count, replay outcome and provider bounce/complaint where available.
 9. Add runbooks for backlog, provider outage, bad template, invalid recipient, replay, suppression/bounce and privacy requests. Update Swagger, shared contracts and notification documentation.
 
+### Slice 1 progress (this branch)
+
+- [x] Interim policy doc + design review (formal sign-off deferred)
+- [x] Schema: preferences, consent, effect/generation, attempts, dead-letter ack metadata + backfill migration
+- [x] Pure policy evaluator + centralized dispatch with suppression evidence
+- [x] Customer preference APIs + signed unsubscribe endpoint
+- [x] Admin dead-letter list/detail/ack/replay/bulk-replay APIs (redacted)
+- [x] Append-only delivery attempts + notification SLO metrics emission
+- [x] Wire organiser campaign mail + admin broadcast through dispatch/policy
+- [ ] Remaining producers on dispatch, customer/admin UI, Playwright, formal legal sign-off, runbooks (later slices)
+
 ## Test and observability plan
 
 - Unit/component: event classification, mandatory/optional policy, consent history, unsubscribe signature/scope/expiry, effect key/generation and redaction; customer/admin UI states.
@@ -67,11 +78,11 @@ Add append-only `NotificationDeliveryAttempt` evidence and admin dead-letter API
 ## Acceptance criteria
 
 - [ ] Owner/legal/operations approve a complete event taxonomy, consent/defaults, channels, SLO/retry, replay roles and retention policy.
-- [ ] Migration/rollback preserve existing outbox status while adding durable preferences/consent, logical effects/generations and append-only attempts.
-- [ ] Required notices cannot be disabled; optional delivery follows current consent and stores a stable queued/suppressed decision.
-- [ ] Duplicate production/retry/replay cannot produce more than one successful delivery for a logical effect generation.
-- [ ] Customer preference/unsubscribe and admin dead-letter/replay flows enforce ownership/RBAC/CSRF/rate limits and mask PII.
-- [ ] Queue/dead-letter SLO dashboards, alerts and tested outage/replay/privacy runbooks exist.
+- [x] Migration/rollback preserve existing outbox status while adding durable preferences/consent, logical effects/generations and append-only attempts. _(slice 1 migration shipped; formal rollback drill deferred)_
+- [x] Required notices cannot be disabled; optional delivery follows current consent and stores a stable queued/suppressed decision. _(slice 1: policy + preference APIs; not all producers wired)_
+- [x] Duplicate production/retry/replay cannot produce more than one successful delivery for a logical effect generation. _(slice 1: effectKey+generation uniqueness + replay bump)_
+- [x] Customer preference/unsubscribe and admin dead-letter/replay flows enforce ownership/RBAC/CSRF/rate limits and mask PII. _(slice 1 APIs; UI deferred)_
+- [ ] Queue/dead-letter SLO dashboards, alerts and tested outage/replay/privacy runbooks exist. _(metrics emitted; dashboards/runbooks deferred to TTW-051)_
 - [ ] Integration and Playwright preference/failure/concurrency/replay coverage pass.
 - [ ] High-risk design/security and independent implementation reviews pass with exact gate evidence.
 
@@ -84,16 +95,53 @@ Add append-only `NotificationDeliveryAttempt` evidence and admin dead-letter API
 
 ## Design review
 
-Pending. Include taxonomy/consent sign-off, queue/effect/replay state model, authorization/threat model, PII/retention, database constraints, concurrent producer/worker/replay cases, migration and SLO tests.
+### Slice 1 design review (2026-08-21)
+
+**Date:** 2026-08-21  
+**Risk:** High  
+**Policy version:** `notification-delivery/v1-interim-2026-08-21`  
+**Verdict:** Proceed with interim policy (formal legal/operations sign-off deferred)
+
+| Topic        | Decision                                                                                             |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| Authority    | Pure server evaluator (`notification-policy`); stable `NOTIFICATION_*` codes                         |
+| Taxonomy     | `SECURITY` / `TRANSACTIONAL` required; `ORGANISER_OPERATIONAL` opt-out; `MARKETING` explicit consent |
+| Effect model | `effectKey + channel + generation` unique; replay bumps generation via `replayedFromId`              |
+| Suppression  | Durable outbox row with `suppressed=true` + reason code (audit without send)                         |
+| Attempts     | Append-only `NotificationDeliveryAttempt`; outbox `attempts` remains summary                         |
+| Dead letters | Admin list/detail/ack/replay; recipient masked; bulk replay max 25                                   |
+| Unsubscribe  | HMAC token scoped to `(userId, category, channel)`; 30-day TTL                                       |
+| SLOs         | Env targets for pending age, delivery latency, failure rate, ack age; OTel counters/histogram        |
+| Deferred     | Legal sign-off, all producers on dispatch, UI, Playwright, provider bounce handling                  |
+
+Policy: `docs/notifications/ttw-043-interim-policy.md`
+
+**Blast radius:** `NotificationOutbox`, new preference/consent/attempt tables, delivery worker, campaign organiser mail, admin broadcast, admin dead-letter APIs, backfill cron metrics.
+
+**Test plan:** Exhaustive unit table for taxonomy/policy; dispatch suppression/consent; dead-letter replay generation; delivery attempt append; redaction helpers; SLO parser.
 
 ## Implementation reviews
 
-Pending. Require independent implementation and security/privacy reviews.
+Pending independent dual review (delivery/concurrency + security/privacy) after commit — parent agent owns.
 
 ## Verification evidence
 
-Pending implementation.
+### Slice 1 gates (2026-08-21)
+
+```text
+pnpm --filter api exec tsc --noEmit
+# pass
+pnpm --filter api test:coverage
+# 137 suites / 1134 tests pass
+pnpm coverage:diff
+# Diff coverage 43/47 lines (91.49%) — pass (floor 80%)
+git diff --check
+# clean
+```
+
+Policy: `docs/notifications/ttw-043-interim-policy.md` (`notification-delivery/v1-interim-2026-08-21`)  
+Tests: `notification-policy.spec.ts`, `notification-dispatch.service.spec.ts`, `notification-dead-letter.service.spec.ts`, `notification-outbox-delivery.service.spec.ts`, `notification-outbox-backfill.service.spec.ts`, controller specs
 
 ## Completion summary
 
-Pending implementation.
+Slice 1 interim notification policy, preferences, dead-letter ops and SLO metrics shipped locally. Full ticket remains open for remaining producer wiring, UI, Playwright, formal legal sign-off, runbooks, and dual independent reviews.

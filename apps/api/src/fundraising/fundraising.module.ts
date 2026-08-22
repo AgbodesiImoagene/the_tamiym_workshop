@@ -15,6 +15,7 @@ import { ModerationModule } from '../moderation/moderation.module';
 import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MailModule } from '../mail/mail.module';
     AdminNotificationsModule,
     AuthModule,
     MailModule,
+    NotificationsModule,
   ],
   controllers: [
     CampaignsController,

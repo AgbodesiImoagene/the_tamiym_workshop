@@ -6,6 +6,7 @@ import { NotificationStatus } from '../generated/prisma/enums';
 import { ObservabilityService } from '../observability/observability.service';
 import { runWithRequestContext } from '../request-context/request-context.store';
 import { NotificationOutboxDeliveryService } from './notification-outbox-delivery.service';
+import { parseNotificationSloConfig } from '../notifications/notification-slo.helpers';
 
 const BACKFILL_BATCH = 50;
 
@@ -38,6 +39,7 @@ export class NotificationOutboxBackfillService {
           async () => {
             await this.resetStaleProcessing();
             await this.enqueuePendingBatch();
+            await this.recordQueueSloSignal();
           },
         ),
     );
@@ -49,6 +51,9 @@ export class NotificationOutboxBackfillService {
       15,
     );
     const cutoff = new Date(Date.now() - minutes * 60_000);
+    // Known slice-1 risk: if a worker sent successfully but crashed before SENT,
+    // resetting stale PROCESSING → PENDING may requeue delivery. Provider-level
+    // idempotency or a durable send token is deferred (TTW-048 / ops runbook).
     const result = await this.prisma.notificationOutbox.updateMany({
       where: {
         status: NotificationStatus.PROCESSING,
@@ -88,6 +93,30 @@ export class NotificationOutboxBackfillService {
         `Notification outbox backfill batch was full (${pending.length}/${batchSize}). ` +
           'The queue may be lagging. Consider scaling workers or increasing ' +
           'NOTIFICATION_OUTBOX_BACKFILL_BATCH.',
+      );
+    }
+  }
+
+  private async recordQueueSloSignal(): Promise<void> {
+    const oldest = await this.prisma.notificationOutbox.findFirst({
+      where: { status: NotificationStatus.PENDING, suppressed: false },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+    if (!oldest) return;
+    const ageSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - oldest.createdAt.getTime()) / 1000),
+    );
+    this.observability.recordNotificationQueueOldestPendingAge(ageSeconds);
+    const slo = parseNotificationSloConfig({
+      NOTIFICATION_SLO_PENDING_MAX_AGE_MINUTES: this.config.get(
+        'NOTIFICATION_SLO_PENDING_MAX_AGE_MINUTES',
+      ),
+    });
+    if (ageSeconds > slo.pendingMaxAgeMinutes * 60) {
+      this.logger.warn(
+        `Notification queue SLO breach: oldest pending age ${ageSeconds}s exceeds ${slo.pendingMaxAgeMinutes}m target`,
       );
     }
   }

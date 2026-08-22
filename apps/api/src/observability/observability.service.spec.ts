@@ -83,4 +83,28 @@ describe('ObservabilityService', () => {
       service.recordMediaFetchDenied({ reason: 'blocked_host' }),
     ).not.toThrow();
   });
+
+  it('records notification dispatch, delivery, replay and queue age metrics', () => {
+    const service = new ObservabilityService();
+    expect(() =>
+      service.recordNotificationDispatch({
+        category: 'TRANSACTIONAL',
+        channel: 'EMAIL',
+        outcome: 'queued',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordNotificationDeliveryAttempt({
+        category: 'TRANSACTIONAL',
+        channel: 'EMAIL',
+        outcome: 'success',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordNotificationDeadLetterReplay({ outcome: 'success' }),
+    ).not.toThrow();
+    expect(() =>
+      service.recordNotificationQueueOldestPendingAge(120),
+    ).not.toThrow();
+  });
 });
