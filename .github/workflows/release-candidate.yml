@@ -116,6 +116,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank?schema=public
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank_shadow?schema=public
     steps:
       - uses: actions/checkout@v4
         with:
@@ -127,6 +128,12 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Create shadow database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE tamiym_workshop_blank_shadow;"
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Verify live migration baseline

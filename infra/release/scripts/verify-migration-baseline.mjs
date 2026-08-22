@@ -38,6 +38,25 @@ export function runPrisma(root, prismaArgs, env = {}) {
 }
 
 /**
+ * @param {string} databaseUrl
+ * @param {string | undefined} shadowDatabaseUrl
+ * @returns {string | undefined}
+ */
+export function resolveShadowDatabaseUrl(databaseUrl, shadowDatabaseUrl) {
+  if (shadowDatabaseUrl?.trim()) {
+    return shadowDatabaseUrl.trim();
+  }
+  try {
+    const url = new URL(databaseUrl);
+    const dbName = url.pathname.replace(/^\//, '').split('/')[0] || 'postgres';
+    url.pathname = `/${dbName}_shadow`;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * @param {string} root
  * @param {string} databaseUrl
  * @returns {string[]}
@@ -49,6 +68,7 @@ export function verifyMigrationBaseline(root, databaseUrl) {
   }
 
   const env = { DATABASE_URL: databaseUrl };
+  const shadowUrl = resolveShadowDatabaseUrl(databaseUrl, process.env.SHADOW_DATABASE_URL);
 
   try {
     runPrisma(root, ['migrate', 'deploy'], env);
@@ -71,18 +91,18 @@ export function verifyMigrationBaseline(root, databaseUrl) {
   }
 
   try {
-    runPrisma(
-      root,
-      [
-        'migrate',
-        'diff',
-        '--from-migrations',
-        'prisma/migrations',
-        '--to-config-datasource',
-        '--exit-code',
-      ],
-      env
-    );
+    const diffArgs = [
+      'migrate',
+      'diff',
+      '--from-migrations',
+      'prisma/migrations',
+      '--to-config-datasource',
+      '--exit-code',
+    ];
+    if (shadowUrl) {
+      diffArgs.push('--shadow-database-url', shadowUrl);
+    }
+    runPrisma(root, diffArgs, env);
   } catch (error) {
     const code = /** @type {NodeJS.ErrnoException & { status?: number }} */ (error).status;
     if (code === 2) {

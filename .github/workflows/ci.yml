@@ -343,6 +343,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank?schema=public
       DATABASE_URL_SNAPSHOT: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_snapshot?schema=public
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank_shadow?schema=public
+      SHADOW_DATABASE_URL_SNAPSHOT: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_snapshot_shadow?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -356,15 +358,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Generate Prisma client
         run: pnpm db:generate
-      - name: Create snapshot database
+      - name: Create snapshot and shadow databases
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
             -c "CREATE DATABASE tamiym_workshop_snapshot;"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE tamiym_workshop_blank_shadow;"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE tamiym_workshop_snapshot_shadow;"
       - name: Verify blank database migration baseline
         run: pnpm release:verify-migrations
       - name: Verify restored-snapshot migration baseline
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_SNAPSHOT }}
+          SHADOW_DATABASE_URL: ${{ env.SHADOW_DATABASE_URL_SNAPSHOT }}
         run: pnpm release:verify-migrations
       - name: Run post-restore invariant queries on snapshot
         env:
