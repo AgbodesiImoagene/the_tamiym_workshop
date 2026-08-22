@@ -17,6 +17,8 @@
     "coverage:diff": "node scripts/quality/check-diff-coverage.mjs",
     "openapi:generate": "pnpm --filter api generate:openapi && pnpm --filter @tamiym/types generate:openapi",
     "openapi:check": "node scripts/quality/check-openapi-drift.mjs",
+    "observability:validate": "node scripts/quality/validate-observability-artefacts.mjs",
+    "observability:validate:test": "node --test scripts/quality/__tests__/validate-observability-artefacts.test.mjs",
     "test:e2e:smoke": "playwright test --grep @smoke --project=setup --project=chromium-web --project=chromium-app --project=chromium-admin --project=chromium-journeys",
     "test:e2e:matrix": "playwright test --project=setup --project=chromium-web --project=chromium-app --project=chromium-admin --project=chromium-journeys --project=firefox-web --project=webkit-web",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md}\"",

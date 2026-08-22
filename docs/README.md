@@ -75,6 +75,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 34. `payouts/ttw-042-interim-policy.md` — interim payout eligibility, KYC destination lifecycle & AUTO_EXECUTE gate (TTW-042)
 35. `analytics/ttw-036-interim-policy.md` — interim analytics KPI catalogue, filters, freshness & drill-downs (TTW-036)
 36. `notifications/ttw-043-interim-policy.md` — interim notification taxonomy, preferences, dead-letter ops & delivery SLOs (TTW-043)
+37. `observability/ttw-051-interim-policy.md` — interim observability SLI catalogue, alert thresholds & owners (TTW-051 slice 1)
 
 ## Deep Dives
 
