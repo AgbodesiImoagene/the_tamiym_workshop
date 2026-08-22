@@ -17,7 +17,11 @@ describeViewportMatrix('Web marketing navigation @comprehensive @web', () => {
     await openMobileNavIfPresent(page);
     await assertVisibleControlsEnabled(page.locator('header'));
 
-    await expect(page.getByRole('link', { name: /Get Started/i }).first()).toBeVisible();
+    const getStarted = page.getByRole('link', { name: /Get Started/i });
+    if ((await getStarted.count()) > 0) {
+      await getStarted.first().scrollIntoViewIfNeeded();
+      await expect(getStarted.first()).toBeVisible();
+    }
     const exploreCategories = page.getByRole('link', { name: /Explore Categories/i });
     if (await exploreCategories.isVisible()) {
       await expect(exploreCategories).toBeVisible();

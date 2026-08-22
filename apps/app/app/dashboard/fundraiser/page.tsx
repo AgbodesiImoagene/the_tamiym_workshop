@@ -132,17 +132,19 @@ export default function DashboardFundraiserPage() {
     enabled: !!user,
   });
 
+  const canManagePayouts = eligibilityQuery.data?.isOrganizer === true;
+
   const banksQuery = useQuery({
     queryKey: ['fundraiser-banks'],
     queryFn: getBanks,
-    enabled: !!user,
+    enabled: !!user && canManagePayouts,
     retry: false,
   });
 
   const payoutProfilesQuery = useQuery({
     queryKey: ['fundraiser-payout-profiles'],
     queryFn: getPayoutProfiles,
-    enabled: !!user,
+    enabled: !!user && canManagePayouts,
     retry: false,
   });
 
