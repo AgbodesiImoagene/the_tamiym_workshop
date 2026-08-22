@@ -67,6 +67,7 @@ function createFixture() {
   );
   writeFileSync(join(discoveryDir, 'ttw-071-interim-policy.md'), '# TTW-071 interim policy\n');
   writeFileSync(join(discoveryDir, 'ttw-072-interim-policy.md'), '# TTW-072 interim policy\n');
+  writeFileSync(join(discoveryDir, 'ttw-073-interim-policy.md'), '# TTW-073 interim policy\n');
   for (const rel of [
     'apps/web/app/robots.ts',
     'apps/web/app/sitemap.ts',
@@ -75,7 +76,10 @@ function createFixture() {
     'apps/web/lib/public-ia.ts',
     'apps/web/lib/content/registry.ts',
     'apps/web/lib/content/types.ts',
+    'apps/web/lib/structured-data/builders.ts',
+    'apps/web/lib/structured-data/constants.ts',
     'apps/web/components/marketing-breadcrumbs.tsx',
+    'apps/web/components/json-ld.tsx',
     'apps/web/app/solutions/bulk/page.tsx',
     'apps/web/app/auth/layout.tsx',
     'apps/web/app/orders/layout.tsx',

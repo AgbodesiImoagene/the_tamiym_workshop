@@ -3,9 +3,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { marketingAssets } from '@/lib/assets';
 import { webRegisterWithNext } from '@/lib/site';
-import { FOOTER_LINK_GROUPS } from '@/lib/public-ia';
+import { FOOTER_LINK_GROUPS, getBreadcrumbs } from '@/lib/public-ia';
 import { MarketingHeader } from '@/components/marketing-header';
 import { MarketingCtaCard } from '@/components/marketing-cta-card';
+import { MarketingBreadcrumbs } from '@/components/marketing-breadcrumbs';
+import { JsonLd } from '@/components/json-ld';
+import { buildBreadcrumbListJsonLd } from '@/lib/structured-data/builders';
 
 const socialLinks = [
   { label: 'Instagram', href: '#', icon: marketingAssets.socialInstagram },
@@ -16,6 +19,7 @@ const socialLinks = [
 
 interface MarketingShellProps {
   children: ReactNode;
+  pagePath?: string;
   ctaTitle?: string;
   ctaBody?: string;
   ctaLabel?: string;
@@ -24,14 +28,20 @@ interface MarketingShellProps {
 
 export function MarketingShell({
   children,
+  pagePath,
   ctaTitle = 'Ready To Create Some Custom Apparel ?',
   ctaBody = '',
   ctaLabel = 'Get Started',
   ctaHref = webRegisterWithNext('/'),
 }: MarketingShellProps) {
+  const breadcrumbs = pagePath ? getBreadcrumbs(pagePath) : null;
+  const breadcrumbJsonLd = breadcrumbs ? buildBreadcrumbListJsonLd(breadcrumbs) : null;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <MarketingHeader />
+      {breadcrumbJsonLd ? <JsonLd data={breadcrumbJsonLd} /> : null}
+      {breadcrumbs ? <MarketingBreadcrumbs items={breadcrumbs} /> : null}
 
       <main>{children}</main>
 

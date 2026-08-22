@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MarketingShell } from '@/components/marketing-shell';
 import { PublicFundraiserDetail } from '@/components/public-fundraiser-detail';
+import { JsonLd } from '@/components/json-ld';
 import { getPublicFundraiser } from '@/lib/fundraisers';
-import { buildFundraiserMetadata } from '@/lib/metadata';
+import { buildFundraiserMetadata, truncateDescription } from '@/lib/metadata';
+import { buildBreadcrumbListJsonLd, buildWebPageJsonLd } from '@/lib/structured-data/builders';
 
 interface FundraiserDetailPageProps {
   params: Promise<{
@@ -38,8 +40,28 @@ export default async function FundraiserDetailPage({ params }: FundraiserDetailP
     notFound();
   }
 
+  const description = truncateDescription(
+    fundraiser.description?.trim() ||
+      fundraiser.story?.trim() ||
+      `Support ${fundraiser.title} with custom merchandise on Tamiym Workshop.`
+  );
+  const path = `/fundraiser/${fundraiser.slug}`;
+  const structuredData = [
+    buildWebPageJsonLd({
+      name: fundraiser.title,
+      description,
+      path,
+    }),
+    buildBreadcrumbListJsonLd([
+      { label: 'Home', href: '/' },
+      { label: 'Fundraisers', href: '/fundraiser' },
+      { label: fundraiser.title, href: path },
+    ]),
+  ].filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
   return (
     <MarketingShell ctaTitle="Ready To Create Some Custom Apparel ?" ctaBody="">
+      <JsonLd data={structuredData} />
       <PublicFundraiserDetail fundraiser={fundraiser} />
     </MarketingShell>
   );

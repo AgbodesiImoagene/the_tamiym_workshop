@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { validateDiscoveryBrief } from './discovery-brief-schema.mjs';
 import { validatePublicIa } from './validate-public-ia.mjs';
+import { validateStructuredData } from './validate-structured-data.mjs';
 import { validateWebSeo } from './validate-web-seo.mjs';
 
 export const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(([^)]+)\)/g;
@@ -201,6 +202,7 @@ export function validateDocumentation(options = {}) {
     ...validateDiscoveryBrief(options),
     ...validateWebSeo(options),
     ...validatePublicIa(options),
+    ...validateStructuredData(options),
   ];
 
   return {
