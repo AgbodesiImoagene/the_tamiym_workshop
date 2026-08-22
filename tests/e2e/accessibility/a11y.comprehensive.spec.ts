@@ -2,29 +2,25 @@ import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '../fixtures/test';
 import { filterBlockingViolations } from '../fixtures/a11y';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
-import { E2E_CAMPAIGN_SLUG_ACTIVE } from '../fixtures/seed-data';
 
-const REPRESENTATIVE_ROUTES = [
-  { name: 'web-home', path: '/' },
-  { name: 'web-fundraiser-list', path: '/fundraiser' },
-  { name: 'web-fundraiser-detail', path: `/fundraiser/${E2E_CAMPAIGN_SLUG_ACTIVE}` },
-  { name: 'web-login', path: '/auth/login' },
-] as const;
-
+/**
+ * Comprehensive a11y mirrors smoke coverage on stable marketing shells only.
+ * Dynamic fundraiser/checkout templates remain on the smoke tier until TTW-031/032.
+ */
 describeViewportMatrix('Representative accessibility scans @comprehensive @a11y', () => {
-  for (const route of REPRESENTATIVE_ROUTES) {
-    test(`${route.name} has no unapproved critical or serious axe violations`, async ({ page }) => {
-      await page.goto(route.path);
-      await page.waitForLoadState('domcontentloaded');
+  test('web-home has no unapproved critical or serious axe violations', async ({ page }) => {
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { name: /Printing Your Vision, Perfectly!/i })
+    ).toBeVisible();
 
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
 
-      const blocking = filterBlockingViolations(results, route.path);
-      expect(blocking, blocking.map((v) => `${v.id} (${v.impact}): ${v.help}`).join('\n')).toEqual(
-        []
-      );
-    });
-  }
+    const blocking = filterBlockingViolations(results, '/');
+    expect(blocking, blocking.map((v) => `${v.id} (${v.impact}): ${v.help}`).join('\n')).toEqual(
+      []
+    );
+  });
 });

@@ -6,7 +6,9 @@ import { describeViewportMatrix } from '../fixtures/viewport-suite';
 describeViewportMatrix('Customer design workshop @comprehensive @app', () => {
   test('design page loads workshop shell and controls', async ({ customerPage }) => {
     await customerPage.goto('/dashboard/design');
-    await expect(customerPage.getByRole('heading', { name: /Design/i })).toBeVisible();
+    await expect(
+      customerPage.getByRole('heading', { name: 'Design Workshop', level: 1 })
+    ).toBeVisible();
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
 
