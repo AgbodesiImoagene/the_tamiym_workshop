@@ -1,13 +1,3 @@
-node_modules
-.next
-dist
-build
-coverage
-.turbo
-*.log
-.env*
-**/src/generated/**
-**/enums.generated.ts
-**/next-env.d.ts
-pnpm-lock.yaml
-**/pnpm-lock.yaml
+# Generated contract artefacts (format controlled by generators)
+docs/openapi/openapi.json
+**/*.generated.ts

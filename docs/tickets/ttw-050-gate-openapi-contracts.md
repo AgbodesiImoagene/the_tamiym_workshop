@@ -1,7 +1,7 @@
 # TTW-050 — Gate OpenAPI and client contracts against drift
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** Not started  
+**Status:** In progress (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-002, TTW-003  
 **Blocks:** TTW-053, TTW-054
@@ -66,15 +66,43 @@ Extract application and Swagger document construction into importable functions 
 
 ## Design review
 
-Record reviewer, date, blast radius, generator/validator choice, operation-ID and normalization rules, compatibility policy, application-factory lifecycle, security/privacy review, tests and verdict before implementation.
+**Reviewer:** implementation agent (slice 1)  
+**Date:** 2026-08-22  
+**Blast radius:** API bootstrap (`main.ts`), new `apps/api/src/openapi/*` helpers, committed `docs/openapi/openapi.json`, generated `packages/types/src/openapi.generated.ts`, root `openapi:*` scripts, CI `openapi` job. Runtime HTTP behaviour unchanged; production still serves Swagger UI from the same document builder.
+
+**Generator / validator:** `apps/api/scripts/generate-openapi.ts` boots real `AppModule` with `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, and `apps/api/.env.test` (no production secrets, no listener). Document built via shared `createOpenApiDocument()` + `operationIdFactory` (`ControllerName_methodName`). Normalized with recursive key sort and stable array ordering; Nest bearer/cookie schemes repaired to valid OpenAPI 3 before `@apidevtools/swagger-parser` validation. Types via `openapi-typescript` into `@tamiym/types`.
+
+**Operation IDs:** `buildOperationId(controllerKey, methodKey)` → `AuthController_login`; duplicates fail generation via `assertUniqueOperationIds`.
+
+**Normalization:** `repairSecuritySchemes` + recursive JSON key sort; `tags`/`required`/`enum` arrays sorted lexicographically; trailing newline on artefact.
+
+**Application lifecycle:** `createApiApplication()` → `init()` → generate → `validateOpenApiDocument()` → write → `app.close()`; no external provider calls required for generation.
+
+**Security / privacy:** Generation uses test env placeholders only; committed spec contains no secrets. Cookie scheme exported as `apiKey`/`cookie` for valid clients.
+
+**Slice 1 progress:** foundational pipeline, drift gate, representative contract tests, CI job — complete. Route/schema annotation inventory, frontend consumption, and mounted-route inventory gate deferred to slice 2+.
+
+**Verdict:** APPROVED for slice 1 implementation (foundational pipeline only).
 
 ## Implementation reviews
 
 Record each independent review iteration, findings, fixes, contract-diff evidence, security verdict and overall verdict.
 
-## Verification evidence
+## Verification evidence (slice 1)
 
-Record exact generation, validation, drift, route-inventory and frontend typecheck commands; attach the intentional contract diff and prove a second generation is byte-identical.
+```text
+pnpm --filter api exec tsc --noEmit
+pnpm --filter api test
+pnpm --filter api test:coverage && pnpm coverage:diff
+pnpm typecheck
+pnpm openapi:check
+git diff --check
+```
+
+- `pnpm --filter api test` — 141 suites / 1177 tests passed (includes `openapi.helpers.spec.ts`, `application.factory.spec.ts`, `openapi-contract.spec.ts`).
+- `pnpm coverage:diff` — 94/103 changed lines covered (91.26%) vs `origin/main`.
+- `pnpm openapi:check` — drift check passed (regenerated JSON + TS types byte-equal to committed artefacts).
+- Committed artefacts: `docs/openapi/openapi.json`, `packages/types/src/openapi.generated.ts`.
 
 ## Completion summary
 

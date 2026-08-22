@@ -8,6 +8,9 @@
 // Re-export all generated enums from Prisma schema
 export * from './enums.generated';
 
+// OpenAPI paths/components generated from docs/openapi/openapi.json
+export * from './openapi.generated';
+
 // Base types
 export interface BaseEntity {
   id: string;

@@ -25,9 +25,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:detect-handles": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand --detectOpenHandles",
-    "cleanup:tokens": "ts-node -r dotenv/config scripts/cleanup-expired-tokens.ts"
+    "cleanup:tokens": "ts-node -r dotenv/config scripts/cleanup-expired-tokens.ts",
+    "generate:openapi": "ts-node -r ./scripts/load-openapi-generation-env.ts -r tsconfig-paths/register scripts/generate-openapi.ts"
   },
   "dependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@aws-sdk/client-s3": "^3.1114.0",
     "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/bullmq": "^11.0.4",
@@ -110,6 +112,7 @@
     "ts-jest": "^29.4.6",
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
