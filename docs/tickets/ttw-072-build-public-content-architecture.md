@@ -1,7 +1,7 @@
 # TTW-072 — Build the public information architecture and content system
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-070\
 **Blocks:** TTW-073–TTW-075
@@ -87,7 +87,7 @@ Design a user-first information architecture mapped to TTW-070 intent clusters a
 - `pnpm public-ia:validate` / `public-ia:validate:test` — registry file gate
 - `pnpm docs:validate` — includes public IA checks
 - `pnpm --filter web build` — new routes compile
-- PR CI — pending
+- PR #70 CI run `32591868744` — all **17 checks pass**; merged to `main` (`83e6c6c`)
 
 ## Completion summary
 

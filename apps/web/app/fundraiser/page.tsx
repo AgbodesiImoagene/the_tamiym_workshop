@@ -1,9 +1,7 @@
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
-import { MarketingBreadcrumbs } from '@/components/marketing-breadcrumbs';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
-import { getBreadcrumbs } from '@/lib/public-ia';
 import { webRegisterWithNext } from '@/lib/site';
 import Image from 'next/image';
 
@@ -16,8 +14,7 @@ export const metadata = buildPageMetadata({
 
 export default function FundraiserPage() {
   return (
-    <MarketingShell>
-      <MarketingBreadcrumbs items={getBreadcrumbs('/fundraiser')} />
+    <MarketingShell pagePath="/fundraiser">
       <MarketingHero
         imageSrc={marketingAssets.fundraiserHero}
         imageAlt="People enjoying the water during a fundraiser campaign visual"
