@@ -1,15 +1,25 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationUnsubscribeDto } from './dto/notification-unsubscribe.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications/unsubscribe')
+@UseGuards(ThrottlerGuard)
 export class NotificationUnsubscribeController {
   constructor(private readonly preferences: NotificationPreferenceService) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Apply signed unsubscribe token (optional categories only)',
     description:

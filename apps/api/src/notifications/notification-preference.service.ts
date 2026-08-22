@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   NotificationCategory,
@@ -190,7 +186,8 @@ export class NotificationPreferenceService {
       select: { id: true },
     });
     if (!user) {
-      throw new NotFoundException('User not found.');
+      // Uniform success — do not reveal whether the user id still exists.
+      return { applied: true };
     }
     await this.updatePreferences(
       payload.userId,

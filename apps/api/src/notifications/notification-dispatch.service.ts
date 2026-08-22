@@ -142,27 +142,25 @@ export class NotificationDispatchService {
       }
     }
 
-    if (!effectiveEvaluation.suppressed) {
-      const existingGeneration = await client.notificationOutbox.findFirst({
-        where: { effectKey, channel: input.channel, generation },
+    const existingGeneration = await client.notificationOutbox.findFirst({
+      where: { effectKey, channel: input.channel, generation },
+    });
+    if (existingGeneration) {
+      this.observability.recordNotificationDispatch({
+        category: evaluation.category ?? undefined,
+        channel: input.channel,
+        outcome: 'duplicate',
       });
-      if (existingGeneration) {
-        this.observability.recordNotificationDispatch({
-          category: evaluation.category ?? undefined,
-          channel: input.channel,
-          outcome: 'duplicate',
-        });
-        return {
-          outboxId: existingGeneration.id,
-          queued: existingGeneration.status === NotificationStatus.PENDING,
-          suppressed: existingGeneration.suppressed,
-          decisionCode: evaluation.decisionCode,
-          policyVersion:
-            existingGeneration.policyVersion ?? NOTIFICATION_POLICY_VERSION,
-          category: existingGeneration.category,
-          idempotentReuse: true,
-        };
-      }
+      return {
+        outboxId: existingGeneration.id,
+        queued: existingGeneration.status === NotificationStatus.PENDING,
+        suppressed: existingGeneration.suppressed,
+        decisionCode: evaluation.decisionCode,
+        policyVersion:
+          existingGeneration.policyVersion ?? NOTIFICATION_POLICY_VERSION,
+        category: existingGeneration.category,
+        idempotentReuse: true,
+      };
     }
 
     const row = await client.notificationOutbox.create({

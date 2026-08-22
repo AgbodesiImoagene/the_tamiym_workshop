@@ -15,6 +15,7 @@ import { ObservabilityService } from '../observability/observability.service';
 import {
   maskNotificationRecipient,
   redactAttemptErrorMessage,
+  redactNotificationPayload,
 } from './notification-redaction.helpers';
 
 export const NOTIFICATION_DEAD_LETTER_BATCH_MAX = 25;
@@ -97,6 +98,7 @@ export class NotificationDeadLetterService {
     }
     return {
       ...row,
+      payload: redactNotificationPayload(row.payload),
       recipient: maskNotificationRecipient(row.channel, row.recipient),
       lastError: row.lastError
         ? redactAttemptErrorMessage(row.lastError)
@@ -137,6 +139,11 @@ export class NotificationDeadLetterService {
     });
     if (!original) {
       throw new NotFoundException('Dead letter not found.');
+    }
+    if (original.deadLetterAckStatus !== DeadLetterAckStatus.ACKNOWLEDGED) {
+      throw new BadRequestException(
+        'Dead letter must be acknowledged before replay.',
+      );
     }
     if (!original.effectKey) {
       throw new BadRequestException(
@@ -182,16 +189,6 @@ export class NotificationDeadLetterService {
       generation: nextGeneration,
       replayedFromId: original.id,
       forceQueue: true,
-    });
-
-    await this.prisma.notificationOutbox.update({
-      where: { id: original.id },
-      data: {
-        deadLetterAckStatus: DeadLetterAckStatus.ACKNOWLEDGED,
-        deadLetterAckAt: new Date(),
-        deadLetterAckByUserId: adminUserId,
-        deadLetterAckNote: trimmedReason.slice(0, 2000),
-      },
     });
 
     this.observability.recordNotificationDeadLetterReplay({

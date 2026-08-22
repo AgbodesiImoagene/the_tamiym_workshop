@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { NotificationDeadLetterService } from './notification-dead-letter.service';
@@ -65,11 +65,12 @@ describe('NotificationDeadLetterService', () => {
     expect(result.items[0].recipient).toBe('a***@example.com');
   });
 
-  it('replays with next generation', async () => {
+  it('replays with next generation when acknowledged', async () => {
     prisma.notificationOutbox.findFirst
       .mockResolvedValueOnce({
         id: 'dl-1',
         status: NotificationStatus.FAILED,
+        deadLetterAckStatus: 'ACKNOWLEDGED',
         effectKey: 'PaymentConfirmed:u1:EMAIL',
         channel: NotificationChannel.EMAIL,
         eventName: 'PaymentConfirmed',
@@ -82,7 +83,6 @@ describe('NotificationDeadLetterService', () => {
     prisma.notificationOutbox.aggregate.mockResolvedValue({
       _max: { generation: 1 },
     });
-    prisma.notificationOutbox.update.mockResolvedValue({});
     dispatch.dispatch.mockResolvedValue({
       outboxId: 'out-2',
       queued: true,
@@ -97,6 +97,21 @@ describe('NotificationDeadLetterService', () => {
     expect(dispatch.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ forceQueue: true, generation: 2 }),
     );
+  });
+
+  it('requires acknowledgement before replay', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'dl-1',
+      status: NotificationStatus.FAILED,
+      deadLetterAckStatus: 'OPEN',
+      effectKey: 'k1',
+      channel: NotificationChannel.EMAIL,
+      generation: 1,
+    });
+    await expect(
+      service.replayDeadLetter('dl-1', 'admin-1', 'reason'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(dispatch.dispatch).not.toHaveBeenCalled();
   });
 
   it('throws when dead letter missing', async () => {

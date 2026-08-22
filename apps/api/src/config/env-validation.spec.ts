@@ -131,6 +131,7 @@ describe('env-validation', () => {
         AUTH_CUSTOMER_ORIGINS: 'https://shop.example.com',
         CLAMAV_HOST: 'clamav.internal',
         DESIGN_SHARE_PUBLIC_ORIGIN: 'https://app.example.com',
+        NOTIFICATION_UNSUBSCRIBE_SECRET: 'dedicated-unsubscribe-secret',
       };
 
       beforeEach(() => {
@@ -140,6 +141,16 @@ describe('env-validation', () => {
       it('passes through a fully valid production config', () => {
         expect(validateEnv(validProductionConfig)).toEqual(
           validProductionConfig,
+        );
+      });
+
+      it('throws when NOTIFICATION_UNSUBSCRIBE_SECRET is missing', () => {
+        expect(() =>
+          validateEnv(
+            omit(validProductionConfig, 'NOTIFICATION_UNSUBSCRIBE_SECRET'),
+          ),
+        ).toThrow(
+          'Missing required production environment variable: NOTIFICATION_UNSUBSCRIBE_SECRET',
         );
       });
 

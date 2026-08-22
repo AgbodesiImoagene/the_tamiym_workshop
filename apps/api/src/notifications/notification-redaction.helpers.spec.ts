@@ -3,6 +3,8 @@ import {
   maskNotificationRecipient,
   maskPhoneRecipient,
   classifyDeliveryError,
+  redactAttemptErrorMessage,
+  redactNotificationPayload,
 } from './notification-redaction.helpers';
 import { NotificationChannel } from '../generated/prisma/enums';
 
@@ -28,5 +30,21 @@ describe('notification-redaction.helpers', () => {
     expect(classifyDeliveryError('Provider timed out')).toBe(
       'provider_timeout',
     );
+  });
+
+  it('redacts emails from error messages', () => {
+    expect(
+      redactAttemptErrorMessage('Failed for alice@example.com after timeout'),
+    ).not.toMatch(/alice@example.com/);
+  });
+
+  it('redacts notification payloads to safe keys only', () => {
+    expect(
+      redactNotificationPayload({
+        orderId: 'o1',
+        firstName: 'Alice',
+        bodyHtml: '<p>secret</p>',
+      }),
+    ).toEqual({ redacted: true, orderId: 'o1' });
   });
 });

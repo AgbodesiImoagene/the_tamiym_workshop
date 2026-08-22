@@ -66,5 +66,39 @@ export function classifyDeliveryError(message: string): string {
 }
 
 export function redactAttemptErrorMessage(message: string): string {
-  return message.slice(0, 240);
+  return message
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]')
+    .replace(/\+?\d[\d\s-]{8,}\d/g, '[phone]')
+    .slice(0, 240);
+}
+
+/** Safe payload projection for admin dead-letter detail (no PII). */
+export function redactNotificationPayload(
+  payload: unknown,
+): Record<string, unknown> | null {
+  if (
+    payload == null ||
+    typeof payload !== 'object' ||
+    Array.isArray(payload)
+  ) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const safeKeys = [
+    'orderId',
+    'campaignId',
+    'eventName',
+    'subject',
+    'category',
+    'template',
+    'referenceId',
+  ];
+  const redacted: Record<string, unknown> = { redacted: true };
+  for (const key of safeKeys) {
+    const value = record[key];
+    if (typeof value === 'string' || typeof value === 'number') {
+      redacted[key] = value;
+    }
+  }
+  return redacted;
 }

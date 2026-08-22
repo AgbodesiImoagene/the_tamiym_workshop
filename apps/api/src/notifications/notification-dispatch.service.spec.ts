@@ -68,6 +68,7 @@ describe('NotificationDispatchService', () => {
   });
 
   it('does not enqueue when suppressed for missing marketing consent', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue(null);
     prisma.notificationOutbox.create.mockResolvedValue({
       id: 'out-2',
       suppressed: true,
@@ -83,5 +84,29 @@ describe('NotificationDispatchService', () => {
 
     expect(result.suppressed).toBe(true);
     expect(outboxDelivery.enqueueDelivery).not.toHaveBeenCalled();
+  });
+
+  it('reuses existing suppressed row for same effectKey and generation', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'out-suppressed',
+      status: NotificationStatus.SENT,
+      suppressed: true,
+      policyVersion: 'v1',
+      category: NotificationCategory.MARKETING,
+    });
+
+    const result = await service.dispatch({
+      eventName: 'AdminBroadcast',
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+      recipientUserId: 'u1',
+      payload: { subject: 'Hi', bodyHtml: '<p>Hi</p>' },
+      effectKey: 'broadcast:u1:EMAIL',
+      generation: 1,
+    });
+
+    expect(result.idempotentReuse).toBe(true);
+    expect(result.outboxId).toBe('out-suppressed');
+    expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
   });
 });

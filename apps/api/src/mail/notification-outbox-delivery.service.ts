@@ -146,7 +146,7 @@ export class NotificationOutboxDeliveryService {
           where: { id: outboxId },
           data: {
             attempts: attemptNumber,
-            lastError: message.slice(0, 2000),
+            lastError: redactAttemptErrorMessage(message),
             status: failed
               ? NotificationStatus.FAILED
               : NotificationStatus.PENDING,
@@ -161,7 +161,7 @@ export class NotificationOutboxDeliveryService {
       });
       if (failed) {
         this.logger.error(
-          `Outbox ${outboxId} permanently failed after ${attemptNumber} attempts: ${message}`,
+          `Outbox ${outboxId} permanently failed after ${attemptNumber} attempts: ${classifyDeliveryError(message)}`,
         );
         return;
       }
