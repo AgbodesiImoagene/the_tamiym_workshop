@@ -1,7 +1,7 @@
 # TTW-076 — Improve public performance and media discoverability
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-071\
 **Blocks:** TTW-078
@@ -88,7 +88,7 @@ Define mobile-first performance budgets for representative home, guide, fundrais
 - `pnpm performance-media:validate:test`
 - `pnpm docs:validate`
 - `pnpm --filter web build`
-- PR CI — pending
+- PR CI — #74 merged (`872b889`), 17 checks green
 
 ## Completion summary
 
