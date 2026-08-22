@@ -1,7 +1,7 @@
 # TTW-070 — Establish the organic-discovery strategy and baseline
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress\
+**Status:** Complete (slice 1)\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-071–TTW-078
@@ -113,4 +113,4 @@ Brief: `docs/discovery/ttw-070-organic-discovery-brief.md` (`discovery-strategy/
 
 ## Completion summary
 
-Slice 1 publishes the interim organic discovery strategy brief and CI frontmatter validation. Full ticket remains open for product/marketing approval, analytics baselines (TTW-077) and independent implementation review.
+Slice 1 interim organic discovery strategy brief merged in #58 (`0a36da9`). Follow-on: formal product/marketing approval, analytics baselines (TTW-077), and implementation slices TTW-071+.
