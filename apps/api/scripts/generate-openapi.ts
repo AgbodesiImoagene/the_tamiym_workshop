@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { createApiApplication } from '../src/openapi/application.factory';
@@ -17,11 +17,15 @@ function loadGenerationEnv(): void {
   process.env.OTEL_SDK_DISABLED = 'true';
   process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';
 
-  loadEnv({
-    path: resolve(apiRoot, '.env.test'),
-    override: false,
-    quiet: true,
-  });
+  const envCandidates = [
+    resolve(apiRoot, '.env.test'),
+    resolve(apiRoot, '.env.test.example'),
+  ];
+  for (const envPath of envCandidates) {
+    if (existsSync(envPath)) {
+      loadEnv({ path: envPath, override: false, quiet: true });
+    }
+  }
 }
 
 function parseOutputPath(argv: string[]): string {

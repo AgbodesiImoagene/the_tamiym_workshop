@@ -18,9 +18,7 @@ export default {
     'prettier --write',
   ],
   '*.{json,md}': (files) => {
-    const source = files.filter(
-      (file) => !file.includes('docs/openapi/openapi.json'),
-    );
+    const source = files.filter((file) => !file.includes('docs/openapi/openapi.json'));
     if (source.length === 0) return [];
     return [`prettier --write ${source.join(' ')}`];
   },
