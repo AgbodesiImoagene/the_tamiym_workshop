@@ -1,8 +1,9 @@
 import { DISCOVERY_EVENTS_VERSION } from './catalogue';
+import { PRIVATE_DISALLOW_PREFIXES } from '@/lib/crawler-policy/matrix';
 import { classifyDocumentReferrer, extractReferrerHost } from './referrers';
 import type { DiscoveryEvent, DiscoveryEventName } from './types';
 
-const BLOCKED_PATH_PREFIXES = ['/auth/', '/orders/', '/verify-email'];
+const BLOCKED_PATH_PREFIXES = [...PRIVATE_DISALLOW_PREFIXES] as const;
 
 export function normalizeDiscoveryPath(path: string): string {
   const trimmed = path.trim() || '/';

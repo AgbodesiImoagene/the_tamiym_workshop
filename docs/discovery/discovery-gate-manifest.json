@@ -1,0 +1,74 @@
+{
+  "manifest_version": "discovery-gates/v1-interim-2026-08-23",
+  "ticket": "TTW-078",
+  "document_date": "2026-08-23",
+  "strategy_ref": "docs/epics/07-organic-discovery-seo-aeo-geo.md",
+  "entries": [
+    {
+      "id": "INV-NO-PRIVATE-INDEX",
+      "invariant": "Authentication, checkout, and account surfaces are not indexable",
+      "layer": "unit",
+      "automation": "automated",
+      "tests": ["apps/web/__tests__/discovery-gates.test.ts"],
+      "playwright": ["tests/e2e/web/discovery.smoke.spec.ts"]
+    },
+    {
+      "id": "INV-CRAWLER-POLICY",
+      "invariant": "Search and training crawler categories are independently governed",
+      "layer": "validator",
+      "automation": "automated",
+      "validators": ["scripts/quality/validate-crawler-policy.mjs"],
+      "tests": ["apps/web/__tests__/crawler-policy.test.ts"]
+    },
+    {
+      "id": "INV-STRUCTURED-DATA",
+      "invariant": "Public JSON-LD describes visible facts without private fields",
+      "layer": "unit",
+      "automation": "automated",
+      "validators": ["scripts/quality/validate-structured-data.mjs"],
+      "tests": ["apps/web/__tests__/structured-data.test.ts"]
+    },
+    {
+      "id": "INV-ANSWER-PARITY",
+      "invariant": "Answer-ready content is governed with evidence and blocked superlatives",
+      "layer": "validator",
+      "automation": "automated",
+      "validators": ["scripts/quality/validate-answer-content.mjs"],
+      "tests": ["apps/web/__tests__/answer-content.test.ts"]
+    },
+    {
+      "id": "INV-SOCIAL-PREVIEW",
+      "invariant": "summary_large_image requires OG/Twitter image metadata",
+      "layer": "unit",
+      "automation": "automated",
+      "validators": ["scripts/quality/validate-performance-media.mjs"],
+      "tests": ["apps/web/__tests__/metadata.test.ts", "apps/web/__tests__/media-registry.test.ts"]
+    },
+    {
+      "id": "INV-DISCOVERY-METRICS",
+      "invariant": "Discovery metrics catalogue records attribution uncertainty",
+      "layer": "validator",
+      "automation": "automated",
+      "validators": ["scripts/quality/validate-discovery-metrics.mjs"],
+      "tests": ["apps/web/__tests__/discovery-metrics.test.ts"]
+    },
+    {
+      "id": "INV-SEO-FOUNDATIONS",
+      "invariant": "Robots, sitemap, canonical and metadata foundations exist",
+      "layer": "validator",
+      "automation": "automated",
+      "validators": [
+        "scripts/quality/validate-web-seo.mjs",
+        "scripts/quality/validate-public-ia.mjs"
+      ],
+      "tests": ["apps/web/__tests__/public-ia.test.ts", "apps/web/__tests__/metadata.test.ts"]
+    },
+    {
+      "id": "INV-RENDERED-DISCOVERY",
+      "invariant": "Production-rendered public routes expose crawl/index contracts",
+      "layer": "playwright",
+      "automation": "automated",
+      "playwright": ["tests/e2e/web/discovery.smoke.spec.ts"]
+    }
+  ]
+}
