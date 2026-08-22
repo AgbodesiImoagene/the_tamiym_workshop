@@ -12,6 +12,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { validateAnswerContent } from './validate-answer-content.mjs';
 import { validateDiscoveryBrief } from './discovery-brief-schema.mjs';
 import { validatePublicIa } from './validate-public-ia.mjs';
 import { validateStructuredData } from './validate-structured-data.mjs';
@@ -203,6 +204,7 @@ export function validateDocumentation(options = {}) {
     ...validateWebSeo(options),
     ...validatePublicIa(options),
     ...validateStructuredData(options),
+    ...validateAnswerContent(options),
   ];
 
   return {

@@ -4,7 +4,7 @@ export type PageType = 'hub' | 'service' | 'landing' | 'policy' | 'dynamic';
 
 export type PageLifecycle = 'published' | 'draft' | 'archived';
 
-export type ContentOwner = 'Product/Marketing' | 'Fundraising PM' | 'Engineering';
+export type ContentOwner = 'Product/Marketing' | 'Fundraising PM' | 'Engineering' | 'Operations';
 
 export interface EvidenceRecord {
   owner: ContentOwner;

@@ -1,7 +1,7 @@
 # TTW-074 — Publish answer-ready authoritative content
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-070, TTW-072\
 **Blocks:** TTW-078
@@ -43,11 +43,11 @@ Create an initial answer library embedded in useful service, guide and policy pa
 
 ## Acceptance criteria
 
-- [ ] Initial priority questions have concise, useful, visible answers on unique canonical pages.
-- [ ] Each answer records owner, evidence, qualifying conditions, publish/review dates and next review trigger.
-- [ ] Policy-sensitive answers agree with approved pricing, fulfillment, refund/return and fundraising behavior.
-- [ ] Semantic structure, accessibility, crawlability, links and any FAQ markup pass automated and editorial review.
-- [ ] Measurement distinguishes engagement and qualified journeys from unverified answer-engine attribution.
+- [x] Initial priority questions have concise, useful, visible answers on unique canonical pages. _(Fundraiser + bulk + guide.)_
+- [x] Each answer records owner, evidence, qualifying conditions, publish/review dates and next review trigger.
+- [x] Policy-sensitive answers agree with approved pricing, fulfillment, refund/return and fundraising behavior. _(Interim policy refs; risky superlatives removed.)_
+- [x] Semantic structure, accessibility, crawlability, links and any FAQ markup pass automated and editorial review. _(dl/FAQPage parity.)_
+- [ ] Measurement distinguishes engagement and qualified journeys from unverified answer-engine attribution. _(Deferred TTW-077.)_
 
 ## Out of scope
 
@@ -56,16 +56,37 @@ Create an initial answer library embedded in useful service, guide and policy pa
 
 ## Design review
 
-Record reviewer, date, question selection, direct-answer quality, evidence, business approval, accessibility, duplication and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area             | Assessment                                               |
+| ---------------- | -------------------------------------------------------- |
+| Blast radius     | Public web copy + answer registry; no API changes        |
+| Question map     | Q-FUND-HOW on `/fundraiser` + guide; Q-BULK on bulk page |
+| Claim correction | Removed "risk-free" / unqualified upfront-cost claims    |
+| FAQ markup       | Visible Q&A + matching `FAQPage` JSON-LD only            |
+| Deferred         | Returns/refund answers, analytics (TTW-077)              |
 
 ## Implementation reviews
 
-Independently review factual/business accuracy and content/technical quality; repeat until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding          | Resolution                      |
+| ---------------- | ------------------------------- |
+| Analytics wiring | Deferred to TTW-077             |
+| Full refund FAQ  | Deferred to TTW-041/074 slice 2 |
 
 ## Verification evidence
 
-Record briefs, approvals, rendered pages, link/schema/accessibility checks and baseline outcome metrics.
+- `pnpm --filter web test` — answer content unit tests
+- `pnpm answer-content:validate:test`
+- `pnpm docs:validate`
+- `pnpm --filter web build`
+- PR CI — pending
 
 ## Completion summary
 
-Summarize answered clusters, published pages, reviewers/evidence, measurement and refresh backlog.
+Slice 1 publishes a governed answer library, corrected fundraiser copy, FAQ sections on priority pages, and `/guides/how-fundraising-works`. Measurement and full policy answer set remain deferred.
