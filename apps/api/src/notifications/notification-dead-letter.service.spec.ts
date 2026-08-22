@@ -114,6 +114,33 @@ describe('NotificationDeadLetterService', () => {
     expect(dispatch.dispatch).not.toHaveBeenCalled();
   });
 
+  it('denies replay when next generation already succeeded', async () => {
+    prisma.notificationOutbox.findFirst
+      .mockResolvedValueOnce({
+        id: 'dl-1',
+        status: NotificationStatus.FAILED,
+        deadLetterAckStatus: 'ACKNOWLEDGED',
+        effectKey: 'PaymentConfirmed:u1:EMAIL',
+        channel: NotificationChannel.EMAIL,
+        generation: 1,
+      })
+      .mockResolvedValueOnce({
+        id: 'out-sent',
+        status: NotificationStatus.SENT,
+      });
+    prisma.notificationOutbox.aggregate.mockResolvedValue({
+      _max: { generation: 1 },
+    });
+
+    await expect(
+      service.replayDeadLetter('dl-1', 'admin-1', 'retry'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(dispatch.dispatch).not.toHaveBeenCalled();
+    expect(
+      observability.recordNotificationDeadLetterReplay,
+    ).toHaveBeenCalledWith({ outcome: 'denied' });
+  });
+
   it('throws when dead letter missing', async () => {
     prisma.notificationOutbox.findFirst.mockResolvedValue(null);
     await expect(

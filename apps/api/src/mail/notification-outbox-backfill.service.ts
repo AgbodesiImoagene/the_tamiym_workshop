@@ -51,6 +51,9 @@ export class NotificationOutboxBackfillService {
       15,
     );
     const cutoff = new Date(Date.now() - minutes * 60_000);
+    // Known slice-1 risk: if a worker sent successfully but crashed before SENT,
+    // resetting stale PROCESSING → PENDING may requeue delivery. Provider-level
+    // idempotency or a durable send token is deferred (TTW-048 / ops runbook).
     const result = await this.prisma.notificationOutbox.updateMany({
       where: {
         status: NotificationStatus.PROCESSING,
