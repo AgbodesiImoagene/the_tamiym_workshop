@@ -1,0 +1,230 @@
+# TTW-051 slice 1 — Prometheus alert and recording rules.
+# Metrics are exported by the OTel collector Prometheus exporter with namespace `tamiym`.
+# Labels are bounded (outcome, route templates, queue names, event names) — no PII.
+
+groups:
+  - name: tamiym_recording
+    interval: 30s
+    rules:
+      - record: tamiym:http_5xx_rate:ratio5m
+        expr: |
+          sum(rate(tamiym_http_server_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(tamiym_http_server_requests_total[5m]))
+
+      - record: tamiym:http_request_duration_ms:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(tamiym_http_server_request_duration_ms_bucket[5m])) by (le)
+          )
+
+      - record: tamiym:webhook_failure_rate:5m
+        expr: sum(rate(tamiym_webhook_events_total{outcome="failure"}[5m]))
+
+      - record: tamiym:webhook_denied_rate:5m
+        expr: sum(rate(tamiym_webhook_events_total{outcome="denied"}[5m]))
+
+      - record: tamiym:queue_job_failure_rate:5m
+        expr: sum by (queue) (rate(tamiym_queue_jobs_total{outcome="failure"}[5m]))
+
+  - name: tamiym_api_health
+    rules:
+      - alert: TamiymApiHigh5xxRate
+        expr: tamiym:http_5xx_rate:ratio5m > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          owner: platform-backend
+          family: api-health
+        annotations:
+          summary: API 5xx error rate above 5% for 5 minutes
+          description: >-
+            More than 5% of HTTP responses are 5xx. Inspect route and dependency health.
+            Runbook: docs/runbooks/api-health.md
+          runbook_path: docs/runbooks/api-health.md
+
+      - alert: TamiymApiHighLatencyP95
+        expr: tamiym:http_request_duration_ms:p95_5m > 2000
+        for: 10m
+        labels:
+          severity: warning
+          owner: platform-backend
+          family: api-health
+        annotations:
+          summary: API p95 latency above 2s for 10 minutes
+          description: >-
+            HTTP request p95 latency exceeds 2 seconds. Correlate with traces and slow routes.
+            Runbook: docs/runbooks/api-health.md
+          runbook_path: docs/runbooks/api-health.md
+
+  - name: tamiym_telemetry_absent
+    rules:
+      - alert: TamiymTelemetryAbsent
+        expr: up{job="otel-collector"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: platform-backend
+          family: telemetry-absent
+        annotations:
+          summary: OTel collector scrape target is down
+          description: >-
+            Prometheus cannot scrape otel-collector:8889. Distinguish exporter outage from zero business events.
+            Runbook: docs/runbooks/telemetry-absent.md
+          runbook_path: docs/runbooks/telemetry-absent.md
+
+  - name: tamiym_webhooks_money
+    rules:
+      - alert: TamiymWebhookFailureSpike
+        expr: tamiym:webhook_failure_rate:5m > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: Webhook processing failure rate elevated
+          description: >-
+            webhook_events_total outcome=failure rate exceeds 0.1/s. Check Paystack signature, payload validation, and idempotency.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
+      - alert: TamiymWebhookDeniedSpike
+        expr: tamiym:webhook_denied_rate:5m > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: Webhook denied rate elevated
+          description: >-
+            webhook_events_total outcome=denied rate exceeds 0.5/s. May indicate replay attacks or misconfigured endpoints.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
+      - alert: TamiymChargeSettlementRejected
+        expr: sum(rate(tamiym_charge_settlement_total{outcome="rejected"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: Charge settlements are being rejected
+          description: >-
+            charge_settlement_total outcome=rejected is non-zero. Reconcile ledger vs provider events before retrying settlements.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
+      - alert: TamiymRefundSettlementFailed
+        expr: sum(rate(tamiym_refund_settlement_total{outcome="failed"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: Refund settlement failures detected
+          description: >-
+            refund_settlement_total outcome=failed is non-zero. Inspect refund reconciliation and provider status.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
+      - alert: TamiymPayoutFailure
+        expr: |
+          sum(rate(tamiym_payouts_total{outcome="failure"}[5m])) > 0
+          or sum(rate(tamiym_payout_runs_total{outcome="failure"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: Payout or payout-run failures detected
+          description: >-
+            payouts_total or payout_runs_total outcome=failure is non-zero. Do not duplicate provider transfers.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
+  - name: tamiym_queues_notifications
+    rules:
+      - alert: TamiymQueueJobFailures
+        expr: sum by (queue) (tamiym:queue_job_failure_rate:5m) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          owner: platform-ops
+          family: queues-notifications
+        annotations:
+          summary: Queue job failure rate elevated for {{ $labels.queue }}
+          description: >-
+            queue_jobs_total outcome=failure rate exceeds 0.05/s for queue {{ $labels.queue }}.
+            Runbook: docs/runbooks/queues-notifications.md
+          runbook_path: docs/runbooks/queues-notifications.md
+
+      - alert: TamiymNotificationQueueStale
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(tamiym_notification_queue_oldest_pending_age_seconds_bucket[15m])) by (le)
+          ) > 600
+        for: 10m
+        labels:
+          severity: warning
+          owner: platform-ops
+          family: queues-notifications
+        annotations:
+          summary: Notification outbox oldest pending age above 10 minutes
+          description: >-
+            notification_queue_oldest_pending_age_seconds p99 exceeds 600s. Inspect mail/notification workers and Redis.
+            Runbook: docs/runbooks/queues-notifications.md
+          runbook_path: docs/runbooks/queues-notifications.md
+
+  - name: tamiym_media_security
+    rules:
+      - alert: TamiymMediaVirusScanFailure
+        expr: |
+          sum(rate(tamiym_media_virus_scan_total{outcome=~"infected|failed"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: security-platform
+          family: media-security
+        annotations:
+          summary: Media virus scan infected or failed outcomes detected
+          description: >-
+            media_virus_scan_total outcome=infected or failed is non-zero. Quarantine affected assets before release.
+            Runbook: docs/runbooks/media-security.md
+          runbook_path: docs/runbooks/media-security.md
+
+  - name: tamiym_auth_abuse
+    rules:
+      - alert: TamiymAuthThrottleLimited
+        expr: sum(rate(tamiym_auth_throttle_total{outcome="limited"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          owner: security-platform
+          family: auth-abuse
+        annotations:
+          summary: Auth throttle limiting elevated
+          description: >-
+            auth_throttle_total outcome=limited exceeds 5/s. May indicate credential stuffing or misconfigured clients.
+            Runbook: docs/runbooks/auth-abuse.md
+          runbook_path: docs/runbooks/auth-abuse.md
+
+      - alert: TamiymAuthLoginDeniedSpike
+        expr: sum(rate(tamiym_auth_login_total{outcome="denied"}[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          owner: security-platform
+          family: auth-abuse
+        annotations:
+          summary: Auth login denied rate elevated
+          description: >-
+            auth_login_total outcome=denied exceeds 2/s for 10 minutes. Correlate with throttle metrics and audit logs.
+            Runbook: docs/runbooks/auth-abuse.md
+          runbook_path: docs/runbooks/auth-abuse.md

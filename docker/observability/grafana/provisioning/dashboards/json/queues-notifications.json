@@ -1,0 +1,92 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Runbook: Queues & notifications",
+      "url": "docs/runbooks/queues-notifications.md",
+      "type": "link",
+      "icon": "doc"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Runbook: docs/runbooks/queues-notifications.md — alert TamiymQueueJobFailures",
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (queue, outcome) (rate(tamiym_queue_jobs_total[5m]))",
+          "legendFormat": "{{queue}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Queue jobs by queue and outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Runbook: docs/runbooks/queues-notifications.md",
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, queue) (rate(tamiym_queue_job_duration_ms_bucket[5m])))",
+          "legendFormat": "{{queue}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Queue job duration p95 by queue",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Runbook: docs/runbooks/queues-notifications.md — alert TamiymNotificationQueueStale",
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(tamiym_notification_queue_oldest_pending_age_seconds_bucket[15m])) by (le))",
+          "legendFormat": "p99 age",
+          "refId": "A"
+        }
+      ],
+      "title": "Notification queue oldest pending age p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Runbook: docs/runbooks/queues-notifications.md",
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (channel, outcome) (rate(tamiym_notification_delivery_attempt_total[5m]))",
+          "legendFormat": "{{channel}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Notification delivery attempts",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["observability", "queues", "notifications", "ttw-051"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Queues & Notifications",
+  "uid": "ttw-051-queues-notifications",
+  "version": 1
+}

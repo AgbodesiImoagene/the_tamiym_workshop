@@ -63,10 +63,27 @@ This is intended to let an operator move across log lines, traces, and audit rec
 
 ## Remaining production work
 
-- dashboards and alert rules for API, webhook, payout, and queue health
 - environment-specific OTLP backends and retention policy
 - e2e validation of trace propagation across separately deployed workers if/when workers move out of the API process
 - broader domain metrics where business reporting needs exceed the current baseline
+- production alert routing / paging drills (slice 2 of TTW-051)
+
+## Dashboards, alerts, and runbooks (TTW-051 slice 1)
+
+Versioned artefacts ship in-repo and validate in CI via `pnpm observability:validate`:
+
+| Artefact                           | Path                                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| SLI catalogue (interim)            | `docs/observability/ttw-051-interim-policy.md`                                                                                |
+| Prometheus alert + recording rules | `docker/observability/prometheus/alerts.yml`                                                                                  |
+| Prometheus scrape config           | `docker/observability/prometheus.yml`                                                                                         |
+| Grafana dashboards (provisioned)   | `docker/observability/grafana/provisioning/dashboards/json/`                                                                  |
+| Runbooks                           | `docs/runbooks/` (`api-health`, `telemetry-absent`, `webhooks-money`, `queues-notifications`, `media-security`, `auth-abuse`) |
+| Canonical metric manifest          | `apps/api/src/observability/metrics.manifest.json`                                                                            |
+
+Start the stack with `docker compose --profile observability up -d`. Grafana (`http://localhost:3333`) loads dashboards from the **Observability** folder. Prometheus (`http://localhost:9090`) evaluates rules from `alerts.yml`.
+
+Alert receiver credentials are environment-managed; committed files document the receiver contract only (see interim policy).
 
 ## Export
 

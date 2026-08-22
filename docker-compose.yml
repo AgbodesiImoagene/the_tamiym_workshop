@@ -100,6 +100,7 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
     ports:
       - '9090:9090'
     depends_on:

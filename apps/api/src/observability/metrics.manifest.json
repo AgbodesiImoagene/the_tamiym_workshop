@@ -1,0 +1,32 @@
+{
+  "version": "observability-metrics/v1-ttw-051-slice1",
+  "namespace": "tamiym",
+  "metrics": [
+    "http_server_requests_total",
+    "http_server_request_duration_ms",
+    "auth_login_total",
+    "auth_throttle_total",
+    "payment_initiation_total",
+    "refunds_total",
+    "refund_settlement_total",
+    "payout_runs_total",
+    "payouts_total",
+    "webhook_events_total",
+    "charge_settlement_total",
+    "inventory_movement_total",
+    "payout_transfer_event_total",
+    "queue_jobs_total",
+    "queue_job_duration_ms",
+    "media_virus_scan_total",
+    "media_fetch_denied_total",
+    "notification_dispatch_total",
+    "notification_delivery_attempt_total",
+    "notification_dead_letter_replay_total",
+    "notification_queue_oldest_pending_age_seconds"
+  ],
+  "prometheusNativeMetrics": [
+    "up",
+    "scrape_duration_seconds",
+    "scrape_samples_scraped"
+  ]
+}
