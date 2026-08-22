@@ -1,7 +1,7 @@
 # TTW-054 — Rehearse and execute a controlled release
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 2)
+**Status:** Complete (slice 2)\
 **Risk:** High  
 **Blocked by:** TTW-010–TTW-015, TTW-020–TTW-027, TTW-030–TTW-036, TTW-040–TTW-043, TTW-050–TTW-053, TTW-068\
 **Blocks:** None
@@ -132,8 +132,11 @@ Define an immutable release manifest and operator-controlled deployment checklis
 - `pnpm release:preflight` — pass
 - `pnpm release:check-migrations` — pass (22 migrations)
 - PR #69 CI — all **17 checks pass** including **Migration Baseline (blank + snapshot)**; merged to `main` (`8ec8609`)
+- TTW-078 discovery regression gates — PR #76 merged (`b31111b`); `discovery-gates:validate` in Documentation CI
 - `release-rehearsal` workflow — available on `main`; owner-dispatch for full rehearsal evidence
 
 ## Completion summary
 
-Summarize candidate and production artefacts, rehearsal and release timeline, migrations, backup/restore results, stop/go decisions, incidents/recovery, reconciliation, approvals and follow-up actions.
+Slice 1 delivered the immutable release manifest schema, credential-free preflight/stop-go scripts, runbook scaffolds, and documentation validation gates. Slice 2 added live `migration-baseline` CI (blank + snapshot `migrate deploy` / drift check), post-restore invariant queries, and manifest stop/go failure-injection rehearsal — merged in PR #69 (`8ec8609`, 17 checks green). Discovery regression aggregation (TTW-078, #76) now runs in Documentation CI.
+
+**Deferred owner-gated / human-only:** staging acceptance on exact candidate artefacts (TTW-068 tmpval), security/operations formal sign-off on live runbooks, and production deploy with post-release reconciliation window.

@@ -1,7 +1,7 @@
 # TTW-078 — Gate SEO, AEO and GEO regressions
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-004, TTW-071, TTW-073–TTW-077\
 **Blocks:** TTW-053, TTW-054
@@ -87,8 +87,8 @@ Add a production-build discovery test suite and release manifest. Unit/contract 
 - `pnpm discovery-gates:validate:test`
 - `pnpm docs:validate`
 - `pnpm test:e2e:smoke` (includes discovery spec)
-- PR CI — pending
+- PR CI — #76 merged (`b31111b`), 17 checks green (including Playwright Smoke with `@discovery`)
 
 ## Completion summary
 
-Slice 1 adds a traceability manifest, aggregated discovery validators, registry contract tests, and Playwright discovery smoke wired into PR CI. Browser matrix expansion, Lighthouse enforcement, and deliberate failure rehearsal remain deferred.
+Slice 1 adds a traceability manifest, aggregated discovery validators, registry contract tests, and Playwright discovery smoke wired into PR CI. Browser matrix expansion, Lighthouse enforcement, and deliberate failure rehearsal remain deferred to TTW-053 matrix follow-up and slice 2.

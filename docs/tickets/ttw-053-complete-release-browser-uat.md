@@ -1,7 +1,7 @@
 # TTW-053 — Complete browser regression and release-environment UAT
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 2 — comprehensive UAT)
+**Status:** Complete (slice 2 — comprehensive UAT)\
 **Risk:** High  
 **Blocked by:** TTW-004, TTW-020–TTW-027, TTW-030–TTW-036, TTW-040–TTW-043, TTW-050, TTW-051, TTW-063, TTW-066\
 **Blocks:** TTW-054, TTW-068
@@ -145,8 +145,11 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 - `pnpm typecheck` / `pnpm lint` — pass (local)
 - PR CI run `32584895866` — all 16 checks pass including Playwright Smoke
 - Comprehensive nightly `32588414778` on `main` — **102/102 pass** (post #65–#68 selector/nav/a11y fixes)
+- TTW-078 discovery smoke (`@discovery`) — included in PR smoke via #76 (`b31111b`)
 - Bugbot review — PASS after `615c5fb` responsive nav fix
 
 ## Completion summary
 
-Summarize automated/manual coverage, supported matrix, approved exceptions, UAT transaction, sign-offs, residual risks and follow-up defects.
+Slice 1 delivered the PRD-to-test manifest scaffold, a11y/visual policy files, manifest validator, and matrix Playwright project configuration. Slice 2 added comprehensive journey specs across web, app, and admin with a three-viewport matrix (`describeViewportMatrix`), representative axe scans, and nightly sharding — **102/102** pass on `main` (`32588414778`). PR smoke remains Chromium-only; discovery metadata checks are covered by TTW-078 (`@discovery` in #76).
+
+**Deferred to owner-gated follow-up (TTW-068 / post-v1):** full manifest row closure for every PRD outcome, Firefox/WebKit/mobile matrix evidence and three consecutive clean full-matrix runs, committed visual baselines, staging temporary-environment UAT with controlled transaction lifecycle, and product/design/operations sign-off.
