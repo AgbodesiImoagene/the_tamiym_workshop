@@ -13,6 +13,12 @@ import {
   validateTicketLinks,
   validateTicketStates,
 } from '../validate-documentation.mjs';
+import {
+  DISCOVERY_BRIEF_PATH,
+  parseYamlFrontmatter,
+  validateDiscoveryBrief,
+  validateDiscoveryBriefFields,
+} from '../discovery-brief-schema.mjs';
 
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), 'ttw-docs-validate-'));
@@ -102,8 +108,38 @@ test('validateDocumentation aggregates all documentation failures', () => {
   try {
     const result = validateDocumentation({ repoRoot: root });
     assert.equal(result.ok, false);
-    assert.equal(result.errors.length, 3);
+    assert.equal(result.errors.length, 4);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('parseYamlFrontmatter extracts key/value pairs', () => {
+  const parsed = parseYamlFrontmatter(
+    '---\nbrief_version: discovery-strategy/v1\nticket: TTW-070\n---\n# Body'
+  );
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.fields.ticket, 'TTW-070');
+});
+
+test('validateDiscoveryBriefFields rejects missing required keys', () => {
+  const errors = validateDiscoveryBriefFields({ ticket: 'TTW-070' });
+  assert.ok(errors.some((message) => message.includes('brief_version')));
+});
+
+test('validateDiscoveryBrief reports missing brief file', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ttw-discovery-brief-'));
+  try {
+    const errors = validateDiscoveryBrief({ repoRoot: root });
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].kind, 'missing-discovery-brief');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validateDiscoveryBrief accepts the committed brief frontmatter', () => {
+  const repoRoot = join(import.meta.dirname, '../../..');
+  const errors = validateDiscoveryBrief({ repoRoot, briefPath: DISCOVERY_BRIEF_PATH });
+  assert.deepEqual(errors, []);
 });

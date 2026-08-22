@@ -1,7 +1,7 @@
 # TTW-070 — Establish the organic-discovery strategy and baseline
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-071–TTW-078
@@ -28,6 +28,15 @@ Create a dated organic-discovery brief covering priority audiences, geographic/l
 4. Define baseline metrics, attribution caveats, targets, review cadence and named content/business owners.
 5. Publish a prioritized roadmap mapping each cluster and technical gap to one canonical page and ticket.
 
+### Slice 1 progress (this branch)
+
+- [x] Dated organic discovery strategy brief (`docs/discovery/ttw-070-organic-discovery-brief.md`)
+- [x] Design review recorded (formal product/marketing sign-off deferred)
+- [x] Discovery brief frontmatter schema validation in `pnpm docs:validate`
+- [ ] Product/marketing formal approval of audiences, markets and channel boundaries
+- [ ] Search Console / analytics baseline exports (TTW-077)
+- [ ] Independent implementation review
+
 ## Test and observability plan
 
 - Unit/component: Validate inventory uniqueness and metric/query-map schemas.
@@ -43,11 +52,11 @@ Create a dated organic-discovery brief covering priority audiences, geographic/l
 
 ## Acceptance criteria
 
-- [ ] Product approves target audiences, markets/languages, business conversions and channel boundaries.
-- [ ] A dated URL/content/entity/query inventory records owners, gaps, evidence and one preferred destination per priority intent.
-- [ ] SEO, AEO and GEO metrics have definitions, baselines, known attribution limits and review cadence.
-- [ ] Unsupported or conflicting public claims have owners and blocking correction tickets.
-- [ ] Prioritized work maps completely to TTW-071–TTW-078 without promising rankings or citations.
+- [ ] Product approves target audiences, markets/languages, business conversions and channel boundaries. _(slice 1: engineering interim brief published; formal approval deferred)_
+- [x] A dated URL/content/entity/query inventory records owners, gaps, evidence and one preferred destination per priority intent.
+- [x] SEO, AEO and GEO metrics have definitions, baselines, known attribution limits and review cadence.
+- [x] Unsupported or conflicting public claims have owners and blocking correction tickets.
+- [x] Prioritized work maps completely to TTW-071–TTW-078 without promising rankings or citations.
 
 ## Out of scope
 
@@ -56,7 +65,30 @@ Create a dated organic-discovery brief covering priority audiences, geographic/l
 
 ## Design review
 
-Record reviewer, date, markets, intent model, evidence quality, privacy, measurement limitations, prioritization and verdict.
+### Slice 1 design review (2026-08-22)
+
+**Reviewer:** Implementing agent (slice 1)\
+**Date:** 2026-08-22\
+**Brief version:** `discovery-strategy/v1-interim-2026-08-22`\
+**Verdict:** Proceed with interim strategy brief (formal product/marketing sign-off deferred)
+
+| Topic              | Decision                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Markets            | Nigeria (`NG`) only; `en-NG`; NGN; domestic fulfilment per PRD and interim policies           |
+| Audiences          | Bulk organisers, fundraising organisers, supporters; SMB partial                              |
+| Intent model       | Seven query clusters with one preferred destination each; cannibalization rule documented     |
+| Evidence quality   | Repo routes/copy cited; third-party volume/SERP data directional only, not product truth      |
+| Privacy            | No private analytics exports in repo; metric catalogue defines sources only                   |
+| Measurement limits | SEO/AEO/GEO definitions separate measurable vs non-measurable outcomes; no ranking guarantees |
+| Prioritization     | 4-axis score (business value, evidence, effort, risk); ranked backlog maps to TTW-071–078     |
+| Content ownership  | Claim domains mapped to owner roles and policy sources (TTW-024/031/040/041/042)              |
+| Deferred           | Metadata, schema, GSC, analytics wiring, localization, paid search → TTW-071–078 or post-v1   |
+
+Brief: `docs/discovery/ttw-070-organic-discovery-brief.md`
+
+**Blast radius:** Documentation and planning only; no runtime, metadata or analytics changes in slice 1.
+
+**Test plan:** `pnpm docs:validate` includes discovery brief frontmatter schema; unit tests in `validate-documentation.test.mjs`.
 
 ## Implementation reviews
 
@@ -64,8 +96,21 @@ Independently review research traceability, business alignment, claim accuracy a
 
 ## Verification evidence
 
-Record inventories, source dates, sampled result evidence, baseline exports, approvals and mapping checks without committing private analytics data.
+### Slice 1 gates (2026-08-22)
+
+```text
+pnpm docs:validate
+# Documentation validation passed.
+pnpm docs:validate:test
+# 11 tests pass (includes discovery brief frontmatter schema)
+pnpm exec prettier --check docs/discovery/ttw-070-organic-discovery-brief.md docs/tickets/ttw-070-establish-organic-discovery-strategy.md docs/tickets/README.md docs/README.md
+# All matched files use Prettier code style!
+git diff --check
+# clean
+```
+
+Brief: `docs/discovery/ttw-070-organic-discovery-brief.md` (`discovery-strategy/v1-interim-2026-08-22`)
 
 ## Completion summary
 
-Summarize target markets/audiences, priority clusters, baseline, content risks, measurement limitations and sequenced work.
+Slice 1 publishes the interim organic discovery strategy brief and CI frontmatter validation. Full ticket remains open for product/marketing approval, analytics baselines (TTW-077) and independent implementation review.

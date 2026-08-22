@@ -12,6 +12,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { validateDiscoveryBrief } from './discovery-brief-schema.mjs';
 
 export const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(([^)]+)\)/g;
 export const TICKET_LINK_RE = /\[(TTW-\d{3})\]\(([^)]+\.md)\)/g;
@@ -195,6 +196,7 @@ export function validateDocumentation(options = {}) {
     ...validateMarkdownLinks(options),
     ...validateTicketLinks(options),
     ...validateTicketStates(options),
+    ...validateDiscoveryBrief(options),
   ];
 
   return {
