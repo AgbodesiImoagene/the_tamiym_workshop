@@ -76,8 +76,7 @@ export function verifyMigrationBaseline(root, databaseUrl) {
       [
         'migrate',
         'diff',
-        '--from-url',
-        databaseUrl,
+        '--from-config-datasource',
         '--to-schema',
         'prisma/schema.prisma',
         '--exit-code',
