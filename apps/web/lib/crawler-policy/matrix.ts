@@ -17,46 +17,47 @@ export const PRIVATE_DISALLOW_PREFIXES = [
   '/policies/',
 ] as const;
 
-export const CATEGORY_DECISIONS: Record<
-  CrawlerAgentDefinition['category'],
-  CrawlerPolicyDecision
-> = {
-  conventional_search: {
-    category: 'conventional_search',
-    allowPublicDiscovery: true,
-    allowTraining: false,
-    owner: 'Product/Marketing',
-    notes: 'Standard search indexing for public marketing pages only.',
-  },
-  ai_search: {
-    category: 'ai_search',
-    allowPublicDiscovery: true,
-    allowTraining: false,
-    owner: 'Product/Marketing',
-    notes: 'Answer/search-oriented agents may fetch the same public HTML as conventional crawlers.',
-  },
-  ai_training: {
-    category: 'ai_training',
-    allowPublicDiscovery: false,
-    allowTraining: false,
-    owner: 'Legal',
-    notes: 'Model-training crawlers are disallowed until explicit content licensing approval.',
-  },
-  default: {
-    category: 'default',
-    allowPublicDiscovery: true,
-    allowTraining: false,
-    owner: 'Engineering',
-    notes: 'Unlisted agents receive public marketing allow rules; training not granted by default.',
-  },
-};
+export const CATEGORY_DECISIONS: Record<CrawlerAgentDefinition['category'], CrawlerPolicyDecision> =
+  {
+    conventional_search: {
+      category: 'conventional_search',
+      allowPublicDiscovery: true,
+      allowTraining: false,
+      owner: 'Product/Marketing',
+      notes: 'Standard search indexing for public marketing pages only.',
+    },
+    ai_search: {
+      category: 'ai_search',
+      allowPublicDiscovery: true,
+      allowTraining: false,
+      owner: 'Product/Marketing',
+      notes:
+        'Answer/search-oriented agents may fetch the same public HTML as conventional crawlers.',
+    },
+    ai_training: {
+      category: 'ai_training',
+      allowPublicDiscovery: false,
+      allowTraining: false,
+      owner: 'Legal',
+      notes: 'Model-training crawlers are disallowed until explicit content licensing approval.',
+    },
+    default: {
+      category: 'default',
+      allowPublicDiscovery: true,
+      allowTraining: false,
+      owner: 'Engineering',
+      notes:
+        'Unlisted agents receive public marketing allow rules; training not granted by default.',
+    },
+  };
 
 /** Documented agents with dated primary sources (slice 1). */
 export const CRAWLER_AGENTS: readonly CrawlerAgentDefinition[] = [
   {
     userAgent: 'Googlebot',
     category: 'conventional_search',
-    sourceUrl: 'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers',
+    sourceUrl:
+      'https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers',
     sourceReviewedAt: '2026-08-22',
   },
   {
@@ -104,13 +105,15 @@ export const CRAWLER_AGENTS: readonly CrawlerAgentDefinition[] = [
   {
     userAgent: 'anthropic-ai',
     category: 'ai_training',
-    sourceUrl: 'https://support.anthropic.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web',
+    sourceUrl:
+      'https://support.anthropic.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web',
     sourceReviewedAt: '2026-08-22',
   },
   {
     userAgent: 'ClaudeBot',
     category: 'ai_training',
-    sourceUrl: 'https://support.anthropic.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web',
+    sourceUrl:
+      'https://support.anthropic.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web',
     sourceReviewedAt: '2026-08-22',
   },
 ] as const;

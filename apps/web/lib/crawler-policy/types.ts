@@ -1,10 +1,6 @@
 /** Crawler governance types (TTW-075). */
 
-export type CrawlerCategory =
-  | 'conventional_search'
-  | 'ai_search'
-  | 'ai_training'
-  | 'default';
+export type CrawlerCategory = 'conventional_search' | 'ai_search' | 'ai_training' | 'default';
 
 export interface CrawlerAgentDefinition {
   userAgent: string;

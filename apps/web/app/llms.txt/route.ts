@@ -23,13 +23,12 @@ export function GET() {
     '',
     '## Documented agents',
     ...CRAWLER_AGENTS.map(
-      (agent) =>
-        `- ${agent.userAgent} (${agent.category}; reviewed ${agent.sourceReviewedAt})`,
+      (agent) => `- ${agent.userAgent} (${agent.category}; reviewed ${agent.sourceReviewedAt})`
     ),
     '',
     '## Category decisions',
     ...Object.values(CATEGORY_DECISIONS).map(
-      (decision) => `- ${decision.category}: ${decision.notes}`,
+      (decision) => `- ${decision.category}: ${decision.notes}`
     ),
     '',
     'Full policy: docs/discovery/ttw-075-interim-policy.md',
