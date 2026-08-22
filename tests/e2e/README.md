@@ -29,6 +29,9 @@ pnpm exec playwright install chromium
 # Smoke (Chromium; starts built servers unless already running)
 pnpm test:e2e:smoke
 
+# Comprehensive UAT (viewport matrix × web/app/admin + representative a11y; not on PR smoke)
+pnpm test:e2e:comprehensive
+
 # Full-matrix script (also selects Firefox/WebKit/mobile/a11y/visual; install browsers first)
 pnpm exec playwright install
 pnpm test:e2e:matrix
@@ -47,4 +50,4 @@ Local tip: export the same env as API Integration (or use `apps/api/.env.test`) 
 
 ## Tags
 
-`@smoke` `@web` `@app` `@admin` `@journey` (plus `@critical` `@a11y` `@visual` for later tickets).
+`@smoke` `@web` `@app` `@admin` `@journey` `@comprehensive` (plus `@critical` `@a11y` `@visual` for later tickets).

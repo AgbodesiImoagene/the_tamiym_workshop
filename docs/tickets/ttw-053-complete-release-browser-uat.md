@@ -1,7 +1,7 @@
 # TTW-053 — Complete browser regression and release-environment UAT
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 1)
+**Status:** In progress (slice 2 — comprehensive UAT)
 **Risk:** High  
 **Blocked by:** TTW-004, TTW-020–TTW-027, TTW-030–TTW-036, TTW-040–TTW-043, TTW-050, TTW-051, TTW-063, TTW-066\
 **Blocks:** TTW-054, TTW-068
@@ -84,6 +84,34 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 | Security / privacy   | No credentials in manifest; traces/reports remain CI artefacts                               |
 | Migration / rollback | Additive; remove manifest validator from docs CI to disable gate                             |
 
+## Design review (slice 2)
+
+**Reviewer:** AI implementation agent (slice 2)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 2 comprehensive UAT implementation
+
+| Area               | Assessment                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Blast radius       | Additive Playwright specs, fixtures, nightly workflow; PR smoke unchanged                                          |
+| Viewport matrix    | Desktop 1440, tablet 834, mobile 393 via `describeViewportMatrix()`                                                |
+| Surface coverage   | Web marketing/auth/fundraiser; app nav/products/orders/settings/authoring; admin sidebar/orders/moderation/catalog |
+| Fixture isolation  | Reuses TTW-004 per-role storage states; seed-data constants synced with `seed-e2e-dummy-data.ts`                   |
+| Interaction policy | `assertVisibleControlsEnabled` skips destructive actions; conditional paths for empty states                       |
+| Accessibility      | Representative axe scans on 4 web routes × 3 viewports; governed exceptions unchanged                              |
+| Deferred           | Full checkout, design workshop save/share, visual baselines, staging UAT (TTW-068), Firefox/WebKit matrix evidence |
+
+## Implementation reviews (slice 2)
+
+**Reviewer:** Bugbot independent reviewer\
+**Date:** 2026-08-22\
+**Verdict:** PASS after responsive nav fix (`615c5fb`)
+
+| Finding                                       | Resolution                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| Customer sidebar hidden on tablet/mobile      | `navigateCustomerSidebarLink` uses `goto` when `aside nav` is not visible |
+| Loose `/dashboard` URL assertion              | `pathUrlMatcher()` anchors home/admin overview paths                      |
+| Mobile hamburger non-functional (product gap) | Documented; comprehensive tests use direct navigation on small viewports  |
+
 ## Implementation reviews
 
 **Reviewer:** Independent implementation reviewer (slice 1)\
@@ -100,6 +128,8 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 
 ## Verification evidence
 
+### Slice 1
+
 - `pnpm playwright:validate` — pass
 - `pnpm playwright:validate:test` — 4/4 pass
 - `pnpm docs:validate` — pass
@@ -107,7 +137,15 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 - `pnpm typecheck` — pass
 - `pnpm lint` — pass (pre-existing warnings only)
 - `git diff --check` — clean
-- PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge
+- PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge (#60)
+
+### Slice 2 (PR #63)
+
+- `pnpm playwright:validate` / `playwright:validate:test` — pass (local)
+- `pnpm typecheck` / `pnpm lint` — pass (local)
+- PR CI run `32584895866` — all 16 checks pass including Playwright Smoke
+- Comprehensive suite — 111 tests listed; nightly workflow ships on merge; first run pending post-merge
+- Bugbot review — PASS after `615c5fb` responsive nav fix
 
 ## Completion summary
 
