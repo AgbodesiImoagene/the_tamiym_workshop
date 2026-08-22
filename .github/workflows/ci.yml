@@ -425,3 +425,18 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Check OpenAPI contract drift
         run: pnpm openapi:check
+
+  observability:
+    name: Observability Artefacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate observability dashboards and alert rules
+        run: pnpm observability:validate && pnpm observability:validate:test

@@ -8,10 +8,7 @@ const RECORDING_PREFIX = 'tamiym:';
  * Load canonical observability metric names from the API metrics manifest.
  */
 export function loadMetricsManifest(repoRoot = process.cwd()) {
-  const manifestPath = resolve(
-    repoRoot,
-    'apps/api/src/observability/metrics.manifest.json',
-  );
+  const manifestPath = resolve(repoRoot, 'apps/api/src/observability/metrics.manifest.json');
   const raw = JSON.parse(readFileSync(manifestPath, 'utf8'));
   const namespace = raw.namespace ?? 'tamiym';
   const baseMetrics = raw.metrics ?? [];

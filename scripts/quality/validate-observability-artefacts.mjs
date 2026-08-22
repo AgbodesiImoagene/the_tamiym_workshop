@@ -19,7 +19,7 @@ const repoRoot = process.cwd();
 const alertsPath = resolve(repoRoot, 'docker/observability/prometheus/alerts.yml');
 const dashboardsDir = resolve(
   repoRoot,
-  'docker/observability/grafana/provisioning/dashboards/json',
+  'docker/observability/grafana/provisioning/dashboards/json'
 );
 
 function fail(message) {
@@ -55,9 +55,7 @@ for (const group of groups) {
     }
     const unknown = validateExpressionMetrics(rule.expr, manifest);
     if (unknown.length > 0) {
-      alertErrors.push(
-        `${group.name}/${rule.name}: unknown metrics: ${unknown.join(', ')}`,
-      );
+      alertErrors.push(`${group.name}/${rule.name}: unknown metrics: ${unknown.join(', ')}`);
     }
   }
 }
@@ -71,7 +69,7 @@ if (alertErrors.length > 0) {
 }
 
 console.log(
-  `Prometheus alerts OK (${groups.length} groups, ${groups.reduce((n, g) => n + g.rules.length, 0)} rules)`,
+  `Prometheus alerts OK (${groups.length} groups, ${groups.reduce((n, g) => n + g.rules.length, 0)} rules)`
 );
 
 const dashboardErrors = [];
