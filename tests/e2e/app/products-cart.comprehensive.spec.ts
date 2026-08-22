@@ -30,7 +30,7 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await customerPage.goto('/dashboard/cart');
     await expect(customerPage.getByRole('heading', { name: 'Cart', level: 1 })).toBeVisible();
     await expect(
-      customerPage.getByRole('link', { name: /Continue shopping|Browse products/i })
+      customerPage.getByRole('link', { name: /Continue shopping|Browse products/i }).first()
     ).toBeVisible();
 
     const qtyPlus = customerPage.getByRole('button', { name: '+' });

@@ -1,4 +1,13 @@
 {
-  "policy_version": "playwright-uat/v1-interim-2026-08-22",
-  "exceptions": []
+  "policy_version": "playwright-uat/v2-comprehensive-2026-08-22",
+  "exceptions": [
+    {
+      "rule_id": "color-contrast",
+      "page": "/",
+      "owner": "platform-frontend",
+      "rationale": "Marketing hero and footer CTA use brand accent colours below WCAG AA contrast on some viewport widths; tracked for design-token remediation.",
+      "expires_on": "2026-12-31",
+      "follow_up_ticket": "TTW-031"
+    }
+  ]
 }
