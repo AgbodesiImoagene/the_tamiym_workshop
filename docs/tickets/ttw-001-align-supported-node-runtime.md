@@ -116,7 +116,7 @@ Choose one pinned active LTS Node line meeting every package's constraint, encod
 
 ### Iteration 1 — 2026-08-18
 
-**Reviewer:** Independent reviewer (did not implement) — [TTW-001 review](9e5e5c4d-2acb-42d1-bea4-8e130df4b2b4)  
+**Reviewer:** Independent reviewer (did not implement) — TTW-001 review
 **Verdict:** CHANGES_REQUIRED
 
 **Findings:**
@@ -129,7 +129,7 @@ Choose one pinned active LTS Node line meeting every package's constraint, encod
 
 ### Iteration 2 — 2026-08-18
 
-**Reviewer:** Independent reviewer (did not implement) — [TTW-001 re-review](9e5e5c4d-2acb-42d1-bea4-8e130df4b2b4)  
+**Reviewer:** Independent reviewer (did not implement) — TTW-001 re-review
 **Verdict:** PASS
 
 **Findings:** No findings.

@@ -32,10 +32,40 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 
 ## Current repo-state summary
 
-- `apps/api` is the most developed part of the repo and contains real domain modules, controllers, services, DTOs, Prisma models, and tests.
-- `apps/web`, `apps/app`, and `apps/admin` are still mostly scaffold-level Next.js apps.
-- Swagger is enabled in the API, but production hardening work remains.
-- The canonical backend backlog now lives in `backend-production-readiness.md`.
+- `apps/api` is the most developed part of the repo and contains real domain modules, controllers, services, DTOs, Prisma models, tests, and OpenTelemetry bootstrap.
+- `apps/web`, `apps/app`, and `apps/admin` have substantial routed surfaces (auth, fundraiser commerce, customer dashboard, admin operations) but remain **Partial** until release UAT and remaining tickets are verified.
+- Swagger is enabled in the API; OpenAPI drift is gated in CI (`pnpm openapi:check`).
+- The canonical delivery backlog lives in `docs/tickets/README.md`; backend readiness gaps are tracked in `backend-production-readiness.md`.
+
+## Documentation ownership
+
+Use these sources of truth and avoid copying volatile status into multiple files.
+
+| Topic                                   | Source of truth                                                                 |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| Product requirements and scope          | PRD (client-approved) and `99-prd-traceability.md`                              |
+| Architecture and domain decisions       | Numbered guides in `docs/` (e.g. `01-architecture.md`, domain interim policies) |
+| Delivery backlog and ticket state       | `docs/tickets/README.md`                                                        |
+| Package and app inventory snapshot      | `docs/00-package-state.md`                                                      |
+| Test strategy and coverage expectations | `docs/12-testing-strategy.md` and `docs/16-playwright-regression-strategy.md`   |
+| Release checklist                       | `docs/release-criteria.md`                                                      |
+| Backend production gaps                 | `docs/backend-production-readiness.md`                                          |
+
+### Status taxonomy (approved TTW-052)
+
+Use these labels when describing capability state. Do not mark **Verified** or **Release-ready** without command output, test names, or precise file-and-line evidence recorded in the owning ticket.
+
+| Status                     | Meaning                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| **Not started**            | No meaningful implementation in repo                                           |
+| **Partial**                | Some behaviour exists; gaps, UX, or verification remain                        |
+| **Implemented-unverified** | Code paths exist and may be ticket-complete, but release proof is not recorded |
+| **Verified**               | Observable evidence (tests, CI gate, or cited code path) proves the behaviour  |
+| **Release-ready**          | Verified plus no unresolved P0/P1 blocker for the affected journey             |
+
+Ticket backlog rows in `docs/tickets/README.md` use a separate delivery vocabulary (`Complete`, `Scoped`, `Deferred`, `In progress`) for epic tracking; map those to the taxonomy above when reconciling milestones.
+
+Validation: `pnpm docs:validate` (also runs in CI).
 
 ## What to read first
 
@@ -174,6 +204,8 @@ resulting code “works”.
 This checklist is the recommended build order to hit the end-of-February delivery target.  
 Each milestone should result in a shippable increment and must include basic tests + telemetry.
 
+**Reconciliation note (2026-08-22):** items marked `[x]` below indicate **Implemented-unverified** unless a ticket records verification evidence. Authoritative delivery status is `docs/tickets/README.md`; many Epic 1–4 backend tickets are **Complete** while browser UAT (`TTW-053`) and documentation reconciliation (`TTW-052`) remain in progress.
+
 ### M0 — Repo & Foundations
 
 - [x] Monorepo scaffold (pnpm + turborepo)
@@ -191,72 +223,72 @@ Each milestone should result in a shippable increment and must include basic tes
 - [x] Role model: CUSTOMER / ORGANIZER / ADMIN
 - [x] **Swagger/OpenAPI auto-generated** and accessible at `/docs`
 - [x] Health endpoint and structured logging
-- [ ] OpenTelemetry runtime instrumentation
+- [x] OpenTelemetry runtime instrumentation (API bootstrap; dashboards/alerts remain TTW-051)
 
 ### M2 — Auth + User Accounts (Day 3–5)
 
-- [ ] Register/login/logout
-- [ ] Profile endpoints + shipping address management
-- [ ] Admin login (role-protected)
-- [ ] Frontend auth flows wired for `app` and `admin`
+- [x] Register/login/logout (API; TTW-023)
+- [x] Profile endpoints + shipping address management (API)
+- [x] Admin login (role-protected)
+- [ ] Frontend auth flows wired for `app` and `admin` (routes exist; UAT pending)
 
 ### M3 — Products & Catalog (Week 1)
 
-- [ ] Product categories + product listing + product detail
-- [ ] Variants (size/color) + availability flags
-- [ ] Admin product CRUD (basic)
-- [ ] Basic search/filter support (category, availability)
+- [x] Product categories + product listing + product detail (API + admin surfaces)
+- [x] Variants (size/color) + availability flags
+- [x] Admin product CRUD (basic)
+- [ ] Basic search/filter support (category, availability) — partial
 
 ### M4 — Design Workshop v1 (Week 1–2)
 
-- [ ] Fabric.js editor scaffold
-- [ ] Printable bounds per product view (front/back/sleeve)
-- [ ] Text layers + image upload layers
-- [ ] Save design (structured model) + thumbnail
-- [ ] Duplicate design
-- [ ] Share link (read-only)
+- [x] Fabric.js editor scaffold
+- [x] Printable bounds per product view (front/back/sleeve)
+- [x] Text layers + image upload layers
+- [x] Save design (structured model) + thumbnail
+- [x] Duplicate design
+- [x] Share link (read-only; TTW-026)
 
 ### M5 — Checkout + Paystack Payments (Week 2)
 
-- [ ] Cart/checkout flow (shipping info)
-- [ ] Create order in `PENDING_PAYMENT`
-- [ ] Paystack initiate transaction
-- [ ] Paystack webhook verification + idempotent processing
-- [ ] Transition to `PAID` + confirmation view
-- [ ] Owner notification: OrderPlaced / PaymentConfirmed
+- [x] Cart/checkout flow (shipping info) — customer app + web fundraiser paths
+- [x] Create order in `PENDING_PAYMENT`
+- [x] Paystack initiate transaction
+- [x] Paystack webhook verification + idempotent processing (TTW-010)
+- [x] Transition to `PAID` + confirmation view
+- [x] Owner notification: OrderPlaced / PaymentConfirmed
 
 ### M6 — Orders (Customer + Admin) (Week 2–3)
 
-- [ ] Customer order history + order detail + status display
-- [ ] Admin order list + order detail + status updates
-- [ ] Refund initiation flow (policy-driven) + notifications
+- [x] Customer order history + order detail + status display (TTW-033)
+- [x] Admin order list + order detail + status updates
+- [x] Refund initiation flow (policy-driven) + notifications (TTW-013, TTW-041)
 
 ### M7 — Fundraising (Week 3)
 
-- [ ] Campaign creation wizard (select/design → story → settings)
-- [ ] Public fundraiser page (shareable)
-- [ ] Campaign performance snapshot (basic)
-- [ ] Admin campaign review/disable
+- [x] Campaign creation wizard (select/design → story → settings) — organiser app (TTW-035)
+- [x] Public fundraiser page (shareable) (TTW-031)
+- [x] Campaign performance snapshot (basic)
+- [x] Admin campaign review/disable (TTW-034)
 
 ### M8 — Moderation + Inventory (Week 3–4)
 
-- [ ] Moderation queue for designs/assets (flag/approve/reject)
-- [ ] Inventory management basics (variant availability, out-of-stock)
+- [x] Moderation queue for designs/assets (flag/approve/reject) (TTW-027)
+- [x] Inventory management basics (variant availability, out-of-stock) (TTW-014)
 - [ ] Admin audit notes (optional but helpful)
 
 ### M9 — Analytics & Reporting (Week 4)
 
-- [ ] Admin ops dashboard: orders/revenue/campaign metrics
-- [ ] Filters (date range, product, campaign)
-- [ ] CSV export for key tables
+- [x] Admin ops dashboard: orders/revenue/campaign metrics (TTW-036 slice 1)
+- [x] Filters (date range, product, campaign)
+- [ ] CSV export for key tables — partial
 
 ### M10 — Hardening + Release (Final week)
 
 - [ ] Error handling polish + empty states
 - [ ] Performance pass on core flows
-- [ ] Security pass (admin separation, webhook verification)
-- [ ] Observability completeness (metrics + traces on critical paths)
-- [ ] UAT checklist + acceptance criteria verification (PRD)
+- [ ] Security pass (admin separation, webhook verification) — largely implemented; formal review pending
+- [ ] Observability completeness (metrics + traces on critical paths) — baseline wired; TTW-051 dashboards pending
+- [ ] UAT checklist + acceptance criteria verification (PRD) — TTW-053
 
 ## AI Execution Philosophy
 

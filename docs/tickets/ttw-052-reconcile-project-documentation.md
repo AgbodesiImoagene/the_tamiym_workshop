@@ -1,7 +1,7 @@
 # TTW-052 — Reconcile project documentation with verified reality
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** Not started  
+**Status:** In progress (slice 1)
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** TTW-054
@@ -68,7 +68,42 @@ Establish one evidence-backed status taxonomy—Not started, Partial, Implemente
 
 ## Design review
 
-Record reviewer, date, document authority map, taxonomy, evidence rules, duplication/removal plan, PRD-preservation check, validation approach and verdict before implementation.
+**Reviewer:** Implementing agent (slice 1)
+**Date:** 2026-08-22
+**Verdict:** Approved for slice 1 implementation
+
+### Status taxonomy (approved)
+
+| Status                     | Meaning                                  | Evidence required                                   |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| **Not started**            | No meaningful implementation             | N/A                                                 |
+| **Partial**                | Some behaviour exists; gaps remain       | Describe what exists and what is missing            |
+| **Implemented-unverified** | Code paths exist; ticket may be Complete | Point to modules/routes; do not claim release proof |
+| **Verified**               | Behaviour proven                         | Command output, test name, or file:line citation    |
+| **Release-ready**          | Verified and no unresolved P0/P1 blocker | Ticket link or explicit decision record             |
+
+Ticket backlog rows (`Complete`, `Scoped`, `Deferred`, `In progress`) remain the delivery-tracking vocabulary in `docs/tickets/README.md`. Milestone and package-state docs map Complete tickets to **Implemented-unverified** unless verification evidence is cited.
+
+### Document authority map (slice 1)
+
+| Claim type                      | Owner                                                     |
+| ------------------------------- | --------------------------------------------------------- |
+| Product scope                   | PRD + `99-prd-traceability.md`                            |
+| Delivery backlog / ticket state | `docs/tickets/README.md`                                  |
+| Package inventory               | `docs/00-package-state.md`                                |
+| Milestone orientation           | `docs/README.md` (links to tickets; not a second backlog) |
+| Test strategy                   | `docs/12-testing-strategy.md`                             |
+| Release checklist               | `docs/release-criteria.md`                                |
+
+### Validation approach (slice 1)
+
+- `scripts/quality/validate-documentation.mjs` checks relative `docs/` links, ticket link targets, and backlog state values.
+- CI job `Documentation` runs `pnpm docs:validate` and `pnpm docs:validate:test`.
+- Slice 1 reconciles `00-package-state.md`, milestone checklist, and observability cross-links only.
+
+### PRD-preservation check
+
+- No PRD business intent changed; milestone updates cite ticket evidence and use **Implemented-unverified** where verification is not recorded.
 
 ## Implementation reviews
 
