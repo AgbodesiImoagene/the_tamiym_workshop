@@ -106,6 +106,7 @@ Validation: `pnpm docs:validate` (also runs in CI).
 35. `analytics/ttw-036-interim-policy.md` — interim analytics KPI catalogue, filters, freshness & drill-downs (TTW-036)
 36. `notifications/ttw-043-interim-policy.md` — interim notification taxonomy, preferences, dead-letter ops & delivery SLOs (TTW-043)
 37. `observability/ttw-051-interim-policy.md` — interim observability SLI catalogue, alert thresholds & owners (TTW-051 slice 1)
+38. `discovery/ttw-070-organic-discovery-brief.md` — interim organic discovery strategy, query map & metrics catalogue (TTW-070 slice 1)
 
 ## Deep Dives
 
@@ -122,6 +123,7 @@ Validation: `pnpm docs:validate` (also runs in CI).
 - `payouts/ttw-042-interim-policy.md` — payout eligibility codes, destination lifecycle, automation gate (TTW-042)
 - `analytics/ttw-036-interim-policy.md` — analytics KPI definitions, Lagos windows, export/drill-down contracts (TTW-036)
 - `notifications/ttw-043-interim-policy.md` — notification taxonomy, consent, dead-letter replay and delivery SLO targets (TTW-043)
+- `discovery/ttw-070-organic-discovery-brief.md` — interim SEO/AEO/GEO strategy, audiences, query clusters and metrics catalogue (TTW-070)
 - `fundraising-campaign-management.md` — organizer campaign lifecycle, campaign product setup, public campaign flow, and campaign checkout behavior
 - `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
 - `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout

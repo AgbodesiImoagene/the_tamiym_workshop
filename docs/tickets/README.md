@@ -93,17 +93,17 @@ See [the epic contract](../epics/06-production-infrastructure-as-code.md) and [p
 
 See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 
-| Ticket                                                       | Priority | Risk     | State  | Outcome                                                                   |
-| ------------------------------------------------------------ | -------- | -------- | ------ | ------------------------------------------------------------------------- |
-| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Scoped | Establish discovery strategy, entities, query map and measurable baseline |
-| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Scoped | Implement crawl, index, canonical, robots and sitemap foundations         |
-| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Scoped | Build governed public information architecture and content system         |
-| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Scoped | Publish truthful entity, content and commerce structured data             |
-| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Scoped | Publish useful, evidence-backed answer-ready content                      |
-| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Scoped | Govern AI crawlers, content rights and generative discovery               |
-| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Scoped | Improve Core Web Vitals and public-media discoverability                  |
-| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Scoped | Measure privacy-safe organic and answer-engine outcomes                   |
-| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Scoped | Gate metadata, schema, crawlability, performance and privacy regressions  |
+| Ticket                                                       | Priority | Risk     | State       | Outcome                                                                   |
+| ------------------------------------------------------------ | -------- | -------- | ----------- | ------------------------------------------------------------------------- |
+| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | In progress | Establish discovery strategy, entities, query map and measurable baseline |
+| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Scoped      | Implement crawl, index, canonical, robots and sitemap foundations         |
+| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Scoped      | Build governed public information architecture and content system         |
+| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Scoped      | Publish truthful entity, content and commerce structured data             |
+| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Scoped      | Publish useful, evidence-backed answer-ready content                      |
+| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Scoped      | Govern AI crawlers, content rights and generative discovery               |
+| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Scoped      | Improve Core Web Vitals and public-media discoverability                  |
+| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Scoped      | Measure privacy-safe organic and answer-engine outcomes                   |
+| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Scoped      | Gate metadata, schema, crawlability, performance and privacy regressions  |
 
 ## Explicitly deferred post-v1 backlog
 
