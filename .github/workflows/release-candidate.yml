@@ -100,6 +100,22 @@ jobs:
     name: Assemble release manifest
     runs-on: ubuntu-latest
     needs: [validate-infra, build-images]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tamiym_workshop_blank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank?schema=public
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,6 +127,10 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Verify live migration baseline
+        run: pnpm release:verify-migrations
       - name: Build manifest (digests empty when push: false)
         env:
           GITHUB_SHA: ${{ github.sha }}

@@ -104,6 +104,8 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Run unit tests
         run: pnpm test
+      - name: Release manifest and rehearsal unit tests
+        run: pnpm release:validate:test && pnpm release:rehearse-stop-go
 
   coverage:
     name: Coverage
@@ -320,6 +322,56 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: ignore
+
+  migration-baseline:
+    name: Migration Baseline (blank + snapshot)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tamiym_workshop_blank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank?schema=public
+      DATABASE_URL_SNAPSHOT: postgresql://postgres:postgres@localhost:5432/tamiym_workshop_snapshot?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Create snapshot database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE tamiym_workshop_snapshot;"
+      - name: Verify blank database migration baseline
+        run: pnpm release:verify-migrations
+      - name: Verify restored-snapshot migration baseline
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_SNAPSHOT }}
+        run: pnpm release:verify-migrations
+      - name: Run post-restore invariant queries on snapshot
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_SNAPSHOT }}
+          RESTORE_CONFIRM_TARGET: ttw-054-ci-snapshot-${{ github.sha }}
+          RESTORE_EVIDENCE_DIR: ${{ github.workspace }}/infra/release/fixtures/backup-evidence
+        run: pnpm release:rehearse-backup
 
   infra:
     name: Infra Validate

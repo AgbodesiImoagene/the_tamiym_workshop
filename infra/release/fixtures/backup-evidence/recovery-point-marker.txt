@@ -1,0 +1,2 @@
+TTW-054 rehearsal fixture — recovery-point evidence marker.
+Replace with captured checksum output from a real owner-gated restore drill.
