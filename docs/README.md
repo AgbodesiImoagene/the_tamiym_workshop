@@ -41,15 +41,16 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 
 Use these sources of truth and avoid copying volatile status into multiple files.
 
-| Topic                                   | Source of truth                                                                 |
-| --------------------------------------- | ------------------------------------------------------------------------------- |
-| Product requirements and scope          | PRD (client-approved) and `99-prd-traceability.md`                              |
-| Architecture and domain decisions       | Numbered guides in `docs/` (e.g. `01-architecture.md`, domain interim policies) |
-| Delivery backlog and ticket state       | `docs/tickets/README.md`                                                        |
-| Package and app inventory snapshot      | `docs/00-package-state.md`                                                      |
-| Test strategy and coverage expectations | `docs/12-testing-strategy.md` and `docs/16-playwright-regression-strategy.md`   |
-| Release checklist                       | `docs/release-criteria.md`                                                      |
-| Backend production gaps                 | `docs/backend-production-readiness.md`                                          |
+| Topic                                   | Source of truth                                                                          |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Product requirements and scope          | PRD (client-approved) and `99-prd-traceability.md`                                       |
+| Architecture and domain decisions       | Numbered guides in `docs/` (e.g. `01-architecture.md`, domain interim policies)          |
+| Delivery backlog and ticket state       | `docs/tickets/README.md`                                                                 |
+| Package and app inventory snapshot      | `docs/00-package-state.md`                                                               |
+| Test strategy and coverage expectations | `docs/12-testing-strategy.md` and `docs/16-playwright-regression-strategy.md`            |
+| Playwright UAT manifest and policy      | `docs/playwright/prd-test-manifest.json` and `docs/playwright/ttw-053-interim-policy.md` |
+| Release checklist                       | `docs/release-criteria.md`                                                               |
+| Backend production gaps                 | `docs/backend-production-readiness.md`                                                   |
 
 ### Status taxonomy (approved TTW-052)
 

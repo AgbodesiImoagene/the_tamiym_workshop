@@ -127,6 +127,30 @@ export default defineConfig({
       testMatch: /web\/.*\.spec\.ts/,
       use: { ...devices['Desktop Safari'], baseURL: WEB_URL },
     },
+    {
+      name: 'mobile-chromium-web',
+      dependencies: ['setup'],
+      testMatch: /web\/.*\.spec\.ts/,
+      use: { ...devices['Pixel 5'], baseURL: WEB_URL },
+    },
+    {
+      name: 'chromium-a11y',
+      dependencies: ['setup'],
+      testMatch: /accessibility\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], baseURL: WEB_URL },
+    },
+    {
+      name: 'chromium-visual',
+      dependencies: ['setup'],
+      testMatch: /visual\/web-home\.visual\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], baseURL: WEB_URL },
+    },
+    {
+      name: 'mobile-visual-web',
+      dependencies: ['setup'],
+      testMatch: /visual\/web-home-mobile\.visual\.spec\.ts/,
+      use: { ...devices['Pixel 5'], baseURL: WEB_URL },
+    },
   ],
   webServer: [
     {

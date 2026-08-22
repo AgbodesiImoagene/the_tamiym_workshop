@@ -454,4 +454,4 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Validate documentation links and ticket backlog
-        run: pnpm docs:validate && pnpm docs:validate:test
+        run: pnpm docs:validate && pnpm docs:validate:test && pnpm playwright:validate && pnpm playwright:validate:test
