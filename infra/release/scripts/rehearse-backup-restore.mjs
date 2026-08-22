@@ -34,17 +34,14 @@ export function runPostRestoreQueries(root, databaseUrl) {
     return [`missing post-restore queries at ${sqlPath}`];
   }
 
+  const absoluteSqlPath = path.resolve(root, sqlPath);
   try {
-    execFileSync(
-      'pnpm',
-      ['exec', 'prisma', 'db', 'execute', '--file', sqlPath, '--schema', 'prisma/schema.prisma'],
-      {
-        cwd: path.join(root, 'apps/api'),
-        encoding: 'utf8',
-        env: { ...process.env, DATABASE_URL: databaseUrl },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
+    execFileSync('pnpm', ['exec', 'prisma', 'db', 'execute', '--file', absoluteSqlPath], {
+      cwd: path.join(root, 'apps/api'),
+      encoding: 'utf8',
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
   } catch (error) {
     const stderr =
       /** @type {NodeJS.ErrnoException & { stderr?: Buffer }} */ (error).stderr?.toString() ?? '';
