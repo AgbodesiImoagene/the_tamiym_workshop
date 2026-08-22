@@ -1,7 +1,7 @@
 # TTW-075 — Govern AI crawlers and generative discovery
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-071, TTW-072\
 **Blocks:** TTW-078
@@ -94,7 +94,7 @@ Approve and encode a crawler matrix covering conventional search, OAI-SearchBot/
 - `pnpm crawler-policy:validate:test`
 - `pnpm docs:validate`
 - `pnpm --filter web build`
-- PR CI — pending
+- PR CI — #73 merged (`f33f5a2`), 17 checks green
 
 ## Completion summary
 

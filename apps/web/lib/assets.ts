@@ -22,4 +22,5 @@ export const marketingAssets = {
   fundraiserHero: '/assets/marketing/fundraiser-hero.jpg',
   fundraiserContent: '/assets/marketing/fundraiser-content.jpg',
   fundraiserDetailFallback: '/assets/marketing/fundraiser-detail-fallback.jpg',
+  ogDefault: '/assets/marketing/og-default.jpg',
 } as const;

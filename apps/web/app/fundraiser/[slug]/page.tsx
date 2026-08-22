@@ -4,6 +4,7 @@ import { MarketingShell } from '@/components/marketing-shell';
 import { PublicFundraiserDetail } from '@/components/public-fundraiser-detail';
 import { JsonLd } from '@/components/json-ld';
 import { getPublicFundraiser } from '@/lib/fundraisers';
+import { pickFundraiserPreviewImage } from '@/lib/media/social';
 import { buildFundraiserMetadata, truncateDescription } from '@/lib/metadata';
 import { buildBreadcrumbListJsonLd, buildWebPageJsonLd } from '@/lib/structured-data/builders';
 
@@ -29,6 +30,7 @@ export async function generateMetadata({ params }: FundraiserDetailPageProps): P
     description: fundraiser.description,
     story: fundraiser.story,
     slug: fundraiser.slug,
+    previewImageUrl: pickFundraiserPreviewImage(fundraiser.products ?? []),
   });
 }
 

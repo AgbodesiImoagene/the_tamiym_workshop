@@ -27,6 +27,12 @@ describe('web metadata helpers', () => {
     expect(metadata.alternates?.canonical).toBe('https://www.example.test/about');
     expect(metadata.robots).toEqual({ index: true, follow: true });
     expect(metadata.openGraph?.url).toBe('https://www.example.test/about');
+    expect(metadata.openGraph?.images?.[0]?.url).toBe(
+      'https://www.example.test/assets/marketing/og-default.jpg'
+    );
+    expect(metadata.twitter?.images?.[0]).toBe(
+      'https://www.example.test/assets/marketing/og-default.jpg'
+    );
   });
 
   it('truncates long fundraiser descriptions', () => {
@@ -44,5 +50,20 @@ describe('web metadata helpers', () => {
 
     expect(metadata.alternates?.canonical).toBe('https://www.example.test/fundraiser/school-drive');
     expect(metadata.robots).toEqual({ index: true, follow: true });
+    expect(metadata.openGraph?.images?.[0]?.url).toBe(
+      'https://www.example.test/assets/marketing/og-default.jpg'
+    );
+  });
+
+  it('uses campaign preview images in fundraiser metadata when provided', () => {
+    const metadata = buildFundraiserMetadata({
+      title: 'School Drive',
+      description: 'Help our school',
+      story: null,
+      slug: 'school-drive',
+      previewImageUrl: 'https://cdn.example.test/campaign.jpg',
+    });
+
+    expect(metadata.openGraph?.images?.[0]?.url).toBe('https://cdn.example.test/campaign.jpg');
   });
 });

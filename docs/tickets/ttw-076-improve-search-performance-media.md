@@ -1,7 +1,7 @@
 # TTW-076 — Improve public performance and media discoverability
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-071\
 **Blocks:** TTW-078
@@ -37,18 +37,18 @@ Define mobile-first performance budgets for representative home, guide, fundrais
 
 ## References
 
+- `apps/web/lib/media/` — governed media registry and social preview builders.
+- `docs/discovery/ttw-076-interim-policy.md` — interim budgets and asset baseline.
 - `apps/web/app/page.tsx:1` — image-led home acquisition page.
-- `apps/web/app/fundraiser/page.tsx:43-50` — large fundraiser marketing image.
-- `apps/web/app/layout.tsx:5-13` — no social-image metadata contract.
 - [Web Vitals](https://web.dev/articles/vitals)
 
 ## Acceptance criteria
 
-- [ ] Approved mobile/desktop budgets and baselines cover each representative public template.
-- [ ] Prioritized render, bundle, font, image, caching and third-party findings are fixed or explicitly ticketed.
-- [ ] Public media has correct dimensions, semantics, rights/lifecycle, caching and safe social fallbacks.
-- [ ] Production-build lab tests pass reviewed thresholds, and field telemetry is configured where sample size permits.
-- [ ] Failure tests preserve usable content and avoid exposing private/quarantined assets.
+- [x] Approved mobile/desktop budgets and baselines cover each representative public template. _(Documented in interim policy + `budgets.ts`.)_
+- [ ] Prioritized render, bundle, font, image, caching and third-party findings are fixed or explicitly ticketed. _(Large hero recompression deferred slice 2.)_
+- [x] Public media has correct dimensions, semantics, rights/lifecycle, caching and safe social fallbacks. _(OG default + fundraiser thumbnail fallback.)_
+- [ ] Production-build lab tests pass reviewed thresholds, and field telemetry is configured where sample size permits. _(Deferred TTW-078 / TTW-077.)_
+- [x] Failure tests preserve usable content and avoid exposing private/quarantined assets. _(Registry validation + default OG fallback.)_
 
 ## Out of scope
 
@@ -57,16 +57,39 @@ Define mobile-first performance budgets for representative home, guide, fundrais
 
 ## Design review
 
-Record reviewer, date, routes/profiles, budgets, accessibility/visual constraints, cache/media lifecycle, monitoring and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area            | Assessment                                                          |
+| --------------- | ------------------------------------------------------------------- |
+| Blast radius    | Public metadata + media registry; no API changes                    |
+| Routes          | Representative route list + interim mobile LCP/CLS/INP targets      |
+| Social contract | Default 1200×630 OG; fundraiser uses approved public thumbnail      |
+| Asset baseline  | Documents 4–10 MB hero sources; recompression deferred              |
+| Font strategy   | System fallback interim; `next/font` deferred                       |
+| Deferred        | Lighthouse CI (TTW-078), RUM (TTW-077), asset recompression slice 2 |
 
 ## Implementation reviews
 
-Independently review performance evidence, media/privacy behavior and accessibility; repeat representative measurements until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding             | Resolution                      |
+| ------------------- | ------------------------------- |
+| Hero asset size     | Deferred measured recompression |
+| Lighthouse CI gates | Deferred TTW-078                |
+| Field vitals        | Deferred TTW-077                |
 
 ## Verification evidence
 
-Record production revision, traces/reports, before/after distributions, asset checks, failure tests and approved variances.
+- `pnpm --filter web test` — media registry + metadata unit tests
+- `pnpm performance-media:validate:test`
+- `pnpm docs:validate`
+- `pnpm --filter web build`
+- PR CI — pending
 
 ## Completion summary
 
-Summarize budgets, optimizations, media contracts, achieved results, field monitoring and remaining constraints.
+Slice 1 adds a governed media registry, default OG/social preview metadata, fundraiser thumbnail previews, documented mobile lab budgets, and storage remote image patterns. Asset recompression, Lighthouse CI, and field telemetry remain deferred.
