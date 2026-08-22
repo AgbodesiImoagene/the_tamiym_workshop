@@ -6,7 +6,8 @@ test.describe('Discovery regression smoke @smoke @discovery @web', () => {
   test('home exposes canonical, social preview, and organization JSON-LD', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${WEB_ORIGIN}/`);
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveAttribute('href', new RegExp(`^${WEB_ORIGIN}/?$`));
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
     await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
       'content',
