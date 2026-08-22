@@ -6,9 +6,6 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
-  IsString,
-  MaxLength,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
 import {

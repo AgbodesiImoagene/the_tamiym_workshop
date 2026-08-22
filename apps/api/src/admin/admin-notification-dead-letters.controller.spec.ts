@@ -37,4 +37,47 @@ describe('AdminNotificationDeadLettersController', () => {
     await controller.list();
     expect(deadLetters.listDeadLetters).toHaveBeenCalled();
   });
+
+  it('gets dead letter detail', async () => {
+    deadLetters.getDeadLetter.mockResolvedValue({ id: 'dl-1' });
+    await controller.get('dl-1');
+    expect(deadLetters.getDeadLetter).toHaveBeenCalledWith('dl-1');
+  });
+
+  it('acknowledges dead letter', async () => {
+    deadLetters.acknowledgeDeadLetter.mockResolvedValue({ id: 'dl-1' });
+    await controller.acknowledge('dl-1', { id: 'admin-1' } as never, {
+      note: 'reviewed',
+    });
+    expect(deadLetters.acknowledgeDeadLetter).toHaveBeenCalledWith(
+      'dl-1',
+      'admin-1',
+      'reviewed',
+    );
+  });
+
+  it('replays dead letter', async () => {
+    deadLetters.replayDeadLetter.mockResolvedValue({ generation: 2 });
+    await controller.replay('dl-1', { id: 'admin-1' } as never, {
+      reason: 'provider recovered',
+    });
+    expect(deadLetters.replayDeadLetter).toHaveBeenCalledWith(
+      'dl-1',
+      'admin-1',
+      'provider recovered',
+    );
+  });
+
+  it('bulk replays dead letters', async () => {
+    deadLetters.replayDeadLettersBulk.mockResolvedValue({ results: [] });
+    await controller.bulkReplay({ id: 'admin-1' } as never, {
+      ids: ['dl-1'],
+      reason: 'batch retry',
+    });
+    expect(deadLetters.replayDeadLettersBulk).toHaveBeenCalledWith(
+      ['dl-1'],
+      'admin-1',
+      'batch retry',
+    );
+  });
 });

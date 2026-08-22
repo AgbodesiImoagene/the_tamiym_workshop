@@ -109,4 +109,55 @@ describe('NotificationDispatchService', () => {
     expect(result.outboxId).toBe('out-suppressed');
     expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
   });
+
+  it('reuses existing row for dedupe key', async () => {
+    prisma.notificationOutbox.findUnique.mockResolvedValue({
+      id: 'out-dedupe',
+      status: NotificationStatus.PENDING,
+      suppressed: false,
+      policyVersion: 'v1',
+      category: NotificationCategory.TRANSACTIONAL,
+    });
+
+    const result = await service.dispatch({
+      eventName: OUTBOX_EVENT_PAYMENT_CONFIRMED,
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+      recipientUserId: 'u1',
+      payload: { orderId: 'o1' },
+      dedupeKey: 'PaymentConfirmed:o1',
+    });
+
+    expect(result.idempotentReuse).toBe(true);
+    expect(result.outboxId).toBe('out-dedupe');
+    expect(observability.recordNotificationDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'duplicate' }),
+    );
+  });
+
+  it('reuses existing row for effect key generation', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'out-gen',
+      status: NotificationStatus.SENT,
+      suppressed: false,
+      policyVersion: 'v1',
+      category: NotificationCategory.TRANSACTIONAL,
+    });
+
+    const result = await service.dispatch({
+      eventName: OUTBOX_EVENT_PAYMENT_CONFIRMED,
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+      recipientUserId: 'u1',
+      payload: { orderId: 'o1' },
+      effectKey: 'PaymentConfirmed:u1:EMAIL',
+      generation: 2,
+    });
+
+    expect(result.idempotentReuse).toBe(true);
+    expect(result.outboxId).toBe('out-gen');
+    expect(observability.recordNotificationDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'duplicate' }),
+    );
+  });
 });

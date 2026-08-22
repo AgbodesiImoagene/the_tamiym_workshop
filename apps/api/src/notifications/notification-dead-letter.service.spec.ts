@@ -147,4 +147,130 @@ describe('NotificationDeadLetterService', () => {
       service.replayDeadLetter('missing', 'admin-1', 'reason'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('returns redacted dead letter detail with attempts', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'dl-1',
+      channel: NotificationChannel.EMAIL,
+      recipient: 'alice@example.com',
+      payload: { secret: 'value' },
+      lastError: 'smtp timeout',
+      deliveryAttempts: [{ attemptNumber: 1, errorMessage: 'smtp timeout' }],
+      replayedFrom: null,
+      replays: [],
+    });
+
+    const result = await service.getDeadLetter('dl-1');
+
+    expect(result.recipient).toBe('a***@example.com');
+    expect(result.lastError).toBe('smtp timeout');
+    expect(result.deliveryAttempts[0].errorMessage).toBe('smtp timeout');
+  });
+
+  it('throws when dead letter detail missing', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue(null);
+    await expect(service.getDeadLetter('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('acknowledges dead letter and returns detail', async () => {
+    prisma.notificationOutbox.updateMany.mockResolvedValue({ count: 1 });
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'dl-1',
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+      payload: {},
+      lastError: null,
+      deliveryAttempts: [],
+      replayedFrom: null,
+      replays: [],
+    });
+
+    const result = await service.acknowledgeDeadLetter(
+      'dl-1',
+      'admin-1',
+      'reviewed',
+    );
+
+    expect(prisma.notificationOutbox.updateMany).toHaveBeenCalled();
+    expect(result.id).toBe('dl-1');
+  });
+
+  it('throws when acknowledge target missing', async () => {
+    prisma.notificationOutbox.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.acknowledgeDeadLetter('missing', 'admin-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects replay without reason', async () => {
+    await expect(
+      service.replayDeadLetter('dl-1', 'admin-1', '   '),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects replay when effect key missing', async () => {
+    prisma.notificationOutbox.findFirst.mockResolvedValue({
+      id: 'dl-1',
+      status: NotificationStatus.FAILED,
+      deadLetterAckStatus: 'ACKNOWLEDGED',
+      effectKey: null,
+      channel: NotificationChannel.EMAIL,
+      generation: 1,
+    });
+    await expect(
+      service.replayDeadLetter('dl-1', 'admin-1', 'reason'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('bulk replays and captures per-item errors', async () => {
+    prisma.notificationOutbox.findFirst
+      .mockResolvedValueOnce({
+        id: 'dl-1',
+        status: NotificationStatus.FAILED,
+        deadLetterAckStatus: 'OPEN',
+        effectKey: 'k1',
+        channel: NotificationChannel.EMAIL,
+        generation: 1,
+      })
+      .mockResolvedValueOnce(null);
+    const result = await service.replayDeadLettersBulk(
+      ['dl-1'],
+      'admin-1',
+      'retry',
+    );
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        id: 'dl-1',
+        error: expect.any(String),
+      }),
+    );
+  });
+
+  it('rejects empty bulk replay', async () => {
+    await expect(
+      service.replayDeadLettersBulk([], 'admin-1', 'retry'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects bulk replay above configured max', async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        NotificationDeadLetterService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationDispatchService, useValue: dispatch },
+        { provide: ObservabilityService, useValue: observability },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn(() => 1) },
+        },
+      ],
+    }).compile();
+    const limited = module.get(NotificationDeadLetterService);
+
+    await expect(
+      limited.replayDeadLettersBulk(['a', 'b'], 'admin-1', 'retry'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

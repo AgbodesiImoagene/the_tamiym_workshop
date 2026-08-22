@@ -16,7 +16,6 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
-  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';

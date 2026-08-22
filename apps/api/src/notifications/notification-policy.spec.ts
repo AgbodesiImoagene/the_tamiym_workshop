@@ -12,8 +12,15 @@ import {
 } from './notification-policy';
 import {
   OUTBOX_EVENT_ADMIN_BROADCAST,
+  OUTBOX_EVENT_ADMIN_OPERATIONAL,
+  OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
   OUTBOX_EVENT_PAYMENT_CONFIRMED,
 } from '../mail/mail-outbox-templates';
+import {
+  categoryRequiresMarketingConsent,
+  isPreferenceCategoryMutable,
+  toPreferenceChannel,
+} from './notification-policy';
 
 describe('notification-policy', () => {
   it('classifies transactional events as required', () => {
@@ -79,5 +86,68 @@ describe('notification-policy', () => {
     expect(result.queue).toBe(true);
     expect(result.category).toBe(NotificationCategory.MARKETING);
     expect(NotificationPreferenceChannel.EMAIL).toBe('EMAIL');
+  });
+
+  it('classifies admin operational as required without preferences', () => {
+    const entry = classifyNotificationEvent(OUTBOX_EVENT_ADMIN_OPERATIONAL);
+    expect(entry?.required).toBe(true);
+    expect(entry?.preferenceApplies).toBe(false);
+  });
+
+  it('classifies organiser operational with preference gates', () => {
+    const entry = classifyNotificationEvent(
+      OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+    );
+    expect(entry?.category).toBe(NotificationCategory.ORGANISER_OPERATIONAL);
+    expect(entry?.preferenceApplies).toBe(true);
+  });
+
+  it('suppresses unmapped taxonomy', () => {
+    const result = evaluateNotificationPolicy({
+      eventName: 'UnknownEvent',
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+    });
+    expect(result.decisionCode).toBe(
+      NotificationDecisionCode.TAXONOMY_UNMAPPED,
+    );
+  });
+
+  it('suppresses missing recipient', () => {
+    const result = evaluateNotificationPolicy({
+      eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+      channel: NotificationChannel.EMAIL,
+      recipient: '   ',
+    });
+    expect(result.decisionCode).toBe(
+      NotificationDecisionCode.RECIPIENT_MISSING,
+    );
+  });
+
+  it('suppresses organiser operational when opted out', () => {
+    const result = evaluateNotificationPolicy({
+      eventName: OUTBOX_EVENT_ORGANIZER_CAMPAIGN_APPROVED,
+      channel: NotificationChannel.EMAIL,
+      recipient: 'a@example.com',
+      recipientUserId: 'u1',
+      preference: { enabled: false },
+    });
+    expect(result.decisionCode).toBe(NotificationDecisionCode.OPTED_OUT);
+  });
+
+  it('maps sms channel and unknown channels for preferences', () => {
+    expect(toPreferenceChannel(NotificationChannel.SMS)).toBe(
+      NotificationPreferenceChannel.SMS,
+    );
+    expect(toPreferenceChannel('PUSH' as NotificationChannel)).toBeNull();
+  });
+
+  it('identifies mutable preference categories and marketing consent', () => {
+    expect(isPreferenceCategoryMutable(NotificationCategory.MARKETING)).toBe(
+      true,
+    );
+    expect(
+      categoryRequiresMarketingConsent(NotificationCategory.MARKETING),
+    ).toBe(true);
   });
 });

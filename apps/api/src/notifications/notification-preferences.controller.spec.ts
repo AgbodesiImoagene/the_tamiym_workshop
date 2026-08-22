@@ -25,4 +25,21 @@ describe('NotificationPreferencesController', () => {
     await controller.getPreferences({ id: 'u1' } as never);
     expect(preferences.getPreferences).toHaveBeenCalledWith('u1');
   });
+
+  it('delegates updatePreferences', async () => {
+    preferences.updatePreferences.mockResolvedValue({ preferences: [] });
+    await controller.updatePreferences(
+      { id: 'u1' } as never,
+      {
+        preferences: [
+          {
+            channel: 'EMAIL',
+            category: 'MARKETING',
+            enabled: false,
+          },
+        ],
+      } as never,
+    );
+    expect(preferences.updatePreferences).toHaveBeenCalled();
+  });
 });
