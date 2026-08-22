@@ -65,13 +65,13 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 5 — Contracts, observability and release proof
 
-| Ticket                                                | Priority | Risk     | State       | Outcome                                                               |
-| ----------------------------------------------------- | -------- | -------- | ----------- | --------------------------------------------------------------------- |
-| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete    | OpenAPI generation + drift gate encoded (slice 1)                     |
-| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete    | Observability dashboards, alerts, runbooks encoded (slice 1)          |
-| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete    | Documentation validation + key state reconciliation (slice 1)         |
-| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | In progress | PRD-to-test manifest, a11y/visual scaffolds, browser matrix (slice 1) |
-| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | In progress | Release manifest extensions, runbooks, preflight (slice 1)            |
+| Ticket                                                | Priority | Risk     | State    | Outcome                                                                |
+| ----------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------- |
+| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                      |
+| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete | Observability dashboards, alerts, runbooks encoded (slice 1)           |
+| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete | Documentation validation + key state reconciliation (slice 1)          |
+| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Complete | Comprehensive Playwright UAT, viewport matrix, nightly shard (slice 2) |
+| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Complete | Migration baseline CI, stop/go rehearsal, release manifest (slice 2)   |
 
 ## Epic 6 — Production infrastructure as code
 
@@ -93,17 +93,17 @@ See [the epic contract](../epics/06-production-infrastructure-as-code.md) and [p
 
 See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 
-| Ticket                                                       | Priority | Risk     | State       | Outcome                                                               |
-| ------------------------------------------------------------ | -------- | -------- | ----------- | --------------------------------------------------------------------- |
-| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Complete    | Organic discovery strategy brief published (slice 1)                  |
-| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete    | Crawl/index/canonical/robots/sitemap foundations (slice 1)            |
-| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Complete    | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)          |
-| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Complete    | Organization/WebSite/Breadcrumb JSON-LD foundations (slice 1)         |
-| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Complete    | Answer library, corrected claims, FAQ markup (slice 1)                |
-| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Complete    | Govern AI crawlers, content rights and generative discovery (slice 1) |
-| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Complete    | Core Web Vitals budgets, OG/social media contracts (slice 1)          |
-| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Complete    | Discovery metrics catalogue, privacy-safe events (slice 1)            |
-| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | In progress | Discovery regression manifest, validators, Playwright smoke (slice 1) |
+| Ticket                                                       | Priority | Risk     | State    | Outcome                                                               |
+| ------------------------------------------------------------ | -------- | -------- | -------- | --------------------------------------------------------------------- |
+| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Complete | Organic discovery strategy brief published (slice 1)                  |
+| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete | Crawl/index/canonical/robots/sitemap foundations (slice 1)            |
+| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Complete | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)          |
+| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Complete | Organization/WebSite/Breadcrumb JSON-LD foundations (slice 1)         |
+| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Complete | Answer library, corrected claims, FAQ markup (slice 1)                |
+| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Complete | Govern AI crawlers, content rights and generative discovery (slice 1) |
+| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Complete | Core Web Vitals budgets, OG/social media contracts (slice 1)          |
+| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Complete | Discovery metrics catalogue, privacy-safe events (slice 1)            |
+| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Complete | Discovery regression manifest, validators, Playwright smoke (slice 1) |
 
 ## Explicitly deferred post-v1 backlog
 
