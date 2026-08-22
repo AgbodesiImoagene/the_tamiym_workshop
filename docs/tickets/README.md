@@ -65,13 +65,13 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 5 — Contracts, observability and release proof
 
-| Ticket                                                | Priority | Risk     | State                 | Outcome                                                              |
-| ----------------------------------------------------- | -------- | -------- | --------------------- | -------------------------------------------------------------------- |
-| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | In progress (slice 1) | Gate generated OpenAPI and shared client contracts against drift     |
-| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Scoped                | Add dashboards, alerts, SLOs and response runbooks                   |
-| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Scoped                | Reconcile documentation with implemented and verified state          |
-| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Scoped                | Complete browser matrix, accessibility, visuals and release UAT      |
-| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Scoped                | Rehearse migrations, backup/restore, rollback and controlled release |
+| Ticket                                                | Priority | Risk     | State    | Outcome                                                              |
+| ----------------------------------------------------- | -------- | -------- | -------- | -------------------------------------------------------------------- |
+| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                    |
+| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Scoped   | Add dashboards, alerts, SLOs and response runbooks                   |
+| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Scoped   | Reconcile documentation with implemented and verified state          |
+| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Scoped   | Complete browser matrix, accessibility, visuals and release UAT      |
+| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Scoped   | Rehearse migrations, backup/restore, rollback and controlled release |
 
 ## Epic 6 — Production infrastructure as code
 

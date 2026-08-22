@@ -1,7 +1,7 @@
 # TTW-050 — Gate OpenAPI and client contracts against drift
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 1)  
+**Status:** Complete (slice 1)  
 **Risk:** High  
 **Blocked by:** TTW-002, TTW-003  
 **Blocks:** TTW-053, TTW-054
@@ -70,7 +70,7 @@ Extract application and Swagger document construction into importable functions 
 **Date:** 2026-08-22  
 **Blast radius:** API bootstrap (`main.ts`), new `apps/api/src/openapi/*` helpers, committed `docs/openapi/openapi.json`, generated `packages/types/src/openapi.generated.ts`, root `openapi:*` scripts, CI `openapi` job. Runtime HTTP behaviour unchanged; production still serves Swagger UI from the same document builder.
 
-**Generator / validator:** `apps/api/scripts/generate-openapi.ts` boots real `AppModule` with `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, and `apps/api/.env.test` (no production secrets, no listener). Document built via shared `createOpenApiDocument()` + `operationIdFactory` (`ControllerName_methodName`). Normalized with recursive key sort and stable array ordering; Nest bearer/cookie schemes repaired to valid OpenAPI 3 before `@apidevtools/swagger-parser` validation. Types via `openapi-typescript` into `@tamiym/types`.
+**Generator / validator:** `apps/api/scripts/generate-openapi.ts` with `load-openapi-generation-env.ts` preloads `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, and `.env.test` / `.env.test.example` before `AppModule` import (no production secrets, no listener). Document built via shared `createOpenApiDocument()` + `operationIdFactory` (`ControllerName_methodName`). Normalized with recursive key sort and stable array ordering; Nest bearer/cookie schemes repaired to valid OpenAPI 3 before `@apidevtools/swagger-parser` validation. Types via `openapi-typescript` into `@tamiym/types`.
 
 **Operation IDs:** `buildOperationId(controllerKey, methodKey)` → `AuthController_login`; duplicates fail generation via `assertUniqueOperationIds`.
 
@@ -86,24 +86,31 @@ Extract application and Swagger document construction into importable functions 
 
 ## Implementation reviews
 
-Record each independent review iteration, findings, fixes, contract-diff evidence, security verdict and overall verdict.
+### Charter A — contract correctness (PASS slice 1)
 
-## Verification evidence (slice 1)
+- Shared bootstrap + `operationIdFactory`; duplicate IDs fail generation; drift gate compares committed JSON + TS types; representative route contract tests + determinism.
+- **Deferred:** mounted-route inventory gate, per-endpoint schema completeness, frontend type consumption (slice 2+).
+
+### Charter B — security/privacy (PASS slice 1)
+
+- Generation uses `load-openapi-generation-env.ts` + `.env.test.example` only; no listener; committed spec has no secrets; cookie auth normalized to valid OpenAPI `apiKey`/`cookie`.
+- Evidence: PR #53 CI green (`90c4a78`).
+
+## Verification evidence (slice 1, post-merge)
 
 ```text
 pnpm --filter api exec tsc --noEmit
 pnpm --filter api test
-pnpm --filter api test:coverage && pnpm coverage:diff
+pnpm coverage:diff
 pnpm typecheck
 pnpm openapi:check
 git diff --check
 ```
 
-- `pnpm --filter api test` — 141 suites / 1177 tests passed (includes `openapi.helpers.spec.ts`, `application.factory.spec.ts`, `openapi-contract.spec.ts`).
-- `pnpm coverage:diff` — 94/103 changed lines covered (91.26%) vs `origin/main`.
-- `pnpm openapi:check` — drift check passed (regenerated JSON + TS types byte-equal to committed artefacts).
-- Committed artefacts: `docs/openapi/openapi.json`, `packages/types/src/openapi.generated.ts`.
+- PR #53 CI: all checks pass (merge `90c4a78`).
+- `pnpm --filter api test` — 141 suites / 1177 tests.
+- `pnpm openapi:check` — drift gate pass (CI + local without `.env.test`).
 
 ## Completion summary
 
-Summarize generated artefacts, mounted coverage, compatibility decisions, consuming clients, CI gate, deviations and follow-up domain contract gaps.
+Slice 1 OpenAPI pipeline merged in #53 (`90c4a78`): `docs/openapi/openapi.json`, `packages/types/src/openapi.generated.ts`, `pnpm openapi:generate` / `pnpm openapi:check`, CI `OpenAPI Contracts` job. Follow-on: frontend contract adoption, mounted-route inventory, schema annotation gaps.
