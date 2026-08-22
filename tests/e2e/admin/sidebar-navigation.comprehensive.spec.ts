@@ -1,20 +1,20 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/test';
-import { assertVisibleControlsEnabled } from '../fixtures/interactions';
+import { assertVisibleControlsEnabled, clickAdminSidebarLink } from '../fixtures/interactions';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
 
 const SIDEBAR_ROUTES = [
-  { label: 'Overview', heading: /Operations overview/i },
-  { label: 'Orders', heading: /Orders workspace/i },
-  { label: 'Campaigns', heading: /Campaigns workspace/i },
-  { label: 'Payouts', heading: /Payout runs/i },
-  { label: 'Catalog', heading: /Products/i },
-  { label: 'Pricing', heading: /Discounts/i },
-  { label: 'Shipping', heading: /Shipping zones/i },
-  { label: 'Moderation', heading: /Campaign moderation/i },
-  { label: 'Notifications', heading: /Notifications/i },
-  { label: 'Admins', heading: /Admins & roles/i },
-  { label: 'Settings', heading: /Site settings/i },
+  { href: '/admin', heading: /Operations overview/i },
+  { href: '/admin/orders', heading: /Orders workspace/i },
+  { href: '/admin/campaigns', heading: /Campaigns workspace/i },
+  { href: '/admin/payouts/runs', heading: /Payout runs/i },
+  { href: '/admin/catalog/products', heading: /Products/i },
+  { href: '/admin/pricing/discounts', heading: /Discounts/i },
+  { href: '/admin/shipping/zones', heading: /Shipping zones/i },
+  { href: '/admin/moderation/campaigns', heading: /Campaign moderation/i },
+  { href: '/admin/notifications', heading: /Notifications/i },
+  { href: '/admin/team', heading: /Admins & roles/i },
+  { href: '/admin/settings/site', heading: /Site settings/i },
 ] as const;
 
 describeViewportMatrix('Admin sidebar navigation @comprehensive @admin', () => {
@@ -23,11 +23,11 @@ describeViewportMatrix('Admin sidebar navigation @comprehensive @admin', () => {
     await expect(adminPage.getByRole('heading', { name: /Operations overview/i })).toBeVisible();
 
     for (const route of SIDEBAR_ROUTES) {
-      await adminPage.getByRole('link', { name: route.label, exact: true }).click();
+      await clickAdminSidebarLink(adminPage, route.href);
       await expect(adminPage.getByRole('heading', { name: route.heading }).first()).toBeVisible();
     }
 
-    await assertVisibleControlsEnabled(adminPage.locator('nav').first());
+    await assertVisibleControlsEnabled(adminPage.locator('aside').first());
   });
 
   test('overview date filters and CSV exports are interactive', async ({ adminPage }) => {

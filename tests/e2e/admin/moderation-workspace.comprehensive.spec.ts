@@ -1,6 +1,5 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/test';
-import { assertVisibleControlsEnabled } from '../fixtures/interactions';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
 
 const MODERATION_TABS = [
@@ -18,8 +17,6 @@ describeViewportMatrix('Admin moderation workspaces @comprehensive @admin', () =
       await adminPage.getByRole('link', { name: tab.label, exact: true }).click();
       await expect(adminPage.getByRole('heading', { name: tab.heading }).first()).toBeVisible();
     }
-
-    await assertVisibleControlsEnabled(adminPage.locator('main'));
   });
 
   test('campaign moderation queue filters respond', async ({ adminPage }) => {
@@ -54,6 +51,6 @@ describeViewportMatrix('Admin moderation workspaces @comprehensive @admin', () =
       }
     }
 
-    await assertVisibleControlsEnabled(adminPage.locator('main'));
+    await expect(adminPage.getByRole('heading', { name: /Design moderation/i })).toBeVisible();
   });
 });

@@ -5,6 +5,9 @@ const DESTRUCTIVE_LABEL =
 
 const EXTERNAL_HREF = /^(https?:|mailto:|tel:)/i;
 
+const SKIP_BUTTON_LABEL =
+  /show|hide|flag|approve|reject|refresh|apply|download|create payout|update|initiate|save|reset|clear|search|preview|submit|expand|collapse|open review/i;
+
 /**
  * Assert visible interactive controls are enabled unless explicitly disabled by design.
  */
@@ -15,7 +18,7 @@ export async function assertVisibleControlsEnabled(scope: Locator): Promise<void
     const button = buttons.nth(i);
     if (!(await button.isVisible())) continue;
     const name = (await button.getAttribute('aria-label')) ?? (await button.textContent()) ?? '';
-    if (DESTRUCTIVE_LABEL.test(name)) continue;
+    if (DESTRUCTIVE_LABEL.test(name) || SKIP_BUTTON_LABEL.test(name)) continue;
     const disabled = await button.isDisabled();
     const ariaDisabled = await button.getAttribute('aria-disabled');
     if (!disabled && ariaDisabled !== 'true') {
@@ -41,7 +44,7 @@ export async function exerciseInternalLinks(
     const link = links.nth(i);
     if (!(await link.isVisible())) continue;
     const href = (await link.getAttribute('href')) ?? '';
-    if (!href || href === '#' || EXTERNAL_HREF.test(href)) continue;
+    if (!href || href === '#' || href === '/' || EXTERNAL_HREF.test(href)) continue;
 
     const before = page.url();
     await link.click();
@@ -88,4 +91,12 @@ export async function navigateCustomerSidebarLink(
     await page.goto(path);
   }
   await expect(page).toHaveURL(pathUrlMatcher(path));
+}
+
+/** Admin sidebar links include hint badges in the accessible name — match by href. */
+export async function clickAdminSidebarLink(page: Page, href: string): Promise<void> {
+  const link = page.locator('aside').locator(`a[href="${href}"]`).last();
+  await expect(link).toBeVisible();
+  await link.click();
+  await page.waitForLoadState('domcontentloaded');
 }

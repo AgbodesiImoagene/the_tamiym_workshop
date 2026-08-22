@@ -7,7 +7,7 @@ import { E2E_ORDER_PAID_ID } from '../fixtures/seed-data';
 describeViewportMatrix('Customer orders @comprehensive @app', () => {
   test('orders list and detail navigation', async ({ customerPage }) => {
     await customerPage.goto('/dashboard/orders');
-    await expect(customerPage.getByRole('heading', { name: /Orders/i })).toBeVisible();
+    await expect(customerPage.getByRole('heading', { name: 'Orders', level: 1 })).toBeVisible();
 
     const details = customerPage.getByRole('link', { name: /Order Details/i });
     if ((await details.count()) > 0) {
