@@ -1,12 +1,10 @@
 import Link from 'next/link';
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
-import { MarketingBreadcrumbs } from '@/components/marketing-breadcrumbs';
 import { MarketingSplitSection } from '@/components/marketing-sections';
 import { getPublicPage } from '@/lib/content/registry';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
-import { getBreadcrumbs } from '@/lib/public-ia';
 import { webRegisterWithNext } from '@/lib/site';
 
 const page = getPublicPage('/solutions/bulk');
@@ -22,11 +20,11 @@ export const metadata = buildPageMetadata({
 export default function BulkSolutionsPage() {
   return (
     <MarketingShell
+      pagePath="/solutions/bulk"
       ctaTitle="Start your bulk order"
       ctaBody="Create an account to design, price, and manage event merchandise in one workshop."
       ctaHref={webRegisterWithNext('/solutions/bulk')}
     >
-      <MarketingBreadcrumbs items={getBreadcrumbs('/solutions/bulk')} />
       <MarketingHero
         imageSrc={marketingAssets.homeOrders}
         imageAlt="Rows of custom event apparel prepared for bulk fulfilment"

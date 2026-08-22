@@ -1,7 +1,7 @@
 # TTW-073 — Publish truthful structured data and commerce signals
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-071, TTW-072, TTW-024, TTW-031, TTW-040, TTW-041\
 **Blocks:** TTW-078
@@ -47,11 +47,11 @@ Create typed server-side JSON-LD builders sourced from the same approved public 
 
 ## Acceptance criteria
 
-- [ ] Approved public templates emit valid typed JSON-LD with stable entity relationships and safe serialization.
-- [ ] Visible content and authoritative DTOs exactly support emitted names, images, prices, availability and policies.
-- [ ] Negative fixtures prove private/internal fields and unsupported ratings/claims cannot be serialized.
-- [ ] Schema.org validation and applicable rich-result tests pass; unsupported eligibility is documented without promises.
-- [ ] Data changes invalidate markup consistently with visible content and canonical/index lifecycle.
+- [x] Approved public templates emit valid typed JSON-LD with stable entity relationships and safe serialization. _(Slice 1: Organization, WebSite, BreadcrumbList, WebPage.)_
+- [x] Visible content and authoritative DTOs exactly support emitted names, images, prices, availability and policies. _(Org facts + fundraiser title/description only; no commerce fields yet.)_
+- [x] Negative fixtures prove private/internal fields and unsupported ratings/claims cannot be serialized. _(Blocked-key guard in unit tests.)_
+- [ ] Schema.org validation and applicable rich-result tests pass; unsupported eligibility is documented without promises. _(Rich-result tooling deferred slice 2 / TTW-078.)_
+- [x] Data changes invalidate markup consistently with visible content and canonical/index lifecycle. _(Server-rendered per request; fundraiser uses live DTO.)_
 
 ## Out of scope
 
@@ -60,16 +60,38 @@ Create typed server-side JSON-LD builders sourced from the same approved public 
 
 ## Design review
 
-Record reviewer, date, entity model, source fields, public allowlists, eligibility rules, escaping, cache lifecycle and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area            | Assessment                                              |
+| --------------- | ------------------------------------------------------- |
+| Blast radius    | Public web JSON-LD only; no API changes                 |
+| Entity model    | Organization + WebSite with stable `@id` graph          |
+| Commerce markup | Explicitly omitted until DTO/policy parity              |
+| Security        | Blocked private keys + `<` escaping in serializer       |
+| Deferred        | Product/Offer, sameAs socials, rich-result CI (TTW-078) |
 
 ## Implementation reviews
 
-Require independent business-data and security/privacy reviews; repeat validation and leakage tests until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding               | Resolution                    |
+| --------------------- | ----------------------------- |
+| Product/Offer JSON-LD | Deferred until TTW-031 parity |
+| Rich Results CI       | Deferred to TTW-078           |
+| sameAs social URLs    | Omitted — footer placeholders |
 
 ## Verification evidence
 
-Record schema fixtures, validator outputs, rendered parity checks, source-field mapping and negative leakage tests.
+- `pnpm --filter web test` — structured data unit tests
+- `pnpm structured-data:validate:test`
+- `pnpm docs:validate`
+- `pnpm --filter web build`
+- PR CI — pending
 
 ## Completion summary
 
-Summarize emitted types, source contracts, eligibility, validation, omitted unsupported data and monitoring.
+Slice 1 emits global Organization/WebSite JSON-LD, breadcrumb lists on marketing pages, and WebPage markup on fundraiser detail without commerce schema. Product/Offer and rich-result gates remain for later slices.

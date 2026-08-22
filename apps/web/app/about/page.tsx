@@ -1,11 +1,9 @@
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
-import { MarketingBreadcrumbs } from '@/components/marketing-breadcrumbs';
 import { EditorialSection, StatsStrip } from '@/components/marketing-sections';
 import { aboutEditorialSections, aboutStats } from '@/lib/content/registry';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
-import { getBreadcrumbs } from '@/lib/public-ia';
 
 export const metadata = buildPageMetadata({
   title: 'About Tamiym Workshop',
@@ -16,8 +14,7 @@ export const metadata = buildPageMetadata({
 
 export default function AboutPage() {
   return (
-    <MarketingShell>
-      <MarketingBreadcrumbs items={getBreadcrumbs('/about')} />
+    <MarketingShell pagePath="/about">
       <MarketingHero
         imageSrc={marketingAssets.aboutHero}
         imageAlt="Bulk apparel billboard showcasing product categories"

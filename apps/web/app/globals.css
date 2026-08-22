@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "@tamiym/config/theme.css";
-@import "@tamiym/config/shadcn.css";
+@import 'tailwindcss';
+@import '@tamiym/config/theme.css';
+@import '@tamiym/config/shadcn.css';
 
 /* Tailwind v4 doesn't follow pnpm-symlinked workspace packages by default. */
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
