@@ -6,6 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "generate:enums": "tsx scripts/generate-enums.ts",
+    "generate:openapi": "tsx scripts/generate-openapi-types.ts",
     "prebuild": "pnpm generate:enums",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -17,6 +18,7 @@
     "@tamiym/config": "workspace:*",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
+    "openapi-typescript": "^7.10.1",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"

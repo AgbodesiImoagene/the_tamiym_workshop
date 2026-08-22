@@ -406,3 +406,22 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Production build
         run: pnpm build
+
+  openapi:
+    name: OpenAPI Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
+      - name: Check OpenAPI contract drift
+        run: pnpm openapi:check
