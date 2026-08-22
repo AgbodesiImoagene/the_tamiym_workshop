@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { MarketingShell } from '@/components/marketing-shell';
+import { noIndexMetadata } from '@/lib/metadata';
 import { webRegisterWithNext } from '@/lib/site';
+
+export const metadata: Metadata = noIndexMetadata('Page not found', '/404');
 
 export default function NotFound() {
   return (

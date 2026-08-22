@@ -3115,6 +3115,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/fundraisers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List indexable public fundraiser slugs
+         * @description Returns ACTIVE, in-window campaign slugs for sitemap generation. Does not expose private campaign fields.
+         */
+        get: operations["PublicFundraisersController_listIndexable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/fundraisers/{slug}": {
         parameters: {
             query?: never;
@@ -4518,6 +4538,20 @@ export interface components {
             story?: Record<string, never> | null;
             /** @example School Fundraiser */
             title: string;
+        };
+        PublicFundraiserSitemapItemDto: {
+            /** @example school-fundraiser */
+            slug: string;
+            /** @example 2026-08-22T12:00:00.000Z */
+            updatedAt: string;
+        };
+        PublicFundraiserSitemapResponseDto: {
+            items: {
+                /** @example school-fundraiser */
+                slug: string;
+                /** @example 2026-08-22T12:00:00.000Z */
+                updatedAt: string;
+            }[];
         };
         QuoteItemDto: {
             /** @example campaign-1 */
@@ -13735,6 +13769,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PublicFundraisersController_listIndexable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Indexable fundraiser slugs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** @example school-fundraiser */
+                            slug: string;
+                            /** @example 2026-08-22T12:00:00.000Z */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
             };
         };
     };

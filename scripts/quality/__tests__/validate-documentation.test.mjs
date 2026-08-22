@@ -24,8 +24,16 @@ function createFixture() {
   const root = mkdtempSync(join(tmpdir(), 'ttw-docs-validate-'));
   const docsRoot = join(root, 'docs');
   const ticketsDir = join(docsRoot, 'tickets');
+  const discoveryDir = join(docsRoot, 'discovery');
+  const webAppDir = join(root, 'apps', 'web', 'app');
+  const webLibDir = join(root, 'apps', 'web', 'lib');
 
   mkdirSync(ticketsDir, { recursive: true });
+  mkdirSync(discoveryDir, { recursive: true });
+  mkdirSync(join(webAppDir, 'auth'), { recursive: true });
+  mkdirSync(join(webAppDir, 'orders'), { recursive: true });
+  mkdirSync(webLibDir, { recursive: true });
+
   writeFileSync(join(docsRoot, 'valid.md'), 'See [ticket](tickets/ttw-001.md).\n');
   writeFileSync(join(docsRoot, 'broken.md'), 'See [missing](missing.md).\n');
   writeFileSync(join(ticketsDir, 'ttw-001.md'), '# TTW-001\n');
@@ -41,6 +49,33 @@ function createFixture() {
     ].join('\n')
   );
   writeFileSync(join(ticketsDir, 'ttw-002.md'), '# TTW-002\n');
+  writeFileSync(
+    join(discoveryDir, 'ttw-070-organic-discovery-brief.md'),
+    [
+      '---',
+      'brief_version: discovery-strategy/v1',
+      'status: approved',
+      'document_date: 2026-08-22',
+      'ticket: TTW-070',
+      'markets_primary: Nigeria',
+      'languages_primary: en-NG',
+      'review_cadence: quarterly',
+      '---',
+      '# Brief',
+      '',
+    ].join('\n')
+  );
+  writeFileSync(join(discoveryDir, 'ttw-071-interim-policy.md'), '# TTW-071 interim policy\n');
+  for (const rel of [
+    'apps/web/app/robots.ts',
+    'apps/web/app/sitemap.ts',
+    'apps/web/lib/metadata.ts',
+    'apps/web/lib/site.ts',
+    'apps/web/app/auth/layout.tsx',
+    'apps/web/app/orders/layout.tsx',
+  ]) {
+    writeFileSync(join(root, rel), 'export {};\n');
+  }
 
   return root;
 }
@@ -108,7 +143,7 @@ test('validateDocumentation aggregates all documentation failures', () => {
   try {
     const result = validateDocumentation({ repoRoot: root });
     assert.equal(result.ok, false);
-    assert.equal(result.errors.length, 4);
+    assert.equal(result.errors.length, 3);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

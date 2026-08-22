@@ -4,11 +4,15 @@ import { CampaignsService } from './campaigns.service';
 
 describe('PublicFundraisersController', () => {
   let controller: PublicFundraisersController;
-  let campaignsService: { getBySlug: jest.Mock };
+  let campaignsService: {
+    getBySlug: jest.Mock;
+    listPublicIndexableSlugs: jest.Mock;
+  };
 
   beforeEach(async () => {
     campaignsService = {
       getBySlug: jest.fn(),
+      listPublicIndexableSlugs: jest.fn(),
     };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PublicFundraisersController],
@@ -33,5 +37,15 @@ describe('PublicFundraisersController', () => {
     expect(campaignsService.getBySlug).toHaveBeenCalledWith(
       'school-fundraiser',
     );
+  });
+
+  it('delegates listIndexable to CampaignsService', async () => {
+    const items = [
+      { slug: 'school-fundraiser', updatedAt: '2026-08-22T00:00:00.000Z' },
+    ];
+    campaignsService.listPublicIndexableSlugs.mockResolvedValue(items);
+
+    await expect(controller.listIndexable()).resolves.toEqual({ items });
+    expect(campaignsService.listPublicIndexableSlugs).toHaveBeenCalled();
   });
 });

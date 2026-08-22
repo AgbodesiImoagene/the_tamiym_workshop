@@ -1,16 +1,8 @@
-import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster, TooltipProvider } from '@tamiym/ui';
+import { rootMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Tamiym Workshop',
-  description:
-    'Tamiym Workshop helps teams, communities, and organizers launch branded merchandise and fundraising campaigns.',
-  icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-  },
-};
+export const metadata = rootMetadata();
 
 export default function RootLayout({
   children,
@@ -18,7 +10,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en-NG">
       <body className="min-h-screen bg-background text-foreground antialiased">
         <TooltipProvider>
           {children}

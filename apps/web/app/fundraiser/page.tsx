@@ -1,8 +1,16 @@
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
 import { marketingAssets } from '@/lib/assets';
+import { buildPageMetadata } from '@/lib/metadata';
 import { webRegisterWithNext } from '@/lib/site';
 import Image from 'next/image';
+
+export const metadata = buildPageMetadata({
+  title: 'Fundraise with custom merchandise',
+  description:
+    'Launch a Nigeria-first merch fundraiser with custom designs, supporter checkout, and organiser tools on Tamiym Workshop.',
+  path: '/fundraiser',
+});
 
 export default function FundraiserPage() {
   return (

@@ -2,6 +2,14 @@ import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
 import { EditorialSection, StatsStrip } from '@/components/marketing-sections';
 import { marketingAssets } from '@/lib/assets';
+import { buildPageMetadata } from '@/lib/metadata';
+
+export const metadata = buildPageMetadata({
+  title: 'About Tamiym Workshop',
+  description:
+    'Learn how Tamiym Workshop helps Nigerian event organisers, teams, and communities create quality custom merchandise and fundraising campaigns.',
+  path: '/about',
+});
 
 export default function AboutPage() {
   return (
