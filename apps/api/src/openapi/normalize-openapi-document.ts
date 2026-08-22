@@ -29,7 +29,8 @@ export function repairSecuritySchemes(document: OpenAPIObject): OpenAPIObject {
       continue;
     }
 
-    const schemeIn = String(scheme.in ?? '').toLowerCase();
+    const schemeIn =
+      typeof scheme.in === 'string' ? scheme.in.toLowerCase() : '';
     if (scheme.type === 'http' && schemeIn === 'cookie') {
       schemes[key] = {
         type: 'apiKey',
