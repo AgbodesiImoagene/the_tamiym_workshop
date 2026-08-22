@@ -96,8 +96,8 @@ See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 | Ticket                                                       | Priority | Risk     | State       | Outcome                                                                  |
 | ------------------------------------------------------------ | -------- | -------- | ----------- | ------------------------------------------------------------------------ |
 | [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Complete    | Organic discovery strategy brief published (slice 1)                     |
-| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | In progress | Crawl/index/canonical/robots/sitemap foundations (slice 1)               |
-| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Scoped      | Build governed public information architecture and content system        |
+| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete    | Crawl/index/canonical/robots/sitemap foundations (slice 1)               |
+| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | In progress | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)             |
 | [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Scoped      | Publish truthful entity, content and commerce structured data            |
 | [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Scoped      | Publish useful, evidence-backed answer-ready content                     |
 | [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Scoped      | Govern AI crawlers, content rights and generative discovery              |

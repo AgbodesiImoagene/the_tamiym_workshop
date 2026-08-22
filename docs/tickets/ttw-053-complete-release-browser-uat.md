@@ -139,12 +139,12 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 - `git diff --check` — clean
 - PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge (#60)
 
-### Slice 2 (PR #63)
+### Slice 2 (PR #63 + fixes #65–#68)
 
 - `pnpm playwright:validate` / `playwright:validate:test` — pass (local)
 - `pnpm typecheck` / `pnpm lint` — pass (local)
 - PR CI run `32584895866` — all 16 checks pass including Playwright Smoke
-- Comprehensive suite — 111 tests listed; nightly workflow ships on merge; first run pending post-merge
+- Comprehensive nightly `32588414778` on `main` — **102/102 pass** (post #65–#68 selector/nav/a11y fixes)
 - Bugbot review — PASS after `615c5fb` responsive nav fix
 
 ## Completion summary

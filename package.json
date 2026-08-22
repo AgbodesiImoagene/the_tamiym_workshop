@@ -23,6 +23,8 @@
     "docs:validate:test": "node --test scripts/quality/__tests__/validate-documentation.test.mjs",
     "playwright:validate": "node scripts/quality/validate-playwright-manifest.mjs",
     "playwright:validate:test": "node --test scripts/quality/__tests__/validate-playwright-manifest.test.mjs",
+    "public-ia:validate": "node scripts/quality/validate-public-ia.mjs",
+    "public-ia:validate:test": "node --test scripts/quality/__tests__/validate-public-ia.test.mjs",
     "release:preflight": "node infra/release/scripts/preflight-release.mjs",
     "release:check-migrations": "node infra/release/scripts/check-migration-artefacts.mjs",
     "release:verify-migrations": "node infra/release/scripts/verify-migration-baseline.mjs",

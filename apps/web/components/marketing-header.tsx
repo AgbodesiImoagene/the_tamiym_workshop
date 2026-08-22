@@ -3,14 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { marketingAssets } from '@/lib/assets';
-import { customerAppPath, webLoginWithNext, webRegisterWithNext } from '@/lib/site';
+import { webLoginWithNext, webRegisterWithNext } from '@/lib/site';
+import { PRIMARY_NAV } from '@/lib/public-ia';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@tamiym/ui';
-
-const navItems = [
-  { label: 'Workshop', href: customerAppPath('/auth/register') },
-  { label: 'Fundraisers', href: '/fundraiser' },
-  { label: 'About', href: '/about' },
-] as const;
 
 export function MarketingHeader() {
   return (
@@ -27,7 +22,7 @@ export function MarketingHeader() {
         </Link>
 
         <nav className="hidden items-center gap-10 lg:flex" aria-label="Primary">
-          {navItems.map((item) => (
+          {PRIMARY_NAV.map((item) => (
             <Link
               key={item.label}
               href={item.href}
@@ -65,7 +60,7 @@ export function MarketingHeader() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1" aria-label="Mobile primary">
-                {navItems.map((item) => (
+                {PRIMARY_NAV.map((item) => (
                   <SheetTrigger key={item.label} asChild>
                     <Link
                       href={item.href}

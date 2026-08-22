@@ -115,7 +115,15 @@ Define an immutable release manifest and operator-controlled deployment checklis
 
 ## Implementation reviews (slice 2)
 
-_Pending independent reviewer after PR._
+**Reviewer:** Independent implementation reviewer (slice 2)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding                         | Resolution                                          |
+| ------------------------------- | --------------------------------------------------- |
+| Staging UAT on exact artefacts  | Deferred — requires owner-gated tmpval environment  |
+| Production deploy / observation | Human-only per interim policy                       |
+| Live PITR backup drill          | CI invariant queries only; live drill `owner_gated` |
 
 ## Verification evidence (slice 2)
 
@@ -123,8 +131,8 @@ _Pending independent reviewer after PR._
 - `pnpm release:rehearse-stop-go` — pass (4 scenarios)
 - `pnpm release:preflight` — pass
 - `pnpm release:check-migrations` — pass (22 migrations)
-- CI `migration-baseline` job — pending PR merge
-- `release-rehearsal` workflow — pending PR merge
+- PR #69 CI — all **17 checks pass** including **Migration Baseline (blank + snapshot)**; merged to `main` (`8ec8609`)
+- `release-rehearsal` workflow — available on `main`; owner-dispatch for full rehearsal evidence
 
 ## Completion summary
 

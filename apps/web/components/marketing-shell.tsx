@@ -2,22 +2,10 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { marketingAssets } from '@/lib/assets';
-import { customerAppPath, webRegisterWithNext } from '@/lib/site';
+import { webRegisterWithNext } from '@/lib/site';
+import { FOOTER_LINK_GROUPS } from '@/lib/public-ia';
 import { MarketingHeader } from '@/components/marketing-header';
 import { MarketingCtaCard } from '@/components/marketing-cta-card';
-
-const footerLinks = {
-  company: [
-    { label: 'About', href: '/about' },
-    { label: 'Fundraisers', href: '/fundraiser' },
-    { label: 'Workshop', href: customerAppPath('/auth/register') },
-    { label: 'Contact Us', href: 'mailto:info@tamiym.org' },
-  ],
-  information: [
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms & Conditions', href: '#' },
-  ],
-};
 
 const socialLinks = [
   { label: 'Instagram', href: '#', icon: marketingAssets.socialInstagram },
@@ -89,7 +77,7 @@ export function MarketingShell({
             <div className="space-y-6">
               <h3 className="text-lg font-bold">Company</h3>
               <div className="space-y-3 text-sm">
-                {footerLinks.company.map((item) => (
+                {FOOTER_LINK_GROUPS.company.map((item) => (
                   <Link key={item.label} href={item.href} className="block">
                     {item.label}
                   </Link>
@@ -100,7 +88,7 @@ export function MarketingShell({
             <div className="space-y-6">
               <h3 className="text-lg font-bold">Information</h3>
               <div className="space-y-3 text-sm">
-                {footerLinks.information.map((item) => (
+                {FOOTER_LINK_GROUPS.information.map((item) => (
                   <Link key={item.label} href={item.href} className="block">
                     {item.label}
                   </Link>

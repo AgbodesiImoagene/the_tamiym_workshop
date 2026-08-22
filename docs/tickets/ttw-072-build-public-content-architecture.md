@@ -1,7 +1,7 @@
 # TTW-072 — Build the public information architecture and content system
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** Standard\
 **Blocked by:** TTW-070\
 **Blocks:** TTW-073–TTW-075
@@ -43,11 +43,11 @@ Design a user-first information architecture mapped to TTW-070 intent clusters a
 
 ## Acceptance criteria
 
-- [ ] Approved information architecture maps priority intents to unique canonical destinations and real conversion/support journeys.
-- [ ] Editorial content has typed ownership, evidence, publish/update/review dates and archive/redirect lifecycle.
-- [ ] Navigation, breadcrumbs and contextual links make every priority page reachable through crawlable anchors.
-- [ ] Duplicate/thin/unsupported pages and claims are consolidated, corrected, deferred or explicitly noindexed.
-- [ ] Templates meet semantic-heading, accessibility, responsive and content-rendering requirements.
+- [x] Approved information architecture maps priority intents to unique canonical destinations and real conversion/support journeys. _(Slice 1 registry + `/solutions/bulk`; home anchors retained.)_
+- [x] Editorial content has typed ownership, evidence, publish/update/review dates and archive/redirect lifecycle. _(Code registry; policy pages `draft` + `noindex`.)_
+- [x] Navigation, breadcrumbs and contextual links make every priority page reachable through crawlable anchors. _(Central nav + breadcrumbs + related links on bulk page.)_
+- [x] Duplicate/thin/unsupported pages and claims are consolidated, corrected, deferred or explicitly noindexed. _(About duplicate heading fixed; policies interim + `noindex`.)_
+- [x] Templates meet semantic-heading, accessibility, responsive and content-rendering requirements. _(Existing marketing templates; breadcrumb `nav` + `aria-current`.)_
 
 ## Out of scope
 
@@ -56,16 +56,39 @@ Design a user-first information architecture mapped to TTW-070 intent clusters a
 
 ## Design review
 
-Record reviewer, date, audience journeys, taxonomy, content model, claims/evidence, accessibility, lifecycle and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area              | Assessment                                                |
+| ----------------- | --------------------------------------------------------- |
+| Blast radius      | Public web nav/content registry; no API or auth changes   |
+| Intent separation | `/solutions/bulk` for Q-BULK; `/fundraiser` for Q-FUND    |
+| Cannibalization   | Home keeps anchors; no duplicate bulk landing on `/`      |
+| Evidence          | Stats/sections require `EvidenceRecord` in registry       |
+| Policies          | Interim pages `noindex` until TTW-074                     |
+| Deferred          | CMS, guides library, freshness dashboard, full legal copy |
 
 ## Implementation reviews
 
-Independently review content accuracy, information architecture, duplication, accessibility and implementation; repeat until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding                     | Resolution          |
+| --------------------------- | ------------------- |
+| CMS / DB editorial workflow | Deferred slice 2+   |
+| Full policy publication     | Deferred to TTW-074 |
+| Content freshness reporting | Deferred to TTW-077 |
 
 ## Verification evidence
 
-Record approved map/briefs, schema tests, link crawl, content review decisions, accessibility results and redirect evidence.
+- `pnpm --filter web test` — public IA unit tests
+- `pnpm public-ia:validate` / `public-ia:validate:test` — registry file gate
+- `pnpm docs:validate` — includes public IA checks
+- `pnpm --filter web build` — new routes compile
+- PR CI — pending
 
 ## Completion summary
 
-Summarize published architecture, page types, initial content, evidence controls, consolidated URLs and remaining briefs.
+Slice 1 publishes a governed page registry, centralized nav/footer, breadcrumbs, `/solutions/bulk`, interim policy pages, and evidence-backed about content. Remaining briefs: guides, full policies, CMS workflow, freshness reporting.

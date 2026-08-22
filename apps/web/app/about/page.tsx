@@ -1,8 +1,11 @@
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
+import { MarketingBreadcrumbs } from '@/components/marketing-breadcrumbs';
 import { EditorialSection, StatsStrip } from '@/components/marketing-sections';
+import { aboutEditorialSections, aboutStats } from '@/lib/content/registry';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
+import { getBreadcrumbs } from '@/lib/public-ia';
 
 export const metadata = buildPageMetadata({
   title: 'About Tamiym Workshop',
@@ -14,6 +17,7 @@ export const metadata = buildPageMetadata({
 export default function AboutPage() {
   return (
     <MarketingShell>
+      <MarketingBreadcrumbs items={getBreadcrumbs('/about')} />
       <MarketingHero
         imageSrc={marketingAssets.aboutHero}
         imageAlt="Bulk apparel billboard showcasing product categories"
@@ -48,75 +52,25 @@ export default function AboutPage() {
       </section>
 
       <StatsStrip
-        items={[
-          { value: '6+', label: 'Years of experience' },
-          { value: '100+', label: 'Campaigns supported' },
-          { value: '5000+', label: 'Products delivered' },
-        ]}
+        items={aboutStats.map((stat) => ({
+          value: stat.value,
+          label: stat.label,
+          evidenceOwner: stat.evidence.owner,
+        }))}
       />
 
       <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-        <EditorialSection
-          title="Quality you can trust"
-          imageUrl={marketingAssets.aboutTrust}
-          imageAlt="Team members reviewing event apparel"
-          body={[
-            'We take pride in delivering premium printing solutions that exceed expectations. Every product goes through rigorous quality checks to ensure your satisfaction.',
-            'We guarantee:',
-          ]}
-          bullets={[
-            'Consistent print quality',
-            'Precise and durable designs',
-            'A dedicated team ready to resolve any concerns promptly',
-          ]}
-        />
-
-        <EditorialSection
-          title="Bulk Savings, Maximum Value"
-          imageUrl={marketingAssets.aboutSavings}
-          imageAlt="Printed apparel detail close-up"
-          body={[
-            'We understand that every event has a budget. That is why we offer competitive pricing on bulk orders, ensuring you get the most value for your investment.',
-            'With us, you can expect:',
-          ]}
-          bullets={[
-            'Affordable rates for large-scale orders',
-            'Cost-effective solutions tailored to your needs',
-            'A partner that helps you make every naira count',
-          ]}
-          reverse
-        />
-
-        <EditorialSection
-          title="Tailored Solutions for Every Occasion"
-          imageUrl={marketingAssets.aboutSavings}
-          imageAlt="Premium garment detail showing quality finish"
-          body={[
-            'From weddings to corporate events and religious gatherings, we provide a wide selection of customizable products to suit your unique vision.',
-            'With us, you will find:',
-          ]}
-          bullets={[
-            'A diverse catalog of apparel and merchandise options',
-            'Custom designs for specific events and themes',
-            'Flexible production to fit your event timeline',
-          ]}
-        />
-
-        <EditorialSection
-          title="Tailored Solutions for Every Occasion"
-          imageUrl={marketingAssets.aboutOccasions}
-          imageAlt="Team session showing collaborative event planning"
-          body={[
-            'We know your event is unlike any other. That is why we prioritize flexibility, reliability, and value every step of the way.',
-            'You can count on:',
-          ]}
-          bullets={[
-            'Efficient production timelines',
-            'On-time delivery for every event',
-            'A committed team keeping your plans on track',
-          ]}
-          reverse
-        />
+        {aboutEditorialSections.map((section) => (
+          <EditorialSection
+            key={section.title}
+            title={section.title}
+            imageUrl={section.imageUrl}
+            imageAlt={section.imageAlt}
+            body={section.body}
+            bullets={section.bullets}
+            reverse={section.reverse}
+          />
+        ))}
       </section>
     </MarketingShell>
   );

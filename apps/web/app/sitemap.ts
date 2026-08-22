@@ -1,11 +1,10 @@
 import type { MetadataRoute } from 'next';
 import { listPublicFundraiserSlugs } from '@/lib/fundraisers';
+import { listIndexableStaticPaths } from '@/lib/content/registry';
 import { absoluteWebUrl } from '@/lib/site';
 
-const STATIC_PATHS = ['/', '/about', '/fundraiser'] as const;
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticEntries: MetadataRoute.Sitemap = STATIC_PATHS.map((path) => ({
+  const staticEntries: MetadataRoute.Sitemap = listIndexableStaticPaths().map((path) => ({
     url: absoluteWebUrl(path),
     changeFrequency: path === '/' ? 'weekly' : 'monthly',
     priority: path === '/' ? 1 : 0.8,
