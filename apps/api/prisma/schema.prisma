@@ -307,6 +307,49 @@ enum NotificationStatus {
   FAILED
 }
 
+/// TTW-043: consent / preference taxonomy category.
+enum NotificationCategory {
+  SECURITY
+  TRANSACTIONAL
+  ORGANISER_OPERATIONAL
+  MARKETING
+}
+
+/// TTW-043: optional preference channel (mirrors delivery channels customers may control).
+enum NotificationPreferenceChannel {
+  EMAIL
+  SMS
+}
+
+/// TTW-043: why a notification was suppressed instead of queued for delivery.
+enum NotificationSuppressionReason {
+  PREFERENCE_OPT_OUT
+  MISSING_CONSENT
+  TAXONOMY_UNMAPPED
+  RECIPIENT_MISSING
+}
+
+/// TTW-043: auditable consent evidence source.
+enum NotificationConsentSource {
+  REGISTRATION
+  PREFERENCE_SETTINGS
+  UNSUBSCRIBE_LINK
+  ADMIN_OVERRIDE
+}
+
+/// TTW-043: append-only delivery attempt outcome.
+enum NotificationAttemptOutcome {
+  SUCCESS
+  FAILURE
+  RETRY_SCHEDULED
+}
+
+/// TTW-043: operator acknowledgement of a dead-letter row.
+enum DeadLetterAckStatus {
+  OPEN
+  ACKNOWLEDGED
+}
+
 /// Type of admin or system action recorded in the audit log.
 enum AuditAction {
   CREATE
@@ -535,7 +578,10 @@ model User {
   payoutRunsApproved   PayoutRun[]          @relation("PayoutRunApprovedBy")
   auditLogs            AuditLog[]           @relation("ActorAuditLogs")
   payoutProfiles       UserPayoutProfile[]
-  notificationOutboxes NotificationOutbox[]
+  notificationOutboxes           NotificationOutbox[]
+  notificationPreferences        NotificationPreference[]
+  notificationConsents           NotificationConsent[]
+  deadLetterAcknowledgements     NotificationOutbox[] @relation("DeadLetterAcknowledgedBy")
   authTokens           AuthToken[]
   authSessions         AuthSession[]
   oauthAccounts        UserOAuthAccount[]
@@ -2459,19 +2505,96 @@ model NotificationOutbox {
   payload         Json // template variables
   /// Optional exactly-once key (e.g. PaymentConfirmed:{orderId}). Nulls allowed for multi-recipient admin fan-out.
   dedupeKey       String?             @unique
+  /// TTW-043: taxonomy category stamped at enqueue/suppress time.
+  category        NotificationCategory?
+  /// TTW-043: policy version used for the preference/consent decision.
+  policyVersion   String?
+  /// TTW-043: logical effect key (event + recipient scope). Generation disambiguates replay.
+  effectKey       String?
+  generation      Int                 @default(1)
+  suppressed      Boolean             @default(false)
+  suppressionReason NotificationSuppressionReason?
+  suppressionReasonCode String?
+  replayedFromId  String?
+  replayedFrom    NotificationOutbox? @relation("NotificationReplay", fields: [replayedFromId], references: [id], onDelete: SetNull)
+  replays         NotificationOutbox[] @relation("NotificationReplay")
+  deadLetterAckStatus DeadLetterAckStatus?
+  deadLetterAckAt DateTime?
+  deadLetterAckByUserId String?
+  deadLetterAckBy User?               @relation("DeadLetterAcknowledgedBy", fields: [deadLetterAckByUserId], references: [id], onDelete: SetNull)
+  deadLetterAckNote String?
   status          NotificationStatus  @default(PENDING)
   attempts        Int                 @default(0)
   lastError       String?
   scheduledAt     DateTime            @default(now())
   sentAt          DateTime?
 
+  deliveryAttempts NotificationDeliveryAttempt[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([effectKey, channel, generation])
   @@index([createdAt])
   @@index([recipientUserId])
   @@index([status, scheduledAt])
+  @@index([status, deadLetterAckStatus, updatedAt])
+  @@index([effectKey, channel])
   @@map("notification_outbox")
+}
+
+/// TTW-043: per-user optional category/channel preference (required categories ignore opt-out).
+model NotificationPreference {
+  id            String                      @id @default(cuid())
+  userId        String
+  user          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel       NotificationPreferenceChannel
+  category      NotificationCategory
+  enabled       Boolean                     @default(true)
+  policyVersion String
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+
+  @@unique([userId, channel, category])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+/// TTW-043: append-only marketing/optional consent evidence.
+model NotificationConsent {
+  id            String                      @id @default(cuid())
+  userId        String
+  user          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel       NotificationPreferenceChannel
+  category      NotificationCategory
+  granted       Boolean
+  source        NotificationConsentSource
+  policyVersion String
+  metadata      Json?
+  createdAt     DateTime                    @default(now())
+
+  @@index([userId, category, channel, createdAt])
+  @@map("notification_consents")
+}
+
+/// TTW-043: append-only provider attempt evidence per outbox row.
+model NotificationDeliveryAttempt {
+  id                String                   @id @default(cuid())
+  outboxId          String
+  outbox            NotificationOutbox       @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  attemptNumber     Int
+  outcome           NotificationAttemptOutcome
+  providerCode      String?
+  providerMessageId String?
+  errorClass        String?
+  errorMessage      String?
+  durationMs        Int?
+  startedAt         DateTime
+  finishedAt        DateTime
+
+  @@unique([outboxId, attemptNumber])
+  @@index([outboxId, startedAt])
+  @@map("notification_delivery_attempts")
 }
 
 /// Immutable audit record of an action on an entity (e.g. order status change, design approval).

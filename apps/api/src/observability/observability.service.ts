@@ -139,6 +139,39 @@ export class ObservabilityService {
     },
   );
 
+  private readonly notificationDispatch = this.meter.createCounter(
+    'notification_dispatch_total',
+    {
+      description:
+        'Notification policy dispatch outcomes grouped by category, channel, and outcome.',
+    },
+  );
+
+  private readonly notificationDeliveryAttempts = this.meter.createCounter(
+    'notification_delivery_attempt_total',
+    {
+      description:
+        'Notification delivery attempts grouped by category, channel, and outcome.',
+    },
+  );
+
+  private readonly notificationDeadLetterReplays = this.meter.createCounter(
+    'notification_dead_letter_replay_total',
+    {
+      description: 'Dead-letter replay attempts grouped by outcome.',
+    },
+  );
+
+  private readonly notificationQueueOldestPendingAge =
+    this.meter.createHistogram(
+      'notification_queue_oldest_pending_age_seconds',
+      {
+        description:
+          'Age in seconds of the oldest pending notification outbox row.',
+        unit: 's',
+      },
+    );
+
   getCurrentTraceId(): string | undefined {
     return trace.getActiveSpan()?.spanContext().traceId;
   }
@@ -278,5 +311,39 @@ export class ObservabilityService {
 
   recordMediaFetchDenied(metric: { reason: string }): void {
     this.mediaFetchDenied.add(1, { reason: metric.reason });
+  }
+
+  recordNotificationDispatch(metric: {
+    category?: string;
+    channel: string;
+    outcome: 'queued' | 'suppressed' | 'duplicate';
+  }): void {
+    this.notificationDispatch.add(1, {
+      category: metric.category ?? 'unknown',
+      channel: metric.channel,
+      outcome: metric.outcome,
+    });
+  }
+
+  recordNotificationDeliveryAttempt(metric: {
+    category?: string;
+    channel: string;
+    outcome: 'success' | 'failure' | 'retry';
+  }): void {
+    this.notificationDeliveryAttempts.add(1, {
+      category: metric.category ?? 'unknown',
+      channel: metric.channel,
+      outcome: metric.outcome,
+    });
+  }
+
+  recordNotificationDeadLetterReplay(metric: {
+    outcome: 'success' | 'denied' | 'failure';
+  }): void {
+    this.notificationDeadLetterReplays.add(1, { outcome: metric.outcome });
+  }
+
+  recordNotificationQueueOldestPendingAge(ageSeconds: number): void {
+    this.notificationQueueOldestPendingAge.record(ageSeconds);
   }
 }

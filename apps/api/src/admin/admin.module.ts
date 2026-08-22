@@ -40,6 +40,8 @@ import { ModerationModule } from '../moderation/moderation.module';
 import { OrganizerModule } from '../organizer/organizer.module';
 import { ShipmentsModule } from '../shipments/shipments.module';
 import { AdminShipmentsController } from './admin-shipments.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminNotificationDeadLettersController } from './admin-notification-dead-letters.controller';
 
 @Module({
   imports: [
@@ -61,6 +63,7 @@ import { AdminShipmentsController } from './admin-shipments.controller';
     ModerationModule,
     OrganizerModule,
     ShipmentsModule,
+    NotificationsModule,
   ],
   providers: [AdminEmailBroadcastService, AdminUsersService],
   controllers: [
@@ -83,6 +86,7 @@ import { AdminShipmentsController } from './admin-shipments.controller';
     AdminDiscountsController,
     AdminBulkPricingController,
     AdminNotificationsController,
+    AdminNotificationDeadLettersController,
     AdminReconciliationController,
     AdminUsersController,
   ],

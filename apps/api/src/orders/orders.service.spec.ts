@@ -513,7 +513,7 @@ describe('OrdersService', () => {
       totalAmount: 12500,
       createdAt: new Date('2026-08-21T00:00:00.000Z'),
       updatedAt: new Date('2026-08-21T00:00:00.000Z'),
-      expiresAt: new Date('2026-08-22T00:00:00.000Z'),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       cancelledAt: null,
       paymentReference: null,
       shipRecipientName: 'John',

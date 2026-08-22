@@ -19,6 +19,7 @@ import {
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { CampaignReadinessService } from './campaign-readiness.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import {
   CAMPAIGN_READINESS_POLICY_VERSION,
   CampaignReadinessPhase,
@@ -92,6 +93,7 @@ describe('CampaignsService', () => {
   let adminNotifyService: jest.Mocked<AdminNotifyService>;
   let readinessService: { evaluate: jest.Mock };
   let outboxDelivery: { enqueueDelivery: jest.Mock };
+  let notificationDispatch: { dispatch: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma: Record<string, unknown> = {};
@@ -156,6 +158,13 @@ describe('CampaignsService', () => {
     outboxDelivery = {
       enqueueDelivery: jest.fn().mockResolvedValue(undefined),
     };
+    notificationDispatch = {
+      dispatch: jest.fn().mockResolvedValue({
+        outboxId: 'outbox-1',
+        queued: true,
+        suppressed: false,
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -176,6 +185,10 @@ describe('CampaignsService', () => {
         {
           provide: NotificationOutboxDeliveryService,
           useValue: outboxDelivery,
+        },
+        {
+          provide: NotificationDispatchService,
+          useValue: notificationDispatch,
         },
       ],
     }).compile();
@@ -529,7 +542,7 @@ describe('CampaignsService', () => {
           }),
         }),
       );
-      expect(prisma.notificationOutbox.create).toHaveBeenCalled();
+      expect(notificationDispatch.dispatch).toHaveBeenCalled();
       expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
     });
 
@@ -617,7 +630,7 @@ describe('CampaignsService', () => {
           }),
         }),
       );
-      expect(prisma.notificationOutbox.create).toHaveBeenCalled();
+      expect(notificationDispatch.dispatch).toHaveBeenCalled();
       expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
       expect(result.status).toBe(CampaignStatus.ACTIVE);
     });
@@ -638,7 +651,7 @@ describe('CampaignsService', () => {
       await expect(
         service.activateForAdmin('camp-1', 'admin-1'),
       ).rejects.toThrow(BadRequestException);
-      expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+      expect(notificationDispatch.dispatch).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when readiness blocks activation', async () => {
@@ -735,18 +748,15 @@ describe('CampaignsService', () => {
           }),
         }),
       );
-      expect(prisma.notificationOutbox.create).toHaveBeenCalledWith(
+      expect(notificationDispatch.dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            payload: expect.objectContaining({
-              customerVisibleReason: 'Please clarify the fundraising story',
-            }),
+          payload: expect.objectContaining({
+            customerVisibleReason: 'Please clarify the fundraising story',
           }),
         }),
       );
-      const outboxCall = (prisma.notificationOutbox.create as jest.Mock).mock
-        .calls[0][0];
-      expect(JSON.stringify(outboxCall.data.payload)).not.toMatch(
+      const outboxCall = notificationDispatch.dispatch.mock.calls[0][0];
+      expect(JSON.stringify(outboxCall.payload)).not.toMatch(
         /internal note|moderationNotes|"notes"/i,
       );
       expect(outboxDelivery.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
@@ -761,7 +771,7 @@ describe('CampaignsService', () => {
       await expect(
         service.rejectForAdmin('camp-1', 'Too late', undefined, 'admin-1'),
       ).rejects.toThrow(BadRequestException);
-      expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+      expect(notificationDispatch.dispatch).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when campaign is not in REVIEW', async () => {
