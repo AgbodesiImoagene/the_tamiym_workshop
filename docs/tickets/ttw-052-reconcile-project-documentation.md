@@ -1,7 +1,7 @@
 # TTW-052 — Reconcile project documentation with verified reality
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 1)
+**Status:** Complete (slice 1)
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** TTW-054
