@@ -44,12 +44,14 @@ describeViewportMatrix('Admin moderation workspaces @comprehensive @admin', () =
   test('design moderation quick actions are present on rows', async ({ adminPage }) => {
     await adminPage.goto('/admin/moderation/designs');
     await expect(adminPage.getByRole('heading', { name: /Design moderation/i })).toBeVisible();
+    // Default filter is Pending — tab label may include a count badge (e.g. "Pending 1").
+    await expect(adminPage.getByRole('tab', { name: /^Pending\b/i })).toBeVisible();
 
-    for (const tab of ['All', 'Pending', 'Flagged', 'Approved', 'Rejected']) {
-      const tabControl = adminPage.getByRole('tab', { name: tab, exact: true });
+    for (const tab of ['All', 'Flagged', 'Approved', 'Rejected']) {
+      const tabControl = adminPage.getByRole('tab', { name: new RegExp(`^${tab}\\b`, 'i') });
       if (await tabControl.isVisible()) {
         await tabControl.scrollIntoViewIfNeeded();
-        await tabControl.click({ force: true });
+        await tabControl.click();
       }
     }
 
