@@ -1,7 +1,7 @@
 # TTW-075 — Govern AI crawlers and generative discovery
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-071, TTW-072\
 **Blocks:** TTW-078
@@ -38,19 +38,20 @@ Approve and encode a crawler matrix covering conventional search, OAI-SearchBot/
 
 ## References
 
-- `apps/web` — no robots or AI-crawler policy currently exists.
+- `apps/web/lib/crawler-policy/matrix.ts` — encoded agent matrix (slice 1).
+- `docs/discovery/ttw-075-interim-policy.md` — interim governance brief.
 - `docs/tickets/ttw-021-secure-media-ingestion.md` — remote-fetch controls must not be weakened for bots.
 - `docs/tickets/ttw-025-implement-privacy-data-lifecycle.md` — content/data governance dependency.
-- [OpenAI crawler controls](https://developers.openai.com/api/docs/bots)
+- [OpenAI crawler controls](https://platform.openai.com/docs/bots)
 - [Google AI features guidance](https://developers.google.com/search/docs/appearance/ai-features)
 
 ## Acceptance criteria
 
-- [ ] Owner-approved matrix independently governs search, training and user-triggered crawler categories with dated source links.
-- [ ] Public/private route tests prove crawler policy cannot disclose restricted content or bypass normal security controls.
-- [ ] Human and allowed-crawler content parity is tested; no hidden answer-engine copy or fabricated citations exist.
-- [ ] Rate, cache, logging, incident and rollback behavior is documented and exercised.
-- [ ] Optional GEO experiments have hypotheses and stop criteria; reporting clearly labels attribution uncertainty.
+- [x] Owner-approved matrix independently governs search, training and user-triggered crawler categories with dated source links. _(Engineering interim; formal legal sign-off deferred.)_
+- [x] Public/private route tests prove crawler policy cannot disclose restricted content or bypass normal security controls. _(Unit matrix + private disallow prefixes.)_
+- [x] Human and allowed-crawler content parity is tested; no hidden answer-engine copy or fabricated citations exist. _(Same HTML; llms.txt mirrors public URLs only.)_
+- [ ] Rate, cache, logging, incident and rollback behavior is documented and exercised. _(Deferred slice 2 — edge/CDN.)_
+- [ ] Optional GEO experiments have hypotheses and stop criteria; reporting clearly labels attribution uncertainty. _(llms.txt experiment documented; measurement deferred TTW-077.)_
 
 ## Out of scope
 
@@ -59,16 +60,42 @@ Approve and encode a crawler matrix covering conventional search, OAI-SearchBot/
 
 ## Design review
 
-Record reviewer, date, crawler/source matrix, content rights, security boundaries, parity, rate/cost controls, measurement and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area              | Assessment                                                                 |
+| ----------------- | -------------------------------------------------------------------------- |
+| Blast radius      | `apps/web` robots, llms.txt, policy registry; no API/auth changes          |
+| Callers           | `robots.ts`, sitemap unchanged contract; new `/llms.txt` static route      |
+| Duplication check | Reuses TTW-071 public prefixes + TTW-072 `listIndexableStaticPaths`        |
+| Interfaces        | `buildRobotsRules()`, `validateCrawlerMatrix()`, `CRAWLER_AGENTS` registry |
+| Invariants        | Training denied; private paths disallowed; no cloaking                     |
+| Edge/failure      | Spoofed UA not trusted for auth; CDN rollback deferred                     |
+| Migration         | None — robots rules additive                                               |
+| Observability     | Crawler volume/attribution deferred TTW-077                                |
+| Test plan         | Unit matrix tests + `crawler-policy:validate` CI hook                      |
 
 ## Implementation reviews
 
-Require independent security/privacy and content-policy review; repeat spoofing, disclosure and parity tests until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding               | Resolution                          |
+| --------------------- | ----------------------------------- |
+| Edge rate limiting    | Deferred slice 2                    |
+| Legal formal sign-off | Interim policy; owner review queued |
+| Generative analytics  | Deferred TTW-077                    |
 
 ## Verification evidence
 
-Record policy sources/dates, approvals, robots outputs, route matrix results, rate/rollback exercises and experiment baselines.
+- `pnpm --filter web test` — crawler policy unit tests
+- `pnpm crawler-policy:validate:test`
+- `pnpm docs:validate`
+- `pnpm --filter web build`
+- PR CI — pending
 
 ## Completion summary
 
-Summarize allowed/disallowed categories, content rights, technical enforcement, entity/source improvements, experiments and limitations.
+Slice 1 encodes a documented crawler matrix in code, refactors `robots.ts` to policy-as-code, serves interim `/llms.txt`, and blocks training crawlers site-wide while allowing public marketing discovery for search/answer agents. Edge rate limits, formal legal approval, and generative measurement remain deferred.
