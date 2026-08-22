@@ -10,12 +10,34 @@ import {
 import { CampaignsService } from './campaigns.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { PublicFundraiserResponseDto } from './dto/public-fundraiser-response.dto';
+import { PublicFundraiserSitemapResponseDto } from './dto/public-fundraiser-sitemap-response.dto';
 
 @ApiTags('Fundraising')
-@ApiExtraModels(PublicFundraiserResponseDto)
+@ApiExtraModels(PublicFundraiserResponseDto, PublicFundraiserSitemapResponseDto)
 @Controller('public/fundraisers')
 export class PublicFundraisersController {
   constructor(private readonly campaignsService: CampaignsService) {}
+
+  /**
+   * List indexable ACTIVE campaign slugs for sitemap generation (read-only).
+   */
+  @Get()
+  @Public()
+  @ApiOperation({
+    summary: 'List indexable public fundraiser slugs',
+    description:
+      'Returns ACTIVE, in-window campaign slugs for sitemap generation. ' +
+      'Does not expose private campaign fields.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Indexable fundraiser slugs',
+    schema: { $ref: getSchemaPath(PublicFundraiserSitemapResponseDto) },
+  })
+  async listIndexable(): Promise<PublicFundraiserSitemapResponseDto> {
+    const items = await this.campaignsService.listPublicIndexableSlugs();
+    return { items };
+  }
 
   /**
    * Get campaign by slug (public, read-only). Includes sellable offers and performance snapshot.

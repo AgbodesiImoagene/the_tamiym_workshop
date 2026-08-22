@@ -3,7 +3,15 @@ import { MarketingHero } from '@/components/marketing-hero';
 import { MarketingPageSideDecor } from '@/components/marketing-page-decor';
 import { MarketingSplitSection } from '@/components/marketing-sections';
 import { marketingAssets } from '@/lib/assets';
+import { buildPageMetadata } from '@/lib/metadata';
 import { webRegisterWithNext } from '@/lib/site';
+
+export const metadata = buildPageMetadata({
+  title: 'Bulk custom apparel and fundraising',
+  description:
+    'Streamline bulk apparel orders with custom designs, high-quality printing, and seamless fundraising campaigns for Nigerian teams and communities.',
+  path: '/',
+});
 
 export default function Home() {
   return (

@@ -1081,6 +1081,33 @@ export class CampaignsService {
   }
 
   /**
+   * List ACTIVE, in-window campaign slugs for public sitemap (TTW-071).
+   * Read-only; does not transition expired campaigns.
+   */
+  async listPublicIndexableSlugs() {
+    const now = new Date();
+    const campaigns = await this.prisma.campaign.findMany({
+      where: {
+        status: CampaignStatus.ACTIVE,
+        AND: [
+          { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+          { OR: [{ endDate: null }, { endDate: { gt: now } }] },
+        ],
+      },
+      select: {
+        slug: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return campaigns.map((campaign) => ({
+      slug: campaign.slug,
+      updatedAt: campaign.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
    * Get campaign by slug (public, read-only).
    * Returns a disclosure-safe payload with sellable offers (TTW-031).
    */

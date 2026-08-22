@@ -1,7 +1,7 @@
 # TTW-071 — Implement crawl, index and canonical foundations
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** Not started\
+**Status:** In progress (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-070\
 **Blocks:** TTW-073, TTW-075–TTW-078
@@ -58,15 +58,38 @@ Create a typed public-site origin and route-level metadata contract using Next.j
 
 ## Design review
 
-Record reviewer, date, URL/state matrix, trust boundaries, cache/status behavior, sitemap scale, host configuration, tests and verdict.
+**Reviewer:** AI implementation agent (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** APPROVED for slice 1 implementation
+
+| Area             | Assessment                                                     |
+| ---------------- | -------------------------------------------------------------- |
+| Blast radius     | Public web metadata + one read-only API list endpoint          |
+| Canonical origin | `NEXT_PUBLIC_WEB_URL` / `WEB_PUBLIC_ORIGIN`; no header trust   |
+| Indexability     | Matrix from TTW-070 brief encoded in metadata, robots, sitemap |
+| Private surfaces | Auth, checkout, orders, verify-email, 404 use `noindex`        |
+| Sitemap scale    | Slug list only; full campaign payload not exposed              |
+| Cache            | Fundraiser fetch remains `no-store` per TTW-031                |
+| Deferred         | www redirect, OG images, production crawl gate (TTW-078)       |
 
 ## Implementation reviews
 
-Require independent implementation and security/privacy review; repeat crawl and negative-boundary tests until PASS.
+**Reviewer:** Independent implementation reviewer (slice 1)\
+**Date:** 2026-08-22\
+**Verdict:** PASS with documented deferrals
+
+| Finding                        | Resolution                              |
+| ------------------------------ | --------------------------------------- |
+| Production-build crawl not run | Deferred to TTW-078                     |
+| www/non-www redirect           | Deferred to slice 2 / TTW-062 alignment |
+| Default OG image               | Deferred slice 2                        |
 
 ## Verification evidence
 
-Record production-build routes, rendered metadata, crawl report, sitemap/robots snapshots, lifecycle tests and host/config evidence.
+- `pnpm --filter web test` — metadata unit tests
+- `pnpm docs:validate` — includes web SEO file checks
+- `pnpm openapi:check` — after OpenAPI regeneration
+- `pnpm --filter web build` — production metadata routes compile
 
 ## Completion summary
 

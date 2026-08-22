@@ -80,6 +80,34 @@ export interface PublicFundraiser {
   products: PublicFundraiserProduct[];
 }
 
+export interface PublicFundraiserSitemapEntry {
+  slug: string;
+  updatedAt: Date;
+}
+
+/**
+ * Fetch indexable fundraiser slugs for sitemap generation.
+ */
+export async function listPublicFundraiserSlugs(): Promise<PublicFundraiserSitemapEntry[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/public/fundraisers`, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const body = (await response.json()) as { items?: { slug: string; updatedAt: string }[] };
+    return (body.items ?? []).map((item) => ({
+      slug: item.slug,
+      updatedAt: new Date(item.updatedAt),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Fetch a public fundraiser by slug.
  * No application-level revalidate cache (TTW-031 interim policy): offer price/availability must stay fresh.

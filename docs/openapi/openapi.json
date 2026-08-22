@@ -3222,6 +3222,51 @@
         ],
         "type": "object"
       },
+      "PublicFundraiserSitemapItemDto": {
+        "properties": {
+          "slug": {
+            "example": "school-fundraiser",
+            "type": "string"
+          },
+          "updatedAt": {
+            "example": "2026-08-22T12:00:00.000Z",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "PublicFundraiserSitemapResponseDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "slug": {
+                  "example": "school-fundraiser",
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "example": "2026-08-22T12:00:00.000Z",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "slug",
+                "updatedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
       "QuoteItemDto": {
         "properties": {
           "campaignId": {
@@ -18108,6 +18153,54 @@
         "summary": "Get shared design by share token",
         "tags": [
           "Designs (Public)"
+        ]
+      }
+    },
+    "/v1/public/fundraisers": {
+      "get": {
+        "description": "Returns ACTIVE, in-window campaign slugs for sitemap generation. Does not expose private campaign fields.",
+        "operationId": "PublicFundraisersController_listIndexable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "slug": {
+                            "example": "school-fundraiser",
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "example": "2026-08-22T12:00:00.000Z",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "updatedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Indexable fundraiser slugs"
+          }
+        },
+        "summary": "List indexable public fundraiser slugs",
+        "tags": [
+          "Fundraising"
         ]
       }
     },
