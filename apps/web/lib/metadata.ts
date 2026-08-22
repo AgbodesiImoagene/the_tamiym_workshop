@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { buildSocialImageFields } from './media/social';
 import { absoluteWebUrl, webPublicOrigin } from './site';
 
 export const SITE_NAME = 'Tamiym Workshop';
@@ -19,10 +20,12 @@ export function buildPageMetadata(input: {
   description: string;
   path: string;
   index?: boolean;
+  previewImageUrl?: string | null;
 }): Metadata {
   const indexable = input.index !== false;
   const canonical = absoluteWebUrl(input.path);
   const title = input.title.includes(SITE_NAME) ? input.title : `${input.title} | ${SITE_NAME}`;
+  const social = buildSocialImageFields(input.previewImageUrl);
 
   return {
     title,
@@ -38,11 +41,13 @@ export function buildPageMetadata(input: {
       siteName: SITE_NAME,
       locale: 'en_NG',
       type: 'website',
+      images: social.openGraphImages,
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description: input.description,
+      images: social.twitterImages,
     },
   };
 }
@@ -52,6 +57,7 @@ export function buildFundraiserMetadata(input: {
   description?: string | null;
   story?: string | null;
   slug: string;
+  previewImageUrl?: string | null;
 }): Metadata {
   const description = truncateDescription(
     input.description?.trim() ||
@@ -64,6 +70,7 @@ export function buildFundraiserMetadata(input: {
     description,
     path: `/fundraiser/${input.slug}`,
     index: true,
+    previewImageUrl: input.previewImageUrl,
   });
 }
 
@@ -77,6 +84,8 @@ export function noIndexMetadata(title: string, path: string): Metadata {
 }
 
 export function rootMetadata(): Metadata {
+  const social = buildSocialImageFields();
+
   return {
     metadataBase: new URL(webPublicOrigin()),
     title: {
@@ -87,6 +96,20 @@ export function rootMetadata(): Metadata {
     icons: {
       icon: '/favicon.ico',
       shortcut: '/favicon.ico',
+    },
+    openGraph: {
+      title: SITE_NAME,
+      description: DEFAULT_DESCRIPTION,
+      siteName: SITE_NAME,
+      locale: 'en_NG',
+      type: 'website',
+      images: social.openGraphImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: SITE_NAME,
+      description: DEFAULT_DESCRIPTION,
+      images: social.twitterImages,
     },
   };
 }

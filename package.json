@@ -31,6 +31,8 @@
     "answer-content:validate:test": "node --test scripts/quality/__tests__/validate-answer-content.test.mjs",
     "crawler-policy:validate": "node scripts/quality/validate-crawler-policy.mjs",
     "crawler-policy:validate:test": "node --test scripts/quality/__tests__/validate-crawler-policy.test.mjs",
+    "performance-media:validate": "node scripts/quality/validate-performance-media.mjs",
+    "performance-media:validate:test": "node --test scripts/quality/__tests__/validate-performance-media.test.mjs",
     "release:preflight": "node infra/release/scripts/preflight-release.mjs",
     "release:check-migrations": "node infra/release/scripts/check-migration-artefacts.mjs",
     "release:verify-migrations": "node infra/release/scripts/verify-migration-baseline.mjs",
