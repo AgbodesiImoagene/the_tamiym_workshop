@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
 import { MarketingSplitSection } from '@/components/marketing-sections';
+import { PageAnswers } from '@/components/page-answers';
 import { getPublicPage } from '@/lib/content/registry';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
@@ -62,6 +63,8 @@ export default function BulkSolutionsPage() {
           reverse
         />
       </section>
+
+      <PageAnswers path="/solutions/bulk" />
 
       <section className="mx-auto max-w-7xl border-t border-black/10 px-6 py-12 lg:px-8">
         <h2 className="text-xl font-bold text-tamiym-blue">Related journeys</h2>

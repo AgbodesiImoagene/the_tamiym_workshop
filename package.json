@@ -27,6 +27,8 @@
     "public-ia:validate:test": "node --test scripts/quality/__tests__/validate-public-ia.test.mjs",
     "structured-data:validate": "node scripts/quality/validate-structured-data.mjs",
     "structured-data:validate:test": "node --test scripts/quality/__tests__/validate-structured-data.test.mjs",
+    "answer-content:validate": "node scripts/quality/validate-answer-content.mjs",
+    "answer-content:validate:test": "node --test scripts/quality/__tests__/validate-answer-content.test.mjs",
     "release:preflight": "node infra/release/scripts/preflight-release.mjs",
     "release:check-migrations": "node infra/release/scripts/check-migration-artefacts.mjs",
     "release:verify-migrations": "node infra/release/scripts/verify-migration-baseline.mjs",

@@ -1,7 +1,7 @@
 # TTW-073 — Publish truthful structured data and commerce signals
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-071, TTW-072, TTW-024, TTW-031, TTW-040, TTW-041\
 **Blocks:** TTW-078
@@ -90,7 +90,7 @@ Create typed server-side JSON-LD builders sourced from the same approved public 
 - `pnpm structured-data:validate:test`
 - `pnpm docs:validate`
 - `pnpm --filter web build`
-- PR CI — pending
+- PR #71 CI run `32592362687` — all **17 checks pass**; merged to `main` (`d8dcdf3`)
 
 ## Completion summary
 

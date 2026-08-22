@@ -1,5 +1,6 @@
 import { MarketingShell } from '@/components/marketing-shell';
 import { MarketingHero } from '@/components/marketing-hero';
+import { PageAnswers } from '@/components/page-answers';
 import { marketingAssets } from '@/lib/assets';
 import { buildPageMetadata } from '@/lib/metadata';
 import { webRegisterWithNext } from '@/lib/site';
@@ -40,10 +41,11 @@ export default function FundraiserPage() {
       <section className="mx-auto max-w-7xl px-6 py-16 text-center lg:px-8">
         <div className="space-y-4 text-tamiym-blue">
           <h2 className="text-4xl font-bold tracking-[-0.03em]">
-            Sell Custom Apparel, Collect Donations, Effortlessly
+            Sell custom apparel to support your cause
           </h2>
           <p className="text-sm font-bold text-black">
-            The Tamiym Workshop Fundraising makes supporting your cause simple and risk-free
+            Design campaign merchandise, share your story, and let supporters checkout on your
+            public campaign page.
           </p>
         </div>
 
@@ -60,14 +62,13 @@ export default function FundraiserPage() {
 
           <div className="space-y-6 text-center">
             <h3 className="text-[3rem] font-bold leading-[1.15] tracking-[-0.03em] text-tamiym-blue">
-              Raise Funds Effortlessly with Custom Apparel
+              Launch with clear organiser responsibilities
             </h3>
             <p className="mx-auto max-w-5xl text-lg leading-[1.45] text-tamiym-blue">
-              Create and sell custom apparel while collecting donations with no upfront costs, no
-              inventory, no stress. Simply design your merch, share your story, and launch your
-              campaign. We handle production and fulfillment, so you can focus on making an impact.
-              Perfect for organizations, events, and communities looking to fundraise in a seamless
-              and risk-free way.
+              Configure your campaign, pass readiness and moderation checks, then share your public
+              fundraiser link. Supporters order in NGN via Paystack while Tamiym coordinates
+              production and domestic fulfilment under documented policies. Payout eligibility
+              depends on campaign approval and organiser KYC requirements.
             </p>
             <a
               href={webRegisterWithNext('/fundraiser')}
@@ -78,6 +79,8 @@ export default function FundraiserPage() {
           </div>
         </div>
       </section>
+
+      <PageAnswers path="/fundraiser" />
     </MarketingShell>
   );
 }

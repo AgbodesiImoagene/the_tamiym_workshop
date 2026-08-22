@@ -1,4 +1,5 @@
 import type { BreadcrumbItem } from '@/lib/content/types';
+import type { AnswerEntry } from '@/lib/content/answers/types';
 import { ORGANIZATION_FACTS, organizationId, websiteId } from './constants';
 import { absoluteWebUrl } from '@/lib/site';
 
@@ -109,4 +110,27 @@ export function buildWebPageJsonLd(input: {
 
 export function buildGlobalStructuredData(): JsonLdObject[] {
   return [buildOrganizationJsonLd(), buildWebSiteJsonLd()];
+}
+
+export function buildFaqPageJsonLd(
+  answers: readonly AnswerEntry[],
+  path: string
+): JsonLdObject | null {
+  if (answers.length === 0) {
+    return null;
+  }
+
+  return {
+    '@context': SCHEMA_CONTEXT,
+    '@type': 'FAQPage',
+    '@id': `${absoluteWebUrl(path)}#faq`,
+    mainEntity: answers.map((answer) => ({
+      '@type': 'Question',
+      name: answer.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: [answer.directAnswer, ...(answer.details ?? [])].join(' '),
+      },
+    })),
+  };
 }
