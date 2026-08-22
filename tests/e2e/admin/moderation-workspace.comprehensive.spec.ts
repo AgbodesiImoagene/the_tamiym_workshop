@@ -27,7 +27,8 @@ describeViewportMatrix('Admin moderation workspaces @comprehensive @admin', () =
     for (const tab of queueTabs) {
       const tabControl = adminPage.getByRole('tab', { name: tab, exact: true });
       if (await tabControl.isVisible()) {
-        await tabControl.click();
+        await tabControl.scrollIntoViewIfNeeded();
+        await tabControl.click({ force: true });
       }
     }
 
@@ -47,7 +48,8 @@ describeViewportMatrix('Admin moderation workspaces @comprehensive @admin', () =
     for (const tab of ['All', 'Pending', 'Flagged', 'Approved', 'Rejected']) {
       const tabControl = adminPage.getByRole('tab', { name: tab, exact: true });
       if (await tabControl.isVisible()) {
-        await tabControl.click();
+        await tabControl.scrollIntoViewIfNeeded();
+        await tabControl.click({ force: true });
       }
     }
 
