@@ -100,6 +100,18 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 | Accessibility      | Representative axe scans on 4 web routes × 3 viewports; governed exceptions unchanged                              |
 | Deferred           | Full checkout, design workshop save/share, visual baselines, staging UAT (TTW-068), Firefox/WebKit matrix evidence |
 
+## Implementation reviews (slice 2)
+
+**Reviewer:** Bugbot independent reviewer\
+**Date:** 2026-08-22\
+**Verdict:** PASS after responsive nav fix (`615c5fb`)
+
+| Finding                                       | Resolution                                                                |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| Customer sidebar hidden on tablet/mobile      | `navigateCustomerSidebarLink` uses `goto` when `aside nav` is not visible |
+| Loose `/dashboard` URL assertion              | `pathUrlMatcher()` anchors home/admin overview paths                      |
+| Mobile hamburger non-functional (product gap) | Documented; comprehensive tests use direct navigation on small viewports  |
+
 ## Implementation reviews
 
 **Reviewer:** Independent implementation reviewer (slice 1)\
@@ -116,6 +128,8 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 
 ## Verification evidence
 
+### Slice 1
+
 - `pnpm playwright:validate` — pass
 - `pnpm playwright:validate:test` — 4/4 pass
 - `pnpm docs:validate` — pass
@@ -123,7 +137,15 @@ Complete the strategy in `docs/16-playwright-regression-strategy.md` as a releas
 - `pnpm typecheck` — pass
 - `pnpm lint` — pass (pre-existing warnings only)
 - `git diff --check` — clean
-- PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge
+- PR smoke (`pnpm test:e2e:smoke`) — CI evidence on merge (#60)
+
+### Slice 2 (PR #63)
+
+- `pnpm playwright:validate` / `playwright:validate:test` — pass (local)
+- `pnpm typecheck` / `pnpm lint` — pass (local)
+- PR CI run `32584895866` — all 16 checks pass including Playwright Smoke
+- Comprehensive suite — 111 tests listed; nightly workflow ships on merge; first run pending post-merge
+- Bugbot review — PASS after `615c5fb` responsive nav fix
 
 ## Completion summary
 
