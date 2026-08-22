@@ -1,6 +1,7 @@
 import './globals.css';
 import { Toaster, TooltipProvider } from '@tamiym/ui';
 import { rootMetadata } from '@/lib/metadata';
+import { DiscoveryAnalytics } from '@/components/discovery-analytics';
 import { JsonLd } from '@/components/json-ld';
 import { buildGlobalStructuredData } from '@/lib/structured-data/builders';
 
@@ -17,6 +18,7 @@ export default function RootLayout({
         <JsonLd data={buildGlobalStructuredData()} />
         <TooltipProvider>
           {children}
+          <DiscoveryAnalytics />
           <Toaster />
         </TooltipProvider>
       </body>
