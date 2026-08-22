@@ -32,7 +32,7 @@ function createFixture() {
       '| [TTW-999](ttw-999-missing.md) | Scoped |',
       '| [TTW-002](ttw-002.md) | Unknown |',
       '',
-    ].join('\n'),
+    ].join('\n')
   );
   writeFileSync(join(ticketsDir, 'ttw-002.md'), '# TTW-002\n');
 
@@ -90,7 +90,9 @@ test('validateTicketStates rejects unknown backlog states', () => {
 
 test('parseTicketStateColumn accepts the approved state set', () => {
   for (const state of ALLOWED_TICKET_STATES) {
-    const errors = parseTicketStateColumn(`| Ticket | State |\n| --- | --- |\n| TTW-001 | ${state} |`);
+    const errors = parseTicketStateColumn(
+      `| Ticket | State |\n| --- | --- |\n| TTW-001 | ${state} |`
+    );
     assert.deepEqual(errors, []);
   }
 });

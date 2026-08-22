@@ -15,12 +15,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 export const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(([^)]+)\)/g;
 export const TICKET_LINK_RE = /\[(TTW-\d{3})\]\(([^)]+\.md)\)/g;
-export const ALLOWED_TICKET_STATES = new Set([
-  'Complete',
-  'Scoped',
-  'Deferred',
-  'In progress',
-]);
+export const ALLOWED_TICKET_STATES = new Set(['Complete', 'Scoped', 'Deferred', 'In progress']);
 
 function isExternalHref(href) {
   return /^(?:https?:|mailto:|tel:|data:)/i.test(href);
