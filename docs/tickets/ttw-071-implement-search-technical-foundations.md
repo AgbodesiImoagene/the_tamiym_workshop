@@ -1,7 +1,7 @@
 # TTW-071 — Implement crawl, index and canonical foundations
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-070\
 **Blocks:** TTW-073, TTW-075–TTW-078
@@ -90,6 +90,7 @@ Create a typed public-site origin and route-level metadata contract using Next.j
 - `pnpm docs:validate` — includes web SEO file checks
 - `pnpm openapi:check` — after OpenAPI regeneration
 - `pnpm --filter web build` — production metadata routes compile
+- PR #62 CI run `32590883475` — all **17 checks pass** (Coverage + Documentation fixed post-rebase); merged to `main` (`6ab0d38`)
 
 ## Completion summary
 
