@@ -1,7 +1,7 @@
 # TTW-077 — Measure organic and answer-engine outcomes
 
 **Epic:** 7 — Organic discovery: SEO, AEO and GEO\
-**Status:** In progress (slice 1)\
+**Status:** Complete (slice 1)\
 **Risk:** High\
 **Blocked by:** TTW-070, TTW-071, TTW-025, TTW-036\
 **Blocks:** TTW-078
@@ -87,7 +87,7 @@ Connect approved Google Search Console and Bing Webmaster capabilities using DNS
 - `pnpm discovery-metrics:validate:test`
 - `pnpm docs:validate`
 - `pnpm --filter web build`
-- PR CI — pending
+- PR CI — #75 merged (`68b7c7b`), 17 checks green
 
 ## Completion summary
 

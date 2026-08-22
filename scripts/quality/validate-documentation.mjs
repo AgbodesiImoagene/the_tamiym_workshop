@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { validateAnswerContent } from './validate-answer-content.mjs';
 import { validateCrawlerPolicy } from './validate-crawler-policy.mjs';
+import { validateDiscoveryGates } from './validate-discovery-gates.mjs';
 import { validateDiscoveryMetrics } from './validate-discovery-metrics.mjs';
 import { validatePerformanceMedia } from './validate-performance-media.mjs';
 import { validateDiscoveryBrief } from './discovery-brief-schema.mjs';
@@ -211,6 +212,7 @@ export function validateDocumentation(options = {}) {
     ...validateCrawlerPolicy(options),
     ...validatePerformanceMedia(options),
     ...validateDiscoveryMetrics(options),
+    ...validateDiscoveryGates(options),
   ];
 
   return {

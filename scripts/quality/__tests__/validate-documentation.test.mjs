@@ -72,6 +72,28 @@ function createFixture() {
   writeFileSync(join(discoveryDir, 'ttw-075-interim-policy.md'), '# TTW-075 interim policy\n');
   writeFileSync(join(discoveryDir, 'ttw-076-interim-policy.md'), '# TTW-076 interim policy\n');
   writeFileSync(join(discoveryDir, 'ttw-077-interim-policy.md'), '# TTW-077 interim policy\n');
+  writeFileSync(join(discoveryDir, 'ttw-078-interim-policy.md'), '# TTW-078 interim policy\n');
+  writeFileSync(
+    join(discoveryDir, 'discovery-gate-manifest.json'),
+    JSON.stringify(
+      {
+        manifest_version: 'discovery-gates/v1-fixture',
+        ticket: 'TTW-078',
+        document_date: '2026-08-23',
+        entries: [
+          {
+            id: 'FIXTURE',
+            invariant: 'fixture entry',
+            layer: 'unit',
+            automation: 'automated',
+            tests: ['apps/web/__tests__/discovery-gates.test.ts'],
+          },
+        ],
+      },
+      null,
+      2
+    )
+  );
   for (const rel of [
     'apps/web/app/robots.ts',
     'apps/web/app/sitemap.ts',
@@ -105,6 +127,8 @@ function createFixture() {
     'apps/web/lib/discovery-metrics/events.ts',
     'apps/web/lib/discovery-metrics/consent.ts',
     'apps/web/components/discovery-analytics.tsx',
+    'apps/web/__tests__/discovery-gates.test.ts',
+    'tests/e2e/web/discovery.smoke.spec.ts',
     'apps/web/app/auth/layout.tsx',
     'apps/web/app/orders/layout.tsx',
   ]) {
