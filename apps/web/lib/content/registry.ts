@@ -203,6 +203,6 @@ export function getPublicPage(path: string): PublicPageDefinition | undefined {
 
 export function listIndexableStaticPaths(): string[] {
   return PUBLIC_PAGES.filter((page) => page.indexable && page.lifecycle === 'published').map(
-    (page) => page.path,
+    (page) => page.path
   );
 }

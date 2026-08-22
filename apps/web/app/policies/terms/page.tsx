@@ -6,14 +6,14 @@ import { getBreadcrumbs } from '@/lib/public-ia';
 
 const page = getPublicPage('/policies/terms');
 
-export const metadata = noIndexMetadata(
-  page?.title ?? 'Terms and conditions',
-  '/policies/terms',
-);
+export const metadata = noIndexMetadata(page?.title ?? 'Terms and conditions', '/policies/terms');
 
 export default function TermsPage() {
   return (
-    <MarketingShell ctaTitle="Need help before you order?" ctaBody="Reach out if you have questions about organiser or supporter terms.">
+    <MarketingShell
+      ctaTitle="Need help before you order?"
+      ctaBody="Reach out if you have questions about organiser or supporter terms."
+    >
       <MarketingBreadcrumbs items={getBreadcrumbs('/policies/terms')} />
       <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8">
         <h1 className="text-3xl font-bold text-tamiym-blue">Terms and conditions (interim)</h1>

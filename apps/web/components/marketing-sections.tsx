@@ -137,9 +137,7 @@ export function StatsStrip({ items }: StatsStripProps) {
             <div
               key={item.label}
               className="space-y-3"
-              {...(item.evidenceOwner
-                ? { 'data-evidence-owner': item.evidenceOwner }
-                : undefined)}
+              {...(item.evidenceOwner ? { 'data-evidence-owner': item.evidenceOwner } : undefined)}
             >
               <p className="font-heading text-5xl uppercase tracking-headline">{item.value}</p>
               <p className="text-sm font-bold">{item.label}</p>

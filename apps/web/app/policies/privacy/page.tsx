@@ -6,14 +6,14 @@ import { getBreadcrumbs } from '@/lib/public-ia';
 
 const page = getPublicPage('/policies/privacy');
 
-export const metadata = noIndexMetadata(
-  page?.title ?? 'Privacy policy',
-  '/policies/privacy',
-);
+export const metadata = noIndexMetadata(page?.title ?? 'Privacy policy', '/policies/privacy');
 
 export default function PrivacyPolicyPage() {
   return (
-    <MarketingShell ctaTitle="Questions about your data?" ctaBody="Contact our team for interim privacy requests.">
+    <MarketingShell
+      ctaTitle="Questions about your data?"
+      ctaBody="Contact our team for interim privacy requests."
+    >
       <MarketingBreadcrumbs items={getBreadcrumbs('/policies/privacy')} />
       <article className="mx-auto max-w-3xl px-6 py-16 lg:px-8">
         <h1 className="text-3xl font-bold text-tamiym-blue">Privacy policy (interim)</h1>

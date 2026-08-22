@@ -14,7 +14,7 @@ describe('public IA registry', () => {
 
   it('lists indexable static paths including bulk solutions', () => {
     expect(listIndexableStaticPaths()).toEqual(
-      expect.arrayContaining(['/', '/about', '/fundraiser', '/solutions/bulk']),
+      expect.arrayContaining(['/', '/about', '/fundraiser', '/solutions/bulk'])
     );
     expect(listIndexableStaticPaths()).not.toContain('/policies/privacy');
   });

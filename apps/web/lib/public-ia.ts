@@ -44,7 +44,11 @@ function isRegisteredInternalPath(href: string): boolean {
 /** Validates nav/footer targets against the public page registry (for CI). */
 export function validateNavTargets(): string[] {
   const errors: string[] = [];
-  const allLinks = [...PRIMARY_NAV, ...FOOTER_LINK_GROUPS.company, ...FOOTER_LINK_GROUPS.information];
+  const allLinks = [
+    ...PRIMARY_NAV,
+    ...FOOTER_LINK_GROUPS.company,
+    ...FOOTER_LINK_GROUPS.information,
+  ];
 
   for (const link of allLinks) {
     if (isExternalHref(link.href)) continue;
