@@ -71,7 +71,7 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete    | Observability dashboards, alerts, runbooks encoded (slice 1)          |
 | [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete    | Documentation validation + key state reconciliation (slice 1)         |
 | [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | In progress | PRD-to-test manifest, a11y/visual scaffolds, browser matrix (slice 1) |
-| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Scoped      | Rehearse migrations, backup/restore, rollback and controlled release  |
+| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | In progress | Release manifest extensions, runbooks, preflight (slice 1)            |
 
 ## Epic 6 — Production infrastructure as code
 

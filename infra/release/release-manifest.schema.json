@@ -82,13 +82,31 @@
     "gateResults": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["infraValidate", "contracts", "observability", "browserUat", "backupRecovery"],
+      "required": [
+        "infraValidate",
+        "contracts",
+        "observability",
+        "browserUat",
+        "backupRecovery",
+        "migrationBaseline"
+      ],
       "properties": {
         "infraValidate": { "$ref": "#/$defs/gateStatus" },
         "contracts": { "$ref": "#/$defs/gateStatus" },
         "observability": { "$ref": "#/$defs/gateStatus" },
         "browserUat": { "$ref": "#/$defs/gateStatus" },
-        "backupRecovery": { "$ref": "#/$defs/gateStatus" }
+        "backupRecovery": { "$ref": "#/$defs/gateStatus" },
+        "migrationBaseline": { "$ref": "#/$defs/gateStatus" }
+      }
+    },
+    "artefactChecksums": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pnpmLockSha256": { "type": "string", "minLength": 1 },
+        "openApiSha256": { "type": "string", "minLength": 1 },
+        "playwrightManifestVersion": { "type": "string", "minLength": 1 },
+        "prismaMigrationCount": { "type": "integer", "minimum": 0 }
       }
     },
     "notes": {

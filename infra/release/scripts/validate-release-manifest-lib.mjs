@@ -79,11 +79,41 @@ export function validateReleaseManifest(manifest) {
     failures.push('notes: must be a string when present');
   }
 
+  if (m.artefactChecksums !== undefined) {
+    if (!requireObject(m.artefactChecksums, 'artefactChecksums', failures)) {
+      // skip nested
+    } else {
+      const ac = /** @type {Record<string, unknown>} */ (m.artefactChecksums);
+      const allowed = [
+        'pnpmLockSha256',
+        'openApiSha256',
+        'playwrightManifestVersion',
+        'prismaMigrationCount',
+      ];
+      for (const key of allowed) {
+        if (ac[key] === undefined) continue;
+        if (key === 'prismaMigrationCount') {
+          if (typeof ac[key] !== 'number' || ac[key] < 0) {
+            failures.push('artefactChecksums.prismaMigrationCount: must be a non-negative number');
+          }
+        } else if (typeof ac[key] !== 'string' || ac[key].length < 1) {
+          failures.push(`artefactChecksums.${key}: must be a non-empty string`);
+        }
+      }
+      for (const key of Object.keys(ac)) {
+        if (!allowed.includes(key)) {
+          failures.push(`artefactChecksums: unexpected property ${key}`);
+        }
+      }
+    }
+  }
+
   const allowedTop = new Set([
     'schemaVersion',
     'ticket',
     'commitSha',
     'createdAt',
+    'artefactChecksums',
     'images',
     'sbomRefs',
     'opentofu',
@@ -179,6 +209,7 @@ export function validateReleaseManifest(manifest) {
       'observability',
       'browserUat',
       'backupRecovery',
+      'migrationBaseline',
     ];
     for (const g of requiredGates) {
       if (typeof gates[g] !== 'string' || !GATE_STATUSES.has(gates[g])) {

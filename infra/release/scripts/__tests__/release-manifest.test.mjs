@@ -25,6 +25,9 @@ test('buildReleaseManifest produces a valid manifest for a hex SHA', () => {
   assert.equal(manifest.commitSha, sha);
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.images.web.digest, '');
+  assert.ok(manifest.artefactChecksums);
+  assert.ok(manifest.artefactChecksums.prismaMigrationCount > 0);
+  assert.equal(manifest.gateResults.migrationBaseline, 'pending');
   assert.deepEqual(validateReleaseManifest(manifest), []);
 });
 

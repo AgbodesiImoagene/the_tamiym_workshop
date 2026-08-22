@@ -104,9 +104,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Build manifest (digests empty when push: false)
         env:
           GITHUB_SHA: ${{ github.sha }}
@@ -117,7 +121,10 @@ jobs:
           RELEASE_GATE_OBSERVABILITY: scoped_elsewhere
           RELEASE_GATE_BROWSER: scoped_elsewhere
           RELEASE_GATE_BACKUP: owner_gated
+          RELEASE_GATE_MIGRATION: pass
         run: |
+          pnpm release:preflight
+          pnpm release:check-migrations
           mkdir -p artefacts/release
           node infra/release/scripts/build-release-manifest.mjs \
             --commit "${{ github.sha }}" \

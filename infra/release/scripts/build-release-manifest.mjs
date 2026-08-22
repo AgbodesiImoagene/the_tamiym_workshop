@@ -23,6 +23,8 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { validateReleaseManifest } from './validate-release-manifest-lib.mjs';
+import { sha256FileHex } from './preflight-release.mjs';
+import { countMigrations } from './check-migration-artefacts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,6 +97,22 @@ function envOr(envName, fallback) {
 
 /**
  * @param {string} root
+ */
+function readPlaywrightManifestVersion(root) {
+  const manifestPath = path.join(root, 'docs/playwright/prd-test-manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return 'missing';
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    return typeof parsed.manifest_version === 'string' ? parsed.manifest_version : 'unknown';
+  } catch {
+    return 'invalid';
+  }
+}
+
+/**
+ * @param {string} root
  * @param {string} commitSha
  */
 export function buildReleaseManifest(root, commitSha) {
@@ -103,9 +121,15 @@ export function buildReleaseManifest(root, commitSha) {
 
   const manifest = {
     schemaVersion: 1,
-    ticket: envOr('RELEASE_TICKET', 'TTW-068'),
+    ticket: envOr('RELEASE_TICKET', 'TTW-054'),
     commitSha,
     createdAt: new Date().toISOString(),
+    artefactChecksums: {
+      pnpmLockSha256: sha256FileHex(root, 'pnpm-lock.yaml'),
+      openApiSha256: sha256FileHex(root, 'docs/openapi/openapi.json'),
+      playwrightManifestVersion: readPlaywrightManifestVersion(root),
+      prismaMigrationCount: countMigrations(root),
+    },
     images: {
       web: { digest: digest('web'), tag: envOr('RELEASE_IMAGE_TAG_WEB', '') },
       app: { digest: digest('app'), tag: envOr('RELEASE_IMAGE_TAG_APP', '') },
@@ -137,6 +161,7 @@ export function buildReleaseManifest(root, commitSha) {
       observability: envOr('RELEASE_GATE_OBSERVABILITY', 'scoped_elsewhere'),
       browserUat: envOr('RELEASE_GATE_BROWSER', 'scoped_elsewhere'),
       backupRecovery: envOr('RELEASE_GATE_BACKUP', 'owner_gated'),
+      migrationBaseline: envOr('RELEASE_GATE_MIGRATION', 'pending'),
     },
   };
 
