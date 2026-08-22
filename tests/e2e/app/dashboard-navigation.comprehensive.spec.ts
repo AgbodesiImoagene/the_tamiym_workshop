@@ -1,6 +1,9 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/test';
-import { assertVisibleControlsEnabled } from '../fixtures/interactions';
+import {
+  assertVisibleControlsEnabled,
+  navigateCustomerSidebarLink,
+} from '../fixtures/interactions';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
 
 const NAV_LINKS = [
@@ -20,10 +23,9 @@ describeViewportMatrix('Customer dashboard navigation @comprehensive @app', () =
     ).toBeVisible();
 
     for (const link of NAV_LINKS) {
-      await customerPage.getByRole('link', { name: link.name }).click();
-      await expect(customerPage).toHaveURL(new RegExp(`${link.path.replace('/', '\\/')}`));
+      await navigateCustomerSidebarLink(customerPage, link.name, link.path);
     }
-    await assertVisibleControlsEnabled(customerPage.locator('nav').first());
+    await assertVisibleControlsEnabled(customerPage.locator('aside nav, main').first());
   });
 
   test('dashboard quick links open profile and settings', async ({ customerPage }) => {

@@ -62,3 +62,30 @@ export async function openMobileNavIfPresent(page: Page): Promise<void> {
     await expect(page.getByRole('link', { name: /sign in/i }).first()).toBeVisible();
   }
 }
+
+/** Strict pathname matcher — anchors `/dashboard` so it does not match sub-routes. */
+export function pathUrlMatcher(path: string): RegExp {
+  const escaped = path.replace(/\//g, '\\/');
+  if (path === '/dashboard' || path === '/admin') {
+    return new RegExp(`${escaped}(?:\\?.*)?$`);
+  }
+  return new RegExp(`${escaped}(?:\\/|\\?|$)`);
+}
+
+/**
+ * Customer app sidebar is desktop-only (`hidden lg:flex`). On smaller viewports,
+ * navigate directly until mobile nav ships (see customer-dashboard-shell).
+ */
+export async function navigateCustomerSidebarLink(
+  page: Page,
+  label: string,
+  path: string
+): Promise<void> {
+  const link = page.locator('aside nav').getByRole('link', { name: label, exact: true });
+  if (await link.isVisible()) {
+    await link.click();
+  } else {
+    await page.goto(path);
+  }
+  await expect(page).toHaveURL(pathUrlMatcher(path));
+}
