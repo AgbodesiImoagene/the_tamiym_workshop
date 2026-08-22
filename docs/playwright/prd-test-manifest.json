@@ -1,5 +1,5 @@
 {
-  "manifest_version": "playwright-uat/v1-interim-2026-08-22",
+  "manifest_version": "playwright-uat/v2-comprehensive-2026-08-22",
   "ticket": "TTW-053",
   "document_date": "2026-08-22",
   "strategy_ref": "docs/16-playwright-regression-strategy.md",
@@ -22,6 +22,7 @@
       "automation": "automated",
       "tests": [
         "tests/e2e/web/anonymous.smoke.spec.ts",
+        "tests/e2e/web/marketing-navigation.comprehensive.spec.ts",
         "tests/e2e/visual/web-home.visual.spec.ts",
         "tests/e2e/visual/web-home-mobile.visual.spec.ts"
       ],
@@ -43,9 +44,9 @@
       "surface": "web",
       "feature": "Active/ended/missing fundraiser detail and product selection",
       "prd_ref": "Fundraising — shareable pages",
-      "automation": "blocked",
-      "blocked_by": "TTW-031",
-      "browser_tiers": ["matrix"],
+      "automation": "automated",
+      "tests": ["tests/e2e/web/fundraiser-detail.comprehensive.spec.ts"],
+      "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@web", "@critical"]
     },
     {
@@ -64,8 +65,11 @@
       "feature": "Home template automated accessibility scan",
       "prd_ref": "Non-functional — accessibility",
       "automation": "automated",
-      "tests": ["tests/e2e/accessibility/a11y.smoke.spec.ts"],
-      "browser_tiers": ["matrix", "a11y"],
+      "tests": [
+        "tests/e2e/accessibility/a11y.smoke.spec.ts",
+        "tests/e2e/accessibility/a11y.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["matrix", "a11y", "comprehensive"],
       "tags": ["@a11y", "@web"]
     },
     {
@@ -84,8 +88,13 @@
       "feature": "Authenticated customer dashboard",
       "prd_ref": "Customer Dashboard",
       "automation": "automated",
-      "tests": ["tests/e2e/app/customer.smoke.spec.ts"],
-      "browser_tiers": ["smoke", "matrix"],
+      "tests": [
+        "tests/e2e/app/customer.smoke.spec.ts",
+        "tests/e2e/app/dashboard-navigation.comprehensive.spec.ts",
+        "tests/e2e/app/products-cart.comprehensive.spec.ts",
+        "tests/e2e/app/settings.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["smoke", "matrix", "comprehensive"],
       "tags": ["@smoke", "@app"]
     },
     {
@@ -94,8 +103,11 @@
       "feature": "Authenticated organiser dashboard entry",
       "prd_ref": "Fundraising — campaign creation",
       "automation": "automated",
-      "tests": ["tests/e2e/app/customer.smoke.spec.ts"],
-      "browser_tiers": ["smoke", "matrix"],
+      "tests": [
+        "tests/e2e/app/customer.smoke.spec.ts",
+        "tests/e2e/app/dashboard-navigation.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["smoke", "matrix", "comprehensive"],
       "tags": ["@smoke", "@app"]
     },
     {
@@ -104,8 +116,11 @@
       "feature": "Organiser campaign authoring workflow",
       "prd_ref": "Fundraising — campaign creation workflow",
       "automation": "automated",
-      "tests": ["tests/e2e/app/campaign-authoring.spec.ts"],
-      "browser_tiers": ["matrix"],
+      "tests": [
+        "tests/e2e/app/campaign-authoring.spec.ts",
+        "tests/e2e/app/campaign-authoring.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["smoke", "matrix", "comprehensive"],
       "tags": ["@app", "@critical"]
     },
     {
@@ -133,9 +148,9 @@
       "surface": "app",
       "feature": "Customer order list and detail states",
       "prd_ref": "Checkout & Orders — order history",
-      "automation": "blocked",
-      "blocked_by": "TTW-033",
-      "browser_tiers": ["matrix"],
+      "automation": "automated",
+      "tests": ["tests/e2e/app/orders.comprehensive.spec.ts"],
+      "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@app"]
     },
     {
@@ -154,8 +169,11 @@
       "feature": "Authenticated admin operations overview",
       "prd_ref": "Admin Dashboard",
       "automation": "automated",
-      "tests": ["tests/e2e/admin/admin.smoke.spec.ts"],
-      "browser_tiers": ["smoke", "matrix"],
+      "tests": [
+        "tests/e2e/admin/admin.smoke.spec.ts",
+        "tests/e2e/admin/sidebar-navigation.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["smoke", "matrix", "comprehensive"],
       "tags": ["@smoke", "@admin"]
     },
     {
@@ -173,9 +191,9 @@
       "surface": "admin",
       "feature": "Order search, detail and refund operations",
       "prd_ref": "Admin Dashboard — orders",
-      "automation": "blocked",
-      "blocked_by": "TTW-041",
-      "browser_tiers": ["matrix"],
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/orders-workspace.comprehensive.spec.ts"],
+      "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@admin", "@critical"]
     },
     {

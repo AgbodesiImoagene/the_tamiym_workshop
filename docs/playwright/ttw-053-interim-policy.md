@@ -1,21 +1,22 @@
 # TTW-053 — Browser UAT interim policy (slice 1)
 
-**Version:** `playwright-uat/v1-interim-2026-08-22`  
+**Version:** `playwright-uat/v2-comprehensive-2026-08-22`
 **Ticket:** TTW-053  
-**Status:** Engineering interim — product/design/operations formal sign-off deferred
+**Status:** Engineering interim — slice 2 comprehensive UAT landed; product/design/operations formal sign-off deferred
 
 This policy governs browser acceptance scope, execution tiers, accessibility exceptions and release thresholds until full TTW-053 acceptance criteria are met. The PRD-to-test manifest at `docs/playwright/prd-test-manifest.json` is the traceability source of truth.
 
 ## Supported browser matrix (v1 interim)
 
-| Tier            | Browsers / profiles                       | When                        | CI job                  |
-| --------------- | ----------------------------------------- | --------------------------- | ----------------------- |
-| PR smoke        | Desktop Chromium                          | Every PR                    | `playwright-smoke`      |
-| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Nightly / release candidate | Slice 2 workflow        |
-| Mobile critical | Mobile Chromium (Pixel 5 profile)         | Nightly / release candidate | Slice 2 workflow        |
-| Accessibility   | Desktop Chromium + axe-core               | Nightly / release candidate | Local `test:e2e:a11y`   |
-| Visual          | Desktop Chromium + mobile Chromium (home) | Nightly / release candidate | Local `test:e2e:visual` |
-| Staging UAT     | Production builds on ephemeral validation | Release candidate only      | Slice 2 — TTW-068       |
+| Tier            | Browsers / profiles                       | When                        | CI job                          |
+| --------------- | ----------------------------------------- | --------------------------- | ------------------------------- |
+| PR smoke        | Desktop Chromium                          | Every PR                    | `playwright-smoke`              |
+| Comprehensive   | Desktop Chromium × viewport matrix        | Nightly / manual            | `playwright-comprehensive`      |
+| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Nightly / release candidate | `test:e2e:matrix`               |
+| Mobile critical | Mobile Chromium (Pixel 5 profile)         | Nightly / release candidate | `test:e2e:matrix`               |
+| Accessibility   | Desktop Chromium + axe-core               | Nightly / comprehensive     | `test:e2e:comprehensive` / a11y |
+| Visual          | Desktop Chromium + mobile Chromium (home) | Nightly / release candidate | Local `test:e2e:visual`         |
+| Staging UAT     | Production builds on ephemeral validation | Release candidate only      | Slice 2 — TTW-068               |
 
 **Intentional capability differences:** Mobile WebKit (Safari) is required before release but not on every PR. Admin MFA TOTP flows run on Chromium smoke only until cross-browser MFA fixtures are proven stable.
 
@@ -24,8 +25,9 @@ This policy governs browser acceptance scope, execution tiers, accessibility exc
 Aligned with `docs/16-playwright-regression-strategy.md`:
 
 1. **Smoke (`pnpm test:e2e:smoke`)** — Chromium, all three apps, health/auth/navigation, critical journeys. Target under 10 minutes on CI.
-2. **Matrix (`pnpm test:e2e:matrix`)** — Adds Firefox, WebKit, mobile Chromium, accessibility and visual projects.
-3. **Staging UAT (slice 2)** — Immutable production-build identifiers on TTW-068 ephemeral environment; one controlled transaction lifecycle with reconciliation and cleanup.
+2. **Comprehensive (`pnpm test:e2e:comprehensive`)** — Viewport matrix (1440 / 834 / 393) across web, app, and admin surfaces; exercises navigation, forms, controls, and representative axe scans. Runs nightly via `.github/workflows/playwright-comprehensive.yml`; not on every PR.
+3. **Matrix (`pnpm test:e2e:matrix`)** — Adds Firefox, WebKit, mobile Chromium, accessibility and visual projects.
+4. **Staging UAT (slice 2)** — Immutable production-build identifiers on TTW-068 ephemeral environment; one controlled transaction lifecycle with reconciliation and cleanup.
 
 ## Manifest coverage rules
 
