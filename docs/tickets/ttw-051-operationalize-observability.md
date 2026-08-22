@@ -1,7 +1,7 @@
 # TTW-051 — Operationalize observability and alert response
 
 **Epic:** 5 — Contracts, observability and release proof  
-**Status:** In progress (slice 1)
+**Status:** Complete (slice 1)
 **Risk:** High  
 **Blocked by:** TTW-003, TTW-010, TTW-011, TTW-013, TTW-015, TTW-021, TTW-023, TTW-036, TTW-043\
 **Blocks:** TTW-053, TTW-054
