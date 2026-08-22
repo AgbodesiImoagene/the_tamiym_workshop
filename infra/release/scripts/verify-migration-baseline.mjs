@@ -91,18 +91,18 @@ export function verifyMigrationBaseline(root, databaseUrl) {
   }
 
   try {
-    const diffArgs = [
-      'migrate',
-      'diff',
-      '--from-migrations',
-      'prisma/migrations',
-      '--to-config-datasource',
-      '--exit-code',
-    ];
-    if (shadowUrl) {
-      diffArgs.push('--shadow-database-url', shadowUrl);
-    }
-    runPrisma(root, diffArgs, env);
+    runPrisma(
+      root,
+      [
+        'migrate',
+        'diff',
+        '--from-migrations',
+        'prisma/migrations',
+        '--to-config-datasource',
+        '--exit-code',
+      ],
+      { ...env, SHADOW_DATABASE_URL: shadowUrl }
+    );
   } catch (error) {
     const code = /** @type {NodeJS.ErrnoException & { status?: number }} */ (error).status;
     if (code === 2) {
