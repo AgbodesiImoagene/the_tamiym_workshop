@@ -21,6 +21,17 @@ pnpm --filter api exec prisma migrate status
 
 Expect: all migrations applied; no pending migrations; `status` reports database schema up to date.
 
+CI proof (TTW-054 slice 2): the `migration-baseline` job in `.github/workflows/ci.yml` runs
+`pnpm release:verify-migrations` on blank and snapshot PostgreSQL databases, then
+`prisma migrate diff --exit-code` to fail on drift.
+
+Local:
+
+```bash
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tamiym_workshop_blank?schema=public
+pnpm release:verify-migrations
+```
+
 ## Compatibility window
 
 1. Deploy migration while previous app version still running **only** when migration is backward-compatible (expand-only).
