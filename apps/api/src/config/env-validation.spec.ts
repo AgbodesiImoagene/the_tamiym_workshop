@@ -289,6 +289,17 @@ describe('env-validation', () => {
         };
         expect(validateEnv(config)).toEqual(config);
       });
+
+      it('throws when AUTH_ADMIN_MFA_DISABLED is enabled in production', () => {
+        expect(() =>
+          validateEnv({
+            ...validProductionConfig,
+            AUTH_ADMIN_MFA_DISABLED: 'true',
+          }),
+        ).toThrow(
+          'AUTH_ADMIN_MFA_DISABLED cannot be enabled when NODE_ENV=production',
+        );
+      });
     });
   });
 });

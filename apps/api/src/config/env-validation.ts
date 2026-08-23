@@ -1,3 +1,5 @@
+import { isAdminMfaBypassEnabled } from '../auth/admin-mfa-bypass';
+
 /**
  * `ConfigModule.forRoot({ validate })` implementation for the API.
  *
@@ -101,6 +103,12 @@ export function validateEnv(
   }
 
   if (process.env.NODE_ENV === 'production') {
+    if (isAdminMfaBypassEnabled(config)) {
+      throw new Error(
+        'AUTH_ADMIN_MFA_DISABLED cannot be enabled when NODE_ENV=production',
+      );
+    }
+
     for (const key of requiredProductionEnvVars) {
       const value = config[key];
       if (typeof value !== 'string' || value.trim() === '') {

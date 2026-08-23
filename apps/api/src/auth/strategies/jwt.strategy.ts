@@ -14,6 +14,7 @@ import { surfaceCookieNames } from '../auth-cookies';
 import { AccountPolicyService } from '../account-policy.service';
 import { AuthSessionService } from '../auth-session.service';
 import { AdminMfaService } from '../admin-mfa.service';
+import { isAdminMfaBypassEnabled } from '../admin-mfa-bypass';
 
 export interface JwtPayload {
   sub: string; // user id
@@ -151,7 +152,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // TTW-023: ADMIN-surface access requires completed MFA enrollment.
     // Blocks pre-cutover sessions that survived without TOTP.
-    if (payload.surface === AuthSurface.ADMIN) {
+    if (payload.surface === AuthSurface.ADMIN && !isAdminMfaBypassEnabled()) {
       const mfaEnabled = await this.adminMfa.isEnabled(user.id);
       if (!mfaEnabled) {
         throw new UnauthorizedException('User not found');

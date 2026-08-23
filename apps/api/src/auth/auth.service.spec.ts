@@ -277,6 +277,41 @@ describe('AuthService', () => {
     expect(authSession.createSession).not.toHaveBeenCalled();
   });
 
+  it('ADMIN password login mints a session when MFA bypass is enabled (dev only)', async () => {
+    const previous = process.env.AUTH_ADMIN_MFA_DISABLED;
+    process.env.AUTH_ADMIN_MFA_DISABLED = 'true';
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@example.com',
+      passwordHash: await bcrypt.hash('password123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      phone: null,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
+    });
+    prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.user.update.mockResolvedValue({});
+
+    const result = await service.login(
+      { email: 'admin@example.com', password: 'password123' },
+      AuthSurface.ADMIN,
+    );
+
+    expect(isMfaChallengeResponse(result)).toBe(false);
+    expect(result.access_token).toBe('jwt');
+    expect(authSession.createSession).toHaveBeenCalled();
+    expect(adminMfa.isEnabled).not.toHaveBeenCalled();
+
+    if (previous === undefined) {
+      delete process.env.AUTH_ADMIN_MFA_DISABLED;
+    } else {
+      process.env.AUTH_ADMIN_MFA_DISABLED = previous;
+    }
+  });
+
   it('signs the JWT payload with the requested surface and sid after MFA session issue', async () => {
     authSession.createSession.mockResolvedValue({
       session: { ...liveSession, authSurface: AuthSurface.ADMIN },

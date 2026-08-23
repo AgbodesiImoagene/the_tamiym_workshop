@@ -42,6 +42,7 @@ import {
   MFA_TOKEN_PURPOSE_ENROLL,
   type MfaChallengeResponse,
 } from './admin-mfa.service';
+import { isAdminMfaBypassEnabled } from './admin-mfa-bypass';
 
 /** Normalized Google userinfo / id_token claims used to sign in or link accounts. */
 export type GoogleOAuthProfile = {
@@ -460,6 +461,14 @@ export class AuthService {
 
     // TTW-023: ADMIN password auth never mints a session until MFA completes.
     if (surface === AuthSurface.ADMIN) {
+      if (isAdminMfaBypassEnabled()) {
+        return this.completeLoginSession(
+          user,
+          'Admin authenticated (MFA bypass — dev only)',
+          surface,
+          opts,
+        );
+      }
       const enabled = await this.adminMfa.isEnabled(user.id);
       this.observability.recordAuthLogin({ outcome: 'success' });
       if (!enabled) {

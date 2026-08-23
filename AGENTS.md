@@ -37,6 +37,11 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 - `pnpm dev` runs all apps concurrently: web `http://localhost:3000`, API `http://localhost:3001` (global prefix `/v1`, Swagger `/docs`, health `/v1/health`), customer app `http://localhost:3002`, admin `http://localhost:3003`.
 - The customer app (`apps/app`) auth/register + dashboard flows are wired to the API (`NEXT_PUBLIC_API_URL`, default `http://localhost:3001/v1`, cookie-based auth). CORS on the API allows origins 3000/3002/3003 by default.
 
+### Admin MFA (TTW-023)
+
+- Production and normal dev: ADMIN password login requires MFA enrollment/challenge before session cookies are set.
+- **Local UI testing bypass:** set `AUTH_ADMIN_MFA_DISABLED=true` in `apps/api/.env.local` (and keep `apps/api/.env` in sync if needed). The API refuses to boot with this flag when `NODE_ENV=production`. Remove the flag before any production-like deploy.
+
 ### Tests
 
 - Unit tests: `pnpm test` (no services required).
