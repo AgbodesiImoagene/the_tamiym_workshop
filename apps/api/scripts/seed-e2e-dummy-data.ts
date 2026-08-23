@@ -37,6 +37,7 @@ import {
   closePrismaScriptContext,
   createPrismaScriptContext,
 } from './_prisma-script-client';
+import { seedWorkshopView, type WorkshopLayerSeedIds } from './workshop-seed-shared';
 import {
   decodeMfaEncryptionKey,
   encryptTotpSecret,
@@ -120,6 +121,9 @@ const IDS = {
   mediaAssets: {
     pendingUpload: 'e2e-media-asset-pending-upload',
     flaggedUpload: 'e2e-media-asset-flagged-upload',
+    teeBase: 'e2e-media-asset-tee-base',
+    teeMask: 'e2e-media-asset-tee-mask',
+    hoodieBase: 'e2e-media-asset-hoodie-base',
   },
   mediaDerivatives: {
     pendingOriginal: 'e2e-media-derivative-pending-original',
@@ -219,6 +223,63 @@ function variantSnapshot(
   return [{ option, optionCode, value, valueCode }];
 }
 
+const teeWorkshopIds: WorkshopLayerSeedIds = {
+  mediaAssets: {
+    base: IDS.mediaAssets.teeBase,
+    mask: IDS.mediaAssets.teeMask,
+  },
+  mediaDerivatives: {
+    baseOriginal: 'e2e-media-derivative-tee-base-original',
+    baseDisplay: 'e2e-media-derivative-tee-base-display',
+    baseThumb: 'e2e-media-derivative-tee-base-thumb',
+    maskOriginal: 'e2e-media-derivative-tee-mask-original',
+    maskDisplay: 'e2e-media-derivative-tee-mask-display',
+    maskThumb: 'e2e-media-derivative-tee-mask-thumb',
+  },
+  productImages: {
+    base: 'e2e-product-image-tee-base',
+    mask: 'e2e-product-image-tee-mask',
+  },
+  productImageRoles: {
+    base: 'e2e-product-image-role-tee-base',
+    mask: 'e2e-product-image-role-tee-mask',
+  },
+  templateLayers: {
+    base: 'e2e-template-layer-tee-base',
+    mask: 'e2e-template-layer-tee-mask',
+  },
+  printArea: 'e2e-print-area-tee-front',
+  templateEffects: [
+    {
+      id: 'e2e-template-effect-tee-navy',
+      optionId: IDS.options.teeColor,
+      optionValueId: IDS.optionValues.teeColorNavy,
+      templateLayerId: 'e2e-template-layer-tee-mask',
+      tintHex: '#1f3c88',
+    },
+    {
+      id: 'e2e-template-effect-tee-white',
+      optionId: IDS.options.teeColor,
+      optionValueId: IDS.optionValues.teeColorWhite,
+      templateLayerId: 'e2e-template-layer-tee-mask',
+      tintHex: '#ffffff',
+    },
+  ],
+};
+
+const hoodieWorkshopIds: WorkshopLayerSeedIds = {
+  mediaAssets: { base: IDS.mediaAssets.hoodieBase },
+  mediaDerivatives: {
+    baseOriginal: 'e2e-media-derivative-hoodie-base-original',
+    baseDisplay: 'e2e-media-derivative-hoodie-base-display',
+    baseThumb: 'e2e-media-derivative-hoodie-base-thumb',
+  },
+  productImages: { base: 'e2e-product-image-hoodie-base' },
+  productImageRoles: { base: 'e2e-product-image-role-hoodie-base' },
+  templateLayers: { base: 'e2e-template-layer-hoodie-base' },
+  printArea: 'e2e-print-area-hoodie-front',
+};
+
 function placeholderImage(
   size: string,
   label: string,
@@ -313,6 +374,21 @@ async function clearFixtureData() {
       },
     });
     await prisma.variantPrice.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.optionValueTemplateEffect.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.workshopTemplateLayer.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.printArea.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.productImageRole.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
+    await prisma.productImage.deleteMany({
       where: { id: { startsWith: FIXTURE_PREFIX } },
     });
     await prisma.productOptionValue.deleteMany({
@@ -869,6 +945,21 @@ async function main() {
           amount: toAmount(13000),
         },
       ],
+    });
+
+    await seedWorkshopView(prisma, {
+      productId: IDS.products.tee,
+      productViewId: IDS.productViews.teeFront,
+      ids: teeWorkshopIds,
+      labels: { product: 'Classic Tee', view: 'Front' },
+      colorOptionId: IDS.options.teeColor,
+    });
+
+    await seedWorkshopView(prisma, {
+      productId: IDS.products.hoodie,
+      productViewId: IDS.productViews.hoodieFront,
+      ids: hoodieWorkshopIds,
+      labels: { product: 'Campus Hoodie', view: 'Front' },
     });
 
     await prisma.mediaAsset.createMany({

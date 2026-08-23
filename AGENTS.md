@@ -31,6 +31,7 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 
 - The `tamiym_workshop_test` database used by integration/e2e is NOT created by compose (which only creates `tamiym_workshop`). Create it once: `docker exec tamiym-postgres psql -U postgres -c "CREATE DATABASE tamiym_workshop_test;"`.
 - Apply schema with `pnpm --filter api exec prisma migrate deploy` (dev and test DBs). The seed (`prisma db seed`) only loads Nigerian geo reference data (states/LGAs) — it does NOT create products or an admin user. Use `apps/api/scripts/create-admin-user.ts` (`pnpm --filter api admin:create`) or `pnpm --filter api seed:e2e` for those.
+- Workshop demo fixtures (products with template layers + print areas): `pnpm --filter api seed:workshop-demo` — creates `demo.customer@tamiym.local` / `DemoPassword1!` and `demo.admin@tamiym.local` / `DemoPassword1!`.
 
 ### Running / ports
 
