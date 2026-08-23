@@ -154,7 +154,13 @@ export function CustomerDashboardShell({
                 className="h-[18px] w-[70px] object-contain"
               />
               <div className="flex items-center gap-3">
-                <button type="button" className="rounded-full p-1.5" aria-label="Notifications">
+                <button
+                  type="button"
+                  className="rounded-full p-1.5 opacity-60"
+                  aria-label="Notifications"
+                  title="Notifications are coming soon"
+                  disabled
+                >
                   <BellIcon />
                 </button>
 

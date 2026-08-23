@@ -37,6 +37,8 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  filterTabsListClassName,
+  filterTabsTriggerClassName,
 } from '@tamiym/ui';
 import { LayerCompositePreview } from '@/components/workshop/LayerCompositePreview';
 import { PrintAreaEditor } from '@/components/workshop/PrintAreaEditor';
@@ -493,16 +495,16 @@ export default function AdminCatalogProductDetailPage({
                 value={activeView?.id ?? product.views[0]?.id ?? ''}
                 onValueChange={(id) => setActiveViewId(id)}
               >
-                <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-                  {product.views.map((view) => (
-                    <TabsTrigger
-                      key={view.id}
-                      value={view.id}
-                      className="h-auto rounded-xl px-4 py-2 text-sm font-medium data-active:bg-primary data-active:text-white data-active:shadow-xs"
-                    >
+              <TabsList className={filterTabsListClassName}>
+                {product.views.map((view) => (
+                  <TabsTrigger
+                    key={view.id}
+                    value={view.id}
+                    className={filterTabsTriggerClassName}
+                  >
                       {view.displayName}
                       {view.templateLayers.length > 0 && (
-                        <span className="ml-1 rounded-full px-1.5 py-0.5 text-xs font-medium">
+                        <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           {view.templateLayers.length}
                         </span>
                       )}

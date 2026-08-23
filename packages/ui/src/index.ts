@@ -55,6 +55,7 @@ export {
   DialogTrigger,
 } from './components/ui/dialog';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
+export { filterTabsListClassName, filterTabsTriggerClassName } from './lib/filter-tabs';
 export {
   Sheet,
   SheetClose,

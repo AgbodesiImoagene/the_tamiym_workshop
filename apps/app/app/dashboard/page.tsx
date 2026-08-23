@@ -347,12 +347,13 @@ export default function DashboardPage() {
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {[
-              { title: 'How to use the Design Lab', image: customerAssets.tutorialVideoOne },
-              { title: 'How to place orders', image: customerAssets.tutorialVideoTwo },
+              { title: 'How to use the Design Lab', image: customerAssets.tutorialVideoOne, href: '/dashboard/design' },
+              { title: 'How to place orders', image: customerAssets.tutorialVideoTwo, href: '/dashboard/products' },
             ].map((video) => (
-              <div
+              <Link
                 key={video.title}
-                className="overflow-hidden rounded-[24px] border border-black/25 shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
+                href={video.href}
+                className="overflow-hidden rounded-[24px] border border-black/25 shadow-[0_4px_4px_rgba(0,0,0,0.25)] transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <div className="relative flex h-[260px] items-center justify-center sm:h-[283px]">
                   <Image
@@ -370,7 +371,7 @@ export default function DashboardPage() {
                 <div className="flex h-[56px] items-center justify-center bg-white px-4 text-center text-sm font-semibold tracking-[0.04em]">
                   {video.title}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

@@ -19,6 +19,8 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  filterTabsListClassName,
+  filterTabsTriggerClassName,
 } from '@tamiym/ui';
 
 type QueueFilter = 'REVIEW' | 'BLOCKED' | 'LIVE' | 'ALL';
@@ -160,12 +162,12 @@ export default function AdminModerationCampaignsPage() {
         <CardContent className="space-y-5">
           <div className="flex flex-wrap gap-2">
             <Tabs value={queueFilter} onValueChange={(val) => setQueueFilter(val as QueueFilter)}>
-              <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+              <TabsList className={filterTabsListClassName}>
                 {queueFilters.map((filter) => (
                   <TabsTrigger
                     key={filter.value}
                     value={filter.value}
-                    className="h-auto rounded-xl px-4 py-2 text-sm font-medium data-active:bg-primary data-active:text-white data-active:shadow-xs"
+                    className={filterTabsTriggerClassName}
                   >
                     {filter.label}
                   </TabsTrigger>

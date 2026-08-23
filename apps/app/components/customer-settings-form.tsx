@@ -18,6 +18,8 @@ import {
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
@@ -87,6 +89,7 @@ export function CustomerSettingsForm({
   passwordTitle,
   shippingTitle,
 }: CustomerSettingsFormProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -159,7 +162,12 @@ export function CustomerSettingsForm({
   return (
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
-        <button type="button" className="rounded-full p-1 text-black">
+        <button
+          type="button"
+          className="rounded-full p-1 text-black"
+          aria-label="Back"
+          onClick={() => router.back()}
+        >
           <svg
             viewBox="0 0 24 24"
             className="h-6 w-6"
