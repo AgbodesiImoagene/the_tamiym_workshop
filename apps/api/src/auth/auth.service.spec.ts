@@ -301,7 +301,9 @@ describe('AuthService', () => {
     );
 
     expect(isMfaChallengeResponse(result)).toBe(false);
-    expect(result.access_token).toBe('jwt');
+    if (!isMfaChallengeResponse(result)) {
+      expect(result.access_token).toBe('jwt');
+    }
     expect(authSession.createSession).toHaveBeenCalled();
     expect(adminMfa.isEnabled).not.toHaveBeenCalled();
 

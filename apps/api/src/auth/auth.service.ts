@@ -404,7 +404,7 @@ export class AuthService {
     loginDto: LoginDto,
     surface: typeof AuthSurface.ADMIN,
     opts?: LoginSessionOptions,
-  ): Promise<MfaChallengeResponse>;
+  ): Promise<LoginResult>;
   async login(
     loginDto: LoginDto,
     surface: AuthSurface,

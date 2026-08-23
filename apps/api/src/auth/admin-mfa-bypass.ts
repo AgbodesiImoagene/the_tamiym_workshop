@@ -12,6 +12,15 @@ export function isAdminMfaBypassEnabled(
   if (raw === undefined || raw === null) {
     return false;
   }
-  const normalized = String(raw).trim().toLowerCase();
-  return normalized === 'true' || normalized === '1';
+  if (typeof raw === 'boolean') {
+    return raw;
+  }
+  if (typeof raw === 'number') {
+    return raw === 1;
+  }
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1';
+  }
+  return false;
 }

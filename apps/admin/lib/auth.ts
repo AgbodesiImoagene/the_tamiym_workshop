@@ -52,7 +52,7 @@ export interface AdminMfaEnrollmentStart {
 }
 
 function isMfaChallengeResponse(
-  value: AuthResponse | AdminMfaChallengeResponse,
+  value: AuthResponse | AdminMfaChallengeResponse
 ): value is AdminMfaChallengeResponse {
   return typeof value === 'object' && value !== null && 'mfa' in value && 'mfa_token' in value;
 }
@@ -83,7 +83,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<AdminLoginResult> => {
     const response = await apiClient.post<AuthResponse | AdminMfaChallengeResponse>(
       '/auth/admin/login',
-      data,
+      data
     );
     if (isMfaChallengeResponse(response)) {
       return response;
