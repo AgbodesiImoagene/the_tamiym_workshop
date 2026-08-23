@@ -953,7 +953,7 @@ function ImageRow({
 }) {
   const [sortOrder, setSortOrder] = useState(String(image.sortOrder));
   const [altText, setAltText] = useState(image.altText ?? '');
-  const [variantId, setVariantId] = useState(image.variantId ?? '');
+  const [variantId, setVariantId] = useState(image.variantId ?? '__ALL__');
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const save = useMutation({
@@ -961,7 +961,7 @@ function ImageRow({
       updateAdminProductImageMeta(productId, image.id, {
         sortOrder: parseInt(sortOrder, 10),
         altText: altText.trim() || undefined,
-        variantId: variantId || null,
+        variantId: variantId && variantId !== '__ALL__' ? variantId : null,
       }),
     onSuccess: () => onSaved(),
   });
@@ -1002,7 +1002,7 @@ function ImageRow({
             <SelectValue placeholder="All variants" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All variants</SelectItem>
+            <SelectItem value="__ALL__">All variants</SelectItem>
             {variants.map((v) => (
               <SelectItem key={v.id} value={v.id}>
                 {v.sku}
