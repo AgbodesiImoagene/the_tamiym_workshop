@@ -57,6 +57,8 @@ function isMfaChallengeResponse(
   return typeof value === 'object' && value !== null && 'mfa' in value && 'mfa_token' in value;
 }
 
+export type AdminLoginResult = AuthResponse | AdminMfaChallengeResponse;
+
 /** Full-page redirect to API Google OAuth start for existing admin accounts only. */
 export function getAdminGoogleSignInUrl(next = '/admin'): string {
   const q = new URLSearchParams({ next });
@@ -74,18 +76,23 @@ export const GOOGLE_SIGN_IN_ERROR_MESSAGES: Record<string, string> = {
 
 export const authApi = {
   /**
-   * Password step for admin login (TTW-023). Never issues a session; returns
-   * an MFA challenge/enrollment token that must be completed next.
+   * Password step for admin login (TTW-023). Normally returns an MFA
+   * challenge/enrollment token; when AUTH_ADMIN_MFA_DISABLED is set on the API,
+   * returns a full session instead (dev-only bypass).
    */
-  login: async (data: LoginRequest): Promise<AdminMfaChallengeResponse> => {
+  login: async (data: LoginRequest): Promise<AdminLoginResult> => {
     const response = await apiClient.post<AuthResponse | AdminMfaChallengeResponse>(
       '/auth/admin/login',
       data
     );
-    if (!isMfaChallengeResponse(response)) {
-      throw new Error('Admin login did not return an MFA challenge');
+    if (isMfaChallengeResponse(response)) {
+      return response;
     }
-    return response;
+    if (response.user) {
+      setCsrfToken(response.csrf_token);
+      return response;
+    }
+    throw new Error('Admin login returned an unexpected response');
   },
 
   /** Start TOTP enrollment; returns otpauth URI + recovery codes once. */

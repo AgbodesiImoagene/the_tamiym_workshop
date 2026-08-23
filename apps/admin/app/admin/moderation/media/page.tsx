@@ -24,6 +24,8 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  filterTabsListClassName,
+  filterTabsTriggerClassName,
 } from '@tamiym/ui';
 
 // ─── Filter tabs ──────────────────────────────────────────────────────────────
@@ -215,7 +217,7 @@ export default function AdminModerationMediaPage() {
         onValueChange={(val) => setActiveFilter(val === '' ? undefined : (val as ModerationStatus))}
         className="mb-6"
       >
-        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+        <TabsList className={filterTabsListClassName}>
           {FILTERS.map((f) => {
             const isFlag = f.value === 'FLAGGED';
             const isPending = f.value === 'PENDING';
@@ -224,7 +226,7 @@ export default function AdminModerationMediaPage() {
               <TabsTrigger
                 key={String(f.value)}
                 value={f.value ?? ''}
-                className="h-auto rounded-xl px-4 py-2 text-sm font-medium data-active:bg-primary data-active:text-white data-active:shadow-xs"
+                className={filterTabsTriggerClassName}
               >
                 {f.label}
                 {count !== null && count > 0 && (

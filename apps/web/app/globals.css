@@ -3,6 +3,7 @@
 @import '@tamiym/config/shadcn.css';
 
 /* Tailwind v4 doesn't follow pnpm-symlinked workspace packages by default. */
+@source "../../**/*.{ts,tsx}";
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 :root {

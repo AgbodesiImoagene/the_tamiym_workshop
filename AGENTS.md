@@ -31,11 +31,17 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 
 - The `tamiym_workshop_test` database used by integration/e2e is NOT created by compose (which only creates `tamiym_workshop`). Create it once: `docker exec tamiym-postgres psql -U postgres -c "CREATE DATABASE tamiym_workshop_test;"`.
 - Apply schema with `pnpm --filter api exec prisma migrate deploy` (dev and test DBs). The seed (`prisma db seed`) only loads Nigerian geo reference data (states/LGAs) — it does NOT create products or an admin user. Use `apps/api/scripts/create-admin-user.ts` (`pnpm --filter api admin:create`) or `pnpm --filter api seed:e2e` for those.
+- Workshop demo fixtures (products with template layers + print areas): `pnpm --filter api seed:workshop-demo` — creates `demo.customer@tamiym.local` / `DemoPassword1!` and `demo.admin@tamiym.local` / `DemoPassword1!`.
 
 ### Running / ports
 
 - `pnpm dev` runs all apps concurrently: web `http://localhost:3000`, API `http://localhost:3001` (global prefix `/v1`, Swagger `/docs`, health `/v1/health`), customer app `http://localhost:3002`, admin `http://localhost:3003`.
 - The customer app (`apps/app`) auth/register + dashboard flows are wired to the API (`NEXT_PUBLIC_API_URL`, default `http://localhost:3001/v1`, cookie-based auth). CORS on the API allows origins 3000/3002/3003 by default.
+
+### Admin MFA (TTW-023)
+
+- Production and normal dev: ADMIN password login requires MFA enrollment/challenge before session cookies are set.
+- **Local UI testing bypass:** set `AUTH_ADMIN_MFA_DISABLED=true` in `apps/api/.env.local` (and keep `apps/api/.env` in sync if needed). The API refuses to boot with this flag when `NODE_ENV=production`. Remove the flag before any production-like deploy.
 
 ### Tests
 

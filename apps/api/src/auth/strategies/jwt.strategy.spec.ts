@@ -269,6 +269,35 @@ describe('JwtStrategy', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
+  it('accepts ADMIN-surface JWT without MFA when dev bypass is enabled', async () => {
+    const previous = process.env.AUTH_ADMIN_MFA_DISABLED;
+    process.env.AUTH_ADMIN_MFA_DISABLED = 'true';
+
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      role: UserRole.ADMIN,
+    });
+    adminMfa.isEnabled.mockResolvedValue(false);
+    const req = buildRequest({ authorization: 'Bearer some.jwt.token' });
+
+    const result = await strategy.validate(
+      req,
+      payload({
+        role: UserRole.ADMIN,
+        surface: AuthSurface.ADMIN,
+      }),
+    );
+
+    expect(result.surface).toBe(AuthSurface.ADMIN);
+    expect(adminMfa.isEnabled).not.toHaveBeenCalled();
+
+    if (previous === undefined) {
+      delete process.env.AUTH_ADMIN_MFA_DISABLED;
+    } else {
+      process.env.AUTH_ADMIN_MFA_DISABLED = previous;
+    }
+  });
+
   it('rejects unverified ADMIN JWT with generic Unauthorized', async () => {
     prisma.user.findUnique.mockResolvedValue({
       ...mockDbUser,

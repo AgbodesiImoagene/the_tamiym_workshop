@@ -137,16 +137,23 @@ function SidebarSection({
               className={cn(
                 'block rounded-2xl border px-4 py-3 transition',
                 active
-                  ? 'border-accent bg-white text-tamiym-blue shadow-sm'
+                  ? 'border-accent bg-white text-foreground shadow-sm'
                   : 'border-white/10 bg-white/5 text-white/78 hover:border-white/20 hover:bg-white/8'
               )}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold">{item.label}</span>
+                <span
+                  className={cn(
+                    'text-sm font-semibold',
+                    active ? 'text-tamiym-blue' : 'text-inherit'
+                  )}
+                >
+                  {item.label}
+                </span>
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]',
-                    active ? 'bg-accent text-tamiym-blue' : 'bg-white/10 text-white/65'
+                    active ? 'bg-accent text-accent-foreground' : 'bg-white/10 text-white/65'
                   )}
                 >
                   {item.hint}

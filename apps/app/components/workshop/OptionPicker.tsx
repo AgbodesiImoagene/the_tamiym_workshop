@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@tamiym/ui';
+import { Button, Label, cn } from '@tamiym/ui';
 import type { ProductOption, TemplateEffect } from '@/lib/designs';
 
 interface OptionPickerProps {
@@ -41,9 +41,9 @@ export default function OptionPicker({
 
         return (
           <div key={option.id} className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {option.name}
-            </span>
+            </Label>
 
             {isColorOption ? (
               <div className="flex flex-wrap gap-2">
@@ -65,10 +65,12 @@ export default function OptionPicker({
                       className={cn(
                         'h-8 w-8 rounded-full border-2 transition-all',
                         isSelected
-                          ? 'border-zinc-900 ring-2 ring-zinc-900 ring-offset-1'
-                          : 'border-white shadow'
+                          ? 'border-foreground ring-2 ring-foreground ring-offset-1'
+                          : 'border-background shadow'
                       )}
-                      style={hex ? { backgroundColor: hex } : { backgroundColor: '#e5e7eb' }}
+                      style={
+                        hex ? { backgroundColor: hex } : { backgroundColor: 'var(--color-muted)' }
+                      }
                       aria-pressed={isSelected}
                     />
                   );
@@ -79,20 +81,17 @@ export default function OptionPicker({
                 {option.values.map((value) => {
                   const isSelected = selectedOptions[option.id] === value.id;
                   return (
-                    <button
+                    <Button
                       key={value.id}
                       type="button"
+                      size="sm"
+                      variant={isSelected ? 'secondary' : 'outline'}
                       onClick={() => handleSelect(option.id, value.id)}
-                      className={cn(
-                        'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                        isSelected
-                          ? 'border-zinc-900 bg-zinc-900 text-white'
-                          : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400'
-                      )}
+                      className="text-xs"
                       aria-pressed={isSelected}
                     >
                       {value.displayName}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

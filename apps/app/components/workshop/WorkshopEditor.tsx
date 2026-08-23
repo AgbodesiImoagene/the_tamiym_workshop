@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import type { WorkshopCanvasHandle } from './WorkshopCanvas';
 import ViewTabs from './ViewTabs';
 import TextTool from './TextTool';
 import ImageTool from './ImageTool';
@@ -74,7 +75,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
 
   // Reference to the active canvas DOM element for thumbnail capture
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const canvasRef = useRef<any>(null);
+  const canvasHandleRef = useRef<WorkshopCanvasHandle>(null);
 
   // Auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,12 +123,12 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   );
 
   const captureThumbnail = useCallback(async (): Promise<Blob | null> => {
-    if (!canvasRef.current) return null;
+    const dataUrl = canvasHandleRef.current?.toDataURL({
+      format: 'webp',
+      quality: 0.8,
+    });
+    if (!dataUrl) return null;
     try {
-      const dataUrl: string = canvasRef.current.toDataURL({
-        format: 'webp',
-        quality: 0.8,
-      });
       const res = await fetch(dataUrl);
       return res.blob();
     } catch {
@@ -183,20 +184,25 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   );
 
   const handleAddText = useCallback((textObject: Record<string, unknown>) => {
-    if (!canvasRef.current) return;
+    const canvas = canvasHandleRef.current?.getCanvas();
+    if (!canvas) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import('fabric').then((mod: any) => {
       const IText = mod.IText ?? mod.fabric?.IText;
-      const itext = new IText(String(textObject.text ?? 'Text'), textObject);
-      canvasRef.current.add(itext);
-      canvasRef.current.setActiveObject(itext);
-      canvasRef.current.requestRenderAll?.();
-      canvasRef.current.renderAll?.();
+      if (!IText) return;
+      const label = String(textObject.text ?? 'Text');
+      const { text: _text, type: _type, ...options } = textObject;
+      const itext = new IText(label, options);
+      canvas.add(itext);
+      canvas.setActiveObject(itext);
+      canvas.requestRenderAll?.();
+      canvas.renderAll?.();
     });
   }, []);
 
   const handleAddImage = useCallback((imageObject: Record<string, unknown>) => {
-    if (!canvasRef.current) return;
+    const canvas = canvasHandleRef.current?.getCanvas();
+    if (!canvas) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import('fabric').then(async (mod: any) => {
       const ImageCtor = mod.FabricImage ?? mod.Image ?? mod.fabric?.Image;
@@ -204,10 +210,10 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         crossOrigin: 'anonymous',
       });
       img.set(imageObject);
-      canvasRef.current.add(img);
-      canvasRef.current.setActiveObject(img);
-      canvasRef.current.requestRenderAll?.();
-      canvasRef.current.renderAll?.();
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.requestRenderAll?.();
+      canvas.renderAll?.();
     });
   }, []);
 
@@ -240,6 +246,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         <div className="flex flex-1 items-start justify-center p-6">
           {activeView && (
             <WorkshopCanvas
+              ref={canvasHandleRef}
               viewKey={activeViewKey}
               printArea={activeView.printArea}
               templateLayers={activeView.templateLayers}

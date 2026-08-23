@@ -18,11 +18,11 @@ interface SavePanelProps {
  */
 export default function SavePanel({ designName, isSaving, onNameChange, onSave }: SavePanelProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-zinc-900">Save Design</h3>
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+      <h3 className="text-sm font-semibold text-foreground">Save Design</h3>
 
       <div className="space-y-1.5">
-        <Label htmlFor="design-name" className="text-xs text-zinc-500">
+        <Label htmlFor="design-name" className="text-xs text-muted-foreground">
           Design name
         </Label>
         {isSaving ? (

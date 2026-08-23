@@ -20,6 +20,23 @@ Each product + view defines a printable bounding box.
 - The editor constrains layer placement to bounds.
 - This addresses the PRD risk: preview ≠ production.
 
+## Local dev fixtures
+
+A designable product requires admin-configured data, not just a `ProductView`:
+
+- `ProductImage` with `WORKSHOP_TEMPLATE` role for the view
+- `WorkshopTemplateLayer` records (at least one `BASE` layer image)
+- `PrintArea` for the view
+- Optional `OptionValueTemplateEffect` (e.g. `TINT`) for colour swatches to change the template
+
+Seed workshop-ready demo data:
+
+```bash
+pnpm --filter api seed:workshop-demo
+```
+
+Creates `demo.customer@tamiym.local` / `DemoPassword1!` and `demo.admin@tamiym.local` / `DemoPassword1!` plus two ACTIVE products with template layers and print areas. For password-only admin login during local UI testing, set `AUTH_ADMIN_MFA_DISABLED=true` in `apps/api/.env.local` (forbidden in production).
+
 ## Save/duplicate/share
 
 - Save stores structured model + references to uploaded assets.
