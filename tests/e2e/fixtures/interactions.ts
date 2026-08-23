@@ -77,18 +77,29 @@ export function pathUrlMatcher(path: string): RegExp {
 
 /**
  * Customer app sidebar is desktop-only (`hidden lg:flex`). On smaller viewports,
- * navigate directly until mobile nav ships (see customer-dashboard-shell).
+ * open the mobile sheet menu when the hamburger is present.
  */
 export async function navigateCustomerSidebarLink(
   page: Page,
   label: string,
   path: string
 ): Promise<void> {
-  const link = page.locator('aside nav').getByRole('link', { name: label, exact: true });
-  if (await link.isVisible()) {
-    await link.click();
+  const desktopLink = page.locator('aside nav').getByRole('link', { name: label, exact: true });
+  if (await desktopLink.isVisible()) {
+    await desktopLink.click();
   } else {
-    await page.goto(path);
+    const menuButton = page.getByRole('button', { name: /open menu/i });
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+      const mobileLink = page.getByRole('navigation', { name: /mobile dashboard/i }).getByRole('link', {
+        name: label,
+        exact: true,
+      });
+      await expect(mobileLink).toBeVisible();
+      await mobileLink.click();
+    } else {
+      await page.goto(path);
+    }
   }
   await expect(page).toHaveURL(pathUrlMatcher(path));
 }

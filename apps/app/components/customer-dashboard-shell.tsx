@@ -6,6 +6,11 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -68,7 +73,7 @@ export function CustomerDashboardShell({
               <p className="text-base font-medium">{displayName}</p>
             </div>
 
-            <nav className="space-y-8">
+            <nav className="space-y-8" aria-label="Dashboard">
               {desktopNavItems.map(({ key, label, href, icon: Icon }) => {
                 const isActive = key === activeNav;
                 const content = (
@@ -76,7 +81,7 @@ export function CustomerDashboardShell({
                     className={cn(
                       'flex h-10 w-full items-center gap-2 rounded-b-[10px] border-b px-4 text-left text-base font-medium transition',
                       isActive
-                        ? 'border-white bg-white text-[#004385]'
+                        ? 'border-white bg-white text-tamiym-blue'
                         : 'border-white text-white hover:bg-white/10'
                     )}
                   >
@@ -149,12 +154,80 @@ export function CustomerDashboardShell({
                 className="h-[18px] w-[70px] object-contain"
               />
               <div className="flex items-center gap-3">
-                <button type="button" className="rounded-full p-1.5">
+                <button type="button" className="rounded-full p-1.5" aria-label="Notifications">
                   <BellIcon />
                 </button>
-                <button type="button" className="rounded-full p-1.5">
-                  <MenuIcon />
-                </button>
+
+                <Sheet>
+                  <SheetTrigger
+                    className="rounded-full p-1.5 text-black"
+                    aria-label="Open menu"
+                  >
+                    <MenuIcon />
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[min(100%,300px)] border-none bg-black p-0 text-white">
+                    <SheetHeader className="border-b border-white/10 px-5 py-6">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 shrink-0">
+                          <AvatarFallback className="bg-white/20 text-sm font-semibold text-white">
+                            {displayName.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <SheetTitle className="truncate text-left text-base font-medium text-white">
+                            {displayName}
+                          </SheetTitle>
+                          <p className="text-sm text-white/65">Customer dashboard</p>
+                        </div>
+                      </div>
+                    </SheetHeader>
+
+                    <nav className="space-y-2 px-3 py-4" aria-label="Mobile dashboard">
+                      {desktopNavItems.map(({ key, label, href, icon: Icon }) => {
+                        if (!href) return null;
+                        const isActive = key === activeNav;
+
+                        return (
+                          <SheetTrigger key={key} asChild>
+                            <Link
+                              href={href}
+                              className={cn(
+                                'flex h-11 items-center gap-2 rounded-lg px-4 text-base font-medium transition',
+                                isActive
+                                  ? 'bg-white text-tamiym-blue'
+                                  : 'text-white hover:bg-white/10'
+                              )}
+                            >
+                              <Icon />
+                              <span>{label}</span>
+                            </Link>
+                          </SheetTrigger>
+                        );
+                      })}
+                    </nav>
+
+                    <div className="border-t border-white/10 px-5 py-4">
+                      <Button
+                        variant="ghost"
+                        onClick={() => void handleLogout()}
+                        className="w-full justify-start gap-2 rounded-lg px-4 text-white hover:bg-white/10"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M10 17 15 12 10 7" />
+                          <path d="M15 12H3" />
+                          <path d="M20 4v16" />
+                        </svg>
+                        Sign out
+                      </Button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
             </div>
 
