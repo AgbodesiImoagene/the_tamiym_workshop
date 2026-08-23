@@ -110,7 +110,12 @@ export async function seedWorkshopView(
   const { productId, productViewId, ids, labels, colorOptionId } = input;
   const baseLabel = labels.product;
   const baseUrl = placeholderImage('600x600', `${baseLabel} Base`, 'd4d4d8');
-  const maskUrl = placeholderImage('600x600', `${baseLabel} Mask`, 'ffffff', '9ca3af');
+  const maskUrl = placeholderImage(
+    '600x600',
+    `${baseLabel} Mask`,
+    'ffffff',
+    '9ca3af',
+  );
 
   const mediaAssets = [
     mediaAssetRow(
@@ -205,7 +210,10 @@ export async function seedWorkshopView(
     );
   }
 
-  await prisma.mediaAsset.createMany({ data: mediaAssets, skipDuplicates: true });
+  await prisma.mediaAsset.createMany({
+    data: mediaAssets,
+    skipDuplicates: true,
+  });
   await prisma.mediaDerivative.createMany({
     data: derivatives,
     skipDuplicates: true,

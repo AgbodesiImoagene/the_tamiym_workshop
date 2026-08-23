@@ -89,7 +89,10 @@ export function CustomerDashboardShell({
                       key={key}
                       type="button"
                       variant="ghost"
-                      className={cn('h-auto w-full justify-start rounded-b-[10px] p-0', navClassName)}
+                      className={cn(
+                        'h-auto w-full justify-start rounded-b-[10px] p-0',
+                        navClassName
+                      )}
                     >
                       <Icon />
                       <span>{label}</span>

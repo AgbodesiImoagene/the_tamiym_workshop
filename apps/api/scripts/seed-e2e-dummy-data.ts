@@ -37,7 +37,10 @@ import {
   closePrismaScriptContext,
   createPrismaScriptContext,
 } from './_prisma-script-client';
-import { seedWorkshopView, type WorkshopLayerSeedIds } from './workshop-seed-shared';
+import {
+  seedWorkshopView,
+  type WorkshopLayerSeedIds,
+} from './workshop-seed-shared';
 import {
   decodeMfaEncryptionKey,
   encryptTotpSecret,

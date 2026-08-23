@@ -158,7 +158,8 @@ async function main() {
           categoryId: IDS.category,
           name: 'Demo Campus Hoodie',
           slug: 'demo-campus-hoodie',
-          description: 'Workshop demo hoodie with a single BASE template layer.',
+          description:
+            'Workshop demo hoodie with a single BASE template layer.',
           status: ProductStatus.ACTIVE,
           weightGrams: 640,
         },
