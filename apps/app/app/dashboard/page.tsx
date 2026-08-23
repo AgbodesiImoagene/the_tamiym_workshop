@@ -347,8 +347,16 @@ export default function DashboardPage() {
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {[
-              { title: 'How to use the Design Lab', image: customerAssets.tutorialVideoOne, href: '/dashboard/design' },
-              { title: 'How to place orders', image: customerAssets.tutorialVideoTwo, href: '/dashboard/products' },
+              {
+                title: 'How to use the Design Lab',
+                image: customerAssets.tutorialVideoOne,
+                href: '/dashboard/design',
+              },
+              {
+                title: 'How to place orders',
+                image: customerAssets.tutorialVideoTwo,
+                href: '/dashboard/products',
+              },
             ].map((video) => (
               <Link
                 key={video.title}

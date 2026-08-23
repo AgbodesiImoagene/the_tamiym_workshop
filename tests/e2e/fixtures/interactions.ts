@@ -91,10 +91,12 @@ export async function navigateCustomerSidebarLink(
     const menuButton = page.getByRole('button', { name: /open menu/i });
     if (await menuButton.isVisible()) {
       await menuButton.click();
-      const mobileLink = page.getByRole('navigation', { name: /mobile dashboard/i }).getByRole('link', {
-        name: label,
-        exact: true,
-      });
+      const mobileLink = page
+        .getByRole('navigation', { name: /mobile dashboard/i })
+        .getByRole('link', {
+          name: label,
+          exact: true,
+        });
       await expect(mobileLink).toBeVisible();
       await mobileLink.click();
     } else {

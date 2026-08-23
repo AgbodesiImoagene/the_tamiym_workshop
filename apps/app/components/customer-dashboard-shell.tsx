@@ -165,13 +165,13 @@ export function CustomerDashboardShell({
                 </button>
 
                 <Sheet>
-                  <SheetTrigger
-                    className="rounded-full p-1.5 text-black"
-                    aria-label="Open menu"
-                  >
+                  <SheetTrigger className="rounded-full p-1.5 text-black" aria-label="Open menu">
                     <MenuIcon />
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-[min(100%,300px)] border-none bg-black p-0 text-white">
+                  <SheetContent
+                    side="right"
+                    className="w-[min(100%,300px)] border-none bg-black p-0 text-white"
+                  >
                     <SheetHeader className="border-b border-white/10 px-5 py-6">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 shrink-0">

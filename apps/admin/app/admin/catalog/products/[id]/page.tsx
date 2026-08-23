@@ -495,13 +495,13 @@ export default function AdminCatalogProductDetailPage({
                 value={activeView?.id ?? product.views[0]?.id ?? ''}
                 onValueChange={(id) => setActiveViewId(id)}
               >
-              <TabsList className={filterTabsListClassName}>
-                {product.views.map((view) => (
-                  <TabsTrigger
-                    key={view.id}
-                    value={view.id}
-                    className={filterTabsTriggerClassName}
-                  >
+                <TabsList className={filterTabsListClassName}>
+                  {product.views.map((view) => (
+                    <TabsTrigger
+                      key={view.id}
+                      value={view.id}
+                      className={filterTabsTriggerClassName}
+                    >
                       {view.displayName}
                       {view.templateLayers.length > 0 && (
                         <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
