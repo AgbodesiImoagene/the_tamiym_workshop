@@ -261,7 +261,18 @@ export async function seedWorkshopView(
     skipDuplicates: true,
   });
 
-  const templateLayers = [
+  const templateLayers: Array<{
+    id: string;
+    productId: string;
+    productViewId: string;
+    key: string;
+    displayName: string;
+    layerType: TemplateLayerType;
+    imageId: string;
+    blendMode: BlendMode;
+    opacity: number;
+    zIndex: number;
+  }> = [
     {
       id: ids.templateLayers.base,
       productId,

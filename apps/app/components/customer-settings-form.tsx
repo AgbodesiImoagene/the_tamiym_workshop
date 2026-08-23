@@ -2,6 +2,7 @@
 
 import { customerAssets } from '@/lib/assets';
 import {
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -71,13 +72,13 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 function SaveButton({ label, loading }: { label: string; loading: boolean }) {
   return (
-    <button
+    <Button
       type="submit"
       disabled={loading}
-      className="h-8 min-w-[178px] rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385] disabled:opacity-60"
+      className="min-w-[178px] border border-black/50 bg-accent font-bold text-primary"
     >
       {loading ? 'Saving...' : label}
-    </button>
+    </Button>
   );
 }
 
@@ -162,9 +163,11 @@ export function CustomerSettingsForm({
   return (
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
-          className="rounded-full p-1 text-black"
+          variant="ghost"
+          size="icon"
+          className="rounded-full text-black"
           aria-label="Back"
           onClick={() => router.back()}
         >
@@ -177,7 +180,7 @@ export function CustomerSettingsForm({
           >
             <path d="m15 18-6-6 6-6" />
           </svg>
-        </button>
+        </Button>
         <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">{pageTitle}</h1>
       </div>
 
@@ -202,12 +205,13 @@ export function CustomerSettingsForm({
                 height={220}
                 className="h-[220px] w-[220px] rounded-full object-cover"
               />
-              <button
+              <Button
                 type="button"
-                className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
+                variant="outline"
+                className="border-black/50 bg-accent font-bold text-primary"
               >
                 {pageTitle === 'Profile' ? 'Upload Profile Picture' : 'Update Profile Picture'}
-              </button>
+              </Button>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">

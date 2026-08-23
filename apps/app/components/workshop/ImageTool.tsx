@@ -71,10 +71,10 @@ export default function ImageTool({ onAddImage }: ImageToolProps) {
   );
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-zinc-900">Add Image</h3>
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+      <h3 className="text-sm font-semibold text-foreground">Add Image</h3>
 
-      <p className="text-xs text-zinc-500">PNG, JPEG or WebP · max {MAX_FILE_SIZE_MB} MB</p>
+      <p className="text-xs text-muted-foreground">PNG, JPEG or WebP · max {MAX_FILE_SIZE_MB} MB</p>
 
       <input
         ref={inputRef}
@@ -96,7 +96,7 @@ export default function ImageTool({ onAddImage }: ImageToolProps) {
       </Button>
 
       {error && (
-        <p className="text-xs font-medium text-red-600" role="alert">
+        <p className="text-xs font-medium text-error" role="alert">
           {error}
         </p>
       )}

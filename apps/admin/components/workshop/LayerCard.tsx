@@ -6,6 +6,8 @@ import { LAYER_TYPE_LABELS, LAYER_TYPE_COLORS, BLEND_MODE_CSS } from '@/lib/prod
 import {
   Button,
   ConfirmDialog,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -125,21 +127,19 @@ export function LayerCard({ layer, productId, viewId, onUpdate, onDelete }: Laye
               key: <code className="font-mono">{layer.key}</code>
             </span>
             <span className="ml-auto text-xs text-muted-foreground">z-index:</span>
-            <input
+            <Input
               type="number"
               value={zIndex}
               onChange={(e) => setZIndex(Number(e.target.value))}
-              className="w-14 rounded border border-border px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+              className="h-7 w-14 px-1.5 text-xs"
             />
           </div>
 
-          {/* Display name */}
-          <input
+          <Input
             type="text"
             placeholder={`Display name (default: ${layer.key})`}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
 
           {/* Blend mode + opacity row */}
@@ -335,19 +335,17 @@ export function NewLayerCard({ productId, viewId, existingCount, onUpload }: New
 
       {/* Fields */}
       <div className="space-y-2">
-        <input
+        <Input
           type="text"
           placeholder="Layer key (e.g. body_mask) *"
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
-        <input
+        <Input
           type="text"
           placeholder="Display name (optional)"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
 
         <div className="flex gap-2">
@@ -378,7 +376,7 @@ export function NewLayerCard({ productId, viewId, existingCount, onUpload }: New
           </Select>
         </div>
 
-        <label className="block space-y-1">
+        <Label className="block space-y-1">
           <span className="text-xs font-medium text-muted-foreground">
             Opacity ({Math.round(opacity * 100)}%)
           </span>
@@ -391,7 +389,7 @@ export function NewLayerCard({ productId, viewId, existingCount, onUpload }: New
             onChange={(e) => setOpacity(Number(e.target.value))}
             className="w-full"
           />
-        </label>
+        </Label>
       </div>
 
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}

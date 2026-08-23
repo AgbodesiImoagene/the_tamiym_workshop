@@ -76,28 +76,39 @@ export function CustomerDashboardShell({
             <nav className="space-y-8" aria-label="Dashboard">
               {desktopNavItems.map(({ key, label, href, icon: Icon }) => {
                 const isActive = key === activeNav;
-                const content = (
-                  <span
-                    className={cn(
-                      'flex h-10 w-full items-center gap-2 rounded-b-[10px] border-b px-4 text-left text-base font-medium transition',
-                      isActive
-                        ? 'border-white bg-white text-tamiym-blue'
-                        : 'border-white text-white hover:bg-white/10'
-                    )}
-                  >
-                    <Icon />
-                    <span>{label}</span>
-                  </span>
+                const navClassName = cn(
+                  'flex h-10 w-full items-center gap-2 rounded-b-[10px] border-b px-4 text-left text-base font-medium transition',
+                  isActive
+                    ? 'border-white bg-white text-tamiym-blue'
+                    : 'border-white text-white hover:bg-white/10'
                 );
 
-                return href ? (
-                  <Link key={key} href={href}>
-                    {content}
-                  </Link>
-                ) : (
-                  <button key={key} type="button" className="w-full text-left">
-                    {content}
-                  </button>
+                if (!href) {
+                  return (
+                    <Button
+                      key={key}
+                      type="button"
+                      variant="ghost"
+                      className={cn('h-auto w-full justify-start rounded-b-[10px] p-0', navClassName)}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </Button>
+                  );
+                }
+
+                return (
+                  <Button
+                    key={key}
+                    asChild
+                    variant="ghost"
+                    className={cn('h-auto w-full justify-start rounded-b-[10px] p-0', navClassName)}
+                  >
+                    <Link href={href}>
+                      <Icon />
+                      <span>{label}</span>
+                    </Link>
+                  </Button>
                 );
               })}
             </nav>
@@ -154,15 +165,17 @@ export function CustomerDashboardShell({
                 className="h-[18px] w-[70px] object-contain"
               />
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   type="button"
-                  className="rounded-full p-1.5 opacity-60"
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full opacity-60"
                   aria-label="Notifications"
                   title="Notifications are coming soon"
                   disabled
                 >
                   <BellIcon />
-                </button>
+                </Button>
 
                 <Sheet>
                   <SheetTrigger className="rounded-full p-1.5 text-black" aria-label="Open menu">

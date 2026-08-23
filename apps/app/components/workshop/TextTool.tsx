@@ -3,6 +3,8 @@
 import { useRef, useState, useCallback } from 'react';
 import {
   Button,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -73,16 +75,15 @@ export default function TextTool({ onAddText }: TextToolProps) {
   }, [text, fontFamily, fontSize, bold, italic, fill, textAlign, onAddText]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-zinc-900">Add Text</h3>
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+      <h3 className="text-sm font-semibold text-foreground">Add Text</h3>
 
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Enter text…"
-        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none focus:border-zinc-400"
       />
 
       <div className="grid grid-cols-2 gap-2">
@@ -116,28 +117,32 @@ export default function TextTool({ onAddText }: TextToolProps) {
       <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant={bold ? 'secondary' : 'outline'}
               onClick={() => setBold((v) => !v)}
-              className={`rounded px-2 py-1 text-sm font-bold ${bold ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+              className="px-2 font-bold"
               aria-pressed={bold}
             >
               B
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>Bold</TooltipContent>
         </Tooltip>
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant={italic ? 'secondary' : 'outline'}
               onClick={() => setItalic((v) => !v)}
-              className={`rounded px-2 py-1 text-sm italic ${italic ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+              className="px-2 italic"
               aria-pressed={italic}
             >
               I
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>Italic</TooltipContent>
         </Tooltip>
@@ -145,14 +150,16 @@ export default function TextTool({ onAddText }: TextToolProps) {
         {(['left', 'center', 'right'] as const).map((align) => (
           <Tooltip key={align}>
             <TooltipTrigger asChild>
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant={textAlign === align ? 'secondary' : 'outline'}
                 onClick={() => setTextAlign(align)}
-                className={`rounded px-2 py-1 text-xs ${textAlign === align ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'}`}
+                className="px-2 text-xs"
                 aria-pressed={textAlign === align}
               >
                 {ALIGN_ICONS[align]}
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>Align {align}</TooltipContent>
           </Tooltip>
@@ -160,9 +167,9 @@ export default function TextTool({ onAddText }: TextToolProps) {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <label className="flex cursor-pointer items-center gap-1 text-xs text-zinc-600">
+            <Label className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground">
               <span
-                className="h-5 w-5 rounded border border-zinc-300"
+                className="h-5 w-5 rounded border border-border"
                 style={{ backgroundColor: fill }}
               />
               <input
@@ -172,7 +179,7 @@ export default function TextTool({ onAddText }: TextToolProps) {
                 className="sr-only"
               />
               Colour
-            </label>
+            </Label>
           </TooltipTrigger>
           <TooltipContent>Text colour</TooltipContent>
         </Tooltip>
