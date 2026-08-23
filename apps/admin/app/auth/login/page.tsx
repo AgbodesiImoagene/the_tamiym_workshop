@@ -106,7 +106,13 @@ export default function AdminLoginPage() {
     setError(null);
     setBusy(true);
     try {
-      const challenge = await authApi.login(values);
+      const result = await authApi.login(values);
+      if (!('mfa' in result)) {
+        await finishSession(result);
+        return;
+      }
+
+      const challenge = result;
       setMfaToken(challenge.mfa_token);
       setMfaStatus(challenge.mfa.status);
       totpForm.reset({ totp: '' });

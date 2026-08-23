@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricCanvas = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricNS = any;
+
+export interface WorkshopCanvasHandle {
+  getCanvas: () => FabricCanvas | null;
+  toDataURL: (options?: { format?: string; quality?: number }) => string | null;
+}
 
 interface WorkshopCanvasProps {
   viewKey: string;
@@ -32,21 +37,41 @@ const DEFAULT_SIZE = 600;
  * Template layers are always reconstructed from props — they are never in fabricJson.
  * Fabric.js is imported dynamically (browser-only). Compatible with fabric v7 named exports.
  */
-export default function WorkshopCanvas({
-  viewKey,
-  printArea,
-  templateLayers,
-  activeEffects,
-  fabricJson,
-  width = DEFAULT_SIZE,
-  height = DEFAULT_SIZE,
-  onLayersChange,
-  readOnly = false,
-}: WorkshopCanvasProps) {
+const WorkshopCanvas = forwardRef<WorkshopCanvasHandle, WorkshopCanvasProps>(function WorkshopCanvas(
+  {
+    viewKey,
+    printArea,
+    templateLayers,
+    activeEffects,
+    fabricJson,
+    width = DEFAULT_SIZE,
+    height = DEFAULT_SIZE,
+    onLayersChange,
+    readOnly = false,
+  },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas>(null);
   const fabricModuleRef = useRef<FabricNS>(null);
   const lastJsonRef = useRef<string>('');
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCanvas: () => fabricRef.current,
+      toDataURL: (options) => {
+        const canvas = fabricRef.current;
+        if (!canvas?.toDataURL) return null;
+        try {
+          return canvas.toDataURL(options);
+        } catch {
+          return null;
+        }
+      },
+    }),
+    [],
+  );
 
   const buildLayerKey = (layerId: string) => `__template_${layerId}`;
 
@@ -228,7 +253,9 @@ export default function WorkshopCanvas({
       <canvas ref={canvasRef} key={viewKey} style={{ width, height, display: 'block' }} />
     </div>
   );
-}
+});
+
+export default WorkshopCanvas;
 
 function blendModeToComposite(blendMode: string): GlobalCompositeOperation {
   const map: Record<string, GlobalCompositeOperation> = {
