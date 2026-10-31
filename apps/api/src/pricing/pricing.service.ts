@@ -402,8 +402,9 @@ export class PricingService {
           include: {
             option: { select: { name: true, code: true } },
             optionValue: {
-              select: { displayName: true, valueCode: true },
-              include: {
+              select: {
+                displayName: true,
+                valueCode: true,
                 upcharges: { where: { currency: currency as any }, take: 1 },
               },
             },
