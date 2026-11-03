@@ -1,7 +1,7 @@
 # TTW-006 — Fix the invalid YAML in the release-candidate workflow
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress: implemented locally on `codex/ttw-006-fix-release-candidate-workflow-syntax`; GitHub acceptance not yet observed\
+**Status:** Complete (2026-11-03): merged to `main` as `46de3a9`; manual release-candidate run #205 green\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** Release-candidate rehearsal (TTW-054, TTW-068)
@@ -47,7 +47,7 @@ Quote the step name (`name: "Build ${{ matrix.name }} image (push: false)"`) and
 
 ## Acceptance criteria
 
-- [ ] GitHub no longer reports `release-candidate.yml` as an invalid workflow file on push, and a manual "Run workflow" dispatch starts (record the run link).
+- [x] GitHub no longer reports `release-candidate.yml` as an invalid workflow file on push, and a manual "Run workflow" dispatch starts (record the run link).
 - [x] No other workflow file has the same syntax problem (`pnpm workflows:validate` parses all six workflows; see evidence).
 - [x] An invalid workflow file fails the CI `Documentation` job (`.github/workflows/ci.yml`, step "Validate GitHub workflow syntax").
 
@@ -61,7 +61,7 @@ Not required (low risk).
 
 ## Implementation reviews
 
-Pending.
+- 2026-11-03, `/code-review low` on the full diff (workflow, CI step, validator, package.json): **no findings**.
 
 ## Verification evidence
 
@@ -75,8 +75,15 @@ Pending.
 
 ### GitHub
 
-Pending: needs a push, then a manual dispatch of "Release Candidate".
+2026-11-03, after `46de3a9` reached GitHub:
+
+- Before the fix, every push, including ticket branches, produced an "Invalid workflow file" failure for this workflow (runs #200–#204, for example #201 on `codex/ttw-038-fix-invalid-pricing-quote-query`).
+- Push of `46de3a9` to `codex/ttw-006-fix-release-candidate-workflow-syntax`, then to `main` (`12b4624..46de3a9`): no new "Invalid workflow file" run (`GET /repos/AgbodesiImoagene/the_tamiym_workshop/actions/workflows/release-candidate.yml/runs` still at `total_count` 204 after both pushes).
+- `GET /repos/…/actions/workflows` now lists the workflow by its name, "Release Candidate", instead of its path, and the Actions page shows the "Run workflow" button.
+- Manual dispatch on `main`: [run #205](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/41672213561) (`workflow_dispatch`, `46de3a9`) concluded **success** (2026-11-03T16:21Z), all seven jobs green: "Validate infra (credential-free)", the four "Build images (no push)" matrix jobs, "Assemble release manifest" and "Live temporary-validation (owner-gated)" (fail-closed default path).
+- CI on `main` for `46de3a9` ([run](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/41667735477)): the `Documentation` job's new step "Validate GitHub workflow syntax" passed. The run is red only on "Production Audit", the pre-existing failure tracked in TTW-007; every other job is green.
+- Process note: a parallel session switched branches in the same checkout during this ticket, so the first push of the ticket branch carried `12b4624` (no fix). The branch was re-pointed to `46de3a9` and pushed again; the evidence above comes from that second push.
 
 ## Completion summary
 
-Pending GitHub acceptance.
+GitHub loads `release-candidate.yml` again and the owner-dispatched rehearsal runs end to end (run #205, green). Three unquoted step names were fixed, not one. A new `pnpm workflows:validate` gate, run in the CI `Documentation` job, parses every workflow so a syntax error now fails CI on the push that introduces it. Nothing left in scope; `main` CI stays red on the production audit until TTW-007.
