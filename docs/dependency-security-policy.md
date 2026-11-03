@@ -15,7 +15,7 @@
 
 1. Upgrade the direct root package (preferred).
 2. Replace an unused / mis-scoped package (e.g. move CLI packages to `devDependencies`, replace unused template engines).
-3. Targeted `pnpm.overrides` for **patched** transitive versions when no compatible parent bump exists yet — each override must map to an advisory in the TTW-022 table.
+3. Targeted `pnpm.overrides` for **patched** transitive versions when no compatible parent bump exists yet — each override must map to an advisory in the TTW-022 table or the TTW-007 override register; new overrides are bounded to their current major (`^`).
 4. Never use `--force`, blanket audit ignores, or `audit-level` lowering to hide critical/high findings.
 
 ## Rollback
