@@ -271,6 +271,49 @@ export enum NotificationStatus {
   FAILED = 'FAILED',
 }
 
+// TTW-043: consent / preference taxonomy category.
+export enum NotificationCategory {
+  SECURITY = 'SECURITY',
+  TRANSACTIONAL = 'TRANSACTIONAL',
+  ORGANISER_OPERATIONAL = 'ORGANISER_OPERATIONAL',
+  MARKETING = 'MARKETING',
+}
+
+// TTW-043: optional preference channel (mirrors delivery channels customers may control).
+export enum NotificationPreferenceChannel {
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+}
+
+// TTW-043: why a notification was suppressed instead of queued for delivery.
+export enum NotificationSuppressionReason {
+  PREFERENCE_OPT_OUT = 'PREFERENCE_OPT_OUT',
+  MISSING_CONSENT = 'MISSING_CONSENT',
+  TAXONOMY_UNMAPPED = 'TAXONOMY_UNMAPPED',
+  RECIPIENT_MISSING = 'RECIPIENT_MISSING',
+}
+
+// TTW-043: auditable consent evidence source.
+export enum NotificationConsentSource {
+  REGISTRATION = 'REGISTRATION',
+  PREFERENCE_SETTINGS = 'PREFERENCE_SETTINGS',
+  UNSUBSCRIBE_LINK = 'UNSUBSCRIBE_LINK',
+  ADMIN_OVERRIDE = 'ADMIN_OVERRIDE',
+}
+
+// TTW-043: append-only delivery attempt outcome.
+export enum NotificationAttemptOutcome {
+  SUCCESS = 'SUCCESS',
+  FAILURE = 'FAILURE',
+  RETRY_SCHEDULED = 'RETRY_SCHEDULED',
+}
+
+// TTW-043: operator acknowledgement of a dead-letter row.
+export enum DeadLetterAckStatus {
+  OPEN = 'OPEN',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+}
+
 // Type of admin or system action recorded in the audit log.
 export enum AuditAction {
   CREATE = 'CREATE',
@@ -332,6 +375,15 @@ export enum PayoutMode {
   MANUAL = 'MANUAL',
   AUTO_APPROVAL_REQUIRED = 'AUTO_APPROVAL_REQUIRED',
   AUTO_EXECUTE = 'AUTO_EXECUTE',
+}
+
+// Only VERIFIED profiles may be selected for new payouts.
+export enum PayoutProfileStatus {
+  PENDING_VERIFICATION = 'PENDING_VERIFICATION',
+  VERIFIED = 'VERIFIED',
+  REJECTED = 'REJECTED',
+  SUSPENDED = 'SUSPENDED',
+  SUPERSEDED = 'SUPERSEDED',
 }
 
 // Status of a payout run (batch).

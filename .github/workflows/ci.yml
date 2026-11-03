@@ -484,6 +484,8 @@ jobs:
           DATABASE_URL: postgresql://user:password@localhost:5432/tamiym_workshop?schema=public
       - name: Check OpenAPI contract drift
         run: pnpm openapi:check
+      - name: Check shared enum drift
+        run: pnpm enums:check && pnpm enums:check:test
 
   observability:
     name: Observability Artefacts
