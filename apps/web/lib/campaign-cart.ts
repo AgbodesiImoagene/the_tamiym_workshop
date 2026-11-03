@@ -244,6 +244,19 @@ export function setPendingOrderId(cart: CampaignCart, orderId: string | null): C
   };
 }
 
+/**
+ * Same lines, new revision: used when the API refuses the current key because it was
+ * already used with other content, e.g. a different delivery address (TTW-037).
+ */
+export function withNewIdempotencyKey(cart: CampaignCart): CampaignCart {
+  return {
+    ...cart,
+    idempotencyKey: newIdempotencyKey(),
+    pendingOrderId: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function checkoutPathForSlug(slug: string): string {
   return `/fundraiser/${encodeURIComponent(slug)}/checkout`;
 }

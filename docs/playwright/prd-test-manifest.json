@@ -55,7 +55,7 @@
       "feature": "Supporter checkout and payment confirmation",
       "prd_ref": "Checkout & Orders",
       "automation": "blocked",
-      "blocked_by": "TTW-032",
+      "blocked_by": "TTW-039",
       "browser_tiers": ["matrix", "journey"],
       "tags": ["@web", "@journey", "@critical"]
     },
@@ -138,8 +138,8 @@
       "surface": "app",
       "feature": "Customer checkout address, quote and payment",
       "prd_ref": "Checkout & Orders",
-      "automation": "blocked",
-      "blocked_by": "TTW-032",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/checkout-idempotency.spec.ts"],
       "browser_tiers": ["matrix", "journey"],
       "tags": ["@app", "@journey", "@critical"]
     },

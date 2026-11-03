@@ -10,6 +10,7 @@ import {
   loadCampaignCart,
   saveCampaignCart,
   setPendingOrderId,
+  withNewIdempotencyKey,
   type CampaignCart,
 } from '@/lib/campaign-cart';
 import {
@@ -219,6 +220,17 @@ export default function FundraiserCheckoutPage() {
       const apiError = err as ApiError;
       if (apiError.code === 'EMAIL_NOT_VERIFIED') {
         router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
+        return;
+      }
+      // The key was already used with other content (e.g. an edited address):
+      // start a new revision of the same lines and ask for a fresh quote (TTW-037).
+      if (apiError.code === 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH') {
+        const rotated = withNewIdempotencyKey(cart);
+        saveCampaignCart(rotated);
+        setCart(rotated);
+        setQuote(null);
+        setQuoteAccepted(false);
+        setError('Your cart or address changed. Review the quote again.');
         return;
       }
       setError(apiError.message || 'We could not start payment for this order.');

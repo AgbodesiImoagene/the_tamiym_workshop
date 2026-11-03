@@ -11666,6 +11666,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a standard order or another campaign. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same request on this campaign returns that order (201). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     CampaignsController_quoteCampaignOrder: {
@@ -12802,6 +12809,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     OrdersController_quote: {
@@ -13104,7 +13118,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid order or payment config */
+            /** @description Invalid order or payment config. code ORDER_NOT_PENDING_PAYMENT when the order is no longer awaiting payment; code PAYMENT_WINDOW_EXPIRED when its payment window has passed (server clock). */
             400: {
                 headers: {
                     [name: string]: unknown;

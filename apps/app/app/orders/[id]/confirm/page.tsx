@@ -3,6 +3,7 @@
 import { OrderStatusBanner } from '@/components/order-status-banner';
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { ApiError, User, authApi } from '@/lib/auth';
+import { clearCartIfPendingOrder } from '@/lib/cart-store';
 import { getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -44,6 +45,15 @@ export default function OrderConfirmPage() {
       return paymentStatus === 'PENDING' || paymentStatus === 'INITIATED' ? 3000 : false;
     },
   });
+
+  // The checkout keeps the cart until the backend confirms payment (TTW-037).
+  const confirmedOrderId =
+    orderQuery.data?.paymentStatus === 'SUCCEEDED' ? orderQuery.data.id : null;
+  useEffect(() => {
+    if (confirmedOrderId) {
+      clearCartIfPendingOrder(confirmedOrderId);
+    }
+  }, [confirmedOrderId]);
 
   async function handleRetryPayment() {
     if (!orderQuery.data?.paymentRetryEligible) {

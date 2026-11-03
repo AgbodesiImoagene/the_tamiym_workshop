@@ -95,6 +95,19 @@ Denial/info code when a client assumes exception ⇒ refund: `SHIPMENT_EXCEPTION
 
 Confirmed refunds continue to adjust campaign totals only via TTW-013 settlement. Negative organiser balance / recovery policy is out of slice 1.
 
+## Order creation idempotency (TTW-037)
+
+| Rule                 | Value                                                                                                                                                                                                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guarantee            | One `(userId, idempotencyKey)` creates at most one order and one inventory reservation, enforced by `@@unique([userId, idempotencyKey])`                                                                                                                                      |
+| Sequential replay    | A known key returns the existing order (201), whatever its status, only if the request content matches the stored fingerprint (lines, saved delivery address content, campaign)                                                                                               |
+| Content mismatch     | A known key with a different fingerprint, or whose order has no fingerprint, → 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH`; nothing is created. Clients start a new key and re-quote                                                                                               |
+| Fingerprint required | `orders_idempotency_fingerprint_required` CHECK (validated on every row): a keyed order must store `idempotencyFingerprint`. The migration marks keyed orders created before TTW-037 with the sentinel `legacy:unreplayable`: they stay updatable and their keys never replay |
+| Concurrent replay    | A request that fails after the winner committed (lost unique constraint, or an earlier check such as stock) rolls back its own work and returns the winner's order; no 5xx                                                                                                    |
+| Kind mismatch        | A key already used for a standard order, another campaign, or a campaign order on the standard endpoint → 409 `IDEMPOTENCY_KEY_REUSED`; nothing is created                                                                                                                    |
+| Client key lifecycle | `apps/app` keeps one key per cart revision; it changes when lines change, when the quoted address differs from the saved one, or when the server reports the order closed or `PAYMENT_WINDOW_EXPIRED` (never from the device clock)                                           |
+| Cart clearing        | `apps/app` clears the cart only after the backend reports the pending order paid (confirmation page or a replay returning a paid order), or on explicit removal                                                                                                               |
+
 ## Stable code catalogue
 
 All machine codes are prefixed for support/runbook use:
@@ -103,6 +116,7 @@ All machine codes are prefixed for support/runbook use:
 - Refund: `REFUND_*`
 - Return: `RETURN_*`
 - Shipment coupling: `SHIPMENT_EXCEPTION_IS_NOT_REMEDY`
+- Order creation (TTW-037): `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH`; payment initiation: `ORDER_NOT_PENDING_PAYMENT`, `PAYMENT_WINDOW_EXPIRED`
 
 Policy version string is returned on eligibility projections and denial payloads.
 

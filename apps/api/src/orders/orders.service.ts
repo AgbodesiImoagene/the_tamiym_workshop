@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,10 +53,33 @@ import type { PricingLineItemOutput } from '../pricing/pricing.types';
 import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
 import { ShipmentDirection, ShipmentStatus } from '../generated/prisma/enums';
 
+import {
+  IDEMPOTENCY_KEY_PAYLOAD_MISMATCH,
+  IDEMPOTENCY_KEY_REUSED,
+  computeOrderRequestFingerprint,
+  type FingerprintAddress,
+} from './order-idempotency';
+
 type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
+
+const ORDER_INCLUDE = {
+  items: {
+    include: {
+      product: { select: { id: true, name: true, slug: true } },
+      variant: { select: { id: true, name: true, sku: true } },
+    },
+  },
+  shippingAddress: {
+    select: { id: true, city: true, state: true, country: true },
+  },
+} as const;
+
+type OrderWithItems = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -75,6 +99,11 @@ export class OrdersService {
   async create(userId: string, dto: CreateOrderDto) {
     await this.assertEmailVerifiedForOrder(userId);
 
+    // One read: the fingerprint and the order snapshot describe the same address.
+    const address = await this.prisma.address.findUnique({
+      where: { id: dto.shippingAddressId },
+    });
+    const fingerprint = this.requestFingerprint(userId, dto, null, address);
     if (dto.idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: {
@@ -86,93 +115,103 @@ export class OrdersService {
         include: this.orderInclude(),
       });
       if (existing) {
+        this.assertIdempotentReplay(existing, null, fingerprint);
         return existing;
       }
     }
 
-    await this.assertDesignOwnershipAndProductMatch(userId, dto.items);
+    const { order, replayed } = await this.createOrReplay(
+      userId,
+      dto.idempotencyKey,
+      null,
+      fingerprint,
+      async () => {
+        await this.assertDesignOwnershipAndProductMatch(userId, dto.items);
 
-    const quoteDto = {
-      shippingAddressId: dto.shippingAddressId,
-      items: dto.items.map((i) => ({
-        variantId: i.variantId,
-        designId: i.designId,
-        quantity: i.quantity,
-      })),
-    };
-    const quote = await this.pricingService.quoteStandard(userId, quoteDto);
-    this.assertShippingResolved(
-      quote.shippingBreakdown as Prisma.JsonValue | null,
-    );
-
-    await this.assertInventoryAvailable(
-      quote.items.map((i) => ({
-        variantId: i.variantId,
-        quantity: i.quantity,
-      })),
-    );
-
-    const address = await this.prisma.address.findUnique({
-      where: { id: dto.shippingAddressId },
-    });
-    if (!address || address.userId !== userId) {
-      throw new ForbiddenException('Access denied to shipping address');
-    }
-
-    const expiresAt = new Date(
-      Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,
-    );
-
-    const order = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({
-        data: {
-          userId,
+        const quoteDto = {
           shippingAddressId: dto.shippingAddressId,
-          status: OrderStatus.PENDING_PAYMENT,
-          paymentStatus: PaymentStatus.PENDING,
-          currency: quote.currency as 'NGN',
-          subtotalAmount: quote.subtotalAmount,
-          shippingFee: quote.shippingFee,
-          discountAmount: quote.discountAmount,
-          vatAmount: quote.vatAmount,
-          roundingAdjustment: quote.roundingAdjustment,
-          vatRateSnapshot: quote.vatRate,
-          pricesIncludeVatSnapshot: quote.pricesIncludeVat,
-          vatAppliesToShippingSnapshot: quote.vatAppliesToShipping,
-          pricingPolicyVersion: quote.pricingPolicyVersion,
-          totalAmount: quote.totalAmount,
-          shipRecipientName: address.recipientName,
-          shipPhone: address.phone,
-          shipLine1: address.addressLine1,
-          shipLine2: address.addressLine2,
-          shipCity: address.city,
-          shipState: address.state ?? '',
-          shipPostalCode: address.postalCode,
-          shipCountry: address.country ?? 'Nigeria',
-          shipLandmark: address.landmark,
-          shipInstructions: address.instructions,
-          shippingBreakdown: quote.shippingBreakdown as object,
-          expiresAt,
-          idempotencyKey: dto.idempotencyKey ?? null,
-          items: {
-            create: quote.items.map((item) =>
-              this.toOrderItemCreateData(item as QuoteLineForCreate),
-            ),
-          },
-        },
-        include: this.orderInclude(),
-      });
-      await this.inventoryLifecycle.reserveOrderItems(
-        created.id,
-        created.items.map((i) => ({
-          id: i.id,
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })),
-        tx,
-      );
-      return created;
-    });
+          items: dto.items.map((i) => ({
+            variantId: i.variantId,
+            designId: i.designId,
+            quantity: i.quantity,
+          })),
+        };
+        const quote = await this.pricingService.quoteStandard(userId, quoteDto);
+        this.assertShippingResolved(
+          quote.shippingBreakdown as Prisma.JsonValue | null,
+        );
+
+        await this.assertInventoryAvailable(
+          quote.items.map((i) => ({
+            variantId: i.variantId,
+            quantity: i.quantity,
+          })),
+        );
+
+        if (!address || address.userId !== userId) {
+          throw new ForbiddenException('Access denied to shipping address');
+        }
+
+        const expiresAt = new Date(
+          Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,
+        );
+
+        return this.prisma.$transaction(async (tx) => {
+          const created = await tx.order.create({
+            data: {
+              userId,
+              shippingAddressId: dto.shippingAddressId,
+              status: OrderStatus.PENDING_PAYMENT,
+              paymentStatus: PaymentStatus.PENDING,
+              currency: quote.currency as 'NGN',
+              subtotalAmount: quote.subtotalAmount,
+              shippingFee: quote.shippingFee,
+              discountAmount: quote.discountAmount,
+              vatAmount: quote.vatAmount,
+              roundingAdjustment: quote.roundingAdjustment,
+              vatRateSnapshot: quote.vatRate,
+              pricesIncludeVatSnapshot: quote.pricesIncludeVat,
+              vatAppliesToShippingSnapshot: quote.vatAppliesToShipping,
+              pricingPolicyVersion: quote.pricingPolicyVersion,
+              totalAmount: quote.totalAmount,
+              shipRecipientName: address.recipientName,
+              shipPhone: address.phone,
+              shipLine1: address.addressLine1,
+              shipLine2: address.addressLine2,
+              shipCity: address.city,
+              shipState: address.state ?? '',
+              shipPostalCode: address.postalCode,
+              shipCountry: address.country ?? 'Nigeria',
+              shipLandmark: address.landmark,
+              shipInstructions: address.instructions,
+              shippingBreakdown: quote.shippingBreakdown as object,
+              expiresAt,
+              idempotencyKey: dto.idempotencyKey ?? null,
+              idempotencyFingerprint: fingerprint,
+              items: {
+                create: quote.items.map((item) =>
+                  this.toOrderItemCreateData(item as QuoteLineForCreate),
+                ),
+              },
+            },
+            include: this.orderInclude(),
+          });
+          await this.inventoryLifecycle.reserveOrderItems(
+            created.id,
+            created.items.map((i) => ({
+              id: i.id,
+              variantId: i.variantId,
+              quantity: i.quantity,
+            })),
+            tx,
+          );
+          return created;
+        });
+      },
+    );
+    if (replayed) {
+      return order;
+    }
 
     const orderNotificationRecipient = this.config.get<string>(
       'ORDER_PLACE_NOTIFICATION_EMAIL',
@@ -225,6 +264,16 @@ export class OrdersService {
       throw new NotFoundException('Campaign not found');
     }
 
+    // One read: the fingerprint and the order snapshot describe the same address.
+    const address = await this.prisma.address.findUnique({
+      where: { id: dto.shippingAddressId },
+    });
+    const fingerprint = this.requestFingerprint(
+      userId,
+      dto,
+      campaignId,
+      address,
+    );
     if (dto.idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: {
@@ -235,114 +284,124 @@ export class OrdersService {
         },
         include: this.orderInclude(),
       });
-      if (existing && existing.campaignId === campaignId) {
+      if (existing) {
+        this.assertIdempotentReplay(existing, campaignId, fingerprint);
         return existing;
       }
     }
 
-    const quoteDto = {
-      shippingAddressId: dto.shippingAddressId,
-      items: dto.items.map((i) => ({
-        variantId: i.variantId,
-        designId: i.designId,
-        quantity: i.quantity,
-      })),
-    };
-    const quote = await this.pricingService.quoteCampaign(
+    const { order, replayed } = await this.createOrReplay(
       userId,
+      dto.idempotencyKey,
       campaignId,
-      quoteDto,
-    );
-    this.assertShippingResolved(
-      quote.shippingBreakdown as Prisma.JsonValue | null,
-    );
-
-    await this.assertInventoryAvailable(
-      quote.items.map((i) => ({
-        variantId: i.variantId,
-        quantity: i.quantity,
-      })),
-    );
-
-    const address = await this.prisma.address.findUnique({
-      where: { id: dto.shippingAddressId },
-    });
-    if (!address || address.userId !== userId) {
-      throw new ForbiddenException('Access denied to shipping address');
-    }
-
-    const expiresAt = new Date(
-      Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,
-    );
-
-    const order = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({
-        data: {
-          userId,
+      fingerprint,
+      async () => {
+        const quoteDto = {
           shippingAddressId: dto.shippingAddressId,
-          status: OrderStatus.PENDING_PAYMENT,
-          paymentStatus: PaymentStatus.PENDING,
+          items: dto.items.map((i) => ({
+            variantId: i.variantId,
+            designId: i.designId,
+            quantity: i.quantity,
+          })),
+        };
+        const quote = await this.pricingService.quoteCampaign(
+          userId,
           campaignId,
-          currency: quote.currency as 'NGN',
-          subtotalAmount: quote.subtotalAmount,
-          shippingFee: quote.shippingFee,
-          discountAmount: quote.discountAmount,
-          vatAmount: quote.vatAmount,
-          roundingAdjustment: quote.roundingAdjustment,
-          vatRateSnapshot: quote.vatRate,
-          pricesIncludeVatSnapshot: quote.pricesIncludeVat,
-          vatAppliesToShippingSnapshot: quote.vatAppliesToShipping,
-          pricingPolicyVersion: quote.pricingPolicyVersion,
-          totalAmount: quote.totalAmount,
-          shipRecipientName: address.recipientName,
-          shipPhone: address.phone,
-          shipLine1: address.addressLine1,
-          shipLine2: address.addressLine2,
-          shipCity: address.city,
-          shipState: address.state ?? '',
-          shipPostalCode: address.postalCode,
-          shipCountry: address.country ?? 'Nigeria',
-          shipLandmark: address.landmark,
-          shipInstructions: address.instructions,
-          shippingBreakdown: quote.shippingBreakdown as object,
-          expiresAt,
-          idempotencyKey: dto.idempotencyKey ?? null,
-          items: {
-            create: quote.items.map((item) =>
-              this.toOrderItemCreateData(
-                item as QuoteLineForCreate,
-                campaignId,
-              ),
-            ),
-          },
-        },
-        include: this.orderInclude(),
-      });
-      await this.inventoryLifecycle.reserveOrderItems(
-        created.id,
-        created.items.map((i) => ({
-          id: i.id,
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })),
-        tx,
-      );
-      if (
-        quote.discountAmount > 0 &&
-        quote.appliedDiscountId != null &&
-        quote.appliedDiscountId !== ''
-      ) {
-        await tx.orderDiscount.create({
-          data: {
-            orderId: created.id,
-            discountId: quote.appliedDiscountId,
-            currency: quote.currency as 'NGN',
-            amountApplied: quote.discountAmount,
-          },
+          quoteDto,
+        );
+        this.assertShippingResolved(
+          quote.shippingBreakdown as Prisma.JsonValue | null,
+        );
+
+        await this.assertInventoryAvailable(
+          quote.items.map((i) => ({
+            variantId: i.variantId,
+            quantity: i.quantity,
+          })),
+        );
+
+        if (!address || address.userId !== userId) {
+          throw new ForbiddenException('Access denied to shipping address');
+        }
+
+        const expiresAt = new Date(
+          Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,
+        );
+
+        return this.prisma.$transaction(async (tx) => {
+          const created = await tx.order.create({
+            data: {
+              userId,
+              shippingAddressId: dto.shippingAddressId,
+              status: OrderStatus.PENDING_PAYMENT,
+              paymentStatus: PaymentStatus.PENDING,
+              campaignId,
+              currency: quote.currency as 'NGN',
+              subtotalAmount: quote.subtotalAmount,
+              shippingFee: quote.shippingFee,
+              discountAmount: quote.discountAmount,
+              vatAmount: quote.vatAmount,
+              roundingAdjustment: quote.roundingAdjustment,
+              vatRateSnapshot: quote.vatRate,
+              pricesIncludeVatSnapshot: quote.pricesIncludeVat,
+              vatAppliesToShippingSnapshot: quote.vatAppliesToShipping,
+              pricingPolicyVersion: quote.pricingPolicyVersion,
+              totalAmount: quote.totalAmount,
+              shipRecipientName: address.recipientName,
+              shipPhone: address.phone,
+              shipLine1: address.addressLine1,
+              shipLine2: address.addressLine2,
+              shipCity: address.city,
+              shipState: address.state ?? '',
+              shipPostalCode: address.postalCode,
+              shipCountry: address.country ?? 'Nigeria',
+              shipLandmark: address.landmark,
+              shipInstructions: address.instructions,
+              shippingBreakdown: quote.shippingBreakdown as object,
+              expiresAt,
+              idempotencyKey: dto.idempotencyKey ?? null,
+              idempotencyFingerprint: fingerprint,
+              items: {
+                create: quote.items.map((item) =>
+                  this.toOrderItemCreateData(
+                    item as QuoteLineForCreate,
+                    campaignId,
+                  ),
+                ),
+              },
+            },
+            include: this.orderInclude(),
+          });
+          await this.inventoryLifecycle.reserveOrderItems(
+            created.id,
+            created.items.map((i) => ({
+              id: i.id,
+              variantId: i.variantId,
+              quantity: i.quantity,
+            })),
+            tx,
+          );
+          if (
+            quote.discountAmount > 0 &&
+            quote.appliedDiscountId != null &&
+            quote.appliedDiscountId !== ''
+          ) {
+            await tx.orderDiscount.create({
+              data: {
+                orderId: created.id,
+                discountId: quote.appliedDiscountId,
+                currency: quote.currency as 'NGN',
+                amountApplied: quote.discountAmount,
+              },
+            });
+          }
+          return created;
         });
-      }
-      return created;
-    });
+      },
+    );
+    if (replayed) {
+      return order;
+    }
 
     await this.adminNotify.emit(ADMIN_NOTIF_ORDER_PLACED, {
       orderId: order.id,
@@ -394,18 +453,93 @@ export class OrdersService {
     this.accountPolicy.assertVerifiedForAction(user, 'CREATE_ORDER');
   }
 
+  /**
+   * Fingerprint of this create request (lines, saved delivery address, campaign),
+   * or null when the request carries no idempotency key.
+   */
+  private requestFingerprint(
+    userId: string,
+    dto: CreateOrderDto,
+    campaignId: string | null,
+    address: (FingerprintAddress & { userId: string }) | null,
+  ): string | null {
+    if (!dto.idempotencyKey) {
+      return null;
+    }
+    return computeOrderRequestFingerprint({
+      campaignId,
+      address: address && address.userId === userId ? address : null,
+      items: dto.items,
+    });
+  }
+
+  /**
+   * A key replays its order only for the same kind (standard, or one campaign) and
+   * the same request content. An order without a fingerprint never replays.
+   */
+  private assertIdempotentReplay(
+    existing: {
+      id: string;
+      campaignId: string | null;
+      idempotencyFingerprint: string | null;
+    },
+    campaignId: string | null,
+    fingerprint: string | null,
+  ): void {
+    if ((existing.campaignId ?? null) !== campaignId) {
+      throw new ConflictException({
+        code: IDEMPOTENCY_KEY_REUSED,
+        message: 'This idempotency key was already used for a different order',
+      });
+    }
+    if (
+      existing.idempotencyFingerprint == null ||
+      existing.idempotencyFingerprint !== fingerprint
+    ) {
+      throw new ConflictException({
+        code: IDEMPOTENCY_KEY_PAYLOAD_MISMATCH,
+        message:
+          'This idempotency key was already used with different order content',
+      });
+    }
+    // Order id only: no key, cart content or address in logs.
+    this.logger.log(`Idempotent create replayed existing order ${existing.id}`);
+  }
+
+  /**
+   * Run an order create and, if it fails while a concurrent request with the same
+   * key has committed its order, return that order instead (TTW-037). Covers the
+   * lost race on `@@unique([userId, idempotencyKey])` (our reservation rolls back
+   * with the transaction) and checks that ran before the winner committed, such
+   * as the stock pre-check. Without such an order the original error is rethrown.
+   */
+  private async createOrReplay(
+    userId: string,
+    idempotencyKey: string | undefined,
+    campaignId: string | null,
+    fingerprint: string | null,
+    create: () => Promise<OrderWithItems>,
+  ): Promise<{ order: OrderWithItems; replayed: boolean }> {
+    try {
+      return { order: await create(), replayed: false };
+    } catch (error) {
+      if (!idempotencyKey) {
+        throw error;
+      }
+      const existing = await this.prisma.order.findUnique({
+        where: { userId_idempotencyKey: { userId, idempotencyKey } },
+        include: this.orderInclude(),
+      });
+      if (!existing) {
+        throw error;
+      }
+      this.assertIdempotentReplay(existing, campaignId, fingerprint);
+      return { order: existing, replayed: true };
+    }
+  }
+
   private orderInclude() {
-    return {
-      items: {
-        include: {
-          product: { select: { id: true, name: true, slug: true } },
-          variant: { select: { id: true, name: true, sku: true } },
-        },
-      },
-      shippingAddress: {
-        select: { id: true, city: true, state: true, country: true },
-      },
-    } as const;
+    return ORDER_INCLUDE;
   }
 
   /**

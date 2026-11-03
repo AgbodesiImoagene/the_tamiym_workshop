@@ -3,7 +3,7 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { removeCartItem, updateCartItemQuantity, useCart } from '@/lib/cart-store';
+import { cartLineKey, removeCartItem, updateCartItemQuantity, useCart } from '@/lib/cart-store';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -91,7 +91,7 @@ export default function DashboardCartPage() {
             <section className="space-y-5">
               {items.map((item) => (
                 <article
-                  key={item.variantId}
+                  key={cartLineKey(item)}
                   className="grid gap-5 rounded-[28px] border border-black/10 bg-white p-5 shadow-[0_4px_12px_rgba(0,0,0,0.08)] sm:grid-cols-[120px_minmax(0,1fr)]"
                 >
                   <div className="relative h-[140px] overflow-hidden rounded-[20px] bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
@@ -115,7 +115,7 @@ export default function DashboardCartPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeCartItem(item.variantId)}
+                        onClick={() => removeCartItem(cartLineKey(item))}
                         className="text-sm font-semibold text-[#b10813]"
                       >
                         Remove
@@ -127,7 +127,10 @@ export default function DashboardCartPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            updateCartItemQuantity(item.variantId, Math.max(1, item.quantity - 1))
+                            updateCartItemQuantity(
+                              cartLineKey(item),
+                              Math.max(1, item.quantity - 1)
+                            )
                           }
                           className="h-10 w-10 rounded-full border border-black/15 text-lg"
                         >
@@ -138,7 +141,9 @@ export default function DashboardCartPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => updateCartItemQuantity(item.variantId, item.quantity + 1)}
+                          onClick={() =>
+                            updateCartItemQuantity(cartLineKey(item), item.quantity + 1)
+                          }
                           className="h-10 w-10 rounded-full border border-black/15 text-lg"
                         >
                           +

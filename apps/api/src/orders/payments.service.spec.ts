@@ -109,6 +109,36 @@ describe('PaymentsService (TTW-012)', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // TTW-037: clients decide on expiry from a stable code, not from their own clock.
+  it('tags an expired payment window with PAYMENT_WINDOW_EXPIRED', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+    const err = await service
+      .initiatePayment('ord_1', 'user_1', undefined)
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      code: 'PAYMENT_WINDOW_EXPIRED',
+      message: 'Order payment window has expired',
+    });
+  });
+
+  it('tags a non-pending order with ORDER_NOT_PENDING_PAYMENT', async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      status: OrderStatus.CANCELLED,
+    });
+    const err = await service
+      .initiatePayment('ord_1', 'user_1', undefined)
+      .catch((e: unknown) => e);
+    expect((err as BadRequestException).getResponse()).toMatchObject({
+      code: 'ORDER_NOT_PENDING_PAYMENT',
+      message: 'Order is not in PENDING_PAYMENT status',
+    });
+  });
+
   it('rejects non-PENDING_PAYMENT orders', async () => {
     prisma.order.findUnique.mockResolvedValue({
       ...order,

@@ -1738,6 +1738,9 @@ model Order {
 
   /// Idempotency key (per user) to avoid duplicate orders on retries.
   idempotencyKey String?
+  /// Hash of the request content (lines, delivery address, campaign) the key was first used with (TTW-037).
+  /// A replay with another fingerprint is refused. Required whenever idempotencyKey is set (DB CHECK constraint).
+  idempotencyFingerprint String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

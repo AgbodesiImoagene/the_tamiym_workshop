@@ -2,13 +2,21 @@
 
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { clearCart, useCart } from '@/lib/cart-store';
+import {
+  type CartItem,
+  cartLineKey,
+  clearCartIfPendingOrder,
+  getCart,
+  rotateCartIdempotencyKey,
+  setCartPendingOrder,
+  useCart,
+} from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface CheckoutFormState {
   recipientName: string;
@@ -34,9 +42,23 @@ function addressToForm(address?: ShippingAddress | null): CheckoutFormState {
   };
 }
 
+function toOrderItems(lines: CartItem[]) {
+  return lines.map((item) => ({
+    variantId: item.variantId,
+    ...(item.designId ? { designId: item.designId } : {}),
+    quantity: item.quantity,
+  }));
+}
+
+// Only server state decides: the device clock may be wrong. A pending order whose
+// window has passed is reported by initiate-payment as PAYMENT_WINDOW_EXPIRED.
+function isOrderClosed(order: { status: string }) {
+  return order.status !== 'PENDING_PAYMENT';
+}
+
 export default function DashboardCheckoutPage() {
   const router = useRouter();
-  const { items, itemCount, subtotal, currency } = useCart();
+  const { items, itemCount, subtotal, currency, idempotencyKey, pendingOrderId } = useCart();
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<OrderQuote | null>(null);
@@ -45,6 +67,16 @@ export default function DashboardCheckoutPage() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
+  // Address last saved to the account. Orders are always placed with the saved address,
+  // so after a reload it is still the address of any earlier attempt. The API returns
+  // the existing order for a known key whatever the payload, so quoting a different
+  // address needs a new key (TTW-037).
+  const savedAddressRef = useRef<string | null>(null);
+
+  // Any new cart revision (lines changed here or in another tab) needs a new quote.
+  useEffect(() => {
+    setQuote(null);
+  }, [idempotencyKey]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -75,17 +107,17 @@ export default function DashboardCheckoutPage() {
     if (address) {
       setSavedAddressId(address.id);
       setForm(addressToForm(address));
+      savedAddressRef.current = JSON.stringify(addressToForm(address));
     }
   }, [addressesQuery.data]);
 
-  const orderItems = useMemo(
-    () =>
-      items.map((item) => ({
-        variantId: item.variantId,
-        quantity: item.quantity,
-      })),
-    [items]
-  );
+  const orderItems = useMemo(() => toOrderItems(items), [items]);
+
+  // Editing the address invalidates the quote, so the edited address is saved and priced.
+  function updateField(field: keyof CheckoutFormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setQuote(null);
+  }
 
   async function ensureAddress() {
     const address = await upsertPrimaryAddress({
@@ -99,6 +131,7 @@ export default function DashboardCheckoutPage() {
       country: form.country || 'Nigeria',
     });
     setSavedAddressId(address.id);
+    savedAddressRef.current = JSON.stringify(form);
     return address.id;
   }
 
@@ -107,6 +140,9 @@ export default function DashboardCheckoutPage() {
     setSubmitMessage(null);
     setIsQuoting(true);
     try {
+      if (savedAddressRef.current !== null && savedAddressRef.current !== JSON.stringify(form)) {
+        rotateCartIdempotencyKey();
+      }
       const shippingAddressId = await ensureAddress();
       const nextQuote = await quoteOrder({
         shippingAddressId,
@@ -121,22 +157,58 @@ export default function DashboardCheckoutPage() {
     }
   }
 
+  function startNewRevision(message: string) {
+    rotateCartIdempotencyKey();
+    setQuote(null);
+    setSubmitMessage(message);
+  }
+
+  function startNewRevisionAfterExpiry() {
+    startNewRevision('Your previous order expired. Review the quote again.');
+  }
+
   async function handlePlaceOrder() {
+    const cart = getCart();
+    if (!cart) return;
     setError(null);
     setSubmitMessage(null);
     setIsSubmitting(true);
     try {
       const shippingAddressId = savedAddressId || (await ensureAddress());
-      const createdOrder = await createOrder({
+      // Same cart revision → same key → the API returns the order already created.
+      const order = await createOrder({
         shippingAddressId,
-        items: orderItems,
-        idempotencyKey: crypto.randomUUID(),
+        items: toOrderItems(cart.lines),
+        idempotencyKey: cart.idempotencyKey,
       });
-      const payment = await initiateOrderPayment(createdOrder.id, user?.email);
-      clearCart();
+      // Only the revision this order was created for; another tab may have changed it.
+      setCartPendingOrder(order.id, cart.idempotencyKey);
+
+      if (order.paymentStatus === 'SUCCEEDED') {
+        // Only the revision this order paid for; a newer cart (other tab) stays.
+        clearCartIfPendingOrder(order.id);
+        router.push(`/orders/${order.id}/confirm`);
+        return;
+      }
+      if (isOrderClosed(order)) {
+        startNewRevisionAfterExpiry();
+        return;
+      }
+
+      const payment = await initiateOrderPayment(order.id, user?.email);
+      // The cart is cleared on the confirmation page once payment is confirmed.
       window.location.assign(payment.authorizationUrl);
     } catch (err) {
       const apiError = err as ApiError;
+      if (apiError.code === 'PAYMENT_WINDOW_EXPIRED') {
+        startNewRevisionAfterExpiry();
+        return;
+      }
+      // The API refuses a known key sent with other content (TTW-037).
+      if (apiError.code === 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH') {
+        startNewRevision('Your cart or address changed. Review the quote again.');
+        return;
+      }
       setSubmitMessage(apiError.message || 'We could not initiate your payment.');
     } finally {
       setIsSubmitting(false);
@@ -191,9 +263,7 @@ export default function DashboardCheckoutPage() {
                   <span>Recipient Name</span>
                   <input
                     value={form.recipientName}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, recipientName: event.target.value }))
-                    }
+                    onChange={(event) => updateField('recipientName', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter recipient name"
                   />
@@ -203,9 +273,7 @@ export default function DashboardCheckoutPage() {
                   <span>Phone</span>
                   <input
                     value={form.phone}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, phone: event.target.value }))
-                    }
+                    onChange={(event) => updateField('phone', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="+234..."
                   />
@@ -215,9 +283,7 @@ export default function DashboardCheckoutPage() {
                   <span>Street Address</span>
                   <input
                     value={form.addressLine1}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, addressLine1: event.target.value }))
-                    }
+                    onChange={(event) => updateField('addressLine1', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter address"
                   />
@@ -227,9 +293,7 @@ export default function DashboardCheckoutPage() {
                   <span>Address Line 2</span>
                   <input
                     value={form.addressLine2}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, addressLine2: event.target.value }))
-                    }
+                    onChange={(event) => updateField('addressLine2', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Apartment, landmark, or suite"
                   />
@@ -239,9 +303,7 @@ export default function DashboardCheckoutPage() {
                   <span>City</span>
                   <input
                     value={form.city}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, city: event.target.value }))
-                    }
+                    onChange={(event) => updateField('city', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter city"
                   />
@@ -251,9 +313,7 @@ export default function DashboardCheckoutPage() {
                   <span>State</span>
                   <input
                     value={form.state}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, state: event.target.value }))
-                    }
+                    onChange={(event) => updateField('state', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Enter state"
                   />
@@ -263,9 +323,7 @@ export default function DashboardCheckoutPage() {
                   <span>Postal Code</span>
                   <input
                     value={form.postalCode}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, postalCode: event.target.value }))
-                    }
+                    onChange={(event) => updateField('postalCode', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Optional postal code"
                   />
@@ -275,9 +333,7 @@ export default function DashboardCheckoutPage() {
                   <span>Country</span>
                   <input
                     value={form.country}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, country: event.target.value }))
-                    }
+                    onChange={(event) => updateField('country', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Nigeria"
                   />
@@ -311,7 +367,7 @@ export default function DashboardCheckoutPage() {
               <div className="space-y-4">
                 {items.map((item) => (
                   <div
-                    key={item.variantId}
+                    key={cartLineKey(item)}
                     className="flex items-start justify-between gap-4 text-sm"
                   >
                     <div>
@@ -367,6 +423,15 @@ export default function DashboardCheckoutPage() {
               >
                 {isSubmitting ? 'Redirecting...' : 'Place order and pay'}
               </button>
+
+              {pendingOrderId ? (
+                <Link
+                  href={`/orders/${pendingOrderId}/confirm`}
+                  className="block text-center text-sm font-semibold text-primary"
+                >
+                  View pending order
+                </Link>
+              ) : null}
 
               <p className="text-xs leading-5 text-black/55">
                 After you place the order we will redirect you to Paystack to complete payment. You

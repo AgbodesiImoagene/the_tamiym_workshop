@@ -205,10 +205,17 @@ export class PaymentsService {
             expiresAt: order.expiresAt,
           })
         ) {
+          // Stable codes let clients react without trusting their own clock (TTW-037).
           throw new BadRequestException(
             order.status !== OrderStatus.PENDING_PAYMENT
-              ? 'Order is not in PENDING_PAYMENT status'
-              : 'Order payment window has expired',
+              ? {
+                  code: 'ORDER_NOT_PENDING_PAYMENT',
+                  message: 'Order is not in PENDING_PAYMENT status',
+                }
+              : {
+                  code: 'PAYMENT_WINDOW_EXPIRED',
+                  message: 'Order payment window has expired',
+                },
           );
         }
         const amountKobo = Math.round(Number(order.totalAmount) * 100);

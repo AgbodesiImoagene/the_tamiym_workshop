@@ -131,7 +131,13 @@ export async function createOrder(input: {
   items: QuoteLineItem[];
   idempotencyKey?: string;
 }) {
-  return apiClient.post<{ id: string }>('/orders', input);
+  // A known idempotency key returns the existing order, whatever its state (TTW-037).
+  return apiClient.post<{
+    id: string;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus;
+    expiresAt?: string | null;
+  }>('/orders', input);
 }
 
 export async function initiateOrderPayment(orderId: string, customerEmail?: string) {

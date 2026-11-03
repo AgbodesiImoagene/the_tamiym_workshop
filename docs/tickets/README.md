@@ -11,12 +11,13 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 0 — Trustworthy delivery system
 
-| Ticket                                                | Priority | Risk     | State    | Outcome                                                                                  |
-| ----------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- |
-| [TTW-001](ttw-001-align-supported-node-runtime.md)    | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
-| [TTW-002](ttw-002-restore-quality-gates.md)           | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
-| [TTW-003](ttw-003-repair-api-integration-harness.md)  | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
-| [TTW-004](ttw-004-establish-playwright-foundation.md) | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
+| Ticket                                                        | Priority | Risk     | State    | Outcome                                                                                  |
+| ------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- |
+| [TTW-001](ttw-001-align-supported-node-runtime.md)            | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
+| [TTW-002](ttw-002-restore-quality-gates.md)                   | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
+| [TTW-003](ttw-003-repair-api-integration-harness.md)          | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
+| [TTW-004](ttw-004-establish-playwright-foundation.md)         | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | P1       | High     | Scoped   | Reconcile the Prisma schema with migrations and guard against drift                      |
 
 ## Epic 1 — Financial and inventory integrity
 
@@ -44,16 +45,19 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 
-| Ticket                                                            | Priority | Risk | State       | Outcome                                                            |
-| ----------------------------------------------------------------- | -------- | ---- | ----------- | ------------------------------------------------------------------ |
-| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md) | P1       | High | Complete    | Implement organiser eligibility, approval and campaign entry       |
-| [TTW-031](ttw-031-render-real-fundraiser-offers.md)               | P1       | High | Complete    | Replace placeholder public options with sellable API-backed offers |
-| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)            | P1       | High | Complete    | Preserve supporter intent through auth and complete web checkout   |
-| [TTW-033](ttw-033-add-customer-order-detail.md)                   | P1       | High | Complete    | Add immutable, redacted customer order detail and honest states    |
-| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)    | P1       | High | Complete    | Enforce activation readiness and notify organisers of decisions    |
-| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)          | P1       | High | Complete    | Complete organiser product, design, price and submission authoring |
-| [TTW-036](ttw-036-complete-analytics-contracts.md)                | P1       | High | Complete    | Interim analytics KPI contracts encoded (slice 1)                  |
-| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)             | P0       | High | In progress | Fix the invalid pricing query that breaks every quote and order    |
+| Ticket                                                                    | Priority | Risk     | State       | Outcome                                                                      |
+| ------------------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------- |
+| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md)         | P1       | High     | Complete    | Implement organiser eligibility, approval and campaign entry                 |
+| [TTW-031](ttw-031-render-real-fundraiser-offers.md)                       | P1       | High     | Complete    | Replace placeholder public options with sellable API-backed offers           |
+| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)                    | P1       | High     | Complete    | Preserve supporter intent through auth and complete web checkout             |
+| [TTW-033](ttw-033-add-customer-order-detail.md)                           | P1       | High     | Complete    | Add immutable, redacted customer order detail and honest states              |
+| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)            | P1       | High     | Complete    | Enforce activation readiness and notify organisers of decisions              |
+| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)                  | P1       | High     | Complete    | Complete organiser product, design, price and submission authoring           |
+| [TTW-036](ttw-036-complete-analytics-contracts.md)                        | P1       | High     | Complete    | Interim analytics KPI contracts encoded (slice 1)                            |
+| [TTW-037](ttw-037-prevent-duplicate-standard-checkout-orders.md)          | P0       | Critical | In progress | Keep one order per cart revision across retries, tabs and concurrent creates |
+| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | In progress | Fix the invalid pricing query that breaks every quote and order              |
+| [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped      | Seed a sellable fundraiser offer and automate the supporter checkout journey |
+| [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped      | Let customers order their saved designs from the Design Workshop             |
 
 ## Epic 4 — Fulfilment, support and business policy
 

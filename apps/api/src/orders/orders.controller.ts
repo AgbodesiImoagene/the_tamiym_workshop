@@ -78,6 +78,11 @@ export class OrdersController {
     description:
       'Forbidden — EMAIL_NOT_VERIFIED when the account must verify before ordering',
   })
+  @ApiResponse({
+    status: 409,
+    description:
+      'IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests.',
+  })
   async create(
     @CurrentUser() user: RequestUser,
     @Body() createOrderDto: CreateOrderDto,
@@ -137,7 +142,11 @@ export class OrdersController {
       'Authorization URL and reference. Retries of an active attempt return the same session.',
     type: InitiatePaymentResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid order or payment config' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid order or payment config. code ORDER_NOT_PENDING_PAYMENT when the order is no longer awaiting payment; code PAYMENT_WINDOW_EXPIRED when its payment window has passed (server clock).',
+  })
   @ApiResponse({
     status: 409,
     description:

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService } from './orders.service';
@@ -11,6 +13,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
+import { computeOrderRequestFingerprint } from './order-idempotency';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
@@ -460,6 +464,410 @@ describe('OrdersService', () => {
       await expect(service.create('user-1', dto)).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('create idempotency (TTW-037)', () => {
+    const uniqueViolation = () =>
+      new Prisma.PrismaClientKnownRequestError('unique', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
+
+    // Replays now also require the same request content (review finding 6).
+    const fingerprintFor = (campaignId: string | null, quantity = 2) =>
+      computeOrderRequestFingerprint({
+        campaignId,
+        address: mockAddress,
+        items: [{ variantId: 'var-1', quantity }],
+      });
+
+    const existingStandardOrder = {
+      ...mockOrder,
+      id: 'order-existing',
+      campaignId: null,
+      idempotencyKey: 'idem-1',
+      idempotencyFingerprint: fingerprintFor(null),
+    };
+
+    const existingCampaignOrder = {
+      ...existingStandardOrder,
+      campaignId: 'camp-1',
+      idempotencyFingerprint: fingerprintFor('camp-1'),
+    };
+
+    beforeEach(() => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 10,
+        reserved: 0,
+      });
+    });
+
+    function expectConflict(err: unknown) {
+      expect(err).toBeInstanceOf(ConflictException);
+      const body = (err as ConflictException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.code).toBe('IDEMPOTENCY_KEY_REUSED');
+    }
+
+    it('returns the order that won a concurrent create with the same key', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingStandardOrder);
+      orderCreateMock.mockRejectedValueOnce(uniqueViolation());
+
+      const result = await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(result.id).toBe('order-existing');
+      expect(prisma.order.findUnique).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_idempotencyKey: {
+              userId: 'user-1',
+              idempotencyKey: 'idem-1',
+            },
+          },
+        }),
+      );
+      expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it('returns the campaign order that won a concurrent create with the same key', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingCampaignOrder);
+      orderCreateMock.mockRejectedValueOnce(uniqueViolation());
+
+      const result = await service.createCampaignOrder('camp-1', 'user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(result.id).toBe('order-existing');
+    });
+
+    // Review finding 3: the winner committed between our pre-read and our stock check.
+    it('returns the existing order when the stock check fails after a concurrent create', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingStandardOrder);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 2,
+        reserved: 2,
+      });
+
+      const result = await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(result.id).toBe('order-existing');
+      expect(orderCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('returns the existing campaign order when the stock check fails after a concurrent create', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingCampaignOrder);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 2,
+        reserved: 2,
+      });
+
+      const result = await service.createCampaignOrder('camp-1', 'user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(result.id).toBe('order-existing');
+    });
+
+    it('still reports insufficient stock when no order exists for the key', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+        variantId: 'var-1',
+        trackInventory: true,
+        stockOnHand: 2,
+        reserved: 2,
+      });
+
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        }),
+      ).rejects.toThrow('Insufficient stock for variant var-1');
+    });
+
+    function expectPayloadMismatch(err: unknown) {
+      expect(err).toBeInstanceOf(ConflictException);
+      const body = (err as ConflictException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.code).toBe('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
+    }
+
+    // Review finding 6: a known key replays only the same request content.
+    it('stores the request fingerprint with the key', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(orderCreateMock.mock.calls[0][0].data).toMatchObject({
+        idempotencyKey: 'idem-1',
+        idempotencyFingerprint: fingerprintFor(null),
+      });
+    });
+
+    it('stores the campaign request fingerprint with the key', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await service.createCampaignOrder('camp-1', 'user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(orderCreateMock.mock.calls[0][0].data).toMatchObject({
+        idempotencyFingerprint: fingerprintFor('camp-1'),
+      });
+    });
+
+    it('stores no fingerprint without a key', async () => {
+      await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      });
+
+      expect(
+        orderCreateMock.mock.calls[0][0].data.idempotencyFingerprint,
+      ).toBeNull();
+    });
+
+    it('replays a known key with the same content', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+        existingStandardOrder,
+      );
+
+      const result = await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(result.id).toBe('order-existing');
+      expect(orderCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a known key sent with different lines', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+        existingStandardOrder,
+      );
+
+      const err = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 3 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectPayloadMismatch(err);
+      expect(orderCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a known key after the saved delivery address changed', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+        existingStandardOrder,
+      );
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        city: 'Lekki',
+      });
+
+      const err = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectPayloadMismatch(err);
+    });
+
+    it('rejects a known key whose order has no fingerprint', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...existingStandardOrder,
+        idempotencyFingerprint: null,
+      });
+
+      const err = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectPayloadMismatch(err);
+    });
+
+    it('rejects a concurrent replay with different content', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          ...existingStandardOrder,
+          idempotencyFingerprint: fingerprintFor(null, 5),
+        });
+      orderCreateMock.mockRejectedValueOnce(uniqueViolation());
+
+      const err = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectPayloadMismatch(err);
+    });
+
+    // Independent review finding 3: the fingerprint and the order snapshot must come
+    // from the same address row, or an edit in between splits them.
+    it('reads the delivery address once for the fingerprint and the order snapshot', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(prisma.address.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the delivery address once for a campaign order too', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await service.createCampaignOrder('camp-1', 'user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      expect(prisma.address.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    // Independent review finding 6: replays are logged with the order id only.
+    it('logs a replay with the order id and without the key', async () => {
+      const logSpy = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => undefined);
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+        existingStandardOrder,
+      );
+
+      await service.create('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      });
+
+      const messages = logSpy.mock.calls.map(([message]) => String(message));
+      logSpy.mockRestore();
+      expect(messages.some((m) => m.includes('order-existing'))).toBe(true);
+      expect(messages.some((m) => m.includes('idem-1'))).toBe(false);
+    });
+
+    it('rethrows a unique violation that is not an idempotency replay', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+      orderCreateMock.mockRejectedValueOnce(uniqueViolation());
+
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        }),
+      ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    });
+
+    it('rejects a standard create whose key belongs to a campaign order', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...existingStandardOrder,
+        campaignId: 'camp-1',
+      });
+
+      const err = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectConflict(err);
+      expect(orderCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a campaign create whose key belongs to another order kind', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+        existingStandardOrder,
+      );
+
+      const err = await service
+        .createCampaignOrder('camp-1', 'user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectConflict(err);
+      expect(orderCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a concurrent replay that resolves to another order kind', async () => {
+      (prisma.order.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          ...existingStandardOrder,
+          campaignId: 'camp-other',
+        });
+      orderCreateMock.mockRejectedValueOnce(uniqueViolation());
+
+      const err = await service
+        .createCampaignOrder('camp-1', 'user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+          idempotencyKey: 'idem-1',
+        })
+        .catch((e: unknown) => e);
+
+      expectConflict(err);
     });
   });
 
