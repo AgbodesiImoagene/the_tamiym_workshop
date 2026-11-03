@@ -1,7 +1,7 @@
 # TTW-006 — Fix the invalid YAML in the release-candidate workflow
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** Not started (to be scheduled later, user decision 2026-11-03)\
+**Status:** In progress: implemented locally on `codex/ttw-006-fix-release-candidate-workflow-syntax`; GitHub acceptance not yet observed\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** Release-candidate rehearsal (TTW-054, TTW-068)
@@ -16,6 +16,8 @@ On every push to `main`, GitHub rejects `.github/workflows/release-candidate.yml
 
 YAML reads `(push: false)` as a nested mapping. The line came with commit `8ec8609` (TTW-054 slice 2), so the release-candidate workflow has not run since, and the container build rehearsal it provides is silently skipped.
 
+Found during implementation (2026-11-03): GitHub only reports the first error, but the file has **three** such step names, lines 71, 86 and 141 (`BLOCK_AS_IMPLICIT_KEY` from the `yaml` parser). The workflow is `workflow_dispatch` only, so it never starts on push; the push-time failure is GitHub refusing to load the file. The first acceptance criterion is reworded accordingly.
+
 ## Proposal
 
 Quote the step name (`name: "Build ${{ matrix.name }} image (push: false)"`) and check the whole file for the same pattern. Validate the file locally (for example with `actionlint` or a YAML parser) before pushing. Optionally add a workflow-syntax check to the quality gates so an invalid workflow fails CI on the pull request or push that introduces it.
@@ -28,25 +30,26 @@ Quote the step name (`name: "Build ${{ matrix.name }} image (push: false)"`) and
 
 1. Quote the offending names; scan the other workflows for unquoted `: ` in scalars.
 2. Validate locally, push, confirm the workflow runs on GitHub.
-3. Optional: workflow lint step in CI.
+3. Workflow syntax check in CI (user chose to include it, 2026-11-03): `scripts/quality/validate-workflows.mjs` parses every `.github/workflows/*.y{a,}ml` with `yaml` (now a root devDependency) and requires a mapping with `on` and `jobs`; `pnpm workflows:validate` / `pnpm workflows:validate:test`, run in the CI `Documentation` job.
 
 ## Test and observability plan
 
-- Unit/component: none.
+- Unit/component: `scripts/quality/__tests__/validate-workflows.test.mjs` (`node:test`): repository root passes; unquoted `(push: false)` step name reported with file and line; same name quoted accepted; missing `jobs`; non-mapping document; non-YAML files ignored.
 - Integration/e2e: the release-candidate workflow runs on GitHub after the fix (record the run link).
 - Failure, retry, and concurrency: not applicable.
 - Logs, metrics, traces, and alerts: none.
 
 ## References
 
-- `.github/workflows/release-candidate.yml:71` — unquoted `(push: false)`.
+- `.github/workflows/release-candidate.yml:71`, `:86`, `:141` — unquoted `(push: false)`.
 - Commit `8ec8609` — introduced the line.
 - GitHub Actions run #202 of `release-candidate.yml` (commit `c9f4bb6`) — "Invalid workflow file".
 
 ## Acceptance criteria
 
-- [ ] GitHub accepts the workflow file and the release-candidate run starts on push.
-- [ ] No other workflow file has the same syntax problem.
+- [ ] GitHub no longer reports `release-candidate.yml` as an invalid workflow file on push, and a manual "Run workflow" dispatch starts (record the run link).
+- [x] No other workflow file has the same syntax problem (`pnpm workflows:validate` parses all six workflows; see evidence).
+- [x] An invalid workflow file fails the CI `Documentation` job (`.github/workflows/ci.yml`, step "Validate GitHub workflow syntax").
 
 ## Out of scope
 
@@ -62,8 +65,18 @@ Pending.
 
 ## Verification evidence
 
-Pending implementation.
+### Local, 2026-11-03 (Node 24.22.1, pnpm 9.0.0)
+
+- Red, before the fix: `pnpm workflows:validate` → exit 1, `release-candidate.yml:71`, `:86`, `:141: invalid YAML (BLOCK_AS_IMPLICIT_KEY)`; `pnpm workflows:validate:test` → **5 passed, 1 failed** (`validateWorkflows passes on repository root`, the same three errors).
+- Fix: the three step names quoted (Prettier normalised them to single quotes); no other line of the workflow changed.
+- Green: `pnpm workflows:validate` → "Workflow validation passed."; `pnpm workflows:validate:test` → **6/6**; `pnpm docs:validate` passed and `pnpm docs:validate:test` **11/11**; `pnpm lint` → 6/6 tasks successful; `pnpm install --frozen-lockfile` succeeds.
+- `pnpm format:check` reports 97 local files that are gitignored or untracked (Prisma output, `next-env.d.ts`, `.claude/`), the same count with and without this change; none of them is tracked.
+- Side effect of `pnpm add -Dw yaml@^2.9.0`: pnpm deduplicated lint-staged's transitive `yaml` from 2.8.2 to 2.9.0 (within its range).
+
+### GitHub
+
+Pending: needs a push, then a manual dispatch of "Release Candidate".
 
 ## Completion summary
 
-Pending implementation.
+Pending GitHub acceptance.

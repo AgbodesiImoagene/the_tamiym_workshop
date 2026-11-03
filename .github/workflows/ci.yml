@@ -514,3 +514,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Validate documentation links and ticket backlog
         run: pnpm docs:validate && pnpm docs:validate:test && pnpm playwright:validate && pnpm playwright:validate:test && pnpm discovery-gates:validate:test
+      - name: Validate GitHub workflow syntax
+        run: pnpm workflows:validate && pnpm workflows:validate:test

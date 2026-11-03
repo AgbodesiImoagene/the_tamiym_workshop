@@ -37,6 +37,8 @@
     "discovery-metrics:validate:test": "node --test scripts/quality/__tests__/validate-discovery-metrics.test.mjs",
     "discovery-gates:validate": "node scripts/quality/validate-discovery-gates.mjs",
     "discovery-gates:validate:test": "node --test scripts/quality/__tests__/validate-discovery-gates.test.mjs",
+    "workflows:validate": "node scripts/quality/validate-workflows.mjs",
+    "workflows:validate:test": "node --test scripts/quality/__tests__/validate-workflows.test.mjs",
     "release:preflight": "node infra/release/scripts/preflight-release.mjs",
     "release:check-migrations": "node infra/release/scripts/check-migration-artefacts.mjs",
     "release:verify-migrations": "node infra/release/scripts/verify-migration-baseline.mjs",
@@ -103,7 +105,8 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "turbo": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "yaml": "^2.9.0"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

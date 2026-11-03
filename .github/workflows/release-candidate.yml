@@ -68,7 +68,7 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build ${{ matrix.name }} image (push: false)
+      - name: 'Build ${{ matrix.name }} image (push: false)'
         if: matrix.name != 'api'
         uses: docker/build-push-action@v6
         with:
@@ -83,7 +83,7 @@ jobs:
           cache-to: type=gha,mode=min,scope=tamiym-rc-${{ matrix.name }}
           provenance: true
           sbom: true
-      - name: Build api image (push: false)
+      - name: 'Build api image (push: false)'
         if: matrix.name == 'api'
         uses: docker/build-push-action@v6
         with:
@@ -138,7 +138,7 @@ jobs:
         run: pnpm db:generate
       - name: Verify live migration baseline
         run: pnpm release:verify-migrations
-      - name: Build manifest (digests empty when push: false)
+      - name: 'Build manifest (digests empty when push: false)'
         env:
           GITHUB_SHA: ${{ github.sha }}
           # Digests intentionally unset: default path does not push to a registry.
