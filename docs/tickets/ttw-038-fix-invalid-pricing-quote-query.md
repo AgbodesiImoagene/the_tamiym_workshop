@@ -1,7 +1,7 @@
 # TTW-038 — Fix the invalid pricing query that breaks every quote and order
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
-**Status:** Implemented-unverified (awaiting commit, PR and CI)\
+**Status:** Complete (2026-11-04): committed as `6c49259` and pushed to `origin/main`; local API e2e suite green (83/83); GitHub CI result on `main` not checked from this session\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-037 (its API e2e red phase cannot run until quotes work)

@@ -2,6 +2,15 @@
 
 This is the ordered delivery map derived from the 2026-08-18 code/security review, the Playwright strategy, and the backend business-completeness audit. Every row links to a scoped implementation contract. `Scoped` means the current evidence, boundaries, dependencies, implementation sequence, tests, observability and acceptance criteria are recorded; owner policy decisions inside the ticket must still be approved at design review before implementation.
 
+## Client review mapping
+
+From 2026-11-04, new work starts from the client review workbook `revue-client/Tamiym_Workshop_Review_2026-10-21 Client reply to questions.xlsx` (sheet "Findings"). Each new feature or fix gets its own ticket that cites the row ID it closes. The `Review` column links existing tickets to that workbook:
+
+- a row ID (for example `4.3`): the ticket is the work for that review row;
+- `Rest: <IDs>`: the ticket's shipped slice stands; its remaining scope is tracked by those review rows and will get new tickets;
+- `Not in review`: the review does not cover this ticket (CI, tooling, infrastructure handled by the client, or deferred post-v1 work), so the ticket stays the only record;
+- `—`: complete, nothing left in the review.
+
 ## Priority model
 
 - **P0:** correctness/security/release foundation; blocks safe business use.
@@ -11,124 +20,124 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 0 — Trustworthy delivery system
 
-| Ticket                                                           | Priority | Risk     | State       | Outcome                                                                                  |
-| ---------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- |
-| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete    | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
-| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
-| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
-| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      |
-| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           |
-| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      |
-| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | In progress | Regenerate the shared enums and fail CI when they drift from the Prisma schema           |
-| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    |
+| Ticket                                                           | Priority | Risk     | State       | Outcome                                                                                  | Review        |
+| ---------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- | ------------- |
+| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete    | Align local/CI Node and pnpm contracts with Next 16 requirements                         | —             |
+| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
+| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
+| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
+| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
+| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
+| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | In progress | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
+| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
-| Ticket                                                  | Priority | Risk     | State    | Outcome                                                                      |
-| ------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- |
-| [TTW-010](ttw-010-make-charge-settlement-idempotent.md) | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery |
-| [TTW-011](ttw-011-make-payout-events-idempotent.md)     | P0       | Critical | Complete | Apply each payout transition and ledger effect exactly once                  |
-| [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Complete | Permit at most one active payment attempt per order                          |
-| [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        |
-| [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     |
-| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks |
+| Ticket                                                  | Priority | Risk     | State    | Outcome                                                                      | Review |
+| ------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | ------ |
+| [TTW-010](ttw-010-make-charge-settlement-idempotent.md) | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery | —      |
+| [TTW-011](ttw-011-make-payout-events-idempotent.md)     | P0       | Critical | Complete | Apply each payout transition and ledger effect exactly once                  | —      |
+| [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Complete | Permit at most one active payment attempt per order                          | —      |
+| [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        | —      |
+| [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     | —      |
+| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks | —      |
 
 ## Epic 2 — Security and trust boundaries
 
-| Ticket                                                              | Priority | Risk | State    | Outcome                                                                        |
-| ------------------------------------------------------------------- | -------- | ---- | -------- | ------------------------------------------------------------------------------ |
-| [TTW-020](ttw-020-isolate-admin-customer-sessions.md)               | P0       | High | Complete | Enforce admin/customer session isolation and a deliberate CSRF model           |
-| [TTW-021](ttw-021-secure-media-ingestion.md)                        | P0       | High | Complete | Add real malware scanning and redirect/DNS-safe remote ingestion               |
-| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Complete | Remediate critical/high production dependency advisories and add audit policy  |
-| [TTW-023](ttw-023-enforce-account-and-privileged-auth-policy.md)    | P1       | High | Complete | Enforce verification, rate-limit, revocable-session and privileged-auth policy |
-| [TTW-024](ttw-024-enforce-pricing-discount-and-tax-policy.md)       | P0       | High | Complete | Enforce reproducible price, discount, VAT and rounding policy                  |
-| [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Complete | Implement auditable export, retention, deletion and anonymisation workflows    |
-| [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete | Replace permanent plaintext shares with expiring, revocable, digest-only links |
-| [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete | Add revision-bound moderation decisions, appeals and evidence retention        |
+| Ticket                                                              | Priority | Risk | State    | Outcome                                                                        | Review                 |
+| ------------------------------------------------------------------- | -------- | ---- | -------- | ------------------------------------------------------------------------------ | ---------------------- |
+| [TTW-020](ttw-020-isolate-admin-customer-sessions.md)               | P0       | High | Complete | Enforce admin/customer session isolation and a deliberate CSRF model           | —                      |
+| [TTW-021](ttw-021-secure-media-ingestion.md)                        | P0       | High | Complete | Add real malware scanning and redirect/DNS-safe remote ingestion               | —                      |
+| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Complete | Remediate critical/high production dependency advisories and add audit policy  | —                      |
+| [TTW-023](ttw-023-enforce-account-and-privileged-auth-policy.md)    | P1       | High | Complete | Enforce verification, rate-limit, revocable-session and privileged-auth policy | Rest: 1.4, 1.5, 1.10   |
+| [TTW-024](ttw-024-enforce-pricing-discount-and-tax-policy.md)       | P0       | High | Complete | Enforce reproducible price, discount, VAT and rounding policy                  | —                      |
+| [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Complete | Implement auditable export, retention, deletion and anonymisation workflows    | Rest: 11.1, 11.2, 11.6 |
+| [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete | Replace permanent plaintext shares with expiring, revocable, digest-only links | Rest: 3.6              |
+| [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete | Add revision-bound moderation decisions, appeals and evidence retention        | Rest: 9.1              |
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 
-| Ticket                                                                    | Priority | Risk     | State       | Outcome                                                                      |
-| ------------------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------- |
-| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md)         | P1       | High     | Complete    | Implement organiser eligibility, approval and campaign entry                 |
-| [TTW-031](ttw-031-render-real-fundraiser-offers.md)                       | P1       | High     | Complete    | Replace placeholder public options with sellable API-backed offers           |
-| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)                    | P1       | High     | Complete    | Preserve supporter intent through auth and complete web checkout             |
-| [TTW-033](ttw-033-add-customer-order-detail.md)                           | P1       | High     | Complete    | Add immutable, redacted customer order detail and honest states              |
-| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)            | P1       | High     | Complete    | Enforce activation readiness and notify organisers of decisions              |
-| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)                  | P1       | High     | Complete    | Complete organiser product, design, price and submission authoring           |
-| [TTW-036](ttw-036-complete-analytics-contracts.md)                        | P1       | High     | Complete    | Interim analytics KPI contracts encoded (slice 1)                            |
-| [TTW-037](ttw-037-prevent-duplicate-standard-checkout-orders.md)          | P0       | Critical | In progress | Keep one order per cart revision across retries, tabs and concurrent creates |
-| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | In progress | Fix the invalid pricing query that breaks every quote and order              |
-| [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped      | Seed a sellable fundraiser offer and automate the supporter checkout journey |
-| [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped      | Let customers order their saved designs from the Design Workshop             |
+| Ticket                                                                    | Priority | Risk     | State    | Outcome                                                                      | Review                      |
+| ------------------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | --------------------------- |
+| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md)         | P1       | High     | Complete | Implement organiser eligibility, approval and campaign entry                 | Rest: 6.1                   |
+| [TTW-031](ttw-031-render-real-fundraiser-offers.md)                       | P1       | High     | Complete | Replace placeholder public options with sellable API-backed offers           | Rest: 13.3                  |
+| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)                    | P1       | High     | Complete | Preserve supporter intent through auth and complete web checkout             | Rest: 4.5, 4.7, 13.3        |
+| [TTW-033](ttw-033-add-customer-order-detail.md)                           | P1       | High     | Complete | Add immutable, redacted customer order detail and honest states              | Rest: 4.8, 13.3             |
+| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)            | P1       | High     | Complete | Enforce activation readiness and notify organisers of decisions              | Rest: 6.10, 6.11, 6.12, 9.5 |
+| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)                  | P1       | High     | Complete | Complete organiser product, design, price and submission authoring           | Rest: 6.3                   |
+| [TTW-036](ttw-036-complete-analytics-contracts.md)                        | P1       | High     | Complete | Interim analytics KPI contracts encoded (slice 1)                            | Rest: 10.3, 10.7            |
+| [TTW-037](ttw-037-prevent-duplicate-standard-checkout-orders.md)          | P0       | Critical | Complete | Keep one order per cart revision across retries, tabs and concurrent creates | 4.3                         |
+| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | Complete | Fix the invalid pricing query that breaks every quote and order              | —                           |
+| [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped   | Seed a sellable fundraiser offer and automate the supporter checkout journey | 13.3                        |
+| [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped   | Let customers order their saved designs from the Design Workshop             | 3.1                         |
 
 ## Epic 4 — Fulfilment, support and business policy
 
-| Ticket                                                         | Priority | Risk     | State    | Outcome                                                      |
-| -------------------------------------------------------------- | -------- | -------- | -------- | ------------------------------------------------------------ |
-| [TTW-040](ttw-040-add-shipment-lifecycle.md)                   | P1       | High     | Complete | Add shipment/tracking and delivery-exception lifecycle       |
-| [TTW-041](ttw-041-encode-cancellation-refund-return-policy.md) | P1       | Critical | Complete | Cancellation/refund/return eligibility encoded (slice 1)     |
-| [TTW-042](ttw-042-enforce-payout-policy-and-kyc.md)            | P1       | Critical | Complete | Interim payout eligibility/KYC gates encoded (slice 1)       |
-| [TTW-043](ttw-043-operationalize-notification-delivery.md)     | P2       | High     | Complete | Interim notification prefs/dead-letter/SLO encoded (slice 1) |
+| Ticket                                                         | Priority | Risk     | State    | Outcome                                                      | Review                        |
+| -------------------------------------------------------------- | -------- | -------- | -------- | ------------------------------------------------------------ | ----------------------------- |
+| [TTW-040](ttw-040-add-shipment-lifecycle.md)                   | P1       | High     | Complete | Add shipment/tracking and delivery-exception lifecycle       | Rest: 5.1                     |
+| [TTW-041](ttw-041-encode-cancellation-refund-return-policy.md) | P1       | Critical | Complete | Cancellation/refund/return eligibility encoded (slice 1)     | Rest: 4.6, 5.2, 5.3, 6.13     |
+| [TTW-042](ttw-042-enforce-payout-policy-and-kyc.md)            | P1       | Critical | Complete | Interim payout eligibility/KYC gates encoded (slice 1)       | Rest: 7.1, 7.2, 7.3, 7.8, 7.9 |
+| [TTW-043](ttw-043-operationalize-notification-delivery.md)     | P2       | High     | Complete | Interim notification prefs/dead-letter/SLO encoded (slice 1) | Rest: 10.2                    |
 
 ## Epic 5 — Contracts, observability and release proof
 
-| Ticket                                                | Priority | Risk     | State    | Outcome                                                                |
-| ----------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------- |
-| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                      |
-| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete | Observability dashboards, alerts, runbooks encoded (slice 1)           |
-| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete | Documentation validation + key state reconciliation (slice 1)          |
-| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Complete | Comprehensive Playwright UAT, viewport matrix, nightly shard (slice 2) |
-| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Complete | Migration baseline CI, stop/go rehearsal, release manifest (slice 2)   |
+| Ticket                                                | Priority | Risk     | State    | Outcome                                                                | Review |
+| ----------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------- | ------ |
+| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                      | —      |
+| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete | Observability dashboards, alerts, runbooks encoded (slice 1)           | —      |
+| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete | Documentation validation + key state reconciliation (slice 1)          | —      |
+| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Complete | Comprehensive Playwright UAT, viewport matrix, nightly shard (slice 2) | —      |
+| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Complete | Migration baseline CI, stop/go rehearsal, release manifest (slice 2)   | —      |
 
 ## Epic 6 — Production infrastructure as code
 
 See [the epic contract](../epics/06-production-infrastructure-as-code.md) and [provider decision brief](../18-production-infrastructure-options.md).
 
-| Ticket                                                            | Priority | Risk     | State    | Outcome                                                                    |
-| ----------------------------------------------------------------- | -------- | -------- | -------- | -------------------------------------------------------------------------- |
-| [TTW-060](ttw-060-select-production-platform.md)                  | P0       | High     | Complete | Finalize DigitalOcean architecture, cost model and ADR evidence            |
-| [TTW-061](ttw-061-establish-iac-foundation.md)                    | P0       | High     | Complete | Establish OpenTofu state, provider controls and reviewed plan/apply        |
-| [TTW-062](ttw-062-provision-network-dns-edge.md)                  | P1       | High     | Complete | Provision private networking, DNS, TLS, ingress and edge controls          |
-| [TTW-063](ttw-063-deploy-production-runtime.md)                   | P1       | High     | Complete | Build immutable images and deploy public, API, worker and scheduler roles  |
-| [TTW-064](ttw-064-provision-managed-data-services.md)             | P0       | Critical | Complete | Provision recoverable PostgreSQL, queue storage and private object storage |
-| [TTW-065](ttw-065-enforce-infrastructure-security.md)             | P0       | High     | Complete | Enforce workload identity, secrets, encryption and break-glass controls    |
-| [TTW-066](ttw-066-operationalize-infrastructure-observability.md) | P1       | High     | Complete | Route infrastructure telemetry, alerts and cost controls                   |
-| [TTW-067](ttw-067-prove-backup-disaster-recovery.md)              | P1       | Critical | Complete | Automate backups and prove recovery objectives through exercises           |
-| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Complete | Validate ephemeral release infrastructure and integrate CI/CD              |
+| Ticket                                                            | Priority | Risk     | State    | Outcome                                                                    | Review                |
+| ----------------------------------------------------------------- | -------- | -------- | -------- | -------------------------------------------------------------------------- | --------------------- |
+| [TTW-060](ttw-060-select-production-platform.md)                  | P0       | High     | Complete | Finalize DigitalOcean architecture, cost model and ADR evidence            | —                     |
+| [TTW-061](ttw-061-establish-iac-foundation.md)                    | P0       | High     | Complete | Establish OpenTofu state, provider controls and reviewed plan/apply        | Not in review (infra) |
+| [TTW-062](ttw-062-provision-network-dns-edge.md)                  | P1       | High     | Complete | Provision private networking, DNS, TLS, ingress and edge controls          | Not in review (infra) |
+| [TTW-063](ttw-063-deploy-production-runtime.md)                   | P1       | High     | Complete | Build immutable images and deploy public, API, worker and scheduler roles  | Not in review (infra) |
+| [TTW-064](ttw-064-provision-managed-data-services.md)             | P0       | Critical | Complete | Provision recoverable PostgreSQL, queue storage and private object storage | —                     |
+| [TTW-065](ttw-065-enforce-infrastructure-security.md)             | P0       | High     | Complete | Enforce workload identity, secrets, encryption and break-glass controls    | —                     |
+| [TTW-066](ttw-066-operationalize-infrastructure-observability.md) | P1       | High     | Complete | Route infrastructure telemetry, alerts and cost controls                   | —                     |
+| [TTW-067](ttw-067-prove-backup-disaster-recovery.md)              | P1       | Critical | Complete | Automate backups and prove recovery objectives through exercises           | —                     |
+| [TTW-068](ttw-068-validate-ephemeral-release-infrastructure.md)   | P2       | High     | Complete | Validate ephemeral release infrastructure and integrate CI/CD              | —                     |
 
 ## Epic 7 — Organic discovery: SEO, AEO and GEO
 
 See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 
-| Ticket                                                       | Priority | Risk     | State    | Outcome                                                               |
-| ------------------------------------------------------------ | -------- | -------- | -------- | --------------------------------------------------------------------- |
-| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Complete | Organic discovery strategy brief published (slice 1)                  |
-| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete | Crawl/index/canonical/robots/sitemap foundations (slice 1)            |
-| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Complete | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)          |
-| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Complete | Organization/WebSite/Breadcrumb JSON-LD foundations (slice 1)         |
-| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Complete | Answer library, corrected claims, FAQ markup (slice 1)                |
-| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Complete | Govern AI crawlers, content rights and generative discovery (slice 1) |
-| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Complete | Core Web Vitals budgets, OG/social media contracts (slice 1)          |
-| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Complete | Discovery metrics catalogue, privacy-safe events (slice 1)            |
-| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Complete | Discovery regression manifest, validators, Playwright smoke (slice 1) |
+| Ticket                                                       | Priority | Risk     | State    | Outcome                                                               | Review |
+| ------------------------------------------------------------ | -------- | -------- | -------- | --------------------------------------------------------------------- | ------ |
+| [TTW-070](ttw-070-establish-organic-discovery-strategy.md)   | P1       | Standard | Complete | Organic discovery strategy brief published (slice 1)                  | —      |
+| [TTW-071](ttw-071-implement-search-technical-foundations.md) | P1       | High     | Complete | Crawl/index/canonical/robots/sitemap foundations (slice 1)            | —      |
+| [TTW-072](ttw-072-build-public-content-architecture.md)      | P1       | Standard | Complete | Public IA registry, nav, breadcrumbs, bulk landing (slice 1)          | —      |
+| [TTW-073](ttw-073-publish-trustworthy-structured-data.md)    | P1       | High     | Complete | Organization/WebSite/Breadcrumb JSON-LD foundations (slice 1)         | —      |
+| [TTW-074](ttw-074-publish-answer-ready-content.md)           | P2       | Standard | Complete | Answer library, corrected claims, FAQ markup (slice 1)                | —      |
+| [TTW-075](ttw-075-govern-generative-discovery.md)            | P2       | High     | Complete | Govern AI crawlers, content rights and generative discovery (slice 1) | —      |
+| [TTW-076](ttw-076-improve-search-performance-media.md)       | P2       | Standard | Complete | Core Web Vitals budgets, OG/social media contracts (slice 1)          | —      |
+| [TTW-077](ttw-077-measure-organic-discovery.md)              | P2       | High     | Complete | Discovery metrics catalogue, privacy-safe events (slice 1)            | —      |
+| [TTW-078](ttw-078-gate-discovery-regressions.md)             | P2       | High     | Complete | Discovery regression manifest, validators, Playwright smoke (slice 1) | —      |
 
 ## Explicitly deferred post-v1 backlog
 
 These tickets are scoped so deferred work is owned and discoverable. They do not block the current v1 release unless an owner promotes them through design review and updates the dependency map.
 
-| Ticket                                                            | Risk     | State    | Outcome                                                                |
-| ----------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------------- |
-| [TTW-044](ttw-044-integrate-carrier-labels-and-webhooks.md)       | High     | Deferred | Integrate carrier rates, label purchasing and tracking webhooks        |
-| [TTW-045](ttw-045-support-partial-and-multi-package-shipments.md) | High     | Deferred | Support partial fulfilment and multiple shipment packages              |
-| [TTW-046](ttw-046-handle-chargebacks-and-payment-disputes.md)     | Critical | Deferred | Reconcile chargebacks, disputes and their accounting effects           |
-| [TTW-047](ttw-047-automate-reverse-logistics.md)                  | High     | Deferred | Automate returns labels, receipts and reverse logistics                |
-| [TTW-048](ttw-048-productionize-notification-providers.md)        | High     | Deferred | Select production providers and implement controlled delivery failover |
-| [TTW-049](ttw-049-add-consented-marketing-segmentation.md)        | High     | Deferred | Add consented marketing segmentation and campaign delivery             |
-| [TTW-055](ttw-055-unify-standard-catalogue-cart-and-checkout.md)  | High     | Deferred | Unify standard catalogue discovery, cart and checkout across surfaces  |
-| [TTW-056](ttw-056-reconcile-bank-and-accounting-records.md)       | Critical | Deferred | Reconcile provider, bank and accounting-system records                 |
-| [TTW-057](ttw-057-support-international-money-and-payouts.md)     | Critical | Deferred | Add international currencies, payouts and withholding controls         |
+| Ticket                                                            | Risk     | State    | Outcome                                                                | Review                                        |
+| ----------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------------- | --------------------------------------------- |
+| [TTW-044](ttw-044-integrate-carrier-labels-and-webhooks.md)       | High     | Deferred | Integrate carrier rates, label purchasing and tracking webhooks        | 5.10                                          |
+| [TTW-045](ttw-045-support-partial-and-multi-package-shipments.md) | High     | Deferred | Support partial fulfilment and multiple shipment packages              | Not in review                                 |
+| [TTW-046](ttw-046-handle-chargebacks-and-payment-disputes.md)     | Critical | Deferred | Reconcile chargebacks, disputes and their accounting effects           | Not in review                                 |
+| [TTW-047](ttw-047-automate-reverse-logistics.md)                  | High     | Deferred | Automate returns labels, receipts and reverse logistics                | 5.3                                           |
+| [TTW-048](ttw-048-productionize-notification-providers.md)        | High     | Deferred | Select production providers and implement controlled delivery failover | 10.5                                          |
+| [TTW-049](ttw-049-add-consented-marketing-segmentation.md)        | High     | Deferred | Add consented marketing segmentation and campaign delivery             | Not in review (10.9 is unsubscribe only)      |
+| [TTW-055](ttw-055-unify-standard-catalogue-cart-and-checkout.md)  | High     | Deferred | Unify standard catalogue discovery, cart and checkout across surfaces  | 2.4                                           |
+| [TTW-056](ttw-056-reconcile-bank-and-accounting-records.md)       | Critical | Deferred | Reconcile provider, bank and accounting-system records                 | Not in review (10.1 is Paystack screens only) |
+| [TTW-057](ttw-057-support-international-money-and-payouts.md)     | Critical | Deferred | Add international currencies, payouts and withholding controls         | Not in review                                 |
 
 ## Recommended first sequence
 
