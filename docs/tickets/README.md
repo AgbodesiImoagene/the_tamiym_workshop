@@ -31,6 +31,7 @@ From 2026-11-04, new work starts from the client review workbook `revue-client/T
 | [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
 | [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | In progress | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
 | [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
+| [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | In progress | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
