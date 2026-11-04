@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin-shell';
@@ -76,13 +76,23 @@ function ViewWorkshopPanel({
   const [viewDefault, setViewDefault] = useState(view.isDefault);
   const [confirmDeleteView, setConfirmDeleteView] = useState(false);
 
-  useEffect(() => {
+  // Reload the form when the saved view changes (another view, or a refresh after a save).
+  const [syncedView, setSyncedView] = useState(view);
+  if (
+    syncedView.id !== view.id ||
+    syncedView.key !== view.key ||
+    syncedView.displayName !== view.displayName ||
+    syncedView.sortOrder !== view.sortOrder ||
+    syncedView.isDesignable !== view.isDesignable ||
+    syncedView.isDefault !== view.isDefault
+  ) {
+    setSyncedView(view);
     setViewKey(view.key);
     setViewDisplayName(view.displayName);
     setViewSortOrder(String(view.sortOrder));
     setViewDesignable(view.isDesignable);
     setViewDefault(view.isDefault);
-  }, [view.id, view.key, view.displayName, view.sortOrder, view.isDesignable, view.isDefault]);
+  }
 
   const saveViewMut = useMutation({
     mutationFn: () => {

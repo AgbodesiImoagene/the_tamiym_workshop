@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ApiError, User, authApi } from '@/lib/auth';
 import { getUserAddresses, upsertPrimaryAddress, type ShippingAddress } from '@/lib/addresses';
 import {
@@ -72,12 +72,6 @@ export default function FundraiserCheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
 
-  const hydrateCart = useCallback(() => {
-    const loaded = loadCampaignCart();
-    setCart(loaded);
-    return loaded;
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     async function bootstrap() {
@@ -85,6 +79,12 @@ export default function FundraiserCheckoutPage() {
         const me = await authApi.getMe();
         if (cancelled) return;
         setUser(me);
+        // The cart lives in this browser; read it once the session is known.
+        const loaded = loadCampaignCart();
+        setCart(loaded);
+        if (!loaded || loaded.lines.length === 0) {
+          setError('Your cart is empty. Choose a product on the fundraiser page first.');
+        }
         if (!me.emailVerified) {
           router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
           return;
@@ -108,13 +108,10 @@ export default function FundraiserCheckoutPage() {
     };
   }, [checkoutPath, router]);
 
+  const cartCampaignId = cart && cart.lines.length > 0 ? cart.campaignId : null;
+
   useEffect(() => {
-    if (!authChecked || !user) return;
-    const loaded = hydrateCart();
-    if (!loaded || loaded.lines.length === 0) {
-      setError('Your cart is empty. Choose a product on the fundraiser page first.');
-      return;
-    }
+    if (!authChecked || !user || !cartCampaignId) return;
 
     let cancelled = false;
     async function matchCampaign() {
@@ -126,7 +123,7 @@ export default function FundraiserCheckoutPage() {
           return;
         }
         setCampaignTitle(fundraiser.title);
-        if (fundraiser.id !== loaded!.campaignId) {
+        if (fundraiser.id !== cartCampaignId) {
           setCampaignMismatch(true);
           setError('This checkout page does not match the campaign in your cart.');
         }
@@ -154,7 +151,7 @@ export default function FundraiserCheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [authChecked, user, slug, hydrateCart]);
+  }, [authChecked, user, slug, cartCampaignId]);
 
   const lineCount = useMemo(
     () => cart?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0,

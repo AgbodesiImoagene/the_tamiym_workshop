@@ -78,14 +78,17 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
 
   // Auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest save handler, so the timer saves the current design rather than the one
+  // captured when it was scheduled.
+  const handleSaveRef = useRef<(withThumbnail?: boolean) => Promise<void>>(async () => {});
 
   const scheduleAutoSave = useCallback(() => {
     if (!designId) return; // Only auto-save after first explicit save
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      handleSave(false);
+      void handleSaveRef.current(false);
     }, AUTOSAVE_DELAY_MS);
-  }, [designId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [designId]);
 
   // Clear autosave on unmount
   useEffect(() => {
@@ -181,6 +184,10 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
     },
     [isSaving, designId, designName, designData, product.id, router, captureThumbnail]
   );
+
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
 
   const handleAddText = useCallback((textObject: Record<string, unknown>) => {
     if (!canvasRef.current) return;

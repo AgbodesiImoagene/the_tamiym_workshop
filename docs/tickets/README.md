@@ -20,6 +20,7 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      |
 | [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | In progress | Fix the invalid YAML that stops the release-candidate workflow                           |
 | [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      |
+| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    |
 
 ## Epic 1 — Financial and inventory integrity
 
