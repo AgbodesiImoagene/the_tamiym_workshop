@@ -17,6 +17,20 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
+let providerRefundIdSeq = 0;
+
+/**
+ * Mocked Paystack refund ids must not repeat across runs: the e2e database is
+ * never emptied (CI runs this suite three times on it), and the refund webhook
+ * resolves refunds by `providerRef`, so a reused id settles an old refund.
+ * Milliseconds x 1000 + a per-process counter stays below
+ * Number.MAX_SAFE_INTEGER, which the numeric webhook `data.id` requires.
+ */
+function uniqueProviderRefundId(): string {
+  providerRefundIdSeq += 1;
+  return String(Date.now() * 1000 + providerRefundIdSeq);
+}
+
 /**
  * TTW-013: refunds settle exactly once under duplicate/concurrent delivery;
  * partial refunds leave PARTIALLY_REFUNDED until the captured value is covered.
@@ -122,6 +136,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
     const suffix = `conc-${Date.now()}`;
     const { order, campaign, payment, providerRef, totalAmount } =
       await createPaidCampaignOrder(suffix);
+    const providerRefundId = uniqueProviderRefundId();
 
     let providerCalls = 0;
     jest
@@ -130,7 +145,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
         providerCalls += 1;
         await Promise.resolve();
         return {
-          providerRefundId: `9001${suffix.slice(-4)}`,
+          providerRefundId,
           providerStatus: 'pending',
           refundReference: null,
           transactionReference: providerRef,
@@ -222,7 +237,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
     );
 
     jest.spyOn(paystackRefundClient, 'createRefund').mockResolvedValue({
-      providerRefundId: `8001${suffix.slice(-4)}`,
+      providerRefundId: uniqueProviderRefundId(),
       providerStatus: 'pending',
       refundReference: null,
       transactionReference: providerRef,
@@ -259,7 +274,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
     const { order, providerRef } = await createPaidCampaignOrder(suffix, 5_000);
 
     jest.spyOn(paystackRefundClient, 'createRefund').mockResolvedValue({
-      providerRefundId: `7001${suffix.slice(-4)}`,
+      providerRefundId: uniqueProviderRefundId(),
       providerStatus: 'pending',
       refundReference: null,
       transactionReference: providerRef,
@@ -297,7 +312,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
         providerCalls += 1;
         await new Promise((r) => setTimeout(r, 15));
         return {
-          providerRefundId: `6000${providerCalls}${suffix.slice(-3)}`,
+          providerRefundId: uniqueProviderRefundId(),
           providerStatus: 'pending',
           refundReference: null,
           transactionReference: providerRef,
@@ -348,6 +363,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
       suffix,
       8_000,
     );
+    const providerRefundId = uniqueProviderRefundId();
 
     let providerCalls = 0;
     jest
@@ -356,7 +372,7 @@ describe('Paystack refund lifecycle (e2e)', () => {
         providerCalls += 1;
         await new Promise((r) => setTimeout(r, 40));
         return {
-          providerRefundId: `5500${suffix.slice(-4)}`,
+          providerRefundId,
           providerStatus: 'pending',
           refundReference: null,
           transactionReference: providerRef,
@@ -385,6 +401,6 @@ describe('Paystack refund lifecycle (e2e)', () => {
 
     const rows = await prisma.refund.findMany({ where: { orderId: order.id } });
     expect(rows).toHaveLength(1);
-    expect(rows[0].providerRef).toBe(`5500${suffix.slice(-4)}`);
+    expect(rows[0].providerRef).toBe(providerRefundId);
   });
 });
