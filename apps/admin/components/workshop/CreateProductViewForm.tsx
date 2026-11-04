@@ -15,7 +15,7 @@ import {
   Label,
 } from '@tamiym/ui';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type Props = {
   productId: string;
@@ -45,13 +45,17 @@ export function CreateProductViewForm({
   const [isDesignable, setIsDesignable] = useState(true);
   const [isDefault, setIsDefault] = useState(views.length === 0);
 
-  useEffect(() => {
+  // Follow the next free sort order, and stop proposing "default" once a view exists.
+  const [syncedNextSort, setSyncedNextSort] = useState(nextSort);
+  if (syncedNextSort !== nextSort) {
+    setSyncedNextSort(nextSort);
     setSortOrder(String(nextSort));
-  }, [nextSort]);
-
-  useEffect(() => {
+  }
+  const [syncedViewCount, setSyncedViewCount] = useState(views.length);
+  if (syncedViewCount !== views.length) {
+    setSyncedViewCount(views.length);
     if (views.length > 0) setIsDefault(false);
-  }, [views.length]);
+  }
 
   const createMut = useMutation({
     mutationFn: () => {

@@ -11,15 +11,16 @@ This is the ordered delivery map derived from the 2026-08-18 code/security revie
 
 ## Epic 0 — Trustworthy delivery system
 
-| Ticket                                                           | Priority | Risk     | State    | Outcome                                                                                  |
-| ---------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- |
-| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
-| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
-| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
-| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped   | Reconcile the Prisma schema with migrations and guard against drift                      |
-| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete | Fix the invalid YAML that stops the release-candidate workflow                           |
-| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Scoped   | Upgrade vulnerable production dependencies so the audit gate passes                      |
+| Ticket                                                           | Priority | Risk     | State       | Outcome                                                                                  |
+| ---------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- |
+| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete    | Align local/CI Node and pnpm contracts with Next 16 requirements                         |
+| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                |
+| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        |
+| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      |
+| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           |
+| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      |
+| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    |
 
 ## Epic 1 — Financial and inventory integrity
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { Suspense, useState, type FormEvent } from 'react';
 import { ApiError, authApi } from '@/lib/auth';
 import { getSafeRedirectPath } from '@/lib/redirect-path';
 import { AuthPageShell, Button, Input } from '@tamiym/ui';
@@ -16,9 +16,12 @@ function VerifyEmailContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  // A new link in the URL replaces the token in the field.
+  const [linkToken, setLinkToken] = useState(tokenFromQuery);
+  if (linkToken !== tokenFromQuery) {
+    setLinkToken(tokenFromQuery);
     setToken(tokenFromQuery);
-  }, [tokenFromQuery]);
+  }
 
   async function handleVerify(event: FormEvent) {
     event.preventDefault();

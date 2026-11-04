@@ -16,7 +16,7 @@ import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface CheckoutFormState {
   recipientName: string;
@@ -71,12 +71,14 @@ export default function DashboardCheckoutPage() {
   // so after a reload it is still the address of any earlier attempt. The API returns
   // the existing order for a known key whatever the payload, so quoting a different
   // address needs a new key (TTW-037).
-  const savedAddressRef = useRef<string | null>(null);
+  const [savedAddressJson, setSavedAddressJson] = useState<string | null>(null);
 
   // Any new cart revision (lines changed here or in another tab) needs a new quote.
-  useEffect(() => {
+  const [quotedRevision, setQuotedRevision] = useState(idempotencyKey);
+  if (quotedRevision !== idempotencyKey) {
+    setQuotedRevision(idempotencyKey);
     setQuote(null);
-  }, [idempotencyKey]);
+  }
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -101,15 +103,18 @@ export default function DashboardCheckoutPage() {
     enabled: !!user,
   });
 
-  useEffect(() => {
+  // Prefill the form each time the saved addresses load.
+  const [loadedAddresses, setLoadedAddresses] = useState<ShippingAddress[] | undefined>();
+  if (loadedAddresses !== addressesQuery.data) {
+    setLoadedAddresses(addressesQuery.data);
     const address =
       (addressesQuery.data ?? []).find((item) => item.isDefault) ?? addressesQuery.data?.[0];
     if (address) {
       setSavedAddressId(address.id);
       setForm(addressToForm(address));
-      savedAddressRef.current = JSON.stringify(addressToForm(address));
+      setSavedAddressJson(JSON.stringify(addressToForm(address)));
     }
-  }, [addressesQuery.data]);
+  }
 
   const orderItems = useMemo(() => toOrderItems(items), [items]);
 
@@ -131,7 +136,7 @@ export default function DashboardCheckoutPage() {
       country: form.country || 'Nigeria',
     });
     setSavedAddressId(address.id);
-    savedAddressRef.current = JSON.stringify(form);
+    setSavedAddressJson(JSON.stringify(form));
     return address.id;
   }
 
@@ -140,7 +145,7 @@ export default function DashboardCheckoutPage() {
     setSubmitMessage(null);
     setIsQuoting(true);
     try {
-      if (savedAddressRef.current !== null && savedAddressRef.current !== JSON.stringify(form)) {
+      if (savedAddressJson !== null && savedAddressJson !== JSON.stringify(form)) {
         rotateCartIdempotencyKey();
       }
       const shippingAddressId = await ensureAddress();

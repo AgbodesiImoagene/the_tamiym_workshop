@@ -35,4 +35,19 @@ describeViewportMatrix('Web auth pages @comprehensive @web', () => {
     await expect(page.getByRole('button', { name: /Verify email/i })).toBeVisible();
     await assertVisibleControlsEnabled(page.locator('form'));
   });
+
+  test('verify-email prefills the token from the link and keeps manual edits', async ({ page }) => {
+    await page.goto('/verify-email?token=link-token&next=%2F');
+    const tokenInput = page.getByLabel(/Verification token/i);
+    await expect(tokenInput).toHaveValue('link-token');
+
+    await tokenInput.fill('pasted-token');
+    await expect(tokenInput).toHaveValue('pasted-token');
+
+    // A new link opened in the same tab replaces the token without a reload.
+    await page.evaluate(() =>
+      window.history.pushState(null, '', '/verify-email?token=second-link&next=%2F')
+    );
+    await expect(tokenInput).toHaveValue('second-link');
+  });
 });

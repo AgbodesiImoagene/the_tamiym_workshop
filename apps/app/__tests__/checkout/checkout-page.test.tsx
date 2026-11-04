@@ -300,6 +300,23 @@ describe('DashboardCheckoutPage', () => {
     expect(sentKeys()[0]).not.toBe(keyBeforeReload);
   });
 
+  // TTW-009: addresses already cached (e.g. back navigation) still prefill the form.
+  it('prefills the saved address when the addresses are already cached on mount', async () => {
+    addCartItem(cartLine());
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['checkout-addresses'], [savedAddress]);
+
+    render(
+      <QueryClientProvider client={client}>
+        <DashboardCheckoutPage />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByLabelText('City')).toHaveValue('Ikeja');
+    expect(screen.getByLabelText('Street Address')).toHaveValue('1 Allen Avenue');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review quote' })).toBeEnabled());
+  });
+
   // Review finding 6: the API refuses a known key sent with different content.
   it('starts a new revision when the API reports the key was used for other content', async () => {
     addCartItem(cartLine());
