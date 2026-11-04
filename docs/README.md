@@ -34,7 +34,7 @@ The PRD defines: public website + customer dashboard + design workshop + checkou
 
 - `apps/api` is the most developed part of the repo and contains real domain modules, controllers, services, DTOs, Prisma models, tests, and OpenTelemetry bootstrap.
 - `apps/web`, `apps/app`, and `apps/admin` have substantial routed surfaces (auth, fundraiser commerce, customer dashboard, admin operations) but remain **Partial** until release UAT and remaining tickets are verified.
-- Swagger is enabled in the API; OpenAPI drift is gated in CI (`pnpm openapi:check`).
+- Swagger is enabled in the API; OpenAPI drift is gated in CI (`pnpm openapi:check`), as is drift of the shared Prisma enums (`pnpm enums:check`).
 - The canonical delivery backlog lives in `docs/tickets/README.md`; backend readiness gaps are tracked in `backend-production-readiness.md`.
 
 ## Documentation ownership

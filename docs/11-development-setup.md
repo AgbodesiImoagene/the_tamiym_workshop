@@ -35,7 +35,7 @@ Do not hand-format or lint generated output. Root `.prettierignore` and package 
 - `packages/types/src/enums.generated.ts`
 - `**/next-env.d.ts`, `dist`, `.next`, `coverage`, `.turbo`, lockfiles
 
-Regenerate Prisma Client with `pnpm db:generate` and enums via `pnpm --filter @tamiym/types generate:enums` rather than editing generated files.
+Regenerate Prisma Client with `pnpm db:generate` and enums via `pnpm --filter @tamiym/types generate:enums` rather than editing generated files. CI fails when the committed enums drift from `apps/api/prisma/schema.prisma` (`pnpm enums:check`).
 
 ## Local services (Docker Compose)
 

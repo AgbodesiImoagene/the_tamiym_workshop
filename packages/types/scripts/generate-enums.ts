@@ -7,10 +7,11 @@
  *
  * Usage: pnpm --filter @tamiym/types generate:enums
  * Or: node packages/types/scripts/generate-enums.ts
+ * Drift check: pnpm --filter @tamiym/types generate:enums -- --schema path/to/schema.prisma --output path/to/enums.ts
  */
 
 import { readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,16 @@ const PRISMA_SCHEMA_PATH = join(__dirname, '../../../apps/api/prisma/schema.pris
 
 // Path to output file
 const OUTPUT_PATH = join(__dirname, '../src/enums.generated.ts');
+
+function parseArg(flag: string, fallback: string): string {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return fallback;
+  const value = process.argv[index + 1];
+  if (!value) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+  return resolve(value);
+}
 
 interface EnumDefinition {
   name: string;
@@ -138,8 +149,11 @@ function generateTypeScriptEnums(enums: EnumDefinition[]): string {
  */
 function main() {
   try {
+    const schemaPath = parseArg('--schema', PRISMA_SCHEMA_PATH);
+    const outputPath = parseArg('--output', OUTPUT_PATH);
+
     console.log('📖 Reading Prisma schema...');
-    const schemaContent = readFileSync(PRISMA_SCHEMA_PATH, 'utf-8');
+    const schemaContent = readFileSync(schemaPath, 'utf-8');
 
     console.log('🔍 Parsing enums...');
     const enums = parsePrismaEnums(schemaContent);
@@ -158,9 +172,9 @@ function main() {
     const generatedCode = generateTypeScriptEnums(enums);
 
     console.log('💾 Writing to file...');
-    writeFileSync(OUTPUT_PATH, generatedCode, 'utf-8');
+    writeFileSync(outputPath, generatedCode, 'utf-8');
 
-    console.log(`✅ Successfully generated ${enums.length} enums to ${OUTPUT_PATH}`);
+    console.log(`✅ Successfully generated ${enums.length} enums to ${outputPath}`);
   } catch (error) {
     console.error('❌ Error generating enums:', error);
     process.exit(1);
