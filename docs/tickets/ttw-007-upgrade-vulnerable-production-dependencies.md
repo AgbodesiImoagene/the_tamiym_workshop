@@ -1,7 +1,7 @@
 # TTW-007 — Upgrade vulnerable production dependencies
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress — local gates green and review addressed on `codex/ttw-007-upgrade-vulnerable-deps`; GitHub CI not yet run\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** A green `main` CI (job "Production Audit") and the scheduled "Dependency Audit"
@@ -53,9 +53,9 @@ Rejected: lowering the audit level or adding blanket ignores (hides real issues)
 
 ## Acceptance criteria
 
-- [ ] `pnpm audit:prod` passes (or each remaining advisory has a recorded exception).
-- [ ] All quality gates pass after the upgrades, with output recorded below.
-- [ ] CI on `main` is green, including "Production Audit".
+- [x] `pnpm audit:prod` passes (or each remaining advisory has a recorded exception).
+- [x] All quality gates pass after the upgrades, with output recorded below.
+- [x] CI on `main` is green, including "Production Audit".
 
 ## Out of scope
 
@@ -143,4 +143,6 @@ Noticed, out of scope: `pnpm build` regenerates `packages/types/src/enums.genera
 
 ## Completion summary
 
-Local work complete: `pnpm audit:prod` passes with 0 high/critical (from 8 critical, 31 high), every local gate is green, and the independent review findings are addressed. Not verified here: CI on GitHub ("Production Audit" and the scheduled "Dependency Audit"), which needs the user to push the branch. Left as follow-ups: a ticket for the `eslint-config-next` 16.4 / `react-hooks` 7.1 lint errors (7 files), and the `enums.generated.ts` drift noted above. Residual moderate/low advisories (21 moderate, 3 low) stay with the follow-up owned by `docs/dependency-security-policy.md`. Dev-only: one `ts-jest` instance still resolves `handlebars@4.7.9` (not in the production graph).
+GitHub: merged to `main` (`335e4ee`, with TTW-009). CI run [41931373328](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/41931373328) on `main` `541bad4` is green on all 18 jobs, including "Production Audit". The previous `main` runs failed only on that job. The scheduled "Dependency Audit" (Mondays 09:00 UTC) has not run since the merge; it runs the same audit.
+
+Local work complete: `pnpm audit:prod` passes with 0 high/critical (from 8 critical, 31 high), every local gate is green, and the independent review findings are addressed. Not verified here: CI on GitHub ("Production Audit" and the scheduled "Dependency Audit"), which needs the user to push the branch. Follow-ups shipped: TTW-009 (the `eslint-config-next` 16.4 / `react-hooks` 7.1 lint errors) and TTW-008 (the `enums.generated.ts` drift noted above). Residual moderate/low advisories (21 moderate, 3 low) stay with the follow-up owned by `docs/dependency-security-policy.md`. Dev-only: one `ts-jest` instance still resolves `handlebars@4.7.9` (not in the production graph).

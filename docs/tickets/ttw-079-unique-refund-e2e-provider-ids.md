@@ -1,7 +1,7 @@
 # TTW-079 — Give refund e2e tests unique Paystack refund ids
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress — local gates green on `codex/ttw-079-unique-refund-e2e-provider-ids`; GitHub CI not yet run\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** A reliably green CI job "API Integration"
@@ -69,7 +69,7 @@ Rejected alternatives:
 - [x] The reproduction fails before the change and passes after it.
 - [x] Full API e2e suite and the open-handle proof pass locally.
 - [x] Lint and typecheck pass for `apps/api`.
-- [ ] CI job "API Integration" green on GitHub.
+- [x] CI job "API Integration" green on GitHub.
 
 ## Out of scope
 
@@ -117,7 +117,7 @@ Gates (local, Node 24, Postgres 17 + Redis):
 - `pnpm exec prettier --check` on the ticket and the spec: passed.
 - `pnpm docs:validate`: passed.
 
-Not verified: CI job "API Integration" on GitHub (needs a push).
+GitHub: CI run [41931373328](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/41931373328) on `main` `541bad4` (merge of `197ba4f`) is green on all 18 jobs. "API Integration" passed all three e2e runs on one database, including "Prove no open handles".
 
 ## Completion summary
 
@@ -125,5 +125,5 @@ Test-only change: `apps/api/test/paystack-refund-lifecycle.e2e-spec.ts` now gets
 
 Observed, not fixed (outside scope):
 
-- When `prove-e2e-open-handles.mjs` times out, it sends `SIGKILL` to `pnpm` only. The `jest` grandchild survives as an orphan and keeps the output pipes open, so the script never exits. Locally it hung for hours instead of failing at 120 s. → candidate follow-up ticket.
-- `Refund.providerRef` is not unique and the webhook lookup uses `findFirst`. Paystack ids are unique in practice, so this is only a hardening question. → candidate follow-up ticket.
+- When `prove-e2e-open-handles.mjs` times out, it sends `SIGKILL` to `pnpm` only. The `jest` grandchild survives as an orphan and keeps the output pipes open, so the script never exits. Locally it hung for hours instead of failing at 120 s. → TTW-080.
+- `Refund.providerRef` is not unique and the webhook lookup uses `findFirst`. Paystack ids are unique in practice, so this is only a hardening question. → TTW-081.

@@ -20,29 +20,31 @@ From 2026-11-04, new work starts from the client review workbook `revue-client/T
 
 ## Epic 0 — Trustworthy delivery system
 
-| Ticket                                                           | Priority | Risk     | State       | Outcome                                                                                  | Review        |
-| ---------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- | ------------- |
-| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete    | Align local/CI Node and pnpm contracts with Next 16 requirements                         | —             |
-| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
-| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
-| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
-| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
-| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | In progress | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
-| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | In progress | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
-| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | In progress | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
-| [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | In progress | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
+| Ticket                                                           | Priority | Risk     | State    | Outcome                                                                                  | Review        |
+| ---------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- | ------------- |
+| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         | —             |
+| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
+| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
+| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped   | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
+| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
+| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Complete | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
+| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | Complete | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
+| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | Complete | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
+| [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | Complete | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
+| [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Scoped   | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
-| Ticket                                                  | Priority | Risk     | State    | Outcome                                                                      | Review |
-| ------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | ------ |
-| [TTW-010](ttw-010-make-charge-settlement-idempotent.md) | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery | —      |
-| [TTW-011](ttw-011-make-payout-events-idempotent.md)     | P0       | Critical | Complete | Apply each payout transition and ledger effect exactly once                  | —      |
-| [TTW-012](ttw-012-serialize-payment-initiation.md)      | P0       | Critical | Complete | Permit at most one active payment attempt per order                          | —      |
-| [TTW-013](ttw-013-correct-refund-lifecycle.md)          | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        | —      |
-| [TTW-014](ttw-014-complete-inventory-lifecycle.md)      | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     | —      |
-| [TTW-015](ttw-015-reconcile-money-and-inventory.md)     | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks | —      |
+| Ticket                                                   | Priority | Risk     | State    | Outcome                                                                      | Review        |
+| -------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | ------------- |
+| [TTW-010](ttw-010-make-charge-settlement-idempotent.md)  | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery | —             |
+| [TTW-011](ttw-011-make-payout-events-idempotent.md)      | P0       | Critical | Complete | Apply each payout transition and ledger effect exactly once                  | —             |
+| [TTW-012](ttw-012-serialize-payment-initiation.md)       | P0       | Critical | Complete | Permit at most one active payment attempt per order                          | —             |
+| [TTW-013](ttw-013-correct-refund-lifecycle.md)           | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        | —             |
+| [TTW-014](ttw-014-complete-inventory-lifecycle.md)       | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     | —             |
+| [TTW-015](ttw-015-reconcile-money-and-inventory.md)      | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks | —             |
+| [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md) | P2       | Critical | Scoped   | Enforce one local refund per Paystack refund id in the database              | Not in review |
 
 ## Epic 2 — Security and trust boundaries
 

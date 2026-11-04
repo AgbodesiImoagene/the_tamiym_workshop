@@ -1,7 +1,7 @@
 # TTW-009 — Upgrade eslint-config-next to match next 16.4
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** Ready to commit on `codex/ttw-009-upgrade-eslint-config-next` (from TTW-007 commit `6fbbed6`)  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None (TTW-007 committed as `6fbbed6`)  
 **Blocks:** None
@@ -136,4 +136,4 @@ Verdicts: correctness PASS, scope PASS, tests PASS. **Overall PASS**; no must-fi
 
 ## Completion summary
 
-Done locally: all gates and browser journeys green, Review 2 PASS. Not yet committed (waiting for the user); GitHub CI not run.
+All gates and browser journeys green locally, Review 2 PASS. Committed as `17db25f`, merged to `main` with TTW-007 (`335e4ee`). CI run [41931373328](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/41931373328) on `main` `541bad4` is green on all 18 jobs, including Lint, Unit Tests and Playwright Smoke. Nothing left in scope.
