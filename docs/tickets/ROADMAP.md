@@ -63,9 +63,6 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q17      | Fin de campagne et production                                       | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
 | Q18      | Livraison des campagnes                                             | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
 | Q39      | Délai de l'option express                                           | TTW-153          | Attendre la réponse                                                                               |
-| Nouvelle | Nouvelle variante : reprend-elle le prix d'une variante existante ? | TTW-174          | Reprendre le prix de la variante correspondante (recommandé, à valider)                           |
-| Nouvelle | Variante conservée : son SKU change-t-il avec la nouvelle valeur ?  | TTW-174          | Garder le SKU (recommandé, à valider)                                                             |
-| Nouvelle | Nouvelle variante : avec quel stock démarre-t-elle ?                | TTW-174          | Stock à 0, pour ne rien vendre sans stock saisi (recommandé, à valider)                           |
 
 ### Déjà répondues : rien à attendre
 
@@ -139,15 +136,15 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 5 : Outils d'administration
 
-| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend             |
-| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | ------------------ |
-| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —                  |
-| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —                  |
-| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —                  |
-| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —                  |
-| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —                  |
-| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —                  |
-| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | TTW-165, décisions |
+| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend  |
+| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | ------- |
+| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —       |
+| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —       |
+| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —       |
+| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —       |
+| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —       |
+| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —       |
+| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | TTW-165 |
 
 ## Phase 6 : Données personnelles, légal, site public
 

@@ -3,7 +3,7 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** user decisions D1, D2 and D3 (see Proposal); TTW-165, for the admin journey\
+**Blocked by:** TTW-165, for the admin journey\
 **Blocks:** entering the real catalogue (roadmap phase 8, no ticket)
 
 ## Background
@@ -93,9 +93,9 @@ Past orders are protected because each order line keeps its own copy of the pric
 
 Variants that really disappear still follow today's rule: a variant with orders is disabled, never deleted. That applies when a value or an option is removed, and it does not change.
 
-### Decisions required
+### Decisions
 
-These are the user's to make. None may be applied until the answer is recorded here. All three are listed under "Décisions à obtenir du client" in `ROADMAP.md`.
+Decided by the user on 2026-11-06: option A for D1, D2 and D3.
 
 **D1. Does a new variant (step 3) take the price of an existing variant, or start without a price of its own?**
 
@@ -105,7 +105,7 @@ These are the user's to make. None may be applied until the answer is recorded h
 | If the admin forgets | Sold at the price of the matching variant, usually the right one | Sold at the product's price, or refused at checkout              |
 | Main drawback        | A colour that costs more needs a manual change                   | A variant-specific price is silently lost on every new colour    |
 
-**Recommendation: A.** The source is the variant that differs only by the new value. For a new size `L`, it is the first size in sort order, because no variant matches. Size surcharges are separate (TTW-094) and still apply. The same copy should cover weight and package size, which have the same fallback to the product (`pricing.service.ts:580`). Bulk tiers, discounts and organiser pricing set on a variant are not copied: they are deliberate commercial terms.
+**Decided: A.** A new variant takes the price of the matching variant by default. If that variant has no price of its own, the new variant has none either and uses the product's price. Either way the price stays editable: it is a one-time copy, so changing `Blue / S` later does not change `Red / S`, and the reverse. The source is the variant that differs only by the new value. For a new size `L`, it is the first size in sort order, because no variant matches. Size surcharges are separate (TTW-094) and still apply. The same copy should cover weight and package size, which have the same fallback to the product (`pricing.service.ts:580`). Bulk tiers, discounts and organiser pricing set on a variant are not copied: they are deliberate commercial terms.
 
 **D2. Does the SKU of a kept variant change when it receives a new value?**
 
@@ -116,7 +116,7 @@ What the code does: nothing changes it. A SKU is written once, at creation (`pro
 | A: keep it (today's code) | `t-shirt-s` for `Blue / S`, next to `t-shirt-red-s` for `Red / S` | SKUs of one product do not look alike. An admin can edit them by hand               |
 | B: rewrite it             | `t-shirt-blue-s`                                                  | Overwrites any SKU an admin typed, and breaks labels or sheets kept outside the app |
 
-**Recommendation: A.** A SKU identifies a thing, so it should not change because the description became more precise. Step 2 above is written for this answer. If the answer is B, only the SKU moves: the row, its id and its data still stay.
+**Decided: A.** A SKU identifies a thing, so it should not change because the description became more precise. No code change is needed for this.
 
 **D3. What stock does a new variant (step 3) start with?**
 
@@ -127,7 +127,7 @@ This question was found while reading the code. Today a new variant has no stock
 | Before stock is entered | Shows as out of stock, cannot be oversold | On sale with no limit          |
 | Main drawback           | The admin must enter stock before selling | Sells items that may not exist |
 
-**Recommendation: A**, keeping the "track stock" setting of the source variant from D1. If that variant does not track stock, the new one does not either. Quantities are never copied: 10 blue t-shirts do not mean 10 red ones.
+**Decided: A**, keeping the "track stock" setting of the source variant from D1. If that variant does not track stock, the new one does not either. Quantities are never copied: 10 blue t-shirts do not mean 10 red ones.
 
 ### Design direction
 
@@ -170,11 +170,11 @@ No schema change is expected. No data repair is needed, because the project is n
 
 ## Implementation plan
 
-1. Record decisions D1, D2 and D3 in this ticket. Start after TTW-165 is merged.
+1. Start after TTW-165 is merged.
 2. Write the failing integration spec for steps 1 to 3, for a variant with orders, and for each edge case.
 3. Make regeneration ignore options with no value.
 4. Link existing variants on the first value, in one transaction.
-5. Apply D1 and D3 to new variants, and D2 if the answer is B.
+5. Apply D1 and D3 to new variants.
 6. Leave empty options out of the customer-facing responses.
 7. Show the order's own copy of the label on the admin order page.
 8. Correct the admin texts that promise regeneration (`apps/admin/components/admin-product-merchandising.tsx:564`, `:1431`). They stay in English.
@@ -204,10 +204,10 @@ Update this plan and record deviations when implementation differs. TTW-174 shou
 
 ## Acceptance criteria
 
-- [ ] The user's decisions D1, D2 and D3 are recorded in this ticket before any code changes.
+- [x] The user's decisions D1, D2 and D3 are recorded in this ticket before any code changes.
 - [ ] After step 1, the variants have the same ids and the same attached data, and they can still be bought.
-- [ ] After step 2, `S` is `Blue / S` with the same id, photo, price, stock, SKU (subject to D2) and order lines.
-- [ ] After step 3, the blue variants are unchanged and the red ones exist, with prices and stock as decided in D1 and D3.
+- [ ] After step 2, `S` is `Blue / S` with the same id, photo, price, stock, SKU and order lines.
+- [ ] After step 3, the blue variants are unchanged and the red ones exist, with prices and stock as decided in D1 and D3: `Red / S` copies the prices of `Blue / S`, and has a stock row at 0 when `Blue / S` tracks stock.
 - [ ] A variant with orders stays available through all three steps, and stays linked to its orders.
 - [ ] Past order lines are unchanged, and the admin order page shows the label from the order.
 - [ ] A variant with a stock row keeps it, so a tracked product never becomes unlimited by adding an option.
@@ -229,7 +229,7 @@ Update this plan and record deviations when implementation differs. TTW-174 shou
 
 ## Design review
 
-Pending. Requires decisions D1, D2 and D3.
+Pending.
 
 ## Implementation reviews
 
