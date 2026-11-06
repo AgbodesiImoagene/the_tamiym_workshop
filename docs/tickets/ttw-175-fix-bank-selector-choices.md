@@ -3,7 +3,7 @@
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-167, which changes the same function; the checks below, which need a real Paystack test key\
+**Blocked by:** The checks below, which need a real Paystack test key\
 **Blocks:** None
 
 ## Background
@@ -52,7 +52,7 @@ Rejected: removing duplicates by code in the API. It would hide one institution 
 - An organiser can only pick an NGN bank that Paystack says can receive transfers.
 - The stored `bankName` is the name of the entry the organiser picked.
 - The stored `bankCode` is the code of that entry.
-- TTW-167 still holds: no entry without a code is returned.
+- No entry without a code is returned, as TTW-167 requires.
 
 ## Implementation plan
 

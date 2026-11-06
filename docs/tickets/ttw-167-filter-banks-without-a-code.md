@@ -154,4 +154,4 @@ Not verified:
 
 ## Completion summary
 
-`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Merged into `main` at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. Left to do: delete the branch `codex/ttw-167-filter-empty-bank-codes`. Follow-up: TTW-175, for the duplicate codes and the banks without transfers found in the live list.
+`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Merged into `main` at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. Follow-up: TTW-175, for the duplicate codes and the banks without transfers found in the live list.
