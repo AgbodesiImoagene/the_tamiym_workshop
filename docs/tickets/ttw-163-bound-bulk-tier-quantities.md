@@ -126,6 +126,8 @@ Environment: macOS, Node v24.22.1, PostgreSQL 17.5 native, Redis, disposable dat
 - Prettier realigned the Epic 2 table in `docs/tickets/README.md`, because `In progress` is wider than the old column.
 - `docs/tickets/ROADMAP.md` is unchanged. It tracks the client order, and this is a small follow-up to TTW-005.
 
+- Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. This departs from the `AGENTS.md` rule of green CI before merge.
+
 **Not verified**
 
 - CI has not run this branch. CI uses Postgres 16 and this was run on 17.
@@ -135,4 +137,4 @@ Environment: macOS, Node v24.22.1, PostgreSQL 17.5 native, Redis, disposable dat
 
 ## Completion summary
 
-Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. The independent implementation review passed. A merge after TTW-005 is still needed. Follow-ups, not fixed here: the `pricePerUnit`, `currency` and `productId` checks, and the admin display of several errors at once.
+Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. The independent implementation review passed. Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted. Follow-ups: TTW-171 for `pricePerUnit`, TTW-172 for `currency`, `productId` and `variantId`. Not ticketed: the admin display of several errors at once.
