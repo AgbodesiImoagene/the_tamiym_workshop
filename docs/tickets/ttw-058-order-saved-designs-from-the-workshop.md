@@ -3,7 +3,7 @@
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
 **Status:** Not started (to be scheduled later, user decision 2026-11-03)\
 **Risk:** High\
-**Blocked by:** TTW-037 (cart lines with `designId`, idempotent checkout)\
+**Blocked by:** TTW-100 (design content validation), TTW-092 (variant picker)\
 **Blocks:** TTW-037 acceptance criterion "Two saved designs on the same variant remain two cart lines and two order items"
 
 ## Background
@@ -14,6 +14,8 @@ Client answer to review question Q6: "work on a single design, save when satisfi
 
 Already in place after TTW-037: cart lines carry an optional `designId` with `variantId:designId` identity (`apps/app/lib/cart-store.ts`); the checkout sends `designId` per line; the API checks design ownership and product match on order create (`apps/api/src/orders/orders.service.ts`, `assertDesignOwnershipAndProductMatch`); pricing quotes per design (view surcharges). What is missing is the way in: no screen puts a saved design in the cart.
 
+Client answer to Q28: for personal designs "we print whatever you send to us. We can reject and refund an order and cite our reasons as feedback." This answers the policy for finding 3.8, as applied in the Proposal.
+
 Related findings: 3.8 (standard orders do not check design moderation, unlike campaigns: once this ticket ships, a rejected design could be ordered) should be fixed with or before this ticket; 3.2 (the workshop does not receive print files) is separate; 3.5 (several products in one session) is not required per Q6.
 
 ## Proposal
@@ -22,7 +24,7 @@ Related findings: 3.8 (standard orders do not check design moderation, unlike ca
 - The same design can be added in several variants; different designs on the same variant stay separate lines.
 - Cart and checkout show which design each line carries (name, thumbnail when available).
 - Confirm the "update / clone" behaviour the client expects on saved designs and cover any gap.
-- Fix finding 3.8 (refuse non-approved designs on standard orders, with the policy chosen by the owner) in this ticket or a ticket that lands first.
+- Fix finding 3.8 with the policy from Q28: an order does not wait for moderation approval, a design already rejected cannot be ordered, and an admin can reject and refund an order with a reason. Record at design review whether the existing refund flow already covers that last action. The client is asked to confirm this reading, and this ticket does not wait for the reply.
 
 ## Invariants
 

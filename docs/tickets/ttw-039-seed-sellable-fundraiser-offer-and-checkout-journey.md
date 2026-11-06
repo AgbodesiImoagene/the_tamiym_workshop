@@ -3,7 +3,7 @@
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
 **Status:** Not started\
 **Risk:** Standard\
-**Blocked by:** TTW-037 (the journey below asserts its 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` behaviour)\
+**Blocked by:** TTW-037 (the journey below asserts its 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` behaviour); client decision on Q23 and Q25\
 **Blocks:** None
 
 ## Background
