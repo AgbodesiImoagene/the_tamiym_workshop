@@ -45,8 +45,8 @@ Rejected: dropping the "All variants" item. An admin could then link an image to
 
 ## References
 
-- `apps/admin/components/admin-product-merchandising.tsx:1003-1012`: the select.
-- `apps/admin/components/admin-product-merchandising.tsx:964`: `variantId: variantId || null`.
+- `apps/admin/components/admin-product-merchandising.tsx:1003-1018`: the select.
+- `apps/admin/components/admin-product-merchandising.tsx:967`: `variantId: variantId || null`.
 - `apps/api/src/products/products.service.ts:1087`: `updateProductImage` stores `null` as sent.
 - `apps/admin/app/admin/pricing/bulk-pricing/page.tsx` on `codex/ttw-005-reconcile-prisma-schema`: `ALL_PRODUCTS`.
 
@@ -68,7 +68,17 @@ Not required: low-risk ticket.
 
 ## Implementation reviews
 
-**Review 1, 2026-11-06, `/code-review low` on the application diff.** No findings. This level reads the diff only and skips test files, and it ran in the implementing session, so it is not a fresh independent reviewer. A fresh reviewer has not looked at this ticket.
+**Review 1, 2026-11-06, `/code-review low` on the application diff.** No findings. This level reads the diff only and skips test files, and it ran in the implementing session, so it does not count as independent.
+
+**Review 2, 2026-11-06, independent reviewer (fresh session, read-only) covering code, test, ticket and similar defects.** Verdict: PASS, no blocking finding. It reran `pnpm --filter admin typecheck` (exit 0) and `pnpm --filter admin lint` (exit 0, 0 errors, 22 warnings). It did not rerun Playwright, so the journey results below remain those of the implementing session.
+
+Non-blocking findings, none changed in this ticket:
+
+1. **Medium, out of scope.** Deleting a variant, or the option value behind it, deletes the images linked to it without warning (`onDelete: Cascade`, `schema.prisma:1184`; `cleanupStaleVariants`, `products.service.ts:1698`). The rule already existed, but this screen could not reach it while the page crashed. Keeping the image on "All variants" or deleting it is a product decision.
+2. **Low, out of scope.** `listBanks` copies Paystack data unfiltered (`paystack-transfer.provider.ts:40`), so an empty `bank.code` would crash the same way at `apps/app/app/dashboard/fundraiser/page.tsx:484`. No real Paystack response was observed, so this is possible, not proven.
+3. **Low, already there.** The `save` mutation of `ImageRow` has no `onError`, so a refused save shows nothing to the admin.
+4. **Low.** `expect.any(String)` in the journey accepts any string. The API validates the id, and the SKU is checked again after the reload.
+5. **Very low.** `placeholder="All variants"` can no longer display.
 
 ## Verification evidence
 
