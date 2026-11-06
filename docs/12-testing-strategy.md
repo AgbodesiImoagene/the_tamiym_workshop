@@ -151,7 +151,7 @@ Coverage exemptions:
 - Use a dedicated test database (`*test*` / `*e2e*` in `DATABASE_URL`) and Redis logical DB (`REDIS_DB`).
 - Jest e2e config loads `.env.test`, runs `prisma migrate deploy` in globalSetup, flushes the Redis test DB in globalTeardown.
 - BullMQ workers use `autorun: false` under `NODE_ENV=test`; mail templates avoid `@css-inline` in test to keep Jest handle-free.
-- Prove clean exit with `node scripts/quality/prove-e2e-open-handles.mjs` (no `--forceExit`).
+- Prove clean exit with `node scripts/quality/prove-e2e-open-handles.mjs` (no `--forceExit`). Past `E2E_OPEN_HANDLE_TIMEOUT_MS` (120 s by default) it kills the whole Jest process group and exits non-zero within `E2E_OPEN_HANDLE_GRACE_MS` (5 s by default). Its own tests run with `pnpm e2e-open-handles:test`.
 
 ## CI pipeline (required)
 

@@ -150,6 +150,7 @@ jobs:
   integration:
     name: API Integration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -209,11 +210,13 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter api exec prisma migrate deploy
       - name: Run API e2e (pass 1)
+        timeout-minutes: 3
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter api test:e2e 2>&1 | tee apps/api/e2e-pass-1.log
       - name: Run API e2e (pass 2)
+        timeout-minutes: 3
         shell: bash
         run: |
           set -o pipefail
@@ -518,3 +521,5 @@ jobs:
         run: pnpm docs:validate && pnpm docs:validate:test && pnpm playwright:validate && pnpm playwright:validate:test && pnpm discovery-gates:validate:test
       - name: Validate GitHub workflow syntax
         run: pnpm workflows:validate && pnpm workflows:validate:test
+      - name: Test the open-handle proof
+        run: pnpm e2e-open-handles:test
