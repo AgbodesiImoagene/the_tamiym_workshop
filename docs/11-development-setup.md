@@ -108,7 +108,7 @@ The repo should provide these root-level scripts:
 2. Set `REDIS_DB=15` (or another unused logical DB) so teardown can `FLUSHDB` safely.
 3. Apply schema: `pnpm --filter api exec prisma migrate deploy` (globalSetup also does this).
 4. Existing non-empty developer DBs that predate the baseline migration need a one-time `prisma migrate resolve --applied 20260819100000_baseline` before `migrate deploy`.
-5. Run `pnpm --filter api test:e2e` (sets `NODE_OPTIONS=--experimental-vm-modules` for Prisma 7). Open-handle proof: `node scripts/quality/prove-e2e-open-handles.mjs`.
+5. Run `pnpm --filter api test:e2e` (sets `NODE_OPTIONS=--experimental-vm-modules` for Prisma 7). Open-handle proof: `node scripts/quality/prove-e2e-open-handles.mjs`. It stops after 120 s by default, so on a slow machine raise `E2E_OPEN_HANDLE_TIMEOUT_MS`.
 
 ## Running apps locally
 
