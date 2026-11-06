@@ -5637,7 +5637,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Overlap or invalid range */
+            /** @description Overlap, invalid range, or a quantity above the limit */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5718,7 +5718,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Overlap or invalid range */
+            /** @description Overlap, invalid range, or a quantity above the limit */
             400: {
                 headers: {
                     [name: string]: unknown;
