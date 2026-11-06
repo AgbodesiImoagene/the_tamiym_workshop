@@ -14,15 +14,10 @@ Chaque ligne des tableaux est un ticket autonome, à confier à un agent. Les fi
 - **Chaque agent travaille dans son propre worktree.** Deux conversations dans le même dossier se gênent : la branche change sous leurs pieds, et leurs changements se mélangent.
 - Quand un ticket est fini, on coche sa case ici et on met à jour `README.md`.
 
-Texte à donner à un agent, en remplaçant le chemin :
+Texte à donner à un agent, en remplaçant le chemin. Le reste des règles est dans `AGENTS.md`, y compris l'obligation de s'arrêter et de te prévenir pour toute décision du client :
 
 ```text
-Travaille sur le ticket docs/tickets/ttw-XXX-....md.
-Lis AGENTS.md et le ticket en entier avant de commencer.
-Travaille dans ton propre worktree, sur une branche créée depuis main.
-Respecte le plan du ticket : relecture de conception si le ticket l'exige, tests d'abord, preuves dans le ticket.
-Reste dans le périmètre du ticket et signale ce que tu remarques ailleurs.
-Si le ticket attend une réponse du client (ligne « Blocked by »), si sa question est encore listée dans « Décisions à obtenir du client » de docs/tickets/ROADMAP.md, ou si tu découvres une décision métier que le ticket ne tranche pas : arrête-toi et préviens-moi avant de coder. Dis-moi la question, ce qu'elle bloque et ce que tu proposes. N'invente pas la réponse et n'applique pas une valeur par défaut sans mon accord.
+Travaille sur le ticket docs/tickets/ttw-XXX-....md, dans ton propre worktree, sur une branche créée depuis main.
 Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 ```
 

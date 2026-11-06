@@ -68,6 +68,11 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 
 Independent tickets may use separate worktrees. Dependent or overlapping tickets remain sequential.
 
+### Client decisions
+
+- Stop before coding and tell the user if the ticket's `Blocked by` names a client answer, if its question is still listed under "Décisions à obtenir du client" in `docs/tickets/ROADMAP.md`, or if the work needs a business decision the ticket does not settle.
+- State the question, what it blocks and your recommendation. Never invent the answer, and never apply a default from a ticket or the roadmap without the user's approval.
+
 ### Review levels
 
 - Low: implementation review.
