@@ -136,6 +136,15 @@ Live list, `curl` without a key, 2026-11-06:
 - `country=nigeria&use_cursor=true&perPage=100`: 99 entries and a next cursor.
 - The 297 entries contain no empty, blank or padded code and no missing name.
 
+On the merge with `main` at `bffe8f6`, which includes TTW-005 and TTW-163, before pushing:
+
+- `pnpm --filter api typecheck`: exit 0.
+- `pnpm --filter api lint`: exit 0, 0 errors, 14 warnings.
+- `pnpm --filter api test`: 145 suites, 1217 tests passed.
+- `pnpm --filter api build`: exit 0.
+- `pnpm openapi:check` and `pnpm docs:validate`: passed.
+- `pnpm --filter api test:e2e`: 20 suites, 118 tests passed, on a disposable database since deleted.
+
 Not verified:
 
 - All bank data in the tests is stubbed. The live list was only read by hand on 2026-11-06, without a key, so the same response with a real key is assumed, not proven.
@@ -143,4 +152,4 @@ Not verified:
 
 ## Completion summary
 
-`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Left to do: the push and the PR, which the user handles. Follow-up: TTW-175, for the duplicate codes and the banks without transfers found in the live list.
+`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Merged into `main` at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. Left to do: confirm CI is green on `main`, then mark the ticket Complete and delete the branch. Follow-up: TTW-175, for the duplicate codes and the banks without transfers found in the live list.
