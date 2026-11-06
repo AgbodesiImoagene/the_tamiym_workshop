@@ -36,6 +36,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | Complete    | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
 | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Complete    | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
 | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)     | P1       | Low      | In progress | Stop the format check failing on generated files so `pnpm verify` runs in full           | Not in review |
+| [TTW-165](ttw-165-fix-image-variant-select-crash.md)             | P1       | Low      | In progress | Stop the admin product page crashing on products with images                             | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
@@ -80,6 +81,8 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | Complete | Fix the invalid pricing query that breaks every quote and order              | —                           |
 | [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped   | Seed a sellable fundraiser offer and automate the supporter checkout journey | 13.3                        |
 | [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped   | Let customers order their saved designs from the Design Workshop             | 3.1, 3.8                    |
+| [TTW-167](ttw-167-filter-banks-without-a-code.md)                         | P2       | High     | Complete | Keep banks without a code out of the bank list                               | Not in review               |
+| [TTW-175](ttw-175-fix-bank-selector-choices.md)                           | P2       | High     | Scoped   | Show organisers only banks they can be paid at                               | Not in review               |
 
 ## Epic 4 — Fulfilment, support and business policy
 

@@ -66,6 +66,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const CURRENCIES = ['NGN'] as const;
 
+/** Select value for an image not tied to a variant: a Select item cannot have an empty value. */
+const ALL_VARIANTS = 'all';
+
 function imageThumbUrl(img: { mediaAsset: AdminProductDetail['images'][0]['mediaAsset'] }) {
   const d = img.mediaAsset?.derivatives ?? [];
   return (
@@ -997,12 +1000,15 @@ function ImageRow({
           value={altText}
           onChange={(e) => setAltText(e.target.value)}
         />
-        <Select value={variantId} onValueChange={setVariantId}>
-          <SelectTrigger className="h-9 rounded-lg text-sm">
+        <Select
+          value={variantId || ALL_VARIANTS}
+          onValueChange={(value) => setVariantId(value === ALL_VARIANTS ? '' : value)}
+        >
+          <SelectTrigger aria-label="Image variant" className="h-9 rounded-lg text-sm">
             <SelectValue placeholder="All variants" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All variants</SelectItem>
+            <SelectItem value={ALL_VARIANTS}>All variants</SelectItem>
             {variants.map((v) => (
               <SelectItem key={v.id} value={v.id}>
                 {v.sku}
