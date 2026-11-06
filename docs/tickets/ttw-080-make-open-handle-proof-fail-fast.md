@@ -1,7 +1,7 @@
 # TTW-080 — Make the open-handle proof fail fast when it times out
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress (committed locally; CI on GitHub pending the user's push)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -54,7 +54,7 @@ On timeout, the script does not fail; it hangs:
 - [x] A test proves a timed-out run exits non-zero and leaves no orphan process; it fails on the current script.
 - [x] The real open-handle proof still passes locally.
 - [x] The "API Integration" job has a `timeout-minutes` backstop.
-- [ ] CI green on GitHub.
+- [x] CI green on GitHub.
 
 ## Out of scope
 
@@ -101,7 +101,9 @@ After the fix:
 - `pnpm exec prettier --check` on every changed file: passed.
 - `pnpm format:check` reports 84 files locally, all under `apps/api/src/generated/` (gitignored Prisma output). The CI Format job does not generate it.
 
-Not verified: CI on GitHub, including the new "Test the open-handle proof" step, the job and step `timeout-minutes`, and whether the `if: failure()` upload runs after a step timeout, because nothing has been pushed.
+CI on GitHub: run 42210055977 on `main` (`f1a1e48`) passed all 18 jobs. Pass 1 took 44 s, pass 2 41 s, the proof 55 s and "Test the open-handle proof" 6 s.
+
+Not verified: no `timeout-minutes` has fired on GitHub, so nothing shows yet how a step timeout behaves in practice or whether the `if: failure()` upload runs after it.
 
 ## Completion summary
 
@@ -121,4 +123,4 @@ Deviations from the proposal:
 
 - Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. This departs from the `AGENTS.md` rule of green CI before merge.
 
-Left to do: push `main`, confirm CI is green there, then mark the ticket Complete and delete the branch.
+Left to do: delete the branch `codex/ttw-080-open-handle-proof-fail-fast`.
