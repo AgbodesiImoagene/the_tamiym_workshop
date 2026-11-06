@@ -186,6 +186,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 67  | [TTW-143](ttw-143-show-moderators-a-real-render.md)                       | 7A  | Vrai rendu du design pour les modérateurs                | 9.3            | Élevé    | 4–8    | TTW-101, Q23, Q25  |
 | [ ]  | 68  | [TTW-144](ttw-144-show-campaign-end-date-and-sales.md)                    | 7D  | Date de fin et ventes sur la page publique               | 6.9            | Standard | 3–5    | Q23, Q25           |
 | [ ]  | 69  | [TTW-145](ttw-145-add-campaign-headline-and-video.md)                     | 7G  | Titre et vidéo optionnelle de campagne                   | 6.8            | Standard | 4–6    | Q23, Q25           |
+| [ ]  | —   | [TTW-167](ttw-167-filter-banks-without-a-code.md)                         | 7A  | Liste des banques : écarter les banques sans code        | —              | Élevé    | —      | —                  |
 
 ## Phase 8 : Recette et mise en ligne
 

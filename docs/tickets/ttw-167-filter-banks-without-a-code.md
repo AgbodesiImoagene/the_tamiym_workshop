@@ -1,0 +1,122 @@
+# TTW-167 — Keep banks without a code out of the bank list
+
+**Epic:** 3 — Complete customer and fundraiser revenue journeys\
+**Status:** In review\
+**Risk:** High\
+**Blocked by:** None\
+**Blocks:** None
+
+## Background
+
+`listBanks` copies every entry of the Paystack bank list into the API response without checking it (`apps/api/src/payouts/paystack-transfer.provider.ts:40` before this ticket). The fundraiser payout form renders each entry as `<SelectItem value={bank.code}>` (`apps/app/app/dashboard/fundraiser/page.tsx:484`).
+
+The Radix `Select` throws when an item has an empty value (`A <Select.Item /> must have a value prop that is not an empty string`, `@radix-ui/react-select` `dist/index.mjs:825`). One entry with `code: ''` would therefore crash the whole form.
+
+This is a possible risk, not a proven one: no real Paystack response with an empty code has been observed. The independent review of TTW-165 found it. The project is not in production.
+
+## Proposal
+
+Filter in `listBanks`, the single place that reads this list: keep only entries whose `code` is a string that is not empty once trimmed. Log a warning with the number of skipped entries, so a bank that disappears from the selector can be traced.
+
+The kept codes are returned unchanged. The form is not touched: once the API filters, it cannot receive an empty code from this endpoint.
+
+Rejected:
+
+- **Filtering in the form.** It would protect one screen only and leave the API returning entries no caller can use.
+- **Failing the whole request.** One bad entry would stop an organiser choosing any bank.
+
+## Invariants
+
+- `GET /v1/banks` never returns an entry whose code is empty, blank, null or missing.
+- Entries with a code keep their code, name and order.
+- The response shape, guards and error behaviour do not change.
+
+## Implementation plan
+
+1. Write the unit test and the e2e test and show they fail on the unfiltered list.
+2. Filter in `listBanks` and log the skipped count.
+3. Run the API gates and record the evidence.
+
+## Test and observability plan
+
+- Unit/component: `apps/api/src/payouts/paystack-transfer.provider.spec.ts` runs the real provider with `fetch` stubbed. No component test: the form does not change.
+- Integration/e2e: `apps/api/test/banks.e2e-spec.ts` boots the real app and calls `GET /v1/banks` as an organiser, with only the Paystack call stubbed.
+- Failure, retry, and concurrency: a Paystack `status: false` response still returns `[]` (unit test). There is no retry or shared state.
+- Logs, metrics, traces, and alerts: one warning with the skipped count. It carries no bank data, secret or user data. The existing `paystack.banks.list` span is unchanged.
+
+## References
+
+- `apps/api/src/payouts/paystack-transfer.provider.ts`: `listBanks`.
+- `apps/api/src/fundraising/banks.controller.ts:42`: the only caller.
+- `apps/app/app/dashboard/fundraiser/page.tsx:484`: the select.
+- `docs/tickets/ttw-165-fix-image-variant-select-crash.md`: same crash on the admin product page, and the review that raised this risk.
+
+## Acceptance criteria
+
+- [x] `listBanks` drops entries with an empty, blank, null or missing code, and the unit test fails without the filter.
+- [x] `GET /v1/banks` returns only selectable banks through the real app, and the e2e test fails without the filter.
+- [x] Entries with a code are returned unchanged, and a Paystack failure still returns an empty list.
+- [x] Required quality gates pass with evidence recorded below.
+- [x] Contracts, migrations, observability, and documentation are updated where applicable: no contract or migration change, one new warning log.
+
+## Out of scope
+
+- `key={bank.code}` in the form assumes codes are unique. Duplicate codes would only give a React warning.
+- `listBanks` does not check `res.ok`, so a Paystack failure gives an empty list with no log. `resolveAccount` does not check it either. This is existing behaviour.
+- Paystack pagination: the request asks for 100 banks at most and reads no further page. Whether the Nigerian list is longer has not been checked.
+
+## Design review
+
+**2026-11-06, implementing session, not independent.** High risk because Paystack is an external integration, as `AGENTS.md` requires. The change itself is small: read-only list, no money movement, no write, no change to auth or to the Paystack request.
+
+- Blast radius: `GET /v1/banks` only. `BanksController.listBanks` is the only caller, and the form is its only consumer.
+- Duplication: no other code reads this list.
+- Interfaces: `BankItem` and the response shape do not change. The OpenAPI entry has no response schema and its description stays true, so no regeneration is needed.
+- Edge cases: empty, blank, null and missing codes. A list where nothing is valid returns `[]`, which the form already handles as an empty select.
+- Main risk: hiding a real bank whose code is malformed. The warning makes this visible, and that bank could not have been selected anyway.
+- Security: only an integer count is logged. A bank without a code cannot reach `resolveAccount` or the transfer recipient call through the form.
+
+Verdict: proceed.
+
+## Implementation reviews
+
+**Review 1, 2026-11-06, `/code-review` on the staged diff.** Ran in the implementing session, so it does not count as independent. Ten candidates, not verified one by one:
+
+1. **Fixed.** The README row used the state `In review`, which `pnpm docs:validate` refuses. It now says `In progress`.
+2. **Not changed, existing.** The `perPage=100` cap and the missing `res.ok` check. See Out of scope.
+3. **Not changed, not proven.** A `null` entry in the array still throws and gives a 500. It did before this ticket too, and it cannot crash the form, which would only receive an error.
+4. **Not changed, not proven.** A padded code such as `' 044 '` is returned unchanged, and an entry with a code but no name is kept. Neither crashes the select.
+5. **Not changed, by decision.** The form has no guard of its own, because the fix was asked for on the API side.
+6. **Not changed, minor.** The e2e `fetch` stub forwards other calls without their options, and no other call happens in this test. `PaystackBank.id` is unused. The log says "1 entries" for a single entry.
+
+**Security review, 2026-11-06, `/security-review` checklist, run inline in the implementing session.** No finding. No new input, the guards are unchanged, and the new log contains only a count. The skill asks for sub-tasks and they were not used, so this is not independent either.
+
+**Independent review:** not done yet. `AGENTS.md` requires one before a PR.
+
+## Verification evidence
+
+Environment: macOS, Node v24.22.1, PostgreSQL 17 native, Redis, disposable database `tamiym_workshop_ttw167_test`. CI has not run this branch and uses Postgres 16.
+
+Before the fix:
+
+- `npx jest src/payouts/paystack-transfer.provider.spec.ts`: 1 failed, 2 passed. `drops entries with an empty, blank, null or missing code and logs how many` received the four invalid entries.
+- `pnpm test:e2e -- test/banks.e2e-spec.ts`: 1 failed. `gives organisers only the banks that can be selected` received the `''` and `null` entries.
+
+After the fix, all from one run:
+
+- `pnpm --filter api typecheck`: exit 0.
+- `pnpm --filter api lint`: exit 0, 0 errors, 14 warnings, none in the files of this ticket.
+- `pnpm --filter api test`: 144 suites, 1210 tests passed.
+- `pnpm --filter api build`: exit 0.
+- `pnpm openapi:check`: `OpenAPI contract drift check passed.`
+- `pnpm --filter api test:e2e`: 18 suites, 94 tests passed, including `test/banks.e2e-spec.ts`.
+- `pnpm docs:validate`: `Documentation validation passed.`
+
+Not verified:
+
+- The real Paystack API was not called. All bank data in these tests is stubbed.
+- The form was not played in a browser. It did not change, and the tests stop at the API response. The Radix error is read from its source, not reproduced on this page.
+
+## Completion summary
+
+`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. Left to do: the independent review, then the push and the PR, which the user handles.
