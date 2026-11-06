@@ -12,7 +12,7 @@
 
 The Radix `Select` throws when an item has an empty value (`A <Select.Item /> must have a value prop that is not an empty string`, `@radix-ui/react-select` `dist/index.mjs:825`). One entry with `code: ''` would therefore crash the whole form.
 
-This is a possible risk, not a proven one: no real Paystack response with an empty code has been observed. The independent review of TTW-165 found it. The project is not in production.
+This is a possible risk, not a proven one. On 2026-11-06 the live list had 297 entries and none had an empty code, so the filter is a safeguard against a future or changed response. The independent review of TTW-165 found it. The project is not in production.
 
 ## Proposal
 
@@ -61,9 +61,9 @@ Rejected:
 
 ## Out of scope
 
-- `key={bank.code}` in the form assumes codes are unique. Duplicate codes would only give a React warning.
+- Duplicate codes and banks marked `supports_transfer: false` in the live list → TTW-175.
 - `listBanks` does not check `res.ok`, so a JSON `status: false` response gives an empty list with no log, and a non-JSON response such as an HTML 502 makes `res.json()` throw and gives a 500. `resolveAccount` does not check it either. This is existing behaviour.
-- Paystack pagination: the request asks for 100 banks at most and reads no further page. Whether the Nigerian list is longer has not been checked.
+- Paystack pagination. Measured on 2026-11-06 without a key: `perPage` is ignored unless `use_cursor=true` is sent, so the current request receives all 297 Nigerian entries and nothing is cut at 100.
 
 ## Design review
 
@@ -102,7 +102,7 @@ Findings:
 3. **Minor, left as is.** The reference to the TTW-165 ticket points to a file that only exists on `codex/ttw-165-fix-image-variant-select`. It resolves when TTW-165 merges.
 4. **Information.** This ticket says `In review` and the index says `In progress`, because the validator refuses `In review` in the index. A numeric `code` is dropped and counted as "without a code", as the proposal says.
 
-The reviewer singled out the `perPage=100` limit as the only unfixed point that could affect an organiser with real data. It predates this ticket and needs a real Paystack test key to check.
+The reviewer singled out the `perPage=100` limit as the only unfixed point that could affect an organiser with real data. It predates this ticket. Checked afterwards against the live list: nothing is cut, see Verification evidence.
 
 ## Verification evidence
 
@@ -130,11 +130,17 @@ After the independent review, for the added test `returns a kept code unchanged`
 - `pnpm --filter api lint`: exit 0, 0 errors, 14 warnings, none in the files of this ticket.
 - The full unit and e2e suites were not rerun after this test-only change.
 
+Live list, `curl` without a key, 2026-11-06:
+
+- `country=nigeria&perPage=100` and `country=nigeria&perPage=10`: 297 entries, no pagination data.
+- `country=nigeria&use_cursor=true&perPage=100`: 99 entries and a next cursor.
+- The 297 entries contain no empty, blank or padded code and no missing name.
+
 Not verified:
 
-- The real Paystack API was not called. All bank data in these tests is stubbed.
+- All bank data in the tests is stubbed. The live list was only read by hand on 2026-11-06, without a key, so the same response with a real key is assumed, not proven.
 - The form was not played in a browser. It did not change, and the tests stop at the API response. The Radix error is read from its source, not reproduced on this page.
 
 ## Completion summary
 
-`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Left to do: the push and the PR, which the user handles. Follow-up: check whether the Nigerian bank list exceeds the 100 entries requested.
+`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Left to do: the push and the PR, which the user handles. Follow-up: TTW-175, for the duplicate codes and the banks without transfers found in the live list.
