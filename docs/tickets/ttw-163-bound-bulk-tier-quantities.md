@@ -1,7 +1,7 @@
 # TTW-163 — Reject bulk tier quantities the database cannot store
 
 **Epic:** 2 — Security and trust boundaries  
-**Status:** In review  
+**Status:** Complete  
 **Risk:** Low  
 **Blocked by:** None  
 **Blocks:** None
@@ -128,13 +128,14 @@ Environment: macOS, Node v24.22.1, PostgreSQL 17.5 native, Redis, disposable dat
 
 - Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. This departs from the `AGENTS.md` rule of green CI before merge.
 
+CI on GitHub: run 42241831170 on `main` (`e0e74f1`) passed all 18 jobs, on Postgres 16.
+
 **Not verified**
 
-- CI has not run this branch. CI uses Postgres 16 and this was run on 17.
 - The new browser test is tagged `@comprehensive`, so CI only runs it nightly or on manual dispatch.
 - `pnpm format:check` and `pnpm verify` were not run as one command. They stop on the generated-file debt that TTW-164 addresses.
 - `pnpm test`, `pnpm build` and Playwright ran before a one-line lint fix in the new DTO spec. That spec, `pnpm lint` and the full e2e suite were rerun after it.
 
 ## Completion summary
 
-Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. The independent implementation review passed. Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted. Follow-ups: TTW-171 for `pricePerUnit`, TTW-172 for `currency`, `productId` and `variantId`. Not ticketed: the admin display of several errors at once.
+Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. The independent implementation review passed. Left to do: delete the branch `codex/ttw-163-bound-bulk-tier-quantities`. Follow-ups: TTW-171 for `pricePerUnit`, TTW-172 for `currency`, `productId` and `variantId`. Not ticketed: the admin display of several errors at once.

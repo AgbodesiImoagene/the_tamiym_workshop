@@ -28,7 +28,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
 | [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
 | [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped   | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Complete | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
 | [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
 | [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Complete | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
 | [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | Complete | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
@@ -50,19 +50,19 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 
 ## Epic 2 — Security and trust boundaries
 
-| Ticket                                                              | Priority | Risk | State       | Outcome                                                                        | Review                 |
-| ------------------------------------------------------------------- | -------- | ---- | ----------- | ------------------------------------------------------------------------------ | ---------------------- |
-| [TTW-020](ttw-020-isolate-admin-customer-sessions.md)               | P0       | High | Complete    | Enforce admin/customer session isolation and a deliberate CSRF model           | —                      |
-| [TTW-021](ttw-021-secure-media-ingestion.md)                        | P0       | High | Complete    | Add real malware scanning and redirect/DNS-safe remote ingestion               | —                      |
-| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Complete    | Remediate critical/high production dependency advisories and add audit policy  | —                      |
-| [TTW-023](ttw-023-enforce-account-and-privileged-auth-policy.md)    | P1       | High | Complete    | Enforce verification, rate-limit, revocable-session and privileged-auth policy | Rest: 1.4, 1.5, 1.10   |
-| [TTW-024](ttw-024-enforce-pricing-discount-and-tax-policy.md)       | P0       | High | Complete    | Enforce reproducible price, discount, VAT and rounding policy                  | —                      |
-| [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Complete    | Implement auditable export, retention, deletion and anonymisation workflows    | Rest: 11.1, 11.2, 11.6 |
-| [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete    | Replace permanent plaintext shares with expiring, revocable, digest-only links | Rest: 3.6              |
-| [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete    | Add revision-bound moderation decisions, appeals and evidence retention        | Rest: 9.1              |
-| [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                    | P2       | Low  | In progress | Reject bulk tier quantities the database cannot store                          | Not in review          |
-| [TTW-171](ttw-171-limit-bulk-tier-prices.md)                        | P2       | Low  | Scoped      | Reject bulk tier prices the database cannot store                              | Not in review          |
-| [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)           | P2       | Low  | Scoped      | Reject unknown currencies, products and variants on bulk tiers                 | Not in review          |
+| Ticket                                                              | Priority | Risk | State    | Outcome                                                                        | Review                 |
+| ------------------------------------------------------------------- | -------- | ---- | -------- | ------------------------------------------------------------------------------ | ---------------------- |
+| [TTW-020](ttw-020-isolate-admin-customer-sessions.md)               | P0       | High | Complete | Enforce admin/customer session isolation and a deliberate CSRF model           | —                      |
+| [TTW-021](ttw-021-secure-media-ingestion.md)                        | P0       | High | Complete | Add real malware scanning and redirect/DNS-safe remote ingestion               | —                      |
+| [TTW-022](ttw-022-remediate-production-dependency-advisories.md)    | P0       | High | Complete | Remediate critical/high production dependency advisories and add audit policy  | —                      |
+| [TTW-023](ttw-023-enforce-account-and-privileged-auth-policy.md)    | P1       | High | Complete | Enforce verification, rate-limit, revocable-session and privileged-auth policy | Rest: 1.4, 1.5, 1.10   |
+| [TTW-024](ttw-024-enforce-pricing-discount-and-tax-policy.md)       | P0       | High | Complete | Enforce reproducible price, discount, VAT and rounding policy                  | —                      |
+| [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Complete | Implement auditable export, retention, deletion and anonymisation workflows    | Rest: 11.1, 11.2, 11.6 |
+| [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete | Replace permanent plaintext shares with expiring, revocable, digest-only links | Rest: 3.6              |
+| [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete | Add revision-bound moderation decisions, appeals and evidence retention        | Rest: 9.1              |
+| [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                    | P2       | Low  | Complete | Reject bulk tier quantities the database cannot store                          | Not in review          |
+| [TTW-171](ttw-171-limit-bulk-tier-prices.md)                        | P2       | Low  | Scoped   | Reject bulk tier prices the database cannot store                              | Not in review          |
+| [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)           | P2       | Low  | Scoped   | Reject unknown currencies, products and variants on bulk tiers                 | Not in review          |
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 

@@ -1,7 +1,7 @@
 # TTW-005 — Reconcile the Prisma schema with the migration history
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None (but every new migration is at risk until this is done)
@@ -72,7 +72,7 @@ Two existing bugs surfaced, both blocking the same bulk pricing path. The user c
 ## Acceptance criteria
 
 - [x] The schema-vs-migrations diff is empty (no allowlist was needed).
-- [ ] A check fails CI when new drift appears. Implemented and proven locally; not yet run by CI, see below.
+- [x] A check fails CI when new drift appears.
 - [x] Overlapping bulk price tiers are still rejected by the database.
 - [x] `payments.status` default is the same in schema and database.
 - [x] Database-only objects are documented.
@@ -149,9 +149,10 @@ The inventory in `docs/database-only-objects.md` was checked against `pg_catalog
 
 - Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone starts no run. This departs from the `AGENTS.md` rule of green CI before merge.
 
+CI on GitHub: run 42241831170 on `main` (`e0e74f1`) passed all 18 jobs, on Postgres 16, including API Integration and Migration Baseline. That is the proof the `dbgenerated` text matches Postgres 16.
+
 **Not verified**
 
-- CI has not run this branch. CI uses Postgres 16 and this was run on 17. `dbgenerated` must match the text Postgres stores, so the first CI run is the real proof for that.
 - The Playwright journey is tagged `@comprehensive`, so CI only runs it nightly or on manual dispatch, not on each push.
 - `pnpm verify` as a single command stops at `format:check` here, because of existing debt: `.prettierignore` does not exclude `apps/api/src/generated/`, so 84 generated files fail, and after a build the 3 ignored `next-env.d.ts` files fail too. Every stage was run separately instead, and Prettier passes on everything else.
 
@@ -159,4 +160,4 @@ The inventory in `docs/database-only-objects.md` was checked against `pg_catalog
 
 Schema and migrations are aligned, `pnpm migrations:check` guards them locally and in CI, and database-only objects are documented. Tiers with no maximum now save, update, quote and overlap correctly, and the admin bulk pricing page loads. Follow-ups, not fixed here: the empty `SelectItem` in `admin-product-merchandising.tsx:1005`, `apps/api/src/generated/` missing from `.prettierignore`, and the missing upper limit on `maxQuantity` (now TTW-163).
 
-Left to do: the user pushes `main`, CI is confirmed green there on Postgres 16, then this ticket is marked Complete and the branch is deleted.
+Left to do: delete the branch `codex/ttw-005-reconcile-prisma-schema`.

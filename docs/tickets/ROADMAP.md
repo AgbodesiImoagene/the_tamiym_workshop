@@ -80,7 +80,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 | Fait | N°  | Ticket                                                        | Lot | Travail                                                         | Excel | Risque   | Heures | Attend |
 | ---- | --- | ------------------------------------------------------------- | --- | --------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [ ]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                  | —     | Élevé    | —      | —      |
+| [x]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                  | —     | Élevé    | —      | —      |
 | [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack | —     | Critique | —      | —      |
 | [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué  | —     | Faible   | —      | —      |
 
