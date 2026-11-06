@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ObservabilityService } from '../observability/observability.service';
 import type {
@@ -11,8 +11,20 @@ import { toPaystackTransferReference } from './paystack-transfer-reference';
 
 const PAYSTACK_BASE = 'https://api.paystack.co';
 
+interface PaystackBank {
+  name: string;
+  code?: string | null;
+  id?: number;
+}
+
+function hasBankCode(bank: PaystackBank): bank is PaystackBank & BankItem {
+  return typeof bank.code === 'string' && bank.code.trim() !== '';
+}
+
 @Injectable()
 export class PaystackTransferProviderService implements PaystackTransferProvider {
+  private readonly logger = new Logger(PaystackTransferProviderService.name);
+
   constructor(
     private config: ConfigService,
     private observability: ObservabilityService,
@@ -34,10 +46,19 @@ export class PaystackTransferProviderService implements PaystackTransferProvider
       );
       const data = (await res.json()) as {
         status?: boolean;
-        data?: { name: string; code: string; id?: number }[];
+        data?: PaystackBank[];
       };
       if (!data.status || !Array.isArray(data.data)) return [];
-      return data.data.map((b) => ({ code: b.code, name: b.name }));
+      // The bank selector cannot render an empty value, and a bank without a
+      // code cannot receive a transfer.
+      const banks = data.data.filter(hasBankCode);
+      const skipped = data.data.length - banks.length;
+      if (skipped > 0) {
+        this.logger.warn(
+          `Paystack bank list: skipped ${skipped} entries without a code`,
+        );
+      }
+      return banks.map((b) => ({ code: b.code, name: b.name }));
     });
   }
 

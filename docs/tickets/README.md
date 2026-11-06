@@ -81,6 +81,8 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | Complete | Fix the invalid pricing query that breaks every quote and order              | —                           |
 | [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped   | Seed a sellable fundraiser offer and automate the supporter checkout journey | 13.3                        |
 | [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped   | Let customers order their saved designs from the Design Workshop             | 3.1, 3.8                    |
+| [TTW-167](ttw-167-filter-banks-without-a-code.md)                         | P2       | High     | Complete | Keep banks without a code out of the bank list                               | Not in review               |
+| [TTW-175](ttw-175-fix-bank-selector-choices.md)                           | P2       | High     | Scoped   | Show organisers only banks they can be paid at                               | Not in review               |
 
 ## Epic 4 — Fulfilment, support and business policy
 

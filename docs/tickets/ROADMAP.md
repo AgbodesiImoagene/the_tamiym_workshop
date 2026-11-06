@@ -167,27 +167,29 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 **Si le client repousse le fundraising :** cette phase passe après le lancement, et on fait seulement [TTW-146](ttw-146-hide-fundraising-until-launch.md), qui masque ces pages et coupe les versements. Le ticket [TTW-146](ttw-146-hide-fundraising-until-launch.md) est le seul de cette phase à ne pas compter dans le total.
 
-| Fait | N°  | Ticket                                                                    | Lot | Travail                                                  | Excel          | Risque   | Heures | Attend             |
-| ---- | --- | ------------------------------------------------------------------------- | --- | -------------------------------------------------------- | -------------- | -------- | ------ | ------------------ |
-| [ ]  | 51  | [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | 7A  | Campagne de démo et test du parcours d'un soutien        | —              | Standard | —      | Q23, Q25           |
-| [ ]  | 52  | [TTW-128](ttw-128-build-organiser-approval-screen.md)                     | 7A  | Écran d'approbation des organisateurs                    | 6.1, 7.7       | Élevé    | 10–15  | Q23, Q33, Q25      |
-| [ ]  | 53  | [TTW-129](ttw-129-build-bank-account-verification-queue.md)               | 7B  | Vérifier les comptes bancaires des organisateurs         | 7.1, 6.11      | Critique | 8–12   | Q23, Q25           |
-| [ ]  | 54  | [TTW-130](ttw-130-check-account-holder-name-with-paystack.md)             | 7C  | Contrôler le nom du titulaire avec Paystack              | 7.2            | Élevé    | 6–10   | Q23, Q25           |
-| [ ]  | 55  | [TTW-131](ttw-131-correct-the-campaign-money-split.md)                    | 7C  | Corriger le partage de l'argent d'une campagne           | 6.2, 6.14, 7.6 | Critique | 25–40  | Q36, Q34, Q23, Q25 |
-| [ ]  | 56  | [TTW-132](ttw-132-define-refund-recovery-after-payout.md)                 | 7D  | Règle de remboursement après versement                   | 6.13           | Critique | 6–10   | Q30, Q23, Q25      |
-| [ ]  | 57  | [TTW-133](ttw-133-cap-one-off-payouts.md)                                 | 7D  | Plafonner le versement manuel et exiger deux admins      | 7.8            | Critique | 4–8    | Q23, Q25           |
-| [ ]  | 58  | [TTW-134](ttw-134-show-organisers-their-money.md)                         | 7D  | Montrer aux organisateurs leur solde et leurs versements | 7.9            | Élevé    | 8–12   | Q35, Q23, Q25      |
-| [ ]  | 59  | [TTW-135](ttw-135-let-organisers-edit-bank-accounts.md)                   | 7D  | Modifier ou supprimer son compte bancaire                | 7.3            | Élevé    | 4–6    | Q23, Q25           |
-| [ ]  | 60  | [TTW-136](ttw-136-allow-guest-fundraiser-checkout.md)                     | 7D  | Paiement sans compte pour les soutiens                   | 4.7            | Critique | 20–30  | Q23, Q25           |
-| [ ]  | 61  | [TTW-137](ttw-137-add-fundraiser-donations.md)                            | 7E  | Dons libres dans le paiement                             | 4.5            | Critique | 40–60  | Q23, Q25           |
-| [ ]  | 62  | [TTW-138](ttw-138-add-campaign-delivery-options.md)                       | 7F  | Options de livraison d'une campagne                      | 5.4            | Élevé    | 15–25  | Q18, Q23, Q25      |
-| [ ]  | 63  | [TTW-139](ttw-139-show-organisers-their-campaign-orders.md)               | 7E  | Écran des commandes de la campagne pour l'organisateur   | 5.9            | Élevé    | 6–10   | Q23, Q25           |
-| [ ]  | 64  | [TTW-140](ttw-140-add-campaign-resume-button.md)                          | 7A  | Bouton de reprise d'une campagne en pause                | 6.10           | Faible   | 1–2    | Q23, Q25           |
-| [ ]  | 65  | [TTW-141](ttw-141-complete-campaign-end-handling.md)                      | 7D  | Fin de campagne et page archivée                         | 6.12           | Élevé    | 6–10   | Q17, Q35, Q23, Q25 |
-| [ ]  | 66  | [TTW-142](ttw-142-freeze-live-campaigns.md)                               | 7A  | Figer la campagne une fois en ligne                      | 9.5            | Élevé    | 4–8    | Q23, Q25           |
-| [ ]  | 67  | [TTW-143](ttw-143-show-moderators-a-real-render.md)                       | 7A  | Vrai rendu du design pour les modérateurs                | 9.3            | Élevé    | 4–8    | TTW-101, Q23, Q25  |
-| [ ]  | 68  | [TTW-144](ttw-144-show-campaign-end-date-and-sales.md)                    | 7D  | Date de fin et ventes sur la page publique               | 6.9            | Standard | 3–5    | Q23, Q25           |
-| [ ]  | 69  | [TTW-145](ttw-145-add-campaign-headline-and-video.md)                     | 7G  | Titre et vidéo optionnelle de campagne                   | 6.8            | Standard | 4–6    | Q23, Q25           |
+| Fait | N°  | Ticket                                                                    | Lot | Travail                                                     | Excel          | Risque   | Heures | Attend             |
+| ---- | --- | ------------------------------------------------------------------------- | --- | ----------------------------------------------------------- | -------------- | -------- | ------ | ------------------ |
+| [ ]  | 51  | [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | 7A  | Campagne de démo et test du parcours d'un soutien           | —              | Standard | —      | Q23, Q25           |
+| [ ]  | 52  | [TTW-128](ttw-128-build-organiser-approval-screen.md)                     | 7A  | Écran d'approbation des organisateurs                       | 6.1, 7.7       | Élevé    | 10–15  | Q23, Q33, Q25      |
+| [ ]  | 53  | [TTW-129](ttw-129-build-bank-account-verification-queue.md)               | 7B  | Vérifier les comptes bancaires des organisateurs            | 7.1, 6.11      | Critique | 8–12   | Q23, Q25           |
+| [ ]  | 54  | [TTW-130](ttw-130-check-account-holder-name-with-paystack.md)             | 7C  | Contrôler le nom du titulaire avec Paystack                 | 7.2            | Élevé    | 6–10   | Q23, Q25           |
+| [ ]  | 55  | [TTW-131](ttw-131-correct-the-campaign-money-split.md)                    | 7C  | Corriger le partage de l'argent d'une campagne              | 6.2, 6.14, 7.6 | Critique | 25–40  | Q36, Q34, Q23, Q25 |
+| [ ]  | 56  | [TTW-132](ttw-132-define-refund-recovery-after-payout.md)                 | 7D  | Règle de remboursement après versement                      | 6.13           | Critique | 6–10   | Q30, Q23, Q25      |
+| [ ]  | 57  | [TTW-133](ttw-133-cap-one-off-payouts.md)                                 | 7D  | Plafonner le versement manuel et exiger deux admins         | 7.8            | Critique | 4–8    | Q23, Q25           |
+| [ ]  | 58  | [TTW-134](ttw-134-show-organisers-their-money.md)                         | 7D  | Montrer aux organisateurs leur solde et leurs versements    | 7.9            | Élevé    | 8–12   | Q35, Q23, Q25      |
+| [ ]  | 59  | [TTW-135](ttw-135-let-organisers-edit-bank-accounts.md)                   | 7D  | Modifier ou supprimer son compte bancaire                   | 7.3            | Élevé    | 4–6    | Q23, Q25           |
+| [ ]  | 60  | [TTW-136](ttw-136-allow-guest-fundraiser-checkout.md)                     | 7D  | Paiement sans compte pour les soutiens                      | 4.7            | Critique | 20–30  | Q23, Q25           |
+| [ ]  | 61  | [TTW-137](ttw-137-add-fundraiser-donations.md)                            | 7E  | Dons libres dans le paiement                                | 4.5            | Critique | 40–60  | Q23, Q25           |
+| [ ]  | 62  | [TTW-138](ttw-138-add-campaign-delivery-options.md)                       | 7F  | Options de livraison d'une campagne                         | 5.4            | Élevé    | 15–25  | Q18, Q23, Q25      |
+| [ ]  | 63  | [TTW-139](ttw-139-show-organisers-their-campaign-orders.md)               | 7E  | Écran des commandes de la campagne pour l'organisateur      | 5.9            | Élevé    | 6–10   | Q23, Q25           |
+| [ ]  | 64  | [TTW-140](ttw-140-add-campaign-resume-button.md)                          | 7A  | Bouton de reprise d'une campagne en pause                   | 6.10           | Faible   | 1–2    | Q23, Q25           |
+| [ ]  | 65  | [TTW-141](ttw-141-complete-campaign-end-handling.md)                      | 7D  | Fin de campagne et page archivée                            | 6.12           | Élevé    | 6–10   | Q17, Q35, Q23, Q25 |
+| [ ]  | 66  | [TTW-142](ttw-142-freeze-live-campaigns.md)                               | 7A  | Figer la campagne une fois en ligne                         | 9.5            | Élevé    | 4–8    | Q23, Q25           |
+| [ ]  | 67  | [TTW-143](ttw-143-show-moderators-a-real-render.md)                       | 7A  | Vrai rendu du design pour les modérateurs                   | 9.3            | Élevé    | 4–8    | TTW-101, Q23, Q25  |
+| [ ]  | 68  | [TTW-144](ttw-144-show-campaign-end-date-and-sales.md)                    | 7D  | Date de fin et ventes sur la page publique                  | 6.9            | Standard | 3–5    | Q23, Q25           |
+| [ ]  | 69  | [TTW-145](ttw-145-add-campaign-headline-and-video.md)                     | 7G  | Titre et vidéo optionnelle de campagne                      | 6.8            | Standard | 4–6    | Q23, Q25           |
+| [x]  | —   | [TTW-167](ttw-167-filter-banks-without-a-code.md)                         | 7A  | Liste des banques : écarter les banques sans code           | —              | Élevé    | —      | —                  |
+| [ ]  | —   | [TTW-175](ttw-175-fix-bank-selector-choices.md)                           | 7A  | Banques proposées : virement possible et bon nom enregistré | —              | Élevé    | —      | —                  |
 
 ## Phase 8 : Recette et mise en ligne
 
