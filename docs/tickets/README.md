@@ -37,6 +37,9 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Complete | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
 | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)     | P1       | Low      | Complete | Stop the format check failing on generated files so `pnpm verify` runs in full           | Not in review |
 | [TTW-165](ttw-165-fix-image-variant-select-crash.md)             | P1       | Low      | Complete | Stop the admin product page crashing on products with images                             | Not in review |
+| [TTW-168](ttw-168-report-failed-admin-product-saves.md)          | P2       | Low      | Scoped   | Tell admins when a change on the product page fails                                      | Not in review |
+| [TTW-169](ttw-169-tighten-image-variant-journey.md)              | P2       | Low      | Scoped   | Tighten the image variant journey and remove its dead placeholder                        | Not in review |
+| [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)       | P2       | Standard | Scoped   | Align the Playwright CI gates with the written strategy                                  | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
@@ -95,13 +98,14 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 
 ## Epic 5 — Contracts, observability and release proof
 
-| Ticket                                                | Priority | Risk     | State    | Outcome                                                                | Review |
-| ----------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------- | ------ |
-| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                      | —      |
-| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete | Observability dashboards, alerts, runbooks encoded (slice 1)           | —      |
-| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete | Documentation validation + key state reconciliation (slice 1)          | —      |
-| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Complete | Comprehensive Playwright UAT, viewport matrix, nightly shard (slice 2) | —      |
-| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Complete | Migration baseline CI, stop/go rehearsal, release manifest (slice 2)   | —      |
+| Ticket                                                | Priority | Risk     | State    | Outcome                                                                  | Review        |
+| ----------------------------------------------------- | -------- | -------- | -------- | ------------------------------------------------------------------------ | ------------- |
+| [TTW-050](ttw-050-gate-openapi-contracts.md)          | P1       | High     | Complete | OpenAPI generation + drift gate encoded (slice 1)                        | —             |
+| [TTW-051](ttw-051-operationalize-observability.md)    | P1       | High     | Complete | Observability dashboards, alerts, runbooks encoded (slice 1)             | —             |
+| [TTW-052](ttw-052-reconcile-project-documentation.md) | P1       | Standard | Complete | Documentation validation + key state reconciliation (slice 1)            | —             |
+| [TTW-053](ttw-053-complete-release-browser-uat.md)    | P2       | High     | Complete | Comprehensive Playwright UAT, viewport matrix, nightly shard (slice 2)   | —             |
+| [TTW-054](ttw-054-rehearse-controlled-release.md)     | P2       | High     | Complete | Migration baseline CI, stop/go rehearsal, release manifest (slice 2)     | —             |
+| [TTW-173](ttw-173-document-image-update-contract.md)  | P2       | Low      | Scoped   | Document how the admin image update unlinks a variant, and its responses | Not in review |
 
 ## Epic 6 — Production infrastructure as code
 

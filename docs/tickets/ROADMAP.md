@@ -86,6 +86,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —      |
 | [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —      |
 | [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —      |
+| [ ]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
@@ -150,6 +151,9 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image                | —     | Faible   | —      | —       |
 | [ ]  | —   | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)   | 5D  | Fiche produit admin : images perdues avec une variante                | —     | Élevé    | 3–5    | TTW-174 |
 | [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | —       |
+| [ ]  | —   | [TTW-168](ttw-168-report-failed-admin-product-saves.md)      | 5A  | Fiche produit admin : signaler les changements refusés                | —     | Faible   | —      | —       |
+| [ ]  | —   | [TTW-169](ttw-169-tighten-image-variant-journey.md)          | 5A  | Resserrer le test image et variante                                   | —     | Faible   | —      | —       |
+| [ ]  | —   | [TTW-173](ttw-173-document-image-update-contract.md)         | 5A  | Documenter dans l'API comment délier une image d'une variante         | —     | Faible   | —      | —       |
 
 ## Phase 6 : Données personnelles, légal, site public
 
