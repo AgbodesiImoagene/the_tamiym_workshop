@@ -219,8 +219,8 @@ Update this plan and record deviations when implementation differs. TTW-174 shou
 
 ## Out of scope
 
-- What happens to an image when a variant really disappears. That choice stays with TTW-166 and stays open. This ticket changes neither its options nor its recommendation.
-- When TTW-166 is next updated: its "Add a new option" rows no longer lose anything, the "last value" row changes as described above, and its Option B no longer needs a warning on "Add option".
+- What happens to an image when a variant really disappears. TTW-166 owns that choice: the images move to "All variants". This ticket does not change it.
+- When TTW-166 is next updated: its "Add a new option" rows no longer lose anything, and the "last value" row changes as described above.
 - Deleting a value or an option, apart from the last-value case above.
 - Which variant survives a collision when an option is deleted (reported in TTW-166).
 - `createOptionValue` keeps the value when the variant limit refuses it (`products.service.ts:1006`). This is existing behaviour, noticed here and not fixed.

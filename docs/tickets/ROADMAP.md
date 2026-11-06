@@ -63,7 +63,6 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q17      | Fin de campagne et production                                       | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
 | Q18      | Livraison des campagnes                                             | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
 | Q39      | Délai de l'option express                                           | TTW-153          | Attendre la réponse                                                                               |
-| Nouvelle | Image liée à une variante qui disparaît : la garder ou la supprimer | TTW-166          | Ramener l'image sur « All variants » (recommandé, à valider)                                      |
 
 ### Déjà répondues : rien à attendre
 
@@ -76,6 +75,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q24      | La prolongation d'une campagne est acceptée                                  | Dans TTW-141                                                              |
 | Q8       | Redirection vers Paystack acceptée                                           | Aucun travail                                                             |
 | Q29      | Modération par IA préférée, lancement possible sans                          | Aucun travail : elle existe déjà                                          |
+| TTW-166  | L'image d'une variante supprimée reste sur le produit, sur « All variants »  | TTW-166 ne l'attend plus                                                  |
 
 ## Phase 0 : Fiabiliser la base et la CI
 
@@ -139,17 +139,17 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 5 : Outils d'administration
 
-| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend            |
-| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | ----------------- |
-| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —                 |
-| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —                 |
-| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —                 |
-| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —                 |
-| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —                 |
-| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —                 |
-| [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image                | —     | Faible   | —      | —                 |
-| [ ]  | —   | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)   | 5D  | Fiche produit admin : images perdues avec une variante                | —     | Élevé    | 3–12   | TTW-174, décision |
-| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | —                 |
+| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend  |
+| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | ------- |
+| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —       |
+| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —       |
+| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —       |
+| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —       |
+| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —       |
+| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —       |
+| [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image                | —     | Faible   | —      | —       |
+| [ ]  | —   | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)   | 5D  | Fiche produit admin : images perdues avec une variante                | —     | Élevé    | 3–5    | TTW-174 |
+| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | —       |
 
 ## Phase 6 : Données personnelles, légal, site public
 
