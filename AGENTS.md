@@ -64,7 +64,7 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 5. Implement only the ticket scope; update its plan when reality differs.
 6. Run the required quality gates and record exact evidence in the ticket.
 7. Obtain an independent implementation review. Fix and repeat the full review until PASS.
-8. Open a PR only when acceptance criteria and required gates pass. Merge only after user confirmation and green CI, then delete the ticket branch.
+8. Do not open pull requests. Once acceptance criteria and required gates pass, and only when the user asks, merge the ticket branch locally into `main`, push `main`, and read the CI result with `gh`. A push to a `codex/ttw-*` branch does not start `ci.yml`, so a CI failure lands on `main`: report it and fix it straight away. Delete the ticket branch only when the user asks.
 
 Independent tickets may use separate worktrees. Dependent or overlapping tickets remain sequential.
 
