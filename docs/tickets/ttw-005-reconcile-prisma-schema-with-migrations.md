@@ -147,6 +147,8 @@ The inventory in `docs/database-only-objects.md` was checked against `pg_catalog
 - `prisma format` reformatted 251 unrelated lines of `schema.prisma`, and `prisma migrate dev` rewrote a comment in `migration_lock.toml`. Both were reverted, so `prisma format` will touch those lines again if someone runs it.
 - A second currency cannot be tested: `CurrencyCode` only has `NGN`. Currency is still part of the constraint.
 
+- Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone starts no run. This departs from the `AGENTS.md` rule of green CI before merge.
+
 **Not verified**
 
 - CI has not run this branch. CI uses Postgres 16 and this was run on 17. `dbgenerated` must match the text Postgres stores, so the first CI run is the real proof for that.
@@ -155,4 +157,6 @@ The inventory in `docs/database-only-objects.md` was checked against `pg_catalog
 
 ## Completion summary
 
-Schema and migrations are aligned, `pnpm migrations:check` guards them locally and in CI, and database-only objects are documented. Tiers with no maximum now save, update, quote and overlap correctly, and the admin bulk pricing page loads. Follow-ups, not fixed here: the empty `SelectItem` in `admin-product-merchandising.tsx:1005`, `apps/api/src/generated/` missing from `.prettierignore`, and the missing upper limit on `maxQuantity`.
+Schema and migrations are aligned, `pnpm migrations:check` guards them locally and in CI, and database-only objects are documented. Tiers with no maximum now save, update, quote and overlap correctly, and the admin bulk pricing page loads. Follow-ups, not fixed here: the empty `SelectItem` in `admin-product-merchandising.tsx:1005`, `apps/api/src/generated/` missing from `.prettierignore`, and the missing upper limit on `maxQuantity` (now TTW-163).
+
+Left to do: the user pushes `main`, CI is confirmed green there on Postgres 16, then this ticket is marked Complete and the branch is deleted.

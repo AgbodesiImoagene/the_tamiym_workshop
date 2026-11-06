@@ -42,7 +42,10 @@ export class AdminBulkPricingController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiResponse({ status: 201, description: 'Tier created' })
-  @ApiResponse({ status: 400, description: 'Overlap or invalid range' })
+  @ApiResponse({
+    status: 400,
+    description: 'Overlap, invalid range, or a quantity above the limit',
+  })
   async create(@Body() dto: CreateBulkPricingDto) {
     return this.bulkPricingService.create({
       productId: dto.productId,
@@ -86,7 +89,10 @@ export class AdminBulkPricingController {
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Bulk pricing tier ID' })
   @ApiResponse({ status: 200, description: 'Tier updated' })
-  @ApiResponse({ status: 400, description: 'Overlap or invalid range' })
+  @ApiResponse({
+    status: 400,
+    description: 'Overlap, invalid range, or a quantity above the limit',
+  })
   @ApiResponse({ status: 404, description: 'Tier not found' })
   async update(@Param('id') id: string, @Body() dto: UpdateBulkPricingDto) {
     return this.bulkPricingService.update(id, {

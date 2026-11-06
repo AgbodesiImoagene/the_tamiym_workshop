@@ -63,4 +63,21 @@ test.describe('Admin bulk pricing @comprehensive @admin', () => {
     await adminPage.getByRole('button', { name: 'Delete tier' }).click();
     await expect(adminPage.getByText(OPEN_ENDED)).toBeHidden();
   });
+
+  // Uses the plain page: this journey provokes a 400 on purpose, which the browser
+  // logs as a console error and the strict adminPage guard would fail on.
+  test('explains why a quantity is too large and saves nothing', async ({ page }) => {
+    await page.goto('/admin/pricing/bulk-pricing');
+
+    await page.getByLabel('Product', { exact: true }).click();
+    await page.getByRole('option', { name: /Classic Tee/ }).click();
+    await page.getByLabel('Min quantity').fill(String(MIN_QUANTITY));
+    await page.getByLabel('Max quantity').fill('2147483647');
+    await page.getByLabel('Price per unit').fill('1000');
+    await page.getByRole('button', { name: 'Create tier' }).click();
+
+    await expect(page.getByText('maxQuantity must be 2147483646 or less.')).toBeVisible();
+    await expect(page.getByText('Bulk pricing tier created.')).toBeHidden();
+    await expect(page.getByText(`${MIN_QUANTITY} to 2147483647 units`)).toBeHidden();
+  });
 });
