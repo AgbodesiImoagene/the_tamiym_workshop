@@ -3,7 +3,7 @@
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-167, which changes the same function; product decision below\
+**Blocked by:** TTW-167, which changes the same function; the checks below, which need a real Paystack test key\
 **Blocks:** None
 
 ## Background
@@ -33,11 +33,13 @@ Paystack's documentation, as quoted in `docs/paystack-integration-status.md:59`,
 2. Add the Paystack `id` to the `GET /v1/banks` response and use it as the select value and React key. The form sends the code and name of the entry that was picked.
 3. Give the route a real response schema in OpenAPI, because the response changes.
 
-### Decision needed before coding
+### Decision
 
-Hiding the 24 banks means an organiser who banks only with one of them cannot add a payout account. The alternative is to show them disabled with an explanation, which keeps the same result but tells the organiser why. Recommendation: hide them, because a saved account that cannot be paid is worse, and revisit if organisers complain.
+Decided by the user on 2026-11-06: hide the banks with `supports_transfer: false`. An organiser who banks only with one of them cannot add a payout account. Showing them disabled was rejected as more work for the same result, and the choice can be revisited if organisers complain.
 
 ### To check before coding
+
+These need a real Paystack test key, and their results must be recorded here before step 2 of the plan.
 
 - Whether Paystack rejects a transfer recipient for a `supports_transfer: false` bank, using a real test key.
 - Whether `50739`, `51253` and `100025` reach the right institution. Two institutions on one code cannot be told apart by the code alone. If one of them cannot be reached, showing both is misleading.
@@ -54,7 +56,7 @@ Rejected: removing duplicates by code in the API. It would hide one institution 
 
 ## Implementation plan
 
-1. Settle the decision and the checks above, and record them here.
+1. Run the checks above and record the results here. If a result contradicts the proposal, update it before coding.
 2. Write the unit, e2e and form tests with the real shape of a Paystack entry, and show they fail.
 3. Change the request and the filter in `listBanks`, and add `id` to `BankItem`.
 4. Update the form, the shared types and OpenAPI.
@@ -76,7 +78,7 @@ Rejected: removing duplicates by code in the API. It would hide one institution 
 
 ## Acceptance criteria
 
-- [ ] The select offers no bank with `supports_transfer: false` and no USD entry, or follows the recorded decision.
+- [ ] The select offers no bank with `supports_transfer: false` and no USD entry.
 - [ ] Picking the second entry of a shared code stores that entry's name, and it is shown after a reload.
 - [ ] Each option has a unique value and key.
 - [ ] Required quality gates pass with evidence recorded below.
