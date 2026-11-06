@@ -116,6 +116,8 @@ Overlap enforcement:
 
 - API rejects overlapping quantity ranges via `BulkPricingService.assertNoOverlap`
 - PostgreSQL also rejects overlaps via `EXCLUDE USING gist` on `(productId, coalesced variantId, currency, int4range)` (TTW-024)
+- A tier with an empty `maxQuantity` is open-ended and stored as an unbounded range, so it overlaps every higher quantity (TTW-005)
+- The columns and constraint behind this are listed in `database-only-objects.md`
 
 ### Product view pricing
 

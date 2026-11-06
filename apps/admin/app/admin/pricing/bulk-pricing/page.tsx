@@ -42,6 +42,9 @@ type TierFormState = {
   pricePerUnit: string;
 };
 
+/** Select items cannot use an empty value, so "no filter" needs its own. */
+const ALL_PRODUCTS = 'all';
+
 const emptyForm: TierFormState = {
   productId: '',
   variantId: '',
@@ -211,12 +214,15 @@ export default function AdminBulkPricingPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="filterProduct">Filter by product</Label>
-                <Select value={filterProductId} onValueChange={setFilterProductId}>
+                <Select
+                  value={filterProductId || ALL_PRODUCTS}
+                  onValueChange={(value) => setFilterProductId(value === ALL_PRODUCTS ? '' : value)}
+                >
                   <SelectTrigger id="filterProduct" className="h-11 w-full rounded-xl">
                     <SelectValue placeholder="All products" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All products</SelectItem>
+                    <SelectItem value={ALL_PRODUCTS}>All products</SelectItem>
                     {(productsQuery.data ?? []).map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name}
