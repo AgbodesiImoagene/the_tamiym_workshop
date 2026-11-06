@@ -210,11 +210,13 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter api exec prisma migrate deploy
       - name: Run API e2e (pass 1)
+        timeout-minutes: 3
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter api test:e2e 2>&1 | tee apps/api/e2e-pass-1.log
       - name: Run API e2e (pass 2)
+        timeout-minutes: 3
         shell: bash
         run: |
           set -o pipefail

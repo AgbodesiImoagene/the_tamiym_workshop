@@ -101,7 +101,7 @@ After the fix:
 - `pnpm exec prettier --check` on every changed file: passed.
 - `pnpm format:check` reports 84 files locally, all under `apps/api/src/generated/` (gitignored Prisma output). The CI Format job does not generate it.
 
-Not verified: CI on GitHub, including the new "Test the open-handle proof" step and `timeout-minutes`, because nothing has been pushed.
+Not verified: CI on GitHub, including the new "Test the open-handle proof" step, the job and step `timeout-minutes`, and whether the `if: failure()` upload runs after a step timeout, because nothing has been pushed.
 
 ## Completion summary
 
@@ -110,11 +110,13 @@ Done:
 - The proof runs Jest in its own process group. On timeout it kills the whole group and exits non-zero within the grace period, without waiting for `close`.
 - A timed-out run can no longer report "passed", even if the group leader had already exited 0.
 - `timeout-minutes: 15` on "API Integration" (about 3 min on run 41931373328, of which 46 s for the proof).
+- `timeout-minutes: 3` on "Run API e2e (pass 1)" and "(pass 2)" (38 s and 35 s on run 41931373328).
 - `pnpm e2e-open-handles:test` runs in the CI "Documentation" job.
 
 Deviations from the proposal:
 
 - Added SIGHUP, SIGINT and SIGTERM handling. With `detached: true`, a Ctrl-C or a closed terminal no longer reaches Jest, so the fix alone would have created a new way to leave orphans.
 - The timeout is sized from run 41931373328, the green run recorded in TTW-079, rather than run 41888502419.
+- Added step timeouts to passes 1 and 2 at the user's request, after review 2. Those steps come before the proof, so a leaked handle would otherwise hang until the 15-minute backstop. This goes slightly beyond the ticket's title and was not part of review 2.
 
 Left to do: push the branch, confirm CI is green, then mark the ticket Complete.
