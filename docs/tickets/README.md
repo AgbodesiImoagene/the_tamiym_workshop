@@ -66,19 +66,20 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 
-| Ticket                                                                    | Priority | Risk     | State    | Outcome                                                                      | Review                      |
-| ------------------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | --------------------------- |
-| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md)         | P1       | High     | Complete | Implement organiser eligibility, approval and campaign entry                 | Rest: 6.1                   |
-| [TTW-031](ttw-031-render-real-fundraiser-offers.md)                       | P1       | High     | Complete | Replace placeholder public options with sellable API-backed offers           | Rest: 13.3                  |
-| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)                    | P1       | High     | Complete | Preserve supporter intent through auth and complete web checkout             | Rest: 4.5, 4.7, 13.3        |
-| [TTW-033](ttw-033-add-customer-order-detail.md)                           | P1       | High     | Complete | Add immutable, redacted customer order detail and honest states              | Rest: 4.8, 13.3             |
-| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)            | P1       | High     | Complete | Enforce activation readiness and notify organisers of decisions              | Rest: 6.10, 6.11, 6.12, 9.5 |
-| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)                  | P1       | High     | Complete | Complete organiser product, design, price and submission authoring           | Rest: 6.3                   |
-| [TTW-036](ttw-036-complete-analytics-contracts.md)                        | P1       | High     | Complete | Interim analytics KPI contracts encoded (slice 1)                            | Rest: 10.3, 10.7            |
-| [TTW-037](ttw-037-prevent-duplicate-standard-checkout-orders.md)          | P0       | Critical | Complete | Keep one order per cart revision across retries, tabs and concurrent creates | 4.3                         |
-| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | Complete | Fix the invalid pricing query that breaks every quote and order              | —                           |
-| [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped   | Seed a sellable fundraiser offer and automate the supporter checkout journey | 13.3                        |
-| [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped   | Let customers order their saved designs from the Design Workshop             | 3.1, 3.8                    |
+| Ticket                                                                    | Priority | Risk     | State       | Outcome                                                                      | Review                      |
+| ------------------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------- | --------------------------- |
+| [TTW-030](ttw-030-add-organiser-onboarding-and-campaign-entry.md)         | P1       | High     | Complete    | Implement organiser eligibility, approval and campaign entry                 | Rest: 6.1                   |
+| [TTW-031](ttw-031-render-real-fundraiser-offers.md)                       | P1       | High     | Complete    | Replace placeholder public options with sellable API-backed offers           | Rest: 13.3                  |
+| [TTW-032](ttw-032-complete-web-fundraiser-checkout.md)                    | P1       | High     | Complete    | Preserve supporter intent through auth and complete web checkout             | Rest: 4.5, 4.7, 13.3        |
+| [TTW-033](ttw-033-add-customer-order-detail.md)                           | P1       | High     | Complete    | Add immutable, redacted customer order detail and honest states              | Rest: 4.8, 13.3             |
+| [TTW-034](ttw-034-enforce-campaign-readiness-and-decisions.md)            | P1       | High     | Complete    | Enforce activation readiness and notify organisers of decisions              | Rest: 6.10, 6.11, 6.12, 9.5 |
+| [TTW-035](ttw-035-build-organiser-campaign-authoring.md)                  | P1       | High     | Complete    | Complete organiser product, design, price and submission authoring           | Rest: 6.3                   |
+| [TTW-036](ttw-036-complete-analytics-contracts.md)                        | P1       | High     | Complete    | Interim analytics KPI contracts encoded (slice 1)                            | Rest: 10.3, 10.7            |
+| [TTW-037](ttw-037-prevent-duplicate-standard-checkout-orders.md)          | P0       | Critical | Complete    | Keep one order per cart revision across retries, tabs and concurrent creates | 4.3                         |
+| [TTW-038](ttw-038-fix-invalid-pricing-quote-query.md)                     | P0       | High     | Complete    | Fix the invalid pricing query that breaks every quote and order              | —                           |
+| [TTW-039](ttw-039-seed-sellable-fundraiser-offer-and-checkout-journey.md) | P1       | Standard | Scoped      | Seed a sellable fundraiser offer and automate the supporter checkout journey | 13.3                        |
+| [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)               | P0       | High     | Scoped      | Let customers order their saved designs from the Design Workshop             | 3.1, 3.8                    |
+| [TTW-167](ttw-167-filter-banks-without-a-code.md)                         | P2       | High     | In progress | Keep banks without a code out of the bank list                               | Not in review               |
 
 ## Epic 4 — Fulfilment, support and business policy
 
