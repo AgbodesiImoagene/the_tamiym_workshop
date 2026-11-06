@@ -222,6 +222,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-160](ttw-160-align-order-summary-with-figma.md)               | P2       | Low      | Scoped | Align the order summary and confirmation with Figma       | 4.4            |
 | [TTW-161](ttw-161-allow-local-courier-tracking-links.md)           | P2       | Standard | Scoped | Allow local courier tracking links                        | 5.10           |
 | [TTW-162](ttw-162-darken-green-button-colour.md)                   | P2       | Low      | Scoped | Darken the green buttons for contrast                     | 12.8           |
+| [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)         | P1       | High     | Scoped | Stop variant changes silently deleting linked images      | Not in review  |
 
 ## Explicitly deferred post-v1 backlog
 
