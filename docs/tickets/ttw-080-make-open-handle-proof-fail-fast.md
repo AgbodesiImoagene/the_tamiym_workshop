@@ -72,8 +72,17 @@ Review 1 (2026-11-06): `/code-review` at high effort, run inside the implementin
 - Fixed: a test hard-coded `1500ms` instead of `TIMEOUT_MS`.
 - No change: `E2E_OPEN_HANDLE_COMMAND` can replace the gate's command. The ticket asks for this test seam, and no workflow sets it.
 - Left open, low impact: an uncaught exception in the script (for example EPIPE on stdout) exits without killing the group.
-- Left open, low impact: `E2E_OPEN_HANDLE_GRACE_MS=0` falls back to 5000. The proof still exits non-zero.
-- Left open, outside this ticket: if the 15-minute backstop fires, the job is cancelled, so the `if: failure()` step does not upload the e2e logs. The proof's own timeout does not hit this, because it fails the step normally.
+- No change (the finding was wrong, see review 2): `E2E_OPEN_HANDLE_GRACE_MS=0` is honoured. Only an empty value falls back to 5000.
+- Left open, outside this ticket: if the 15-minute backstop fires, the `if: failure()` step may not upload the e2e logs. This is inferred from GitHub's cancellation behaviour, not confirmed. The output stays in the job log.
+
+Review 2 (2026-11-06): independent review in a fresh session, read-only. **PASS** for `91aa9ae`.
+
+- Both invariants were checked with real `pnpm` and real `jest` on macOS. A run in time exits 0. A stuck Jest (8 s timeout, 1 s grace) exits 1 in 8.3 s, and a real leaked handle exits 1 in 12.2 s, with no `jest` left in either case. Piping through `tee` as CI does does not hang.
+- Mutation check on copies of the script: 12 of 15 mutations were caught, including all the kill, grace, signal and exit-code logic. The 3 survivors touch the default command or its environment, which the tests replace and this change did not alter. For example, removing `--detectOpenHandles` would go unnoticed.
+- The EPIPE finding was reproduced with `| head -1`, which leaves the fake `jest` alive. It only happens when the reader closes early, and reading the old code shows it did not kill anything in that case either, so it is not a regression.
+- Corrected the grace finding above: with a 500 ms timeout, `0` exits in 0.7 s and an empty value in 5.7 s.
+- `test:e2e` has no timeout of its own, so a leaked handle would hang pass 1 before the proof runs. The 15-minute backstop would stop the job in that case, not the 120 s limit.
+- Not covered by this review: Linux, CI on GitHub, and the full e2e suite.
 
 ## Verification evidence
 
