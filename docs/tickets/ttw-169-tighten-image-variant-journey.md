@@ -51,7 +51,7 @@ Rejected: leaving the placeholder as a fallback. It can never display, so it onl
 
 ## Out of scope
 
-- Running this journey on each PR → TTW-170.
+- Running this journey on each push to `main` → TTW-170.
 
 ## Design review
 
