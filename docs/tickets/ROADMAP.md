@@ -139,16 +139,17 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 5 : Outils d'administration
 
-| Fait | N°  | Ticket                                                       | Lot | Travail                                                   | Excel | Risque   | Heures | Attend                     |
-| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------- | ----- | -------- | ------ | -------------------------- |
-| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                  | 1.9   | Élevé    | 6–10   | —                          |
-| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification   | 1.10  | Élevé    | 2–4    | —                          |
-| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins         | 1.3   | Élevé    | 6–10   | —                          |
-| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                          | 10.1  | Élevé    | 20–30  | —                          |
-| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin | 9.6   | Standard | 3–5    | —                          |
-| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                  | 10.8  | Standard | 4–6    | —                          |
-| [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image    | —     | Faible   | —      | —                          |
-| [ ]  | —   | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)   | 5B  | Fiche produit admin : images perdues avec une variante    | —     | Élevé    | 3–12   | TTW-005, TTW-165, décision |
+| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend                     |
+| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | -------------------------- |
+| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —                          |
+| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —                          |
+| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —                          |
+| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —                          |
+| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —                          |
+| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —                          |
+| [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image                | —     | Faible   | —      | —                          |
+| [ ]  | —   | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)   | 5B  | Fiche produit admin : images perdues avec une variante                | —     | Élevé    | 3–12   | TTW-005, TTW-165, décision |
+| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | TTW-165                    |
 
 ## Phase 6 : Données personnelles, légal, site public
 
@@ -196,12 +197,12 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 8 : Recette et mise en ligne
 
-| Fait | N°  | Ticket                                                                                                                                            | Lot | Travail                                        | Excel | Risque   | Heures | Attend  |
-| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------- | ----- | -------- | ------ | ------- |
-| [ ]  | 70  | pas de ticket                                                                                                                                     | —   | Saisir le vrai catalogue                       | 2.9   | Standard | 20–60  | Q5      |
-| [ ]  | 71  | [TTW-147](ttw-147-choose-and-configure-email-provider.md)                                                                                         | 8A  | Choisir et configurer le fournisseur d'e-mail  | —     | Élevé    | —      | TTW-085 |
-| [ ]  | 72  | [TTW-061](ttw-061-establish-iac-foundation.md), [TTW-062](ttw-062-provision-network-dns-edge.md), [TTW-063](ttw-063-deploy-production-runtime.md) | 8A  | Terminer les relectures d'infra et déployer    | —     | Élevé    | —      | —       |
-| [ ]  | 73  | [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)                                                                                  | 8B  | Tests de bout en bout et recette par le client | 13.3  | Élevé    | 10–20  | —       |
+| Fait | N°  | Ticket                                                                                                                                            | Lot | Travail                                        | Excel | Risque   | Heures | Attend      |
+| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------- | ----- | -------- | ------ | ----------- |
+| [ ]  | 70  | pas de ticket                                                                                                                                     | —   | Saisir le vrai catalogue                       | 2.9   | Standard | 20–60  | Q5, TTW-174 |
+| [ ]  | 71  | [TTW-147](ttw-147-choose-and-configure-email-provider.md)                                                                                         | 8A  | Choisir et configurer le fournisseur d'e-mail  | —     | Élevé    | —      | TTW-085     |
+| [ ]  | 72  | [TTW-061](ttw-061-establish-iac-foundation.md), [TTW-062](ttw-062-provision-network-dns-edge.md), [TTW-063](ttw-063-deploy-production-runtime.md) | 8A  | Terminer les relectures d'infra et déployer    | —     | Élevé    | —      | —           |
+| [ ]  | 73  | [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)                                                                                  | 8B  | Tests de bout en bout et recette par le client | 13.3  | Élevé    | 10–20  | —           |
 
 ## Phase 9 : Après le lancement
 
