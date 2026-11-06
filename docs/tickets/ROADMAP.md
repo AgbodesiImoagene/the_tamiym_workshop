@@ -144,6 +144,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                          | 10.1  | Élevé    | 20–30  | —      |
 | [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin | 9.6   | Standard | 3–5    | —      |
 | [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                  | 10.8  | Standard | 4–6    | —      |
+| [ ]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image    | —     | Faible   | —      | —      |
 
 ## Phase 6 : Données personnelles, légal, site public
 
