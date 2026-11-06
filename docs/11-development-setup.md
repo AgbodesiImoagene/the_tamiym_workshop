@@ -97,7 +97,8 @@ The repo should provide these root-level scripts:
 - `pnpm test:coverage` — full coverage run
 - `pnpm coverage:ratchet` — fail if API aggregate coverage drops below committed floors
 - `pnpm coverage:diff` — fail if changed API executable lines are under the diff-coverage floor
-- `pnpm verify` — local composite of the release-facing unit/format/coverage/build gates (integration runs in CI’s API Integration job)
+- `pnpm migrations:check` — fail if `schema.prisma` and the migrations disagree; needs PostgreSQL and a dedicated shadow database (see `database-only-objects.md`)
+- `pnpm verify` — local composite of the release-facing unit/format/coverage/build gates; needs PostgreSQL for `pnpm migrations:check` (integration runs in CI’s API Integration job)
 - `pnpm db:migrate`
 - `pnpm db:seed`
 - `pnpm db:generate` — required before `pnpm typecheck` and `pnpm build` (Prisma Client is gitignored)

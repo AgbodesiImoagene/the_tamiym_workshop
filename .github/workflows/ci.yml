@@ -366,6 +366,8 @@ jobs:
             -c "CREATE DATABASE tamiym_workshop_blank_shadow;"
           PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
             -c "CREATE DATABASE tamiym_workshop_snapshot_shadow;"
+      - name: Check Prisma schema matches the migrations
+        run: pnpm migrations:check && pnpm migrations:check:test
       - name: Verify blank database migration baseline
         run: pnpm release:verify-migrations
       - name: Verify restored-snapshot migration baseline
