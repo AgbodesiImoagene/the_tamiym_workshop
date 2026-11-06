@@ -25,7 +25,7 @@ Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 
 | Phase | But                                      | Tickets | Heures (Excel)             |
 | ----- | ---------------------------------------- | ------- | -------------------------- |
-| 0     | Fiabiliser la base et la CI              | 3       | hors Excel                 |
+| 0     | Fiabiliser la base et la CI              | 4       | hors Excel                 |
 | 1     | Fermer les failles sécurité et argent    | 7       | 20–35 h                    |
 | 2     | Comptes et achat d'un produit            | 10      | 73–122 h                   |
 | 3     | Commander son design et l'imprimer       | 8       | 108–171 h                  |
@@ -34,7 +34,7 @@ Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 | 6     | Données personnelles, légal, site public | 11      | 47–79 h                    |
 | 7     | Fundraising                              | 19      | 174–277 h                  |
 | 8     | Recette et mise en ligne                 | 5       | 10–20 h, plus le catalogue |
-| 9     | Après le lancement                       | 14      | 89–144 h                   |
+| 9     | Après le lancement                       | 16      | 89–144 h                   |
 
 Pourquoi cet ordre :
 
@@ -83,6 +83,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                  | —     | Élevé    | —      | —      |
 | [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack | —     | Critique | —      | —      |
 | [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué  | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker | —     | Faible   | —      | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
@@ -201,22 +202,24 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 Priorité P2 de l'Excel, sauf indication contraire : à classer selon les retours des vrais utilisateurs.
 
-| Fait | N°  | Ticket                                                          | Lot | Travail                                         | Excel | Risque   | Heures | Attend  |
-| ---- | --- | --------------------------------------------------------------- | --- | ----------------------------------------------- | ----- | -------- | ------ | ------- |
-| [ ]  | 74  | [TTW-149](ttw-149-add-returns-and-claims.md)                    | 9A  | Retours et réclamations                         | 5.3   | Critique | 30–45  | Q19     |
-| [ ]  | 75  | [TTW-150](ttw-150-build-moderation-appeal-screens.md)           | 9A  | Écrans d'appel de modération                    | 9.1   | Élevé    | 15–20  | —       |
-| [ ]  | 76  | [TTW-151](ttw-151-complete-admin-analytics.md)                  | 9A  | Graphiques et filtres des statistiques          | 10.3  | Standard | 8–14   | —       |
-| [ ]  | 77  | [TTW-152](ttw-152-add-workshop-earnings-metric.md)              | 9A  | Métrique de gain de l'atelier                   | 10.7  | Standard | 4–6    | TTW-131 |
-| [ ]  | 78  | [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md) | 9A  | Délai estimé et option express                  | 8.7   | Élevé    | 3–5    | Q39     |
-| [ ]  | 79  | [TTW-154](ttw-154-add-audit-log-screen.md)                      | 9A  | Consulter le journal d'audit                    | 10.4  | Élevé    | 6–10   | —       |
-| [ ]  | 80  | [TTW-155](ttw-155-paginate-admin-orders.md)                     | 9A  | Pagination des commandes côté admin             | 5.8   | Standard | 4–8    | —       |
-| [ ]  | 81  | [TTW-156](ttw-156-add-search-to-admin-products.md)              | 9A  | Recherche et pagination des produits côté admin | 2.8   | Faible   | 2–4    | —       |
-| [ ]  | 82  | [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)       | 9A  | Recherche, tri et filtre prix du catalogue      | 2.6   | Faible   | 4–6    | —       |
-| [ ]  | 83  | [TTW-158](ttw-158-add-active-sessions-screen.md)                | 9A  | Écran « sessions actives »                      | 1.5   | Élevé    | 4–8    | —       |
-| [ ]  | 84  | [TTW-159](ttw-159-add-share-link-management.md)                 | 9A  | Écran de gestion des liens de partage           | 3.6   | Standard | 3–5    | —       |
-| [ ]  | 85  | [TTW-160](ttw-160-align-order-summary-with-figma.md)            | 9B  | Récapitulatif plus proche de Figma              | 4.4   | Faible   | 4–8    | —       |
-| [ ]  | 86  | [TTW-161](ttw-161-allow-local-courier-tracking-links.md)        | 9A  | Liens de suivi pour les coursiers locaux        | 5.10  | Standard | 1–2    | —       |
-| [ ]  | 87  | [TTW-162](ttw-162-darken-green-button-colour.md)                | 9A  | Assombrir le vert des boutons                   | 12.8  | Faible   | 1–3    | —       |
+| Fait | N°  | Ticket                                                          | Lot | Travail                                                      | Excel | Risque   | Heures | Attend  |
+| ---- | --- | --------------------------------------------------------------- | --- | ------------------------------------------------------------ | ----- | -------- | ------ | ------- |
+| [ ]  | 74  | [TTW-149](ttw-149-add-returns-and-claims.md)                    | 9A  | Retours et réclamations                                      | 5.3   | Critique | 30–45  | Q19     |
+| [ ]  | 75  | [TTW-150](ttw-150-build-moderation-appeal-screens.md)           | 9A  | Écrans d'appel de modération                                 | 9.1   | Élevé    | 15–20  | —       |
+| [ ]  | 76  | [TTW-151](ttw-151-complete-admin-analytics.md)                  | 9A  | Graphiques et filtres des statistiques                       | 10.3  | Standard | 8–14   | —       |
+| [ ]  | 77  | [TTW-152](ttw-152-add-workshop-earnings-metric.md)              | 9A  | Métrique de gain de l'atelier                                | 10.7  | Standard | 4–6    | TTW-131 |
+| [ ]  | 78  | [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md) | 9A  | Délai estimé et option express                               | 8.7   | Élevé    | 3–5    | Q39     |
+| [ ]  | 79  | [TTW-154](ttw-154-add-audit-log-screen.md)                      | 9A  | Consulter le journal d'audit                                 | 10.4  | Élevé    | 6–10   | —       |
+| [ ]  | 80  | [TTW-155](ttw-155-paginate-admin-orders.md)                     | 9A  | Pagination des commandes côté admin                          | 5.8   | Standard | 4–8    | —       |
+| [ ]  | 81  | [TTW-156](ttw-156-add-search-to-admin-products.md)              | 9A  | Recherche et pagination des produits côté admin              | 2.8   | Faible   | 2–4    | —       |
+| [ ]  | 82  | [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)       | 9A  | Recherche, tri et filtre prix du catalogue                   | 2.6   | Faible   | 4–6    | —       |
+| [ ]  | 83  | [TTW-158](ttw-158-add-active-sessions-screen.md)                | 9A  | Écran « sessions actives »                                   | 1.5   | Élevé    | 4–8    | —       |
+| [ ]  | 84  | [TTW-159](ttw-159-add-share-link-management.md)                 | 9A  | Écran de gestion des liens de partage                        | 3.6   | Standard | 3–5    | —       |
+| [ ]  | 85  | [TTW-160](ttw-160-align-order-summary-with-figma.md)            | 9B  | Récapitulatif plus proche de Figma                           | 4.4   | Faible   | 4–8    | —       |
+| [ ]  | 86  | [TTW-161](ttw-161-allow-local-courier-tracking-links.md)        | 9A  | Liens de suivi pour les coursiers locaux                     | 5.10  | Standard | 1–2    | —       |
+| [ ]  | 87  | [TTW-162](ttw-162-darken-green-button-colour.md)                | 9A  | Assombrir le vert des boutons                                | 12.8  | Faible   | 1–3    | —       |
+| [ ]  | 88  | [TTW-171](ttw-171-limit-bulk-tier-prices.md)                    | 9A  | Refuser les prix de palier que la base ne peut pas stocker   | —     | Faible   | —      | —       |
+| [ ]  | 89  | [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)       | 9B  | Refuser devise, produit et variante inconnus sur les paliers | —     | Faible   | —      | —       |
 
 **Options repoussées par le client** (50–90 h, sans ticket tant que le client ne les redemande pas) :
 
