@@ -30,7 +30,7 @@ Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 | 2     | Comptes et achat d'un produit            | 10      | 73–122 h                   |
 | 3     | Commander son design et l'imprimer       | 8       | 108–171 h                  |
 | 4     | Produire, expédier, facturer             | 5       | 36–58 h                    |
-| 5     | Outils d'administration                  | 6       | 41–65 h                    |
+| 5     | Outils d'administration                  | 7       | 41–65 h                    |
 | 6     | Données personnelles, légal, site public | 11      | 47–79 h                    |
 | 7     | Fundraising                              | 19      | 174–277 h                  |
 | 8     | Recette et mise en ligne                 | 5       | 10–20 h, plus le catalogue |
@@ -63,6 +63,9 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q17      | Fin de campagne et production                                       | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
 | Q18      | Livraison des campagnes                                             | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
 | Q39      | Délai de l'option express                                           | TTW-153          | Attendre la réponse                                                                               |
+| Nouvelle | Nouvelle variante : reprend-elle le prix d'une variante existante ? | TTW-174          | Reprendre le prix de la variante correspondante (recommandé, à valider)                           |
+| Nouvelle | Variante conservée : son SKU change-t-il avec la nouvelle valeur ?  | TTW-174          | Garder le SKU (recommandé, à valider)                                                             |
+| Nouvelle | Nouvelle variante : avec quel stock démarre-t-elle ?                | TTW-174          | Stock à 0, pour ne rien vendre sans stock saisi (recommandé, à valider)                           |
 
 ### Déjà répondues : rien à attendre
 
@@ -136,14 +139,15 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 5 : Outils d'administration
 
-| Fait | N°  | Ticket                                                       | Lot | Travail                                                   | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                  | 1.9   | Élevé    | 6–10   | —      |
-| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification   | 1.10  | Élevé    | 2–4    | —      |
-| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins         | 1.3   | Élevé    | 6–10   | —      |
-| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                          | 10.1  | Élevé    | 20–30  | —      |
-| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin | 9.6   | Standard | 3–5    | —      |
-| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                  | 10.8  | Standard | 4–6    | —      |
+| Fait | N°  | Ticket                                                       | Lot | Travail                                                               | Excel | Risque   | Heures | Attend             |
+| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------------------- | ----- | -------- | ------ | ------------------ |
+| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                              | 1.9   | Élevé    | 6–10   | —                  |
+| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification               | 1.10  | Élevé    | 2–4    | —                  |
+| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins                     | 1.3   | Élevé    | 6–10   | —                  |
+| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                                      | 10.1  | Élevé    | 20–30  | —                  |
+| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin             | 9.6   | Standard | 3–5    | —                  |
+| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                              | 10.8  | Standard | 4–6    | —                  |
+| [ ]  | —   | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)    | 5C  | Fiche produit admin : garder les variantes quand on ajoute une option | —     | Élevé    | 8–14   | TTW-165, décisions |
 
 ## Phase 6 : Données personnelles, légal, site public
 
@@ -189,12 +193,12 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 8 : Recette et mise en ligne
 
-| Fait | N°  | Ticket                                                                                                                                            | Lot | Travail                                        | Excel | Risque   | Heures | Attend  |
-| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------- | ----- | -------- | ------ | ------- |
-| [ ]  | 70  | pas de ticket                                                                                                                                     | —   | Saisir le vrai catalogue                       | 2.9   | Standard | 20–60  | Q5      |
-| [ ]  | 71  | [TTW-147](ttw-147-choose-and-configure-email-provider.md)                                                                                         | 8A  | Choisir et configurer le fournisseur d'e-mail  | —     | Élevé    | —      | TTW-085 |
-| [ ]  | 72  | [TTW-061](ttw-061-establish-iac-foundation.md), [TTW-062](ttw-062-provision-network-dns-edge.md), [TTW-063](ttw-063-deploy-production-runtime.md) | 8A  | Terminer les relectures d'infra et déployer    | —     | Élevé    | —      | —       |
-| [ ]  | 73  | [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)                                                                                  | 8B  | Tests de bout en bout et recette par le client | 13.3  | Élevé    | 10–20  | —       |
+| Fait | N°  | Ticket                                                                                                                                            | Lot | Travail                                        | Excel | Risque   | Heures | Attend      |
+| ---- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------- | ----- | -------- | ------ | ----------- |
+| [ ]  | 70  | pas de ticket                                                                                                                                     | —   | Saisir le vrai catalogue                       | 2.9   | Standard | 20–60  | Q5, TTW-174 |
+| [ ]  | 71  | [TTW-147](ttw-147-choose-and-configure-email-provider.md)                                                                                         | 8A  | Choisir et configurer le fournisseur d'e-mail  | —     | Élevé    | —      | TTW-085     |
+| [ ]  | 72  | [TTW-061](ttw-061-establish-iac-foundation.md), [TTW-062](ttw-062-provision-network-dns-edge.md), [TTW-063](ttw-063-deploy-production-runtime.md) | 8A  | Terminer les relectures d'infra et déployer    | —     | Élevé    | —      | —           |
+| [ ]  | 73  | [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)                                                                                  | 8B  | Tests de bout en bout et recette par le client | 13.3  | Élevé    | 10–20  | —           |
 
 ## Phase 9 : Après le lancement
 
