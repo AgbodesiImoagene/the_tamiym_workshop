@@ -17,8 +17,8 @@ JOIN bulk_pricing b
  AND a."productId" = b."productId"
  AND COALESCE(a."variantId", '') = COALESCE(b."variantId", '')
  AND a.currency = b.currency
- AND int4range(a."minQuantity", COALESCE(a."maxQuantity", 2147483647), '[]')
-     && int4range(b."minQuantity", COALESCE(b."maxQuantity", 2147483647), '[]');
+ AND int4range(a."minQuantity", a."maxQuantity", '[]')
+     && int4range(b."minQuantity", b."maxQuantity", '[]');
 
 -- Multiple ACTIVE campaign discounts per campaign (quote fail-closed path)
 SELECT dc."campaignId", COUNT(*) AS active_discount_links, array_agg(d.id) AS discount_ids

@@ -1,3 +1,11 @@
 # Generated contract artefacts (format controlled by generators)
 docs/openapi/openapi.json
 **/*.generated.ts
+
+# Git-ignored generated output, excluded only by nested .gitignore files,
+# which Prettier does not read
+apps/api/src/generated/
+apps/*/next-env.d.ts
+
+# Local agent state: worktrees and session journals
+.claude/

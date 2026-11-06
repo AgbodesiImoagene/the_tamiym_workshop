@@ -2431,6 +2431,13 @@ model BulkPricing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Stored generated columns behind the bulk_pricing_quantity_no_overlap EXCLUDE
+  // constraint. Declared so `prisma migrate dev` stops proposing to drop them; the
+  // text must match what Postgres stores. Never written by the application and
+  // hidden from Prisma Client. See docs/database-only-objects.md.
+  variantKey    String?                   @default(dbgenerated("COALESCE(\"variantId\", ''::text)")) @ignore
+  quantityRange Unsupported("int4range")? @default(dbgenerated("int4range(\"minQuantity\", \"maxQuantity\", '[]'::text)"))
+
   // Prevent duplicate tiers for same scope:
   @@unique([productId, variantId, currency, minQuantity])
   @@index([productId])

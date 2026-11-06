@@ -177,6 +177,16 @@
       "tags": ["@smoke", "@admin"]
     },
     {
+      "id": "ADMIN-BULK-PRICING",
+      "surface": "admin",
+      "feature": "Admin bulk pricing tiers, including tiers with no maximum",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/bulk-pricing.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
       "id": "ADMIN-MFA",
       "surface": "admin",
       "feature": "Privileged admin MFA login",

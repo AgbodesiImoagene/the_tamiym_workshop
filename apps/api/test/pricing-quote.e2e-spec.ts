@@ -239,6 +239,31 @@ describe('Pricing quote (e2e)', () => {
     });
   }
 
+  it('applies an open-ended bulk tier to the unit price (TTW-005)', async () => {
+    const suffix = `open-tier-${Date.now()}`;
+    const { customer, product, variant, address } =
+      await seedPurchasableVariant(suffix);
+    await prisma.bulkPricing.create({
+      data: {
+        productId: product.id,
+        currency: CurrencyCode.NGN,
+        minQuantity: 5,
+        maxQuantity: null,
+        pricePerUnit: 4000,
+      },
+    });
+
+    const quote = await pricing.quoteStandard(customer.id, {
+      shippingAddressId: address.id,
+      items: [{ variantId: variant.id, quantity: 6 }],
+    });
+
+    expect(quote.items[0]).toMatchObject({
+      unitFinalPrice: 4000,
+      lineTotal: 24000,
+    });
+  });
+
   it('quotes a standard variant without options at the product price plus zone shipping', async () => {
     const suffix = `plain-${Date.now()}`;
     const { customer, variant, address } = await seedPurchasableVariant(suffix);

@@ -28,13 +28,14 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
 | [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
 | [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Scoped      | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Complete    | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
 | [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
 | [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Complete    | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
 | [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | Complete    | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
 | [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | Complete    | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
 | [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | Complete    | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
 | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Complete    | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
+| [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)     | P1       | Low      | In progress | Stop the format check failing on generated files so `pnpm verify` runs in full           | Not in review |
 | [TTW-165](ttw-165-fix-image-variant-select-crash.md)             | P1       | Low      | In progress | Stop the admin product page crashing on products with images                             | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
@@ -61,6 +62,9 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-025](ttw-025-implement-privacy-data-lifecycle.md)              | P0       | High | Complete | Implement auditable export, retention, deletion and anonymisation workflows    | Rest: 11.1, 11.2, 11.6 |
 | [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete | Replace permanent plaintext shares with expiring, revocable, digest-only links | Rest: 3.6              |
 | [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete | Add revision-bound moderation decisions, appeals and evidence retention        | Rest: 9.1              |
+| [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                    | P2       | Low  | Complete | Reject bulk tier quantities the database cannot store                          | Not in review          |
+| [TTW-171](ttw-171-limit-bulk-tier-prices.md)                        | P2       | Low  | Scoped   | Reject bulk tier prices the database cannot store                              | Not in review          |
+| [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)           | P2       | Low  | Scoped   | Reject unknown currencies, products and variants on bulk tiers                 | Not in review          |
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 

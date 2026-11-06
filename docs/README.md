@@ -132,6 +132,7 @@ Validation: `pnpm docs:validate` (also runs in CI).
 - `14-auth-and-session-architecture.md` — recommended site-boundary and session-sharing architecture for fundraiser commerce on the public site
 - `15-public-fundraiser-checkout-implementation-plan.md` — phased implementation plan for web-owned fundraiser auth and checkout
 - `pricing-strategy.md` — pricing pipeline, money model, discount and bulk-pricing constraints, and rounding policy
+- `database-only-objects.md` — generated columns, constraints, triggers and partial indexes Prisma cannot express, and the schema drift check (TTW-005)
 - `backend-production-readiness.md` — module-by-module backend readiness tracker and next steps
 
 ## Output expectations for the AI agent
