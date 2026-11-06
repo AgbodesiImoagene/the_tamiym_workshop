@@ -119,4 +119,6 @@ Deviations from the proposal:
 - The timeout is sized from run 41931373328, the green run recorded in TTW-079, rather than run 41888502419.
 - Added step timeouts to passes 1 and 2 at the user's request, after review 2. Those steps come before the proof, so a leaked handle would otherwise hang until the 15-minute backstop. This goes slightly beyond the ticket's title and was not part of review 2.
 
-Left to do: push the branch, confirm CI is green, then mark the ticket Complete.
+- Merged into `main` locally before CI ran, at the user's request and without a PR. `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so pushing this branch alone would start no run. This departs from the `AGENTS.md` rule of green CI before merge.
+
+Left to do: push `main`, confirm CI is green there, then mark the ticket Complete and delete the branch.
