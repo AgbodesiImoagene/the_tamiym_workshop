@@ -1,7 +1,7 @@
 # TTW-165 — Stop the admin product page crashing on products with images
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In review\
+**Status:** In progress (merged locally; CI on GitHub pending the user's push)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -104,6 +104,17 @@ Not verified:
 - The journey is tagged `@comprehensive`, so CI only runs it nightly or on manual dispatch, not on each push.
 - The image was a queued URL import, so the row was tested without a processed file. MinIO is not available on this machine.
 
+After merging local `main` (5522b23, with TTW-005, TTW-163 and TTW-164) and `origin/main` (0fd9548, with TTW-167 and TTW-175) into this branch, on aab8b4a:
+
+- `pnpm verify`: exit 0, every step run, including `migrations:check` (`Prisma schema matches the migrations.`), 145 API suites and 1217 tests under coverage, `coverage:ratchet`, and `build` 5/5 tasks. `coverage:diff` was skipped because the branch has no changed API source against `origin/main`. `audit:prod` passed with 24 low and moderate findings.
+- `DATABASE_URL` came from `apps/api/.env.test`, and `SHADOW_DATABASE_URL` pointed to a disposable `tamiym_workshop_ttw165_shadow`, created for the run and dropped after it.
+- `pnpm docs:validate`: exit 0.
+- The only merge conflict was in `docs/tickets/README.md`: the TTW-005 row keeps `Complete` from `main`, and the TTW-164 and TTW-165 rows are both kept.
+
+Not verified after the merge: the Playwright journey, which `pnpm verify` does not run and which was not replayed on aab8b4a. In `apps/admin`, the merge only changed `app/admin/pricing/bulk-pricing/page.tsx`, so the page this ticket fixes is unchanged since the journey passed. CI has not run either: `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so it could not run on this branch.
+
 ## Completion summary
 
-The admin product page no longer crashes for a product with images. "All variants" now uses the dedicated `ALL_VARIANTS` value, and the saved value for it stays `null`. No deviation from the plan, no migration and no contract change. The branch stops at a local commit, as requested.
+The admin product page no longer crashes for a product with images. "All variants" now uses the dedicated `ALL_VARIANTS` value, and the saved value for it stays `null`. No deviation from the plan, no migration and no contract change. Merged into `main` locally before CI ran, at the user's request and without a PR. The merge also brings `origin/main` into local `main`, which had diverged from it.
+
+Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted.
