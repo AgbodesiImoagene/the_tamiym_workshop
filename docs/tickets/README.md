@@ -61,6 +61,8 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-026](ttw-026-secure-design-share-links.md)                     | P1       | High | Complete    | Replace permanent plaintext shares with expiring, revocable, digest-only links | Rest: 3.6              |
 | [TTW-027](ttw-027-add-moderation-appeals-and-evidence-retention.md) | P1       | High | Complete    | Add revision-bound moderation decisions, appeals and evidence retention        | Rest: 9.1              |
 | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                    | P2       | Low  | In progress | Reject bulk tier quantities the database cannot store                          | Not in review          |
+| [TTW-171](ttw-171-limit-bulk-tier-prices.md)                        | P2       | Low  | Scoped      | Reject bulk tier prices the database cannot store                              | Not in review          |
+| [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)           | P2       | Low  | Scoped      | Reject unknown currencies, products and variants on bulk tiers                 | Not in review          |
 
 ## Epic 3 — Complete customer and fundraiser revenue journeys
 
