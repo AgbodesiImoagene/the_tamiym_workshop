@@ -75,6 +75,18 @@ describe('PaystackTransferProviderService.listBanks', () => {
     );
   });
 
+  it('returns a kept code unchanged', async () => {
+    mockPaystackResponse({
+      status: true,
+      data: [{ name: 'Padded code', code: ' 044 ' }],
+    });
+
+    await expect(provider.listBanks()).resolves.toEqual([
+      { code: ' 044 ', name: 'Padded code' },
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('returns an empty list when Paystack reports a failure', async () => {
     mockPaystackResponse({ status: false, message: 'Invalid key' });
 

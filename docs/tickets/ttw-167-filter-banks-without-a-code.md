@@ -55,14 +55,14 @@ Rejected:
 
 - [x] `listBanks` drops entries with an empty, blank, null or missing code, and the unit test fails without the filter.
 - [x] `GET /v1/banks` returns only selectable banks through the real app, and the e2e test fails without the filter.
-- [x] Entries with a code are returned unchanged, and a Paystack failure still returns an empty list.
+- [x] Entries with a code are returned unchanged, and a Paystack `status: false` response still returns an empty list.
 - [x] Required quality gates pass with evidence recorded below.
 - [x] Contracts, migrations, observability, and documentation are updated where applicable: no contract or migration change, one new warning log.
 
 ## Out of scope
 
 - `key={bank.code}` in the form assumes codes are unique. Duplicate codes would only give a React warning.
-- `listBanks` does not check `res.ok`, so a Paystack failure gives an empty list with no log. `resolveAccount` does not check it either. This is existing behaviour.
+- `listBanks` does not check `res.ok`, so a JSON `status: false` response gives an empty list with no log, and a non-JSON response such as an HTML 502 makes `res.json()` throw and gives a 500. `resolveAccount` does not check it either. This is existing behaviour.
 - Paystack pagination: the request asks for 100 banks at most and reads no further page. Whether the Nigerian list is longer has not been checked.
 
 ## Design review
@@ -91,7 +91,18 @@ Verdict: proceed.
 
 **Security review, 2026-11-06, `/security-review` checklist, run inline in the implementing session.** No finding. No new input, the guards are unchanged, and the new log contains only a count. The skill asks for sub-tasks and they were not used, so this is not independent either.
 
-**Independent review:** not done yet. `AGENTS.md` requires one before a PR.
+**Review 2, 2026-11-06, independent reviewer (fresh session, read-only) on commit `cd1916b`.** Verdict: PASS, no blocking finding. Accuracy, tests, contracts, security and ticket each passed. None of the findings left unfixed in Review 1 needs fixing before merge.
+
+The reviewer reran `pnpm --filter api typecheck` (exit 0), `pnpm --filter api lint` (exit 0, 0 errors, 14 warnings), `pnpm openapi:check`, `pnpm docs:validate`, `prettier --check` on the six files, and the unit spec. On a temporary copy it ran `test/banks.e2e-spec.ts` with and without the filter (passes, then fails on the `''` and `null` entries) and eight mutations of the provider, seven of which were caught. `git merge-tree` reports no conflict with `main` at `e0e74f1`. It did not rerun the full unit and e2e suites or the build.
+
+Findings:
+
+1. **Minor, fixed after the review.** The ticket said a Paystack failure gives an empty list, which is only true of a JSON `status: false` response. The wording is now precise.
+2. **Minor, fixed after the review.** Nothing protected "code returned unchanged": trimming the returned code left all tests green. The unit test `returns a kept code unchanged` now covers it. The reviewer did not see this test; it was run as recorded below.
+3. **Minor, left as is.** The reference to the TTW-165 ticket points to a file that only exists on `codex/ttw-165-fix-image-variant-select`. It resolves when TTW-165 merges.
+4. **Information.** This ticket says `In review` and the index says `In progress`, because the validator refuses `In review` in the index. A numeric `code` is dropped and counted as "without a code", as the proposal says.
+
+The reviewer singled out the `perPage=100` limit as the only unfixed point that could affect an organiser with real data. It predates this ticket and needs a real Paystack test key to check.
 
 ## Verification evidence
 
@@ -112,6 +123,13 @@ After the fix, all from one run:
 - `pnpm --filter api test:e2e`: 18 suites, 94 tests passed, including `test/banks.e2e-spec.ts`.
 - `pnpm docs:validate`: `Documentation validation passed.`
 
+After the independent review, for the added test `returns a kept code unchanged`:
+
+- `npx jest src/payouts/paystack-transfer.provider.spec.ts`: 4 tests passed. With the returned code trimmed on purpose: 1 failed, and the code was restored.
+- `pnpm --filter api typecheck`: exit 0.
+- `pnpm --filter api lint`: exit 0, 0 errors, 14 warnings, none in the files of this ticket.
+- The full unit and e2e suites were not rerun after this test-only change.
+
 Not verified:
 
 - The real Paystack API was not called. All bank data in these tests is stubbed.
@@ -119,4 +137,4 @@ Not verified:
 
 ## Completion summary
 
-`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. Left to do: the independent review, then the push and the PR, which the user handles.
+`GET /v1/banks` no longer returns banks with an empty, blank, null or missing code, and logs how many it skipped. The response shape and the form are unchanged, so there is no OpenAPI change and no migration. The independent review passed. Left to do: the push and the PR, which the user handles. Follow-up: check whether the Nigerian bank list exceeds the 100 entries requested.
