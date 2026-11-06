@@ -63,7 +63,7 @@ Deviation from the request: `.claude/` was not in the request, which named the g
 
 - [x] `pnpm format:check` passes after `pnpm db:generate` and `pnpm build`.
 - [x] `pnpm verify` passes in full, including every step after `format:check`.
-- [x] The check still fails on a badly formatted tracked file.
+- [x] The check still fails on a badly formatted file.
 - [x] No generated file is reformatted.
 - [x] Required quality gates pass with evidence recorded below.
 
@@ -79,6 +79,7 @@ Not required: Low risk.
 ## Implementation reviews
 
 - 2026-11-06, `/code-review low` on the uncommitted `.prettierignore` diff, run in the implementing session: no findings. This was not an independent review; one is still required before merge.
+- 2026-11-06, independent review, read-only, in a separate session: FAIL. `pnpm docs:validate` rejected the state "In review" at `docs/tickets/README.md:38`, because only Complete, Scoped, Deferred and In progress are allowed. The `.prettierignore` change itself passed: no tracked file excluded, no CI coverage lost, and a badly formatted file still detected whether tracked or not. Fix: the README row now says "In progress". A re-review of the fix is pending.
 
 ## Verification evidence
 
@@ -103,9 +104,10 @@ After the change:
   - `audit:prod`: passed at `--audit-level=high` (24 found: 3 low, 21 moderate).
   - build: 5/5 tasks, served from the Turbo cache because `pnpm build` had just run.
 - `pnpm format:check` again after `pnpm verify`, with `apps/api/coverage`, `apps/api/dist` and `apps/web/.next` present: exit 0.
-- Negative test: a temporary badly formatted `apps/api/src/ttw164-bad-format.ts` made `pnpm format:check` exit 1 and was named in the output. File removed.
+- Negative test: a temporary badly formatted `apps/api/src/ttw164-bad-format.ts` made `pnpm format:check` exit 1 and was named in the output. File removed. This file was untracked; the independent review confirmed the same result on a tracked file.
 - `git ls-files -ci --exclude-from=.prettierignore`: 0 tracked files matched outside the two existing entries.
 - No file under `apps/api/src/generated/`, and no `next-env.d.ts`, is newer than this ticket file.
+- `pnpm docs:validate`, added after the review because `pnpm verify` does not run it: exit 0, `Documentation validation passed.` `pnpm docs:validate:test`: 11 passed, 0 failed.
 - Main checkout, Prettier run with a temporary root copy of the new ignore file: exit 0, `.claude/` included. `pnpm verify` itself was not run there, since the fix is not on `main` yet.
 
 ## Completion summary
