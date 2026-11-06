@@ -78,11 +78,12 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 0 : Fiabiliser la base et la CI
 
-| Fait | N°  | Ticket                                                        | Lot | Travail                                                         | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------- | --- | --------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [ ]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                  | —     | Élevé    | —      | —      |
-| [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack | —     | Critique | —      | —      |
-| [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué  | —     | Faible   | —      | —      |
+| Fait | N°  | Ticket                                                        | Lot | Travail                                                           | Excel | Risque   | Heures | Attend |
+| ---- | --- | ------------------------------------------------------------- | --- | ----------------------------------------------------------------- | ----- | -------- | ------ | ------ |
+| [ ]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                    | —     | Élevé    | —      | —      |
+| [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
+| [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —      |
+| [ ]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
@@ -136,14 +137,17 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 5 : Outils d'administration
 
-| Fait | N°  | Ticket                                                       | Lot | Travail                                                   | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------ | --- | --------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                  | 1.9   | Élevé    | 6–10   | —      |
-| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification   | 1.10  | Élevé    | 2–4    | —      |
-| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins         | 1.3   | Élevé    | 6–10   | —      |
-| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                          | 10.1  | Élevé    | 20–30  | —      |
-| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin | 9.6   | Standard | 3–5    | —      |
-| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                  | 10.8  | Standard | 4–6    | —      |
+| Fait | N°  | Ticket                                                       | Lot | Travail                                                       | Excel | Risque   | Heures | Attend |
+| ---- | --- | ------------------------------------------------------------ | --- | ------------------------------------------------------------- | ----- | -------- | ------ | ------ |
+| [ ]  | 34  | [TTW-111](ttw-111-let-admins-suspend-users.md)               | 5A  | Suspendre un utilisateur                                      | 1.9   | Élevé    | 6–10   | —      |
+| [ ]  | 35  | [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)      | 5B  | Écran de réinitialisation de la double authentification       | 1.10  | Élevé    | 2–4    | —      |
+| [ ]  | 36  | [TTW-113](ttw-113-fix-admin-google-sign-in.md)               | 5A  | Réparer ou retirer la connexion Google des admins             | 1.3   | Élevé    | 6–10   | —      |
+| [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                              | 10.1  | Élevé    | 20–30  | —      |
+| [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin     | 9.6   | Standard | 3–5    | —      |
+| [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                      | 10.8  | Standard | 4–6    | —      |
+| [ ]  | —   | [TTW-168](ttw-168-report-failed-admin-product-saves.md)      | 5A  | Fiche produit admin : signaler les changements refusés        | —     | Faible   | —      | —      |
+| [ ]  | —   | [TTW-169](ttw-169-tighten-image-variant-journey.md)          | 5A  | Resserrer le test image et variante                           | —     | Faible   | —      | —      |
+| [ ]  | —   | [TTW-173](ttw-173-document-image-update-contract.md)         | 5A  | Documenter dans l'API comment délier une image d'une variante | —     | Faible   | —      | —      |
 
 ## Phase 6 : Données personnelles, légal, site public
 
