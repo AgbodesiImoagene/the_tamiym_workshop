@@ -1,7 +1,7 @@
 # TTW-165 — Stop the admin product page crashing on products with images
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress (merged locally; CI on GitHub pending the user's push)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -113,8 +113,10 @@ After merging local `main` (5522b23, with TTW-005, TTW-163 and TTW-164) and `ori
 
 Not verified after the merge: the Playwright journey, which `pnpm verify` does not run and which was not replayed on aab8b4a. In `apps/admin`, the merge only changed `app/admin/pricing/bulk-pricing/page.tsx`, so the page this ticket fixes is unchanged since the journey passed. CI has not run either: `ci.yml` only runs on pushes to `main` or `develop` and on PRs, so it could not run on this branch.
 
+CI on GitHub: run 42262808016 on `main` (`2e9b693`) passed, all 18 jobs. That run does not include this ticket's journey, which is tagged `@comprehensive`.
+
 ## Completion summary
 
 The admin product page no longer crashes for a product with images. "All variants" now uses the dedicated `ALL_VARIANTS` value, and the saved value for it stays `null`. No deviation from the plan, no migration and no contract change. Merged into `main` locally before CI ran, at the user's request and without a PR. The merge also brings `origin/main` into local `main`, which had diverged from it.
 
-Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted.
+The user pushed `main`, CI passed on `2e9b693`, and the branch and its worktree were deleted.

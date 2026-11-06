@@ -1,7 +1,7 @@
 # TTW-164 — Stop the format check failing on generated files
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress (merged locally; CI on GitHub pending the user's push)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -119,8 +119,10 @@ After merging `main` (bffe8f6, with TTW-005 and TTW-163) into this branch, on 49
 
 Not verified: CI on GitHub, because `ci.yml` only runs on pushes to `main` or `develop` and on PRs. Plain `pnpm verify` in the main checkout was not run with its own settings: `pnpm migrations:check` fails there with P1000, because `apps/api/.env` has no password for the Postgres on port 5432, and `tamiym_workshop_test_shadow` does not exist. That local setup is outside this ticket.
 
+CI on GitHub: run 42262808016 on `main` (`2e9b693`) passed, all 18 jobs.
+
 ## Completion summary
 
 `pnpm format:check` no longer checks generated output or local agent state, so `pnpm verify` runs to the end. Deviation: `.claude/` was added beyond the request (see the implementation plan). Merged into `main` locally before CI ran, at the user's request and without a PR.
 
-Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted.
+The user pushed `main`, CI passed on `2e9b693`, and the branch and its worktree were deleted.

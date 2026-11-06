@@ -25,12 +25,12 @@ Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 
 | Phase | But                                      | Tickets | Heures (Excel)             |
 | ----- | ---------------------------------------- | ------- | -------------------------- |
-| 0     | Fiabiliser la base et la CI              | 4       | hors Excel                 |
+| 0     | Fiabiliser la base et la CI              | 5       | hors Excel                 |
 | 1     | Fermer les failles sécurité et argent    | 7       | 20–35 h                    |
 | 2     | Comptes et achat d'un produit            | 10      | 73–122 h                   |
 | 3     | Commander son design et l'imprimer       | 8       | 108–171 h                  |
 | 4     | Produire, expédier, facturer             | 5       | 36–58 h                    |
-| 5     | Outils d'administration                  | 6       | 41–65 h                    |
+| 5     | Outils d'administration                  | 7       | 41–65 h                    |
 | 6     | Données personnelles, légal, site public | 11      | 47–79 h                    |
 | 7     | Fundraising                              | 19      | 174–277 h                  |
 | 8     | Recette et mise en ligne                 | 5       | 10–20 h, plus le catalogue |
@@ -78,12 +78,13 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 0 : Fiabiliser la base et la CI
 
-| Fait | N°  | Ticket                                                        | Lot | Travail                                                         | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------- | --- | --------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [x]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                  | —     | Élevé    | —      | —      |
-| [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack | —     | Critique | —      | —      |
-| [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué  | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker | —     | Faible   | —      | —      |
+| Fait | N°  | Ticket                                                        | Lot | Travail                                                           | Excel | Risque   | Heures | Attend |
+| ---- | --- | ------------------------------------------------------------- | --- | ----------------------------------------------------------------- | ----- | -------- | ------ | ------ |
+| [x]  | 1   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                    | —     | Élevé    | —      | —      |
+| [ ]  | 2   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0B  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
+| [x]  | 3   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
@@ -145,7 +146,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 37  | [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)  | 5A  | Écrans de rapprochement Paystack                          | 10.1  | Élevé    | 20–30  | —      |
 | [ ]  | 38  | [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md) | 5A  | Compteurs de files d'attente sur le tableau de bord admin | 9.6   | Standard | 3–5    | —      |
 | [ ]  | 39  | [TTW-116](ttw-116-add-missing-admin-alerts.md)               | 5A  | Alertes admin manquantes                                  | 10.8  | Standard | 4–6    | —      |
-| [ ]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image    | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-165](ttw-165-fix-image-variant-select-crash.md)         | 5A  | Fiche produit admin : plantage dès qu'il y a une image    | —     | Faible   | —      | —      |
 
 ## Phase 6 : Données personnelles, légal, site public
 
