@@ -3,14 +3,14 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-005; TTW-165; user decision on the image outcome (see Proposal)\
+**Blocked by:** TTW-174; user decision on the image outcome (see Proposal)\
 **Blocks:** None
 
 ## Background
 
 An admin can link a product image to one variant. Any action that removes that variant also removes the image, without warning. Nothing in the admin says so.
 
-TTW-165 makes this reachable. Until it merges, the admin product page crashes as soon as a product has an image, so an admin cannot set the link from that screen.
+TTW-165 made this reachable. Before it merged, the admin product page crashed as soon as a product had an image, so an admin could not set the link from that screen.
 
 The rule is `ProductImage.variant` with `onDelete: Cascade` (`apps/api/prisma/schema.prisma:1184`, and the same in the baseline migration, `migration.sql:1531`). Variants are removed in two places: `removeVariant` (`apps/api/src/products/products.service.ts:869`) and the `deleteMany` in `cleanupStaleVariants` (`:1699`), which runs after every option or value change.
 
@@ -92,7 +92,7 @@ Refusing the action while images are linked. Regeneration runs inside other edit
 
 ## Implementation plan
 
-1. Record the user's decision in this ticket. Start only after TTW-005 and TTW-165 are merged.
+1. Record the user's decision in this ticket. Start only after TTW-174 is merged, as both touch the admin product dialogs.
 2. Write the failing integration spec for every row of the measured table.
 
 **If Option A:**

@@ -3,8 +3,8 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-165, for the admin journey\
-**Blocks:** entering the real catalogue (roadmap phase 8, no ticket)
+**Blocked by:** None\
+**Blocks:** TTW-166; entering the real catalogue (roadmap phase 8, no ticket)
 
 ## Background
 
@@ -170,7 +170,7 @@ No schema change is expected. No data repair is needed, because the project is n
 
 ## Implementation plan
 
-1. Start after TTW-165 is merged.
+1. Start from current `main`, which includes TTW-165.
 2. Write the failing integration spec for steps 1 to 3, for a variant with orders, and for each edge case.
 3. Make regeneration ignore options with no value.
 4. Link existing variants on the first value, in one transaction.
