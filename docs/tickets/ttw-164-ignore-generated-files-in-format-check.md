@@ -1,7 +1,7 @@
 # TTW-164 — Stop the format check failing on generated files
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In review\
+**Status:** In progress (merged locally; CI on GitHub pending the user's push)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -111,6 +111,16 @@ After the change:
 - `pnpm docs:validate`, added after the review because `pnpm verify` does not run it: exit 0, `Documentation validation passed.` `pnpm docs:validate:test`: 11 passed, 0 failed.
 - Main checkout, Prettier run with a temporary root copy of the new ignore file: exit 0, `.claude/` included. `pnpm verify` itself was not run there, since the fix is not on `main` yet.
 
+After merging `main` (bffe8f6, with TTW-005 and TTW-163) into this branch, on 490c44e:
+
+- `pnpm verify`: exit 0, every step run, now including `migrations:check` (`Prisma schema matches the migrations.`), 144 API suites, and `build` 5/5 tasks. `coverage:diff` was again skipped, and `audit:prod` passed with the same 24 low and moderate findings.
+- `DATABASE_URL` came from `apps/api/.env.test`, and `SHADOW_DATABASE_URL` pointed to a disposable `tamiym_workshop_ttw164_shadow`, created for the run and dropped after it.
+- `pnpm format:check` and `pnpm docs:validate`: passed.
+
+Not verified: CI on GitHub, because `ci.yml` only runs on pushes to `main` or `develop` and on PRs. Plain `pnpm verify` in the main checkout was not run with its own settings: `pnpm migrations:check` fails there with P1000, because `apps/api/.env` has no password for the Postgres on port 5432, and `tamiym_workshop_test_shadow` does not exist. That local setup is outside this ticket.
+
 ## Completion summary
 
-`pnpm format:check` no longer checks generated output or local agent state, so `pnpm verify` runs to the end. Deviation: `.claude/` was added beyond the request (see the implementation plan). Local commits only: not pushed, no PR. The ticket stays open until the merge.
+`pnpm format:check` no longer checks generated output or local agent state, so `pnpm verify` runs to the end. Deviation: `.claude/` was added beyond the request (see the implementation plan). Merged into `main` locally before CI ran, at the user's request and without a PR.
+
+Left to do: the user pushes `main`, CI is confirmed green there, then this ticket is marked Complete and the branch is deleted.
