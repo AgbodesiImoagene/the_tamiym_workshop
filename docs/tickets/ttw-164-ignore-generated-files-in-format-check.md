@@ -79,7 +79,8 @@ Not required: Low risk.
 ## Implementation reviews
 
 - 2026-11-06, `/code-review low` on the uncommitted `.prettierignore` diff, run in the implementing session: no findings. This was not an independent review; one is still required before merge.
-- 2026-11-06, independent review, read-only, in a separate session: FAIL. `pnpm docs:validate` rejected the state "In review" at `docs/tickets/README.md:38`, because only Complete, Scoped, Deferred and In progress are allowed. The `.prettierignore` change itself passed: no tracked file excluded, no CI coverage lost, and a badly formatted file still detected whether tracked or not. Fix: the README row now says "In progress". A re-review of the fix is pending.
+- 2026-11-06, independent review, read-only, in a separate session: FAIL. `pnpm docs:validate` rejected the state "In review" at `docs/tickets/README.md:38`, because only Complete, Scoped, Deferred and In progress are allowed. The `.prettierignore` change itself passed: no tracked file excluded, no CI coverage lost, and a badly formatted file still detected whether tracked or not. Fix: the README row now says "In progress".
+- 2026-11-06, independent re-review of 91e6ea0, same session: PASS. It ran `pnpm docs:validate`, `pnpm docs:validate:test`, `pnpm playwright:validate`, `pnpm playwright:validate:test`, `pnpm discovery-gates:validate:test`, `pnpm workflows:validate`, `pnpm workflows:validate:test` and `pnpm format:check`, all passing. `pnpm e2e-open-handles:test` was not run, because the branch changes no code.
 
 ## Verification evidence
 
@@ -112,4 +113,4 @@ After the change:
 
 ## Completion summary
 
-`pnpm format:check` no longer checks generated output or local agent state, so `pnpm verify` runs to the end. Deviation: `.claude/` was added beyond the request (see the implementation plan). Local commit only: not pushed, no PR.
+`pnpm format:check` no longer checks generated output or local agent state, so `pnpm verify` runs to the end. Deviation: `.claude/` was added beyond the request (see the implementation plan). Local commits only: not pushed, no PR. The ticket stays open until the merge.
