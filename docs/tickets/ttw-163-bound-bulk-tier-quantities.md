@@ -80,7 +80,7 @@ Not required for a low-risk ticket.
 
 ## Implementation reviews
 
-**Review 1, 2026-11-06, `/code-review` at high effort.** This ran inside the implementing session, so it is **not** the independent review `AGENTS.md` requires. That review is still to do. Overall verdict: no blocking defect in the change.
+**Review 1, 2026-11-06, `/code-review` at high effort.** This ran inside the implementing session, so it is **not** the independent review `AGENTS.md` requires. Overall verdict: no blocking defect in the change.
 
 1. **Fixed.** This ticket's invariant wrongly said the limit only removes values that could never be saved. A `minQuantity` of 2147483647 with no maximum used to save. It no longer does.
 2. **Not fixed, out of scope.** `pricePerUnit` has no upper limit although the column is `Decimal(10,2)`, so a very large price probably still returns a 500. Not run. Follow-up.
@@ -88,6 +88,13 @@ Not required for a low-risk ticket.
 4. **Not fixed, existing.** `apps/admin/lib/api.ts:137` stores the validation `message` array in a string field, so two errors at once render with no separator.
 5. **Accepted.** The limit is in the DTO, not in `BulkPricingService`. The admin controller is the only caller, and direct writes are still refused by Postgres.
 6. **Accepted.** The new browser test uses the plain Playwright page, because the strict `adminPage` guard fails on any 400 in the console. It therefore does not detect an unhandled page error. Changing the shared guard is a separate decision.
+
+**Review 2, 2026-11-06, independent reviewer (fresh session, read-only).** Overall verdict: **PASS**. Correctness, tests, contracts, docs and ticket: PASS. No blocking finding and nothing to change.
+
+- It reran `pnpm --filter api test:e2e -- test/bulk-pricing-quantity-limits.e2e-spec.ts` (exit 0, 12 of 12) and `pnpm openapi:check` (no drift).
+- It confirmed that only `BulkPricingService.create` and `update` write to `bulk_pricing`, through the admin controller.
+- It did not rerun the full e2e suite, Playwright, the build or coverage, and did not reproduce the failure without the fix. For those it relied on the evidence below.
+- Two minor notes, no change: `expectQuantityRejected` matches the response text rather than the `message` array, and the limit lives in the DTO rather than the service (see review 1, point 5).
 
 ## Verification evidence
 
@@ -128,4 +135,4 @@ Environment: macOS, Node v24.22.1, PostgreSQL 17.5 native, Redis, disposable dat
 
 ## Completion summary
 
-Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. An independent implementation review, then a merge after TTW-005, are still needed. Follow-ups, not fixed here: the `pricePerUnit`, `currency` and `productId` checks, and the admin display of several errors at once.
+Bulk tier quantities above 2147483646 now get a 400 with a clear message on create and update, instead of a 500. The admin page shows that message, and Swagger and the OpenAPI artefacts show the limit. No migration. The independent implementation review passed. A merge after TTW-005 is still needed. Follow-ups, not fixed here: the `pricePerUnit`, `currency` and `productId` checks, and the admin display of several errors at once.
