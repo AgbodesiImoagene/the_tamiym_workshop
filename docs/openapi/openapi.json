@@ -395,11 +395,15 @@
           "maxQuantity": {
             "description": "Maximum quantity (inclusive); omit for open-ended",
             "example": 24,
+            "maximum": 2147483646,
+            "minimum": 1,
             "type": "number"
           },
           "minQuantity": {
             "description": "Minimum quantity for this tier",
             "example": 10,
+            "maximum": 2147483646,
+            "minimum": 1,
             "type": "number"
           },
           "pricePerUnit": {
@@ -3701,11 +3705,15 @@
           "maxQuantity": {
             "description": "Maximum quantity (inclusive); omit for open-ended",
             "example": 24,
+            "maximum": 2147483646,
+            "minimum": 1,
             "type": "number"
           },
           "minQuantity": {
             "description": "Minimum quantity for this tier",
             "example": 10,
+            "maximum": 2147483646,
+            "minimum": 1,
             "type": "number"
           },
           "pricePerUnit": {
@@ -6003,11 +6011,15 @@
                   "maxQuantity": {
                     "description": "Maximum quantity (inclusive); omit for open-ended",
                     "example": 24,
+                    "maximum": 2147483646,
+                    "minimum": 1,
                     "type": "number"
                   },
                   "minQuantity": {
                     "description": "Minimum quantity for this tier",
                     "example": 10,
+                    "maximum": 2147483646,
+                    "minimum": 1,
                     "type": "number"
                   },
                   "pricePerUnit": {
@@ -6040,7 +6052,7 @@
             "description": "Tier created"
           },
           "400": {
-            "description": "Overlap or invalid range"
+            "description": "Overlap, invalid range, or a quantity above the limit"
           }
         },
         "security": [
@@ -6117,11 +6129,15 @@
                   "maxQuantity": {
                     "description": "Maximum quantity (inclusive); omit for open-ended",
                     "example": 24,
+                    "maximum": 2147483646,
+                    "minimum": 1,
                     "type": "number"
                   },
                   "minQuantity": {
                     "description": "Minimum quantity for this tier",
                     "example": 10,
+                    "maximum": 2147483646,
+                    "minimum": 1,
                     "type": "number"
                   },
                   "pricePerUnit": {
@@ -6148,7 +6164,7 @@
             "description": "Tier updated"
           },
           "400": {
-            "description": "Overlap or invalid range"
+            "description": "Overlap, invalid range, or a quantity above the limit"
           },
           "404": {
             "description": "Tier not found"
