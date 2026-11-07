@@ -43,15 +43,15 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 
 ## Epic 1 — Financial and inventory integrity
 
-| Ticket                                                   | Priority | Risk     | State    | Outcome                                                                      | Review        |
-| -------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------- | ------------- |
-| [TTW-010](ttw-010-make-charge-settlement-idempotent.md)  | P0       | Critical | Complete | Settle each Paystack charge exactly once under duplicate/concurrent delivery | —             |
-| [TTW-011](ttw-011-make-payout-events-idempotent.md)      | P0       | Critical | Complete | Apply each payout transition and ledger effect exactly once                  | —             |
-| [TTW-012](ttw-012-serialize-payment-initiation.md)       | P0       | Critical | Complete | Permit at most one active payment attempt per order                          | —             |
-| [TTW-013](ttw-013-correct-refund-lifecycle.md)           | P0       | Critical | Complete | Track provider-confirmed partial/full refunds and reconcile them once        | —             |
-| [TTW-014](ttw-014-complete-inventory-lifecycle.md)       | P0       | Critical | Complete | Convert paid reservations to consumed stock or release them exactly once     | —             |
-| [TTW-015](ttw-015-reconcile-money-and-inventory.md)      | P1       | Critical | Complete | Add scheduled financial/inventory reconciliation reports and repair runbooks | —             |
-| [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md) | P2       | Critical | Scoped   | Enforce one local refund per Paystack refund id in the database              | Not in review |
+| Ticket                                                   | Priority | Risk     | State       | Outcome                                                                      | Review        |
+| -------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------- | ------------- |
+| [TTW-010](ttw-010-make-charge-settlement-idempotent.md)  | P0       | Critical | Complete    | Settle each Paystack charge exactly once under duplicate/concurrent delivery | —             |
+| [TTW-011](ttw-011-make-payout-events-idempotent.md)      | P0       | Critical | Complete    | Apply each payout transition and ledger effect exactly once                  | —             |
+| [TTW-012](ttw-012-serialize-payment-initiation.md)       | P0       | Critical | Complete    | Permit at most one active payment attempt per order                          | —             |
+| [TTW-013](ttw-013-correct-refund-lifecycle.md)           | P0       | Critical | Complete    | Track provider-confirmed partial/full refunds and reconcile them once        | —             |
+| [TTW-014](ttw-014-complete-inventory-lifecycle.md)       | P0       | Critical | Complete    | Convert paid reservations to consumed stock or release them exactly once     | —             |
+| [TTW-015](ttw-015-reconcile-money-and-inventory.md)      | P1       | Critical | Complete    | Add scheduled financial/inventory reconciliation reports and repair runbooks | —             |
+| [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md) | P2       | Critical | In progress | Enforce one local refund per Paystack refund id in the database              | Not in review |
 
 ## Epic 2 — Security and trust boundaries
 

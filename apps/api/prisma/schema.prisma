@@ -1992,7 +1992,7 @@ model Refund {
 
   @@index([orderId])
   @@index([paymentId])
-  @@index([provider, providerRef])
+  @@unique([provider, providerRef])
   @@index([transactionReference])
   @@index([status])
   @@map("refunds")
