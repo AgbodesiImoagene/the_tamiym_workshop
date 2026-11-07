@@ -1,7 +1,7 @@
 # TTW-170 — Align the Playwright CI gates with the written strategy
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** Partial (CI proof pending a push)\
+**Status:** In progress (CI proof done; push trigger to be seen after the merge)\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
@@ -64,7 +64,7 @@ Add the `push` trigger on `main` to the comprehensive workflow, then make the st
 ## Acceptance criteria
 
 - [x] The owner's decision is recorded.
-- [ ] The chosen gate is seen running in CI, failing on a broken spec and passing on a good one.
+- [x] The chosen gate is seen running in CI, failing on a broken spec and passing on a good one. → runs 42395749602 (red) and 42396217167 (green), see evidence.
 - [x] The merge-to-`main` and nightly matrix gates are running, or the documents say they are not. → main regression runs on push once merged; the matrix is documented as not in CI.
 - [x] The two documents and the workflows agree.
 - [x] Required quality gates pass with evidence recorded below.
@@ -118,7 +118,14 @@ Local, on branch `codex/ttw-170-align-playwright-gates` (worktree from `main` at
 - `pnpm playwright:validate` → `Playwright manifest validation passed.`
 - `actionlint`: not installed on this machine, so not run. The `concurrency` group uses only the standard `github.workflow` and `github.ref` contexts.
 
-Not run: the CI proof (acceptance criterion 2). The owner asked this session not to push. Procedure, to run when a push is allowed, without breaking `main`:
+CI proof (acceptance criterion 2), run on 2026-11-07 after the owner allowed the push, on the throwaway branch `codex/ttw-170-gate-proof` (branched from this ticket branch, so it runs the new workflow file). Pushing that branch started no workflow (`gh run list --branch codex/ttw-170-gate-proof` was empty before the dispatch).
+
+- Red: run [42395749602](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42395749602), `workflow_dispatch`, with the home heading assertion of `tests/e2e/web/marketing-navigation.comprehensive.spec.ts` broken on purpose. Conclusion `failure` at "Run Playwright comprehensive suite": `3 failed` (the same test at the three viewports, `expect(locator).toBeVisible() failed` on the broken heading), `3 skipped`, `109 passed`. "Upload Playwright report on failure" succeeded; artefact `playwright-comprehensive-report` (24.9 MB).
+- Green: run [42396217167](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42396217167), after `git revert` of the broken commit (the branch tree is then identical to this ticket branch). Conclusion `success`: `112 passed (53.3s)`, `3 skipped`; the upload step was skipped. Run time 2 min 50 s.
+
+Still to see after the merge: the push to `main` itself must start a run with event `push` (step 5 below). The throwaway branch is still on GitHub; delete it when the owner agrees.
+
+Procedure used, kept for reference:
 
 1. From this branch, create a throwaway branch, for example `codex/ttw-170-gate-proof`, and in it make one `@comprehensive` assertion fail on purpose (for example change an expected heading in `tests/e2e/web/marketing-navigation.comprehensive.spec.ts`). Commit and push only that branch. It starts no `ci.yml` run, because `ci.yml` only runs on `main` and `develop`.
 2. `gh workflow run playwright-comprehensive.yml --ref codex/ttw-170-gate-proof`, then `gh run watch`. Expected: the run fails at "Run Playwright comprehensive suite" and the `playwright-comprehensive-report` artefact is uploaded.
@@ -139,5 +146,6 @@ Deviations from the plan: the job timeout was lowered and two more documents wer
 
 Remaining:
 
-- Acceptance criterion 2: the CI proof above, which needs a push.
+- See the push trigger fire on the first push to `main` after the merge, then mark the ticket Complete and tick it in `ROADMAP.md`.
+- Delete the throwaway branch `codex/ttw-170-gate-proof` once the owner agrees.
 - Wiring the browser matrix into CI is not done: TTW-176 (created at the owner's request on 2026-11-07).
