@@ -12,7 +12,7 @@ This policy governs browser acceptance scope, execution tiers, accessibility exc
 | --------------- | ----------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
 | Smoke           | Desktop Chromium                          | Every push to `main` or `develop`, and any PR to them    | CI: `ci.yml`, job `playwright-smoke`                               |
 | Comprehensive   | Desktop Chromium × viewport matrix        | Every push to `main`, nightly (cron 02:00 UTC), manually | CI: `playwright-comprehensive.yml`                                 |
-| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Before a release, by hand                                | Not in CI: no workflow runs `test:e2e:matrix`                      |
+| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Before a release, by hand                                | Not in CI: no workflow runs `test:e2e:matrix` (TTW-176)            |
 | Mobile critical | Mobile Chromium (Pixel 5 profile)         | Before a release, by hand                                | Not in CI: part of `test:e2e:matrix`                               |
 | Accessibility   | Desktop Chromium + axe-core               | With comprehensive                                       | CI: `playwright-comprehensive.yml` (`chromium-a11y` project)       |
 | Visual          | Desktop Chromium + mobile Chromium (home) | Before a release, by hand                                | Not in CI: local `test:e2e:visual`, also part of `test:e2e:matrix` |

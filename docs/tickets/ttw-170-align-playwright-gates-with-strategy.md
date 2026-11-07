@@ -74,6 +74,7 @@ Add the `push` trigger on `main` to the comprehensive workflow, then make the st
 - Writing or changing specs.
 - Running CI on pushes of ticket branches, which would give a result before the merge into `main`. It is a separate decision and needs its own ticket if wanted.
 - Tightening the TTW-165 journey → TTW-169.
+- Running the browser matrix in CI → TTW-176.
 
 ## Design review
 
@@ -83,7 +84,7 @@ Design (2026-11-07, implementing session):
 - **Concurrency.** A `concurrency` block keyed on the workflow name and the ref, with `cancel-in-progress: true`. A second push to `main` cancels the run still in progress for the older commit. The newer commit contains the older one, so its run still covers it. A nightly run on `main` shares the group and can be cancelled by a push the same way; the push run tests the same or newer code. Runs on different refs (a manual dispatch on a throwaway branch) do not cancel each other.
 - **Timeouts.** The job keeps a job-level timeout (90 minutes, lowered to 30 after the independent review, finding 3). The Playwright step gets its own `timeout-minutes: 20`: the last runs took 66 s in that step, and the setup, build and browser install steps stay under the job limit. This follows TTW-080 (every new step has a timeout).
 - **Reports.** The existing `if: failure()` upload of `playwright-report/` and `test-results/` is unchanged.
-- **Browser matrix.** Not wired in this ticket. `test:e2e:matrix` adds Firefox, WebKit, mobile and visual projects; the visual baselines and the extra browsers have never run in CI, so turning them on is its own piece of work with its own failure modes. Both documents mark the matrix as not running in CI. A follow-up ticket is proposed to the owner, not created here.
+- **Browser matrix.** Not wired in this ticket. `test:e2e:matrix` adds Firefox, WebKit, mobile and visual projects; the visual baselines and the extra browsers have never run in CI, so turning them on is its own piece of work with its own failure modes. Both documents mark the matrix as not running in CI. A follow-up ticket is proposed to the owner, not created here. The owner asked for it on 2026-11-07: TTW-176.
 - **Documents.** `docs/16-playwright-regression-strategy.md` and `docs/playwright/ttw-053-interim-policy.md` describe the gates as they run: smoke on every push, ticket acceptance run locally before the merge with the evidence in the ticket, `@comprehensive` on every push to `main` plus nightly, matrix not in CI. The strategy's tag list gains `@comprehensive`. The interim policy stops claiming it is "aligned with" the strategy where it is not.
 - **Proof.** A failing then passing CI run needs a pushed throwaway branch and `gh workflow run --ref <branch>`. The owner asked this session not to push, so that criterion stays open with the procedure written below.
 - **Parallel work.** TTW-081 runs at the same time in another worktree. The two tickets share no code. Both would tick a row in `docs/tickets/ROADMAP.md` on adjacent lines, so this branch leaves `ROADMAP.md` alone; the box is ticked when the branch is merged.
@@ -139,4 +140,4 @@ Deviations from the plan: the job timeout was lowered and two more documents wer
 Remaining:
 
 - Acceptance criterion 2: the CI proof above, which needs a push.
-- Wiring the browser matrix into CI is not done. It needs its own ticket (Firefox/WebKit installs, Linux visual baselines, a nightly schedule), proposed to the owner and not created here.
+- Wiring the browser matrix into CI is not done: TTW-176 (created at the owner's request on 2026-11-07).

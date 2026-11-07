@@ -40,6 +40,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-168](ttw-168-report-failed-admin-product-saves.md)          | P2       | Low      | Scoped      | Tell admins when a change on the product page fails                                      | Not in review |
 | [TTW-169](ttw-169-tighten-image-variant-journey.md)              | P2       | Low      | Scoped      | Tighten the image variant journey and remove its dead placeholder                        | Not in review |
 | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)       | P2       | Standard | In progress | Align the Playwright CI gates with the written strategy                                  | Not in review |
+| [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                   | P2       | Standard | Scoped      | Run the Playwright browser matrix (Firefox, WebKit, mobile, visual) in CI                | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
