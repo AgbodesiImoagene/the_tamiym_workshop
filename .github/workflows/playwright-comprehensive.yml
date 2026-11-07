@@ -1,15 +1,26 @@
 name: Playwright Comprehensive
 
 on:
+  # TTW-170: every push to main runs the full @comprehensive suite (the
+  # "main regression" gate), on top of the nightly run and manual dispatch.
+  push:
+    branches: [main]
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
+
+# One run per ref at a time. A newer push to main cancels the run still in
+# progress for the older commit; the newer commit contains it, so its run
+# covers both. A cancelled run is neither a pass nor a failure.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   playwright-comprehensive:
     name: Playwright Comprehensive UAT
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -85,6 +96,7 @@ jobs:
       - name: Production build
         run: pnpm build
       - name: Run Playwright comprehensive suite
+        timeout-minutes: 20
         run: pnpm test:e2e:comprehensive
       - name: Upload Playwright report on failure
         if: failure()

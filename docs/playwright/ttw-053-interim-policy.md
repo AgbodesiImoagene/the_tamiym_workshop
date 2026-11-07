@@ -8,26 +8,26 @@ This policy governs browser acceptance scope, execution tiers, accessibility exc
 
 ## Supported browser matrix (v1 interim)
 
-| Tier            | Browsers / profiles                       | When                        | CI job                          |
-| --------------- | ----------------------------------------- | --------------------------- | ------------------------------- |
-| PR smoke        | Desktop Chromium                          | Every PR                    | `playwright-smoke`              |
-| Comprehensive   | Desktop Chromium × viewport matrix        | Nightly / manual            | `playwright-comprehensive`      |
-| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Nightly / release candidate | `test:e2e:matrix`               |
-| Mobile critical | Mobile Chromium (Pixel 5 profile)         | Nightly / release candidate | `test:e2e:matrix`               |
-| Accessibility   | Desktop Chromium + axe-core               | Nightly / comprehensive     | `test:e2e:comprehensive` / a11y |
-| Visual          | Desktop Chromium + mobile Chromium (home) | Nightly / release candidate | Local `test:e2e:visual`         |
-| Staging UAT     | Production builds on ephemeral validation | Release candidate only      | Slice 2 — TTW-068               |
+| Tier            | Browsers / profiles                       | When                                                     | Where it runs                                                      |
+| --------------- | ----------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| Smoke           | Desktop Chromium                          | Every push to `main` or `develop`, and any PR to them    | CI: `ci.yml`, job `playwright-smoke`                               |
+| Comprehensive   | Desktop Chromium × viewport matrix        | Every push to `main`, nightly (cron 02:00 UTC), manually | CI: `playwright-comprehensive.yml`                                 |
+| Full matrix     | Chromium, Firefox, WebKit (desktop web)   | Before a release, by hand                                | Not in CI: no workflow runs `test:e2e:matrix`                      |
+| Mobile critical | Mobile Chromium (Pixel 5 profile)         | Before a release, by hand                                | Not in CI: part of `test:e2e:matrix`                               |
+| Accessibility   | Desktop Chromium + axe-core               | With comprehensive                                       | CI: `playwright-comprehensive.yml` (`chromium-a11y` project)       |
+| Visual          | Desktop Chromium + mobile Chromium (home) | Before a release, by hand                                | Not in CI: local `test:e2e:visual`, also part of `test:e2e:matrix` |
+| Staging UAT     | Production builds on ephemeral validation | Release candidate only                                   | Not started: slice 2 on the TTW-068 temporary environment          |
 
-**Intentional capability differences:** Mobile WebKit (Safari) is required before release but not on every PR. Admin MFA TOTP flows run on Chromium smoke only until cross-browser MFA fixtures are proven stable.
+**Intentional capability differences:** Mobile WebKit (Safari) is required before release; no Playwright project runs it yet. Admin MFA TOTP flows run on Chromium smoke only until cross-browser MFA fixtures are proven stable.
 
 ## Execution tiers
 
-Aligned with `docs/16-playwright-regression-strategy.md`:
+These tiers match the execution tiers in `docs/16-playwright-regression-strategy.md` (TTW-170). The project opens no pull requests: a ticket branch is merged locally into `main` and `main` is pushed, which starts CI.
 
-1. **Smoke (`pnpm test:e2e:smoke`)** — Chromium, all three apps, health/auth/navigation, critical journeys. Target under 10 minutes on CI.
-2. **Comprehensive (`pnpm test:e2e:comprehensive`)** — Viewport matrix (1440 / 834 / 393) across web, app, and admin surfaces; exercises navigation, forms, controls, and representative axe scans. Runs nightly via `.github/workflows/playwright-comprehensive.yml`; not on every PR.
-3. **Matrix (`pnpm test:e2e:matrix`)** — Adds Firefox, WebKit, mobile Chromium, accessibility and visual projects.
-4. **Staging UAT (slice 2)** — Immutable production-build identifiers on TTW-068 ephemeral environment; one controlled transaction lifecycle with reconciliation and cleanup.
+1. **Smoke (`pnpm test:e2e:smoke`)** — Chromium, all three apps, health/auth/navigation, and the cross-surface journeys in `tests/e2e/journeys/`. Target under 10 minutes on CI. Runs on every push to `main`.
+2. **Comprehensive (`pnpm test:e2e:comprehensive`)** — Every `@comprehensive` spec in the Chromium web, app, admin and accessibility projects, with the viewport matrix (1440 / 834 / 393) where a spec uses it; exercises navigation, forms, controls, and representative axe scans. It does not select the journeys project. Runs via `.github/workflows/playwright-comprehensive.yml` on every push to `main`, nightly, and on manual dispatch. It is not a merge blocker: it starts after the push, so a failure means `main` is already broken and is fixed straight away. A newer push to `main` cancels the run still in progress for the older commit (shown as "cancelled", neither pass nor failure); the newer run covers both commits, so after two quick pushes the first has no result of its own. A push can also cancel the nightly run or a manual run on `main`; a manual run on another branch is not affected.
+3. **Matrix (`pnpm test:e2e:matrix`)** — Adds Firefox, WebKit, mobile Chromium, accessibility and visual projects. Not run in CI; run by hand before a release.
+4. **Staging UAT (slice 2, not started)** — Immutable production-build identifiers on TTW-068 ephemeral environment; one controlled transaction lifecycle with reconciliation and cleanup.
 
 ## Manifest coverage rules
 
