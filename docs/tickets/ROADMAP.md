@@ -27,7 +27,7 @@ Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
 
 | Phase | But                                      | Tickets | Heures (Excel)             |
 | ----- | ---------------------------------------- | ------- | -------------------------- |
-| 0     | Fiabiliser la base et la CI              | 6       | hors Excel                 |
+| 0     | Fiabiliser la base et la CI              | 7       | hors Excel                 |
 | 1     | Fermer les failles sécurité et argent    | 7       | 20–35 h                    |
 | 2     | Comptes et achat d'un produit            | 10      | 73–122 h                   |
 | 3     | Commander son design et l'imprimer       | 8       | 108–171 h                  |
@@ -88,14 +88,15 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 0 : Fiabiliser la base et la CI
 
-| Fait | N°  | Ticket                                                        | Lot | Travail                                                           | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------- | --- | ----------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                    | —     | Élevé    | —      | —      |
-| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —      |
-| [ ]  | 1   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0A  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
-| [ ]  | 2   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —      |
+| Fait | N°  | Ticket                                                        | Lot | Travail                                                           | Excel | Risque   | Heures | Attend                     |
+| ---- | --- | ------------------------------------------------------------- | --- | ----------------------------------------------------------------- | ----- | -------- | ------ | -------------------------- |
+| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                    | —     | Élevé    | —      | —                          |
+| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —                          |
+| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —                          |
+| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —                          |
+| [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —                          |
+| [ ]  | 1   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0A  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —                          |
+| [ ]  | 2   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI              | —     | Standard | —      | Décision : quand la lancer |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 

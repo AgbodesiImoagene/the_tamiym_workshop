@@ -1,7 +1,7 @@
 # TTW-170 — Align the Playwright CI gates with the written strategy
 
 **Epic:** 0 — Trustworthy delivery system\
-**Status:** In progress (CI proof done; push trigger to be seen after the merge)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
@@ -123,7 +123,7 @@ CI proof (acceptance criterion 2), run on 2026-11-07 after the owner allowed the
 - Red: run [42395749602](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42395749602), `workflow_dispatch`, with the home heading assertion of `tests/e2e/web/marketing-navigation.comprehensive.spec.ts` broken on purpose. Conclusion `failure` at "Run Playwright comprehensive suite": `3 failed` (the same test at the three viewports, `expect(locator).toBeVisible() failed` on the broken heading), `3 skipped`, `109 passed`. "Upload Playwright report on failure" succeeded; artefact `playwright-comprehensive-report` (24.9 MB).
 - Green: run [42396217167](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42396217167), after `git revert` of the broken commit (the branch tree is then identical to this ticket branch). Conclusion `success`: `112 passed (53.3s)`, `3 skipped`; the upload step was skipped. Run time 2 min 50 s.
 
-Still to see after the merge: the push to `main` itself must start a run with event `push` (step 5 below). The throwaway branch is still on GitHub; delete it when the owner agrees.
+After the merge (owner request, 2026-11-07): `main` pushed as `740945a`. The push started run [42397690538](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42397690538), "Playwright Comprehensive", event `push`, conclusion `success` (2 min 51 s), next to CI run [42397690527](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/42397690527), conclusion `success` for all 20 jobs, Playwright Smoke included. The throwaway branch `codex/ttw-170-gate-proof` was deleted on GitHub and locally at the owner's request.
 
 Procedure used, kept for reference:
 
@@ -135,17 +135,15 @@ Procedure used, kept for reference:
 
 ## Completion summary
 
-**Partial** (taxonomy in `docs/README.md`). Implemented on the ticket branch, committed locally, not pushed:
+**Complete.** Merged into `main` (`740945a`) and pushed at the owner's request; the push started the comprehensive suite and both runs passed (see evidence).
 
 - `.github/workflows/playwright-comprehensive.yml`: `push` trigger on `main`, a `concurrency` group per ref with `cancel-in-progress: true`, job timeout 90 → 30 minutes, a 20-minute timeout on the Playwright step. The failure report upload is unchanged. `ci.yml` is unchanged, so smoke still runs on every push.
 - `docs/16-playwright-regression-strategy.md`: the execution tiers describe the push flow, with a status per gate; the matrix and the staging gates are marked not started in CI; `@comprehensive` added to the tags.
 - `docs/playwright/ttw-053-interim-policy.md`: the browser matrix table and the tiers match the workflows; the false "Aligned with" line is gone; the cancellation effects are written down.
 - `docs/12-testing-strategy.md` and `tests/e2e/README.md`: their one-line descriptions of the gates now match (found by the design review).
 
-Deviations from the plan: the job timeout was lowered and two more documents were corrected, both after the independent design review. `docs/tickets/ROADMAP.md` is left unchanged on this branch to avoid a conflict with TTW-081 (adjacent rows); tick TTW-170 there when merging.
+Deviations from the plan: the job timeout was lowered and two more documents were corrected, both after the independent design review. `docs/tickets/ROADMAP.md` was left unchanged on the ticket branch to avoid a conflict with TTW-081 (adjacent rows); TTW-170 is ticked and TTW-176 added there in a closing commit after the merge.
 
-Remaining:
+Follow-up:
 
-- See the push trigger fire on the first push to `main` after the merge, then mark the ticket Complete and tick it in `ROADMAP.md`.
-- Delete the throwaway branch `codex/ttw-170-gate-proof` once the owner agrees.
 - Wiring the browser matrix into CI is not done: TTW-176 (created at the owner's request on 2026-11-07).
