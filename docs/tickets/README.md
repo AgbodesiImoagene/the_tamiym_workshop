@@ -22,24 +22,25 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 
 ## Epic 0 — Trustworthy delivery system
 
-| Ticket                                                           | Priority | Risk     | State    | Outcome                                                                                  | Review        |
-| ---------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- | ------------- |
-| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete | Align local/CI Node and pnpm contracts with Next 16 requirements                         | —             |
-| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
-| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
-| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
-| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Complete | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
-| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
-| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Complete | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
-| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | Complete | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
-| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | Complete | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
-| [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | Complete | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
-| [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Complete | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
-| [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)     | P1       | Low      | Complete | Stop the format check failing on generated files so `pnpm verify` runs in full           | Not in review |
-| [TTW-165](ttw-165-fix-image-variant-select-crash.md)             | P1       | Low      | Complete | Stop the admin product page crashing on products with images                             | Not in review |
-| [TTW-168](ttw-168-report-failed-admin-product-saves.md)          | P2       | Low      | Scoped   | Tell admins when a change on the product page fails                                      | Not in review |
-| [TTW-169](ttw-169-tighten-image-variant-journey.md)              | P2       | Low      | Scoped   | Tighten the image variant journey and remove its dead placeholder                        | Not in review |
-| [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)       | P2       | Standard | Scoped   | Align the Playwright CI gates with the written strategy                                  | Not in review |
+| Ticket                                                           | Priority | Risk     | State       | Outcome                                                                                  | Review        |
+| ---------------------------------------------------------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- | ------------- |
+| [TTW-001](ttw-001-align-supported-node-runtime.md)               | P0       | Standard | Complete    | Align local/CI Node and pnpm contracts with Next 16 requirements                         | —             |
+| [TTW-002](ttw-002-restore-quality-gates.md)                      | P0       | Standard | Complete    | Restore lint, formatting and coverage gates with an explicit debt ratchet                | —             |
+| [TTW-003](ttw-003-repair-api-integration-harness.md)             | P0       | High     | Complete    | Run real API E2E tests deterministically with PostgreSQL/Redis and clean shutdown        | —             |
+| [TTW-004](ttw-004-establish-playwright-foundation.md)            | P0       | High     | Complete    | Establish multi-app Playwright infrastructure, fixtures, provider simulator and smoke CI | —             |
+| [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)    | P1       | High     | Complete    | Reconcile the Prisma schema with migrations and guard against drift                      | Not in review |
+| [TTW-006](ttw-006-fix-release-candidate-workflow-syntax.md)      | P1       | Low      | Complete    | Fix the invalid YAML that stops the release-candidate workflow                           | —             |
+| [TTW-007](ttw-007-upgrade-vulnerable-production-dependencies.md) | P0       | High     | Complete    | Upgrade vulnerable production dependencies so the audit gate passes                      | Not in review |
+| [TTW-008](ttw-008-regenerate-shared-enums-and-gate-drift.md)     | P1       | Low      | Complete    | Regenerate the shared enums and fail CI when they drift from the Prisma schema           | Not in review |
+| [TTW-009](ttw-009-upgrade-eslint-config-next.md)                 | P2       | Standard | Complete    | Upgrade eslint-config-next to match next 16.4 and fix the new React hooks lint errors    | Not in review |
+| [TTW-079](ttw-079-unique-refund-e2e-provider-ids.md)             | P0       | Low      | Complete    | Give refund e2e tests unique Paystack refund ids so API Integration stops flaking        | Not in review |
+| [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)           | P2       | Low      | Complete    | Make the open-handle proof kill its whole process tree and fail fast on timeout          | Not in review |
+| [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)     | P1       | Low      | Complete    | Stop the format check failing on generated files so `pnpm verify` runs in full           | Not in review |
+| [TTW-165](ttw-165-fix-image-variant-select-crash.md)             | P1       | Low      | Complete    | Stop the admin product page crashing on products with images                             | Not in review |
+| [TTW-168](ttw-168-report-failed-admin-product-saves.md)          | P2       | Low      | Scoped      | Tell admins when a change on the product page fails                                      | Not in review |
+| [TTW-169](ttw-169-tighten-image-variant-journey.md)              | P2       | Low      | Scoped      | Tighten the image variant journey and remove its dead placeholder                        | Not in review |
+| [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)       | P2       | Standard | In progress | Align the Playwright CI gates with the written strategy                                  | Not in review |
+| [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                   | P2       | Standard | Scoped      | Run the Playwright browser matrix (Firefox, WebKit, mobile, visual) in CI                | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 

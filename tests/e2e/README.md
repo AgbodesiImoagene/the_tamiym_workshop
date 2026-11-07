@@ -29,7 +29,8 @@ pnpm exec playwright install chromium
 # Smoke (Chromium; starts built servers unless already running)
 pnpm test:e2e:smoke
 
-# Comprehensive UAT (viewport matrix × web/app/admin + representative a11y; not on PR smoke)
+# Comprehensive UAT (viewport matrix × web/app/admin + representative a11y).
+# CI runs it on every push to main, nightly, and on manual dispatch (playwright-comprehensive.yml).
 pnpm test:e2e:comprehensive
 
 # Full-matrix script (also selects Firefox/WebKit/mobile/a11y/visual; install browsers first)
