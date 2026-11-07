@@ -664,7 +664,134 @@ describe('RefundsService', () => {
       );
       expect(result.status).toBe(RefundStatus.SUCCEEDED);
     });
+
+    it('moves to NEEDS_ATTENTION without settling when the provider id is owned by another refund (TTW-081)', async () => {
+      const initiated = {
+        id: 'refund-1',
+        orderId: 'order-1',
+        provider: 'PAYSTACK',
+        status: RefundStatus.INITIATED,
+        amount: 5000,
+        providerRef: null,
+        transactionReference: 'txn_123',
+        payment: mockPayment,
+        updatedAt: new Date(),
+      };
+      mockReserveSuccess(initiated);
+      paystackRefundClient.createRefund.mockResolvedValue({
+        providerRefundId: '991',
+        providerStatus: 'processed',
+        refundReference: null,
+        transactionReference: 'txn_123',
+        amountKobo: 500_000,
+        currency: 'NGN',
+      });
+      // Only the provider-id write breaks the constraint (the stale-claim sweep
+      // runs updateMany first).
+      prisma.refund.updateMany.mockImplementation(
+        (args: { data: { providerRef?: string | null } }) =>
+          args.data.providerRef === '991'
+            ? Promise.reject(uniqueViolation())
+            : Promise.resolve({ count: 1 }),
+      );
+      prisma.refund.findFirst.mockResolvedValue({ id: 'refund-owner' });
+      prisma.refund.findUniqueOrThrow.mockResolvedValue({
+        ...initiated,
+        status: RefundStatus.NEEDS_ATTENTION,
+      });
+
+      const result = await service.initiateRefund(
+        'order-1',
+        5000,
+        RefundReasonCode.ADMIN_GOODWILL,
+        'reused id',
+        'admin-1',
+      );
+
+      expect(result.status).toBe(RefundStatus.NEEDS_ATTENTION);
+      expect(prisma.refund.updateMany).toHaveBeenLastCalledWith({
+        where: {
+          id: 'refund-1',
+          status: RefundStatus.INITIATED,
+          providerRef: 'driving:refund-1',
+        },
+        data: { status: RefundStatus.NEEDS_ATTENTION, providerRef: null },
+      });
+      expect(prisma.refund.findFirst).toHaveBeenCalledWith({
+        where: {
+          provider: 'PAYSTACK',
+          providerRef: '991',
+          NOT: { id: 'refund-1' },
+        },
+        select: { id: true },
+      });
+      expectConflictAudit('refund-1', 'refund-owner', '991');
+      expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
+        'rejected',
+      );
+      // Reserve + drive claim only: no settlement transaction.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(campaignLedger.createRefundApplied).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a non-unique error from the provider id write', async () => {
+      const initiated = {
+        id: 'refund-1',
+        orderId: 'order-1',
+        status: RefundStatus.INITIATED,
+        amount: 5000,
+        providerRef: null,
+        transactionReference: 'txn_123',
+        payment: mockPayment,
+      };
+      mockReserveSuccess(initiated);
+      prisma.refund.updateMany.mockImplementation(
+        (args: { data: { providerRef?: string | null } }) =>
+          args.data.providerRef === '991'
+            ? Promise.reject(new Error('db down'))
+            : Promise.resolve({ count: 1 }),
+      );
+
+      await expect(
+        service.initiateRefund(
+          'order-1',
+          5000,
+          RefundReasonCode.ADMIN_GOODWILL,
+        ),
+      ).rejects.toThrow('db down');
+      expect(paystackRefundClient.createRefund).toHaveBeenCalledTimes(1);
+      expect(prisma.refund.findFirst).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
   });
+
+  function uniqueViolation() {
+    return new Prisma.PrismaClientKnownRequestError('Unique', {
+      code: 'P2002',
+      clientVersion: 'test',
+    });
+  }
+
+  function expectConflictAudit(
+    refundId: string,
+    ownerId: string | null,
+    providerRef: string,
+  ) {
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'refund.provider_ref_conflict',
+        entityType: 'Refund',
+        entityId: refundId,
+        targetType: 'Refund',
+        targetId: ownerId,
+        outcome: 'FAILURE',
+        after: {
+          status: RefundStatus.NEEDS_ATTENTION,
+          conflictingProviderRef: providerRef,
+        },
+      }),
+    );
+  }
 
   describe('applyRefundWebhookEvent', () => {
     const baseRefund = {
@@ -917,6 +1044,167 @@ describe('RefundsService', () => {
         data: {},
       });
       expect(ok).toBe(false);
+    });
+
+    describe('provider id already owned by another refund (TTW-081)', () => {
+      it.each([
+        ['refund.processing', 'processing'],
+        ['refund.needs-attention', 'needs-attention'],
+        ['refund.failed', 'failed'],
+      ])(
+        '%s flags the matched refund instead of throwing',
+        async (event, status) => {
+          prisma.refund.findFirst
+            .mockResolvedValueOnce({ ...baseRefund, providerRef: null })
+            .mockResolvedValueOnce({ id: 'refund-owner' });
+          prisma.refund.updateMany
+            .mockRejectedValueOnce(uniqueViolation())
+            .mockResolvedValueOnce({ count: 1 });
+
+          const ok = await service.applyRefundWebhookEvent({
+            event,
+            data: { id: 991, status },
+          });
+
+          expect(ok).toBe(true);
+          expect(prisma.refund.updateMany).toHaveBeenLastCalledWith({
+            where: {
+              id: 'refund-1',
+              status: {
+                in: expect.arrayContaining([RefundStatus.PROCESSING]),
+              },
+            },
+            data: { status: RefundStatus.NEEDS_ATTENTION },
+          });
+          expectConflictAudit('refund-1', 'refund-owner', '991');
+          expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
+            'rejected',
+          );
+          expect(observability.recordRefundSettlement).not.toHaveBeenCalledWith(
+            'status_updated',
+          );
+        },
+      );
+
+      it.each([
+        ['amount', { amount: 100, currency: 'NGN' }],
+        ['currency', { amount: 500000, currency: 'USD' }],
+      ])(
+        'keeps the %s mismatch in NEEDS_ATTENTION without taking the id',
+        async (_label, mismatch) => {
+          prisma.refund.findFirst
+            .mockResolvedValueOnce({ ...baseRefund, providerRef: null })
+            .mockResolvedValueOnce({ id: 'refund-owner' });
+          prisma.refund.updateMany
+            .mockRejectedValueOnce(uniqueViolation())
+            .mockResolvedValueOnce({ count: 1 });
+
+          const ok = await service.applyRefundWebhookEvent({
+            event: 'refund.processed',
+            data: { id: 991, status: 'processed', ...mismatch },
+          });
+
+          expect(ok).toBe(true);
+          expect(prisma.$transaction).not.toHaveBeenCalled();
+          expect(prisma.refund.updateMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              data: { status: RefundStatus.NEEDS_ATTENTION },
+            }),
+          );
+          expectConflictAudit('refund-1', 'refund-owner', '991');
+          expect(
+            observability.recordRefundSettlement.mock.calls.filter(
+              ([o]) => o === 'rejected',
+            ),
+          ).toHaveLength(1);
+        },
+      );
+
+      it('flags instead of reporting a duplicate when settlement hits the provider id constraint', async () => {
+        prisma.refund.findFirst
+          .mockResolvedValueOnce({ ...baseRefund, providerRef: null })
+          .mockResolvedValueOnce({ id: 'refund-owner' });
+        prisma.$transaction.mockRejectedValue(uniqueViolation());
+        prisma.refundSettlementClaim.findUnique.mockResolvedValue(null);
+        prisma.refund.updateMany.mockResolvedValue({ count: 1 });
+
+        const ok = await service.applyRefundWebhookEvent({
+          event: 'refund.processed',
+          data: {
+            id: 991,
+            status: 'processed',
+            amount: 500000,
+            currency: 'NGN',
+          },
+        });
+
+        expect(ok).toBe(true);
+        expect(prisma.refund.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: 'refund-1',
+            status: {
+              in: expect.arrayContaining([
+                RefundStatus.PROCESSING,
+                RefundStatus.FAILED,
+              ]),
+            },
+          },
+          data: { status: RefundStatus.NEEDS_ATTENTION },
+        });
+        expectConflictAudit('refund-1', 'refund-owner', '991');
+        expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
+          'rejected',
+        );
+        expect(observability.recordRefundSettlement).not.toHaveBeenCalledWith(
+          'duplicate',
+        );
+        expect(adminNotify.emit).not.toHaveBeenCalled();
+      });
+
+      it('keeps the old rejection when settlement fails on a unique error with no claim and no other owner', async () => {
+        prisma.refund.findFirst
+          .mockResolvedValueOnce(baseRefund)
+          .mockResolvedValueOnce(null);
+        prisma.$transaction.mockRejectedValue(uniqueViolation());
+        prisma.refundSettlementClaim.findUnique.mockResolvedValue(null);
+
+        const ok = await service.applyRefundWebhookEvent({
+          event: 'refund.processed',
+          data: {
+            id: 991,
+            status: 'processed',
+            amount: 500000,
+            currency: 'NGN',
+          },
+        });
+
+        expect(ok).toBe(true);
+        expect(prisma.refund.updateMany).not.toHaveBeenCalled();
+        expect(audit.log).not.toHaveBeenCalled();
+        expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
+          'rejected',
+        );
+      });
+
+      it('does not audit when the refund already left the guarded statuses', async () => {
+        prisma.refund.findFirst
+          .mockResolvedValueOnce({ ...baseRefund, providerRef: null })
+          .mockResolvedValueOnce(null);
+        prisma.refund.updateMany
+          .mockRejectedValueOnce(uniqueViolation())
+          .mockResolvedValueOnce({ count: 0 });
+
+        const ok = await service.applyRefundWebhookEvent({
+          event: 'refund.processing',
+          data: { id: 991, status: 'processing' },
+        });
+
+        expect(ok).toBe(true);
+        expect(audit.log).not.toHaveBeenCalled();
+        expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
+          'rejected',
+        );
+      });
     });
 
     it('returns false when refund.failed cannot be matched', async () => {

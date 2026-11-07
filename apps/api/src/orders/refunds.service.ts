@@ -15,6 +15,7 @@ import {
   PaymentStatus,
   NotificationChannel,
   AuditAction,
+  AuditOutcome,
   AuditSource,
   ShipmentDirection,
   ShipmentStatus,
@@ -59,6 +60,9 @@ const IN_FLIGHT: ReadonlySet<RefundStatus> = new Set([
   RefundStatus.PROCESSING,
   RefundStatus.NEEDS_ATTENTION,
 ]);
+
+/** Audit event when a provider refund id already belongs to another refund (TTW-081). */
+const PROVIDER_REF_CONFLICT_EVENT = 'refund.provider_ref_conflict';
 
 /** Stale INITIATED without providerRef may be re-driven (TTW-013). */
 const STALE_INITIATED_MS = 45_000;
@@ -516,12 +520,14 @@ export class RefundsService {
       const nextStatus = providerStatusToRefundStatus(
         providerResult.providerStatus,
       );
-      const updated = await this.prisma.refund.updateMany({
-        where: {
-          id: refund.id,
-          status: RefundStatus.INITIATED,
-          providerRef: `driving:${refund.id}`,
-        },
+      const drivingGuard = {
+        status: RefundStatus.INITIATED,
+        providerRef: `driving:${refund.id}`,
+      };
+      const updated = await this.updateRefundOrFlagConflict({
+        refund,
+        providerRef: providerResult.providerRefundId,
+        guard: drivingGuard,
         data: {
           providerRef: providerResult.providerRefundId,
           transactionReference: providerResult.transactionReference,
@@ -532,7 +538,17 @@ export class RefundsService {
                 ? RefundStatus.FAILED
                 : nextStatus,
         },
+        // Release the in-flight placeholder; the same idempotency key can re-drive.
+        onConflictData: { providerRef: null },
+        actorUserId,
       });
+      if (updated.conflict) {
+        this.observability.recordRefund({ outcome: 'failure' });
+        this.observability.recordRefundSettlement('rejected');
+        return this.prisma.refund.findUniqueOrThrow({
+          where: { id: refund.id },
+        });
+      }
       if (updated.count !== 1) {
         return this.prisma.refund.findUniqueOrThrow({
           where: { id: refund.id },
@@ -727,24 +743,29 @@ export class RefundsService {
         ? RefundStatus.NEEDS_ATTENTION
         : RefundStatus.PROCESSING;
 
-    const updated = await this.prisma.refund.updateMany({
-      where: {
-        id: refund.id,
-        status: { in: [...IN_FLIGHT] },
-      },
+    const providerRef =
+      payload.data.id != null
+        ? String(payload.data.id)
+        : payload.data.refund_reference
+          ? String(payload.data.refund_reference)
+          : undefined;
+    const updated = await this.updateRefundOrFlagConflict({
+      refund,
+      providerRef,
+      guard: { status: { in: [...IN_FLIGHT] } },
       data: {
         status: next,
-        providerRef:
-          payload.data.id != null
-            ? String(payload.data.id)
-            : payload.data.refund_reference
-              ? String(payload.data.refund_reference)
-              : undefined,
+        providerRef,
         transactionReference: payload.data.transaction_reference ?? undefined,
       },
+      source: AuditSource.WEBHOOK,
     });
     this.observability.recordRefundSettlement(
-      updated.count === 1 ? 'status_updated' : 'stale',
+      updated.conflict
+        ? 'rejected'
+        : updated.count === 1
+          ? 'status_updated'
+          : 'stale',
     );
     return true;
   }
@@ -769,21 +790,19 @@ export class RefundsService {
       return true;
     }
 
-    const updated = await this.prisma.refund.updateMany({
-      where: {
-        id: refund.id,
-        status: { in: [...IN_FLIGHT] },
-      },
-      data: {
-        status: RefundStatus.FAILED,
-        providerRef:
-          payload.data.id != null
-            ? String(payload.data.id)
-            : (refund.providerRef ?? undefined),
-      },
+    const providerRef =
+      payload.data.id != null
+        ? String(payload.data.id)
+        : (refund.providerRef ?? undefined);
+    const updated = await this.updateRefundOrFlagConflict({
+      refund,
+      providerRef,
+      guard: { status: { in: [...IN_FLIGHT] } },
+      data: { status: RefundStatus.FAILED, providerRef },
+      source: AuditSource.WEBHOOK,
     });
     this.observability.recordRefundSettlement(
-      updated.count === 1 ? 'failed' : 'stale',
+      updated.conflict ? 'rejected' : updated.count === 1 ? 'failed' : 'stale',
     );
     return true;
   }
@@ -821,12 +840,12 @@ export class RefundsService {
       this.logger.error(
         `refund.processed amount mismatch for ${refund.id}: local=${amount} providerMajor=${providerMajor}`,
       );
-      await this.prisma.refund.updateMany({
-        where: {
-          id: refund.id,
-          status: { in: [...IN_FLIGHT, RefundStatus.FAILED] },
-        },
+      await this.updateRefundOrFlagConflict({
+        refund,
+        providerRef,
+        guard: { status: { in: [...IN_FLIGHT, RefundStatus.FAILED] } },
         data: { status: RefundStatus.NEEDS_ATTENTION, providerRef },
+        source: AuditSource.WEBHOOK,
       });
       this.observability.recordRefundSettlement('rejected');
       await this.adminNotify.emit(ADMIN_NOTIF_REFUND_COMPLETED, {
@@ -845,12 +864,12 @@ export class RefundsService {
       this.logger.error(
         `refund.processed currency mismatch for ${refund.id}: local=${order.currency} provider=${payload.data.currency}`,
       );
-      await this.prisma.refund.updateMany({
-        where: {
-          id: refund.id,
-          status: { in: [...IN_FLIGHT, RefundStatus.FAILED] },
-        },
+      await this.updateRefundOrFlagConflict({
+        refund,
+        providerRef,
+        guard: { status: { in: [...IN_FLIGHT, RefundStatus.FAILED] } },
         data: { status: RefundStatus.NEEDS_ATTENTION, providerRef },
+        source: AuditSource.WEBHOOK,
       });
       this.observability.recordRefundSettlement('rejected');
       return true;
@@ -999,6 +1018,19 @@ export class RefundsService {
           this.observability.recordRefundSettlement('duplicate');
           return true;
         }
+        // The transaction rolled back, so no ledger entry or order change exists.
+        const owner = await this.findOtherProviderRefOwner(refund, providerRef);
+        if (owner) {
+          await this.flagProviderRefConflict({
+            refund,
+            providerRef,
+            ownerId: owner.id,
+            guard: { status: { in: [...IN_FLIGHT, RefundStatus.FAILED] } },
+            source: AuditSource.WEBHOOK,
+          });
+          this.observability.recordRefundSettlement('rejected');
+          return true;
+        }
         this.logger.error(
           `Unique constraint during refund settlement for ${refund.id} without local claim`,
         );
@@ -1023,6 +1055,107 @@ export class RefundsService {
     this.observability.recordRefund({ outcome: 'success' });
     this.observability.recordRefundSettlement('settled');
     return true;
+  }
+
+  /**
+   * Conditional refund write that may set a provider refund id. The only unique
+   * key such a write can break is `(provider, providerRef)` (TTW-081), so a
+   * unique violation means another refund already owns that id: flag this
+   * refund instead of throwing, and never touch the owner.
+   */
+  private async updateRefundOrFlagConflict(input: {
+    refund: { id: string; provider: PaymentProvider | null };
+    providerRef: string | undefined;
+    guard: Prisma.RefundWhereInput;
+    data: Prisma.RefundUpdateManyMutationInput;
+    onConflictData?: Prisma.RefundUpdateManyMutationInput;
+    actorUserId?: string | null;
+    source?: AuditSource;
+  }): Promise<{ count: number; conflict: boolean }> {
+    try {
+      const { count } = await this.prisma.refund.updateMany({
+        where: { id: input.refund.id, ...input.guard },
+        data: input.data,
+      });
+      return { count, conflict: false };
+    } catch (error) {
+      if (!isUniqueConstraintError(error) || input.providerRef == null) {
+        throw error;
+      }
+      await this.flagProviderRefConflict({
+        ...input,
+        providerRef: input.providerRef,
+      });
+      return { count: 0, conflict: true };
+    }
+  }
+
+  private findOtherProviderRefOwner(
+    refund: { id: string; provider: PaymentProvider | null },
+    providerRef: string,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.refund.findFirst({
+      where: {
+        provider: refund.provider ?? PaymentProvider.PAYSTACK,
+        providerRef,
+        NOT: { id: refund.id },
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Provider anomaly (TTW-081): the provider id belongs to another refund. Move
+   * this refund to NEEDS_ATTENTION (it still counts toward the captured-value
+   * cap) for an operator. Nothing is settled and the owner is left untouched.
+   */
+  private async flagProviderRefConflict(input: {
+    refund: { id: string; provider: PaymentProvider | null };
+    providerRef: string;
+    ownerId?: string | null;
+    guard: Prisma.RefundWhereInput;
+    onConflictData?: Prisma.RefundUpdateManyMutationInput;
+    actorUserId?: string | null;
+    source?: AuditSource;
+  }): Promise<void> {
+    const ownerId =
+      input.ownerId !== undefined
+        ? input.ownerId
+        : ((
+            await this.findOtherProviderRefOwner(
+              input.refund,
+              input.providerRef,
+            )
+          )?.id ?? null);
+    const flagged = await this.prisma.refund.updateMany({
+      where: { id: input.refund.id, ...input.guard },
+      data: { status: RefundStatus.NEEDS_ATTENTION, ...input.onConflictData },
+    });
+    this.logger.error(
+      `Paystack refund id ${input.providerRef} already belongs to refund ${ownerId ?? 'unknown'}; refund ${input.refund.id} ${
+        flagged.count === 1
+          ? 'moved to NEEDS_ATTENTION'
+          : 'left unchanged (status moved on)'
+      }; nothing settled`,
+    );
+    if (flagged.count !== 1) return;
+
+    await this.audit.log({
+      eventName: PROVIDER_REF_CONFLICT_EVENT,
+      action: AuditAction.REFUND,
+      outcome: AuditOutcome.FAILURE,
+      entityType: 'Refund',
+      entityId: input.refund.id,
+      targetType: 'Refund',
+      targetId: ownerId,
+      actorUserId: input.actorUserId ?? null,
+      after: {
+        status: RefundStatus.NEEDS_ATTENTION,
+        conflictingProviderRef: input.providerRef,
+      },
+      note: 'Provider refund id already belongs to another refund; operator review required',
+      ...(input.source ? { source: input.source } : {}),
+    });
   }
 
   /**
