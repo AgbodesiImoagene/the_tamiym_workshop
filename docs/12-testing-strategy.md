@@ -64,7 +64,7 @@ Browser acceptance (Playwright):
 - Root `playwright.config.ts` + `tests/e2e/**` cover `web` / `app` / `admin` (see `docs/16-playwright-regression-strategy.md`).
 - `pnpm test:e2e:smoke` — Chromium `@smoke` on every push to `main` (**Playwright Smoke** job in `ci.yml`); HTML report + traces uploaded on failure.
 - `pnpm test:e2e:comprehensive` — Chromium `@comprehensive` on every push to `main`, nightly and on manual dispatch (`playwright-comprehensive.yml`); report uploaded on failure.
-- `pnpm test:e2e:matrix` — full-matrix script (Firefox/WebKit web projects scaffolded). Not run in CI; run by hand before a release.
+- `pnpm test:e2e:matrix` — full-matrix script (Firefox, WebKit, mobile Chromium and mobile WebKit web projects, accessibility, visual). `.github/workflows/playwright-matrix.yml` (TTW-176) is written to run it nightly and on manual dispatch, but no CI run has been seen yet (Implemented-unverified); run it by hand before a release.
 - Role fixtures: customer, organiser, admin (storage under `tests/e2e/.auth/`, gitignored). Paystack is simulated locally — never live.
 - Cookie _name_ isolation for admin vs customer remains TTW-020; smoke still proves customer→admin UI/API denial via separate users/contexts.
 

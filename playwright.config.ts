@@ -114,7 +114,7 @@ export default defineConfig({
         baseURL: APP_URL,
       },
     },
-    // Full-matrix stubs (invoked via test:e2e:matrix; not on every PR).
+    // Full-matrix projects (test:e2e:matrix, run by playwright-matrix.yml; not on every push).
     {
       name: 'firefox-web',
       dependencies: ['setup'],
@@ -132,6 +132,13 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /web\/.*\.spec\.ts/,
       use: { ...devices['Pixel 5'], baseURL: WEB_URL },
+    },
+    {
+      // TTW-176: mobile Safari, required before release (ttw-053 interim policy).
+      name: 'mobile-webkit-web',
+      dependencies: ['setup'],
+      testMatch: /web\/.*\.spec\.ts/,
+      use: { ...devices['iPhone 13'], baseURL: WEB_URL },
     },
     {
       name: 'chromium-a11y',
