@@ -132,6 +132,10 @@ describe('env-validation', () => {
         CLAMAV_HOST: 'clamav.internal',
         DESIGN_SHARE_PUBLIC_ORIGIN: 'https://app.example.com',
         NOTIFICATION_UNSUBSCRIBE_SECRET: 'dedicated-unsubscribe-secret',
+        MAIL_HOST: 'smtp.example.com',
+        MAIL_USER: 'apikey',
+        MAIL_PASSWORD: 'a-real-mail-password',
+        MAIL_FROM: '"Tamiym" <noreply@mail.example.com>',
       };
 
       beforeEach(() => {
@@ -287,6 +291,121 @@ describe('env-validation', () => {
           AUTH_ADMIN_ORIGINS:
             'https://admin.example.com,https://admin2.example.com',
         };
+        expect(validateEnv(config)).toEqual(config);
+      });
+
+      describe('mail settings (TTW-085)', () => {
+        const mailKeys = [
+          'MAIL_HOST',
+          'MAIL_USER',
+          'MAIL_PASSWORD',
+          'MAIL_FROM',
+        ] as const;
+
+        it.each(mailKeys)('throws when %s is missing', (key) => {
+          expect(() => validateEnv(omit(validProductionConfig, key))).toThrow(
+            `Missing required production environment variable: ${key}`,
+          );
+        });
+
+        it.each(mailKeys)('throws when %s is blank', (key) => {
+          expect(() =>
+            validateEnv({ ...validProductionConfig, [key]: '   ' }),
+          ).toThrow(`Missing required production environment variable: ${key}`);
+        });
+
+        it.each([
+          'localhost',
+          ' LOCALHOST ',
+          'mail.localhost',
+          '127.0.0.1',
+          '127.1.2.3',
+          '::1',
+          '[::1]',
+          '0.0.0.0',
+          'localhost.',
+          '127.1',
+          '0',
+          '::',
+          '0:0:0:0:0:0:0:1',
+          '::ffff:127.0.0.1',
+          '[::ffff:127.0.0.1]',
+        ])('throws when MAIL_HOST points at the local machine (%p)', (host) => {
+          expect(() =>
+            validateEnv({ ...validProductionConfig, MAIL_HOST: host }),
+          ).toThrow(
+            'Environment variable MAIL_HOST must name a real mail server in production, not the local machine',
+          );
+        });
+
+        it.each(mailKeys)(
+          'throws when %s is left as a secrets-template placeholder',
+          (key) => {
+            expect(() =>
+              validateEnv({
+                ...validProductionConfig,
+                [key]: `PLACEHOLDER_${key}`,
+              }),
+            ).toThrow(
+              `Environment variable ${key} must be set to a real value, not a placeholder`,
+            );
+          },
+        );
+
+        it('rejects a placeholder regardless of case', () => {
+          expect(() =>
+            validateEnv({
+              ...validProductionConfig,
+              MAIL_HOST: 'placeholder_mail_host',
+            }),
+          ).toThrow(
+            'Environment variable MAIL_HOST must be set to a real value, not a placeholder',
+          );
+        });
+
+        it('never echoes the mail password in the error message', () => {
+          const password = 'PLACEHOLDER-but-actually-sensitive-value';
+          let message = '';
+          try {
+            validateEnv({ ...validProductionConfig, MAIL_PASSWORD: password });
+          } catch (error) {
+            message = (error as Error).message;
+          }
+          expect(message).toContain('MAIL_PASSWORD');
+          expect(message).not.toContain(password);
+        });
+
+        it('accepts a real mail host whose name merely contains "localhost"', () => {
+          const config = {
+            ...validProductionConfig,
+            MAIL_HOST: 'localhost-relay.example.com',
+          };
+          expect(validateEnv(config)).toEqual(config);
+        });
+      });
+    });
+
+    describe('mail settings outside production (TTW-085)', () => {
+      beforeEach(() => {
+        process.env.NODE_ENV = 'development';
+      });
+
+      it('does not require any mail setting in development', () => {
+        expect(validateEnv(validBaseConfig)).toEqual(validBaseConfig);
+      });
+
+      it('still accepts a localhost mail catcher in development', () => {
+        const config = {
+          ...validBaseConfig,
+          MAIL_HOST: 'localhost',
+          MAIL_PORT: '1025',
+        };
+        expect(validateEnv(config)).toEqual(config);
+      });
+
+      it('still skips mail validation under NODE_ENV=test', () => {
+        process.env.NODE_ENV = 'test';
+        const config = { MAIL_HOST: 'localhost' };
         expect(validateEnv(config)).toEqual(config);
       });
     });

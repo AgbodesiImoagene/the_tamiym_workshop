@@ -1,3 +1,5 @@
+import { isIPv6 } from 'node:net';
+
 /**
  * `ConfigModule.forRoot({ validate })` implementation for the API.
  *
@@ -13,6 +15,18 @@ export const requiredEnvVars = [
   'MFA_TOTP_ENCRYPTION_KEY',
 ] as const;
 
+/**
+ * Mail transport settings required in production (TTW-085). Without them
+ * `buildMailTransportConfig` falls back to `localhost:1025` and a hard-coded
+ * sender, so the API would boot while every email silently failed.
+ */
+export const requiredProductionMailEnvVars = [
+  'MAIL_HOST',
+  'MAIL_USER',
+  'MAIL_PASSWORD',
+  'MAIL_FROM',
+] as const;
+
 /** Required in production only — surface Origin allowlists (TTW-020). */
 export const requiredProductionEnvVars = [
   'AUTH_ADMIN_ORIGINS',
@@ -20,7 +34,40 @@ export const requiredProductionEnvVars = [
   'CLAMAV_HOST',
   'DESIGN_SHARE_PUBLIC_ORIGIN',
   'NOTIFICATION_UNSUBSCRIBE_SECRET',
+  ...requiredProductionMailEnvVars,
 ] as const;
+
+/** Prefix used by `infra/runtime/secrets/.env.example` for unset secrets. */
+const SECRETS_TEMPLATE_PLACEHOLDER_PREFIX = 'placeholder';
+
+/**
+ * True when `host` names the local machine: `localhost` or `*.localhost`,
+ * the IPv4 loopback range `127.0.0.0/8`, the unspecified address `0.0.0.0`,
+ * or IPv6 `::1` / `::` (including IPv4-mapped loopback). The host is first
+ * canonicalised with the WHATWG URL parser, so spellings such as `127.1`,
+ * `0`, `localhost.`, `[::1]` and `0:0:0:0:0:0:0:1` are caught too.
+ */
+export function isLocalMailHost(host: string): boolean {
+  const trimmed = host.trim().replace(/\.$/, '');
+  const unbracketed = trimmed.replace(/^\[(.*)\]$/, '$1');
+  const literal = isIPv6(unbracketed) ? `[${unbracketed}]` : trimmed;
+  let canonical: string;
+  try {
+    canonical = new URL(`http://${literal}`).hostname;
+  } catch {
+    canonical = trimmed.toLowerCase();
+  }
+  return (
+    canonical === 'localhost' ||
+    canonical.endsWith('.localhost') ||
+    canonical.startsWith('127.') ||
+    canonical === '0.0.0.0' ||
+    canonical === '[::1]' ||
+    canonical === '[::]' ||
+    canonical.startsWith('[::ffff:7f') ||
+    canonical === '[::ffff:0:0]'
+  );
+}
 
 export const forbiddenPlaceholders = new Set([
   'secret',
@@ -56,6 +103,9 @@ export function parseOriginEntries(raw: string): string[] {
  * `AUTH_ADMIN_ORIGINS` / `AUTH_CUSTOMER_ORIGINS` to each contain at least one
  * valid origin URL, since a missing or unparsable allowlist would otherwise
  * silently fall back to the localhost defaults in `auth-surface.ts`.
+ * Production also requires usable mail settings (TTW-085): `MAIL_HOST`,
+ * `MAIL_USER`, `MAIL_PASSWORD` and `MAIL_FROM` set, none left as a secrets
+ * template `PLACEHOLDER_*` value, and `MAIL_HOST` not the local machine.
  */
 export function validateEnv(
   config: Record<string, unknown>,
@@ -130,6 +180,22 @@ export function validateEnv(
           );
         }
       }
+    }
+
+    for (const key of requiredProductionMailEnvVars) {
+      // Presence is checked by the loop above; never echo the value, since
+      // MAIL_PASSWORD must not reach a log.
+      const value = String(config[key]).trim();
+      if (value.toLowerCase().startsWith(SECRETS_TEMPLATE_PLACEHOLDER_PREFIX)) {
+        throw new Error(
+          `Environment variable ${key} must be set to a real value, not a placeholder`,
+        );
+      }
+    }
+    if (isLocalMailHost(String(config.MAIL_HOST))) {
+      throw new Error(
+        'Environment variable MAIL_HOST must name a real mail server in production, not the local machine',
+      );
     }
 
     const virusScanner = String(
