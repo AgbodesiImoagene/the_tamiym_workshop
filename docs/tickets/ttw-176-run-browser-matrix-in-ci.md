@@ -3,7 +3,7 @@
 **Epic:** 0 — Trustworthy delivery system  
 **Status:** Not started  
 **Risk:** Standard  
-**Blocked by:** Owner answer on mobile Safari (see "Decision")  
+**Blocked by:** None  
 **Blocks:** None
 
 ## Background
@@ -28,16 +28,17 @@ Why it is more than adding a line to a workflow:
 - **B. Before a release only.** Manual dispatch, run as part of the release checklist. Fewest minutes, but a break can sit unnoticed for weeks.
 - **C. On every push to `main`.** Fastest feedback, most minutes, and the longest run per push.
 
-Still open: should a mobile WebKit project (for example the `iPhone 13` device profile) be added in this ticket, or left for later? Do not implement before the owner answers.
+Second question: should a mobile WebKit project be added in this ticket, or left for later? **Added in this ticket, owner decision on 2026-11-07.** A mobile WebKit project (an iPhone device profile, for example `iPhone 13`) joins `playwright.config.ts` and `test:e2e:matrix`.
 
 ## Proposal
 
 To be confirmed at design review once the decision is made:
 
-1. A workflow (new, or a job in an existing one) that installs Chromium, Firefox and WebKit and runs `pnpm test:e2e:matrix` nightly and on manual dispatch, with a step timeout, a concurrency group and the report uploaded on failure, as in TTW-170.
-2. Visual baselines generated on Linux (for example with the official Playwright Docker image, or a one-off `--update-snapshots` CI run whose artefact is reviewed), reviewed on purpose, and committed.
-3. A first full run; every failure is either fixed in its own ticket or quarantined with an owner and a ticket.
-4. The strategy, the interim policy and the manifest updated to say what runs and when.
+1. A mobile WebKit project (iPhone device profile) in `playwright.config.ts`, selected by `test:e2e:matrix`, and named in the interim policy's browser matrix.
+2. A workflow (new, or a job in an existing one) that installs Chromium, Firefox and WebKit and runs `pnpm test:e2e:matrix` nightly and on manual dispatch, with a step timeout, a concurrency group and the report uploaded on failure, as in TTW-170.
+3. Visual baselines generated on Linux (for example with the official Playwright Docker image, or a one-off `--update-snapshots` CI run whose artefact is reviewed), reviewed on purpose, and committed.
+4. A first full run; every failure is either fixed in its own ticket or quarantined with an owner and a ticket.
+5. The strategy, the interim policy and the manifest updated to say what runs and when.
 
 ## Invariants
 
@@ -49,7 +50,7 @@ To be confirmed at design review once the decision is made:
 
 1. Owner decision recorded; design review.
 2. Generate and review the visual baselines.
-3. Add the workflow and run it by manual dispatch on a throwaway branch until it is green or every failure is ticketed.
+3. Add the mobile WebKit project and the workflow, and run it by manual dispatch on a throwaway branch until it is green or every failure is ticketed.
 4. Update the documents.
 
 ## Test and observability plan
@@ -71,7 +72,8 @@ To be confirmed at design review once the decision is made:
 
 ## Acceptance criteria
 
-- [ ] The owner's decisions are recorded. → schedule: nightly (2026-11-07); mobile Safari: open.
+- [x] The owner's decisions are recorded. → schedule: nightly; mobile Safari: added in this ticket (both 2026-11-07).
+- [ ] A mobile WebKit project runs as part of the matrix.
 - [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one.
 - [ ] Visual baselines are committed after an intentional review.
 - [ ] Every failure from the first run is fixed or quarantined with an owner and a ticket.
