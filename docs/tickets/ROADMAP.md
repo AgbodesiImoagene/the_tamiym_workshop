@@ -95,7 +95,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —      |
 | [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —      |
 | [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —      |
-| [ ]  | 1   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0A  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
+| [x]  | —   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0A  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
 | [ ]  | 2   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI              | —     | Standard | —      | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
