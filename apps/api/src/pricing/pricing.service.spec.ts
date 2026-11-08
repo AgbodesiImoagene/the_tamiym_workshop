@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { CampaignStatus } from '../generated/prisma/enums';
 describe('PricingService', () => {
   let service: PricingService;
   let prisma: jest.Mocked<PrismaService>;
+  let resolver: jest.Mocked<ShippingDestinationResolver>;
+  let rateEngine: jest.Mocked<ShippingRateEngine>;
 
   const mockAddress = {
     id: 'addr-1',
@@ -72,6 +75,53 @@ describe('PricingService', () => {
     productViewPricings: [],
   };
 
+  const mockDestination = {
+    countryCode: 'NG',
+    zoneId: 'zone-1',
+    zoneName: 'Lagos',
+    ruleId: 'rule-1',
+    matchType: 'ADMIN1',
+    matchValue: 'LA',
+    matchContext: null,
+    resolutionMethod: 'RULE_ADMIN1',
+    confidence: 'medium',
+  };
+
+  function shippingBreakdownWithFee(appliedFee: number) {
+    return {
+      version: 2,
+      provider: 'INTERNAL',
+      rateSource: 'ZONE_FLAT_RATE',
+      rateId: 'rate-1',
+      zoneId: 'zone-1',
+      zoneName: 'Lagos',
+      appliedFee,
+      currency: 'NGN',
+      serviceLevel: 'STANDARD',
+      priority: 100,
+      vatAppliedToShipping: true,
+      resolutionMethod: 'RULE_ADMIN1',
+      destination: {
+        countryCode: 'NG',
+        ruleId: 'rule-1',
+        matchType: 'ADMIN1',
+        matchValue: 'LA',
+        matchContext: null,
+        confidence: 'medium',
+      },
+      estimatedDeliveryMinDays: 2,
+      estimatedDeliveryMaxDays: 4,
+      shipmentSummary: {
+        totalQuantity: 1,
+        totalWeightGrams: 300,
+        packageLengthMm: 320,
+        packageWidthMm: 240,
+        packageHeightMm: 40,
+        lineItems: [],
+      },
+    };
+  }
+
   beforeEach(async () => {
     const mockPrisma = {
       address: {
@@ -99,11 +149,14 @@ describe('PricingService', () => {
       productViewPricing: { findMany: jest.fn().mockResolvedValue([]) },
       discountCampaign: { findMany: jest.fn().mockResolvedValue([]) },
     };
+    // TTW-086: an address outside every zone is refused, so the default
+    // fixture is a covered address with an explicit ₦0 rate. Price
+    // assertions below are unchanged by shipping.
     const mockResolver = {
-      resolveAddress: jest.fn().mockResolvedValue(null),
+      resolveAddress: jest.fn().mockResolvedValue(mockDestination),
     };
     const mockRateEngine = {
-      quote: jest.fn().mockResolvedValue(null),
+      quote: jest.fn().mockResolvedValue(shippingBreakdownWithFee(0)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -117,6 +170,8 @@ describe('PricingService', () => {
 
     service = module.get<PricingService>(PricingService);
     prisma = module.get(PrismaService);
+    resolver = module.get(ShippingDestinationResolver);
+    rateEngine = module.get(ShippingRateEngine);
   });
 
   it('should be defined', () => {
@@ -348,6 +403,98 @@ describe('PricingService', () => {
       expect(
         result.totalBeforeDisplayRounding + result.roundingAdjustment,
       ).toBe(result.totalAmount);
+    });
+  });
+
+  describe('address outside every shipping zone (TTW-086)', () => {
+    const dto = {
+      shippingAddressId: 'addr-1',
+      items: [{ variantId: 'var-1', quantity: 1 }],
+    };
+
+    async function expectNotCovered(promise: Promise<unknown>) {
+      const error: unknown = await promise.then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(BadRequestException);
+      const body = (error as BadRequestException).getResponse();
+      expect(body).toMatchObject({
+        code: 'SHIPPING_ADDRESS_NOT_COVERED',
+        message: expect.stringContaining("We don't deliver to this address"),
+      });
+    }
+
+    it('refuses a standard quote when no zone matches the address', async () => {
+      (resolver.resolveAddress as jest.Mock).mockResolvedValue(null);
+
+      await expectNotCovered(service.quoteStandard('user-1', dto));
+      expect(rateEngine.quote).not.toHaveBeenCalled();
+    });
+
+    it('refuses a campaign quote when no zone matches the address', async () => {
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 10000 }],
+      });
+      (resolver.resolveAddress as jest.Mock).mockResolvedValue(null);
+
+      await expectNotCovered(service.quoteCampaign('user-1', 'camp-1', dto));
+    });
+
+    it('refuses a quote when the zone has no active rate', async () => {
+      (rateEngine.quote as jest.Mock).mockResolvedValue(null);
+
+      await expectNotCovered(service.quoteStandard('user-1', dto));
+    });
+
+    it('logs the reason and coarse location only, never the street or city', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      try {
+        (resolver.resolveAddress as jest.Mock).mockResolvedValueOnce(null);
+        await expectNotCovered(service.quoteStandard('user-1', dto));
+        (rateEngine.quote as jest.Mock).mockResolvedValueOnce(null);
+        await expectNotCovered(service.quoteStandard('user-1', dto));
+
+        const lines = warn.mock.calls.map(([line]) => String(line));
+        expect(lines).toHaveLength(2);
+        expect(lines[0]).toContain('reason=NO_ZONE');
+        expect(lines[0]).toContain('state=LA');
+        expect(lines[1]).toContain('reason=NO_RATE');
+        expect(lines[1]).toContain('zone=zone-1');
+        for (const line of lines) {
+          expect(line).not.toContain(mockAddress.addressLine1);
+          expect(line).not.toContain(mockAddress.city);
+          expect(line).not.toContain(mockAddress.userId);
+        }
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('keeps an explicit ₦0 rate set by an admin', async () => {
+      (rateEngine.quote as jest.Mock).mockResolvedValue(
+        shippingBreakdownWithFee(0),
+      );
+
+      const result = await service.quoteStandard('user-1', dto);
+
+      expect(result.shippingFee).toBe(0);
+      expect(result.shippingBreakdown).toMatchObject({ appliedFee: 0 });
+    });
+
+    it('applies the matching zone rate to the total', async () => {
+      (rateEngine.quote as jest.Mock).mockResolvedValue(
+        shippingBreakdownWithFee(2000),
+      );
+
+      const result = await service.quoteStandard('user-1', dto);
+
+      expect(result.shippingFee).toBe(2000);
+      // Inclusive VAT: merchandise 5000 + shipping 2000.
+      expect(result.totalAmount).toBe(7000);
     });
   });
 

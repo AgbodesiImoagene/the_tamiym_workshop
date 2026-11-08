@@ -11645,7 +11645,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11728,7 +11728,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12809,7 +12809,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12882,7 +12882,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
             400: {
                 headers: {
                     [name: string]: unknown;

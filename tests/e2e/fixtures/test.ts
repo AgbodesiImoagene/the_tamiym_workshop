@@ -4,6 +4,7 @@ import {
   type Page,
   type APIRequestContext,
   type BrowserContext,
+  type ConsoleMessage,
 } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,11 +18,23 @@ const FIRST_PARTY_HOSTS = new Set(
   [urls.api, urls.web, urls.app, urls.admin].map((value) => new URL(value).host)
 );
 
+export interface StrictPageGuardOptions {
+  /**
+   * Narrow opt-in for a console error the test provokes on purpose (for example
+   * the browser's "Failed to load resource" line for an expected 4xx). Match the
+   * exact request; everything else still fails the test.
+   */
+  allowConsoleError?: (message: ConsoleMessage) => boolean;
+}
+
 /**
  * Strategy: unexpected console/page errors and failed first-party requests fail the test.
  * Returns an assertion to run before disposing the page/context.
  */
-export function attachStrictPageGuards(page: Page): () => void {
+export function attachStrictPageGuards(
+  page: Page,
+  options: StrictPageGuardOptions = {}
+): () => void {
   const failures: string[] = [];
 
   page.on('pageerror', (error) => {
@@ -31,6 +44,7 @@ export function attachStrictPageGuards(page: Page): () => void {
     if (msg.type() !== 'error') return;
     const text = msg.text();
     if (text.includes('Download the React DevTools')) return;
+    if (options.allowConsoleError?.(msg)) return;
     failures.push(`Unexpected console error: ${text}`);
   });
   page.on('requestfailed', (request) => {
@@ -116,4 +130,4 @@ export const test = base.extend<Fixtures>({
   },
 });
 
-export { expect, e2eUsers, urls };
+export { authDir, expect, e2eUsers, urls };

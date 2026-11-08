@@ -52,7 +52,11 @@ export class OrdersController {
     status: 200,
     description: 'Quote with line items, shipping, VAT, and total',
   })
-  @ApiResponse({ status: 400, description: 'Invalid input or address' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry.',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({
     status: 503,
@@ -75,7 +79,8 @@ export class OrdersController {
   @ApiResponse({ status: 201, description: 'Order created' })
   @ApiResponse({
     status: 400,
-    description: 'Invalid input or insufficient stock',
+    description:
+      'Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({

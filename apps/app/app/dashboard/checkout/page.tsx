@@ -12,6 +12,7 @@ import {
   useCart,
 } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
+import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -155,6 +156,11 @@ export default function DashboardCheckoutPage() {
       });
       setQuote(nextQuote);
     } catch (err) {
+      if (isShippingNotCovered(err)) {
+        setQuote(null);
+        setError(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       setError(apiError.message || 'Failed to calculate your quote');
     } finally {
@@ -204,6 +210,12 @@ export default function DashboardCheckoutPage() {
       // The cart is cleared on the confirmation page once payment is confirmed.
       window.location.assign(payment.authorizationUrl);
     } catch (err) {
+      // Nothing was created: the customer corrects the address, the cart stays (TTW-086).
+      if (isShippingNotCovered(err)) {
+        setQuote(null);
+        setSubmitMessage(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       if (apiError.code === 'PAYMENT_WINDOW_EXPIRED') {
         startNewRevisionAfterExpiry();
@@ -417,8 +429,16 @@ export default function DashboardCheckoutPage() {
                 </div>
               </div>
 
-              {error ? <p className="text-sm text-red-700">{error}</p> : null}
-              {submitMessage ? <p className="text-sm text-red-700">{submitMessage}</p> : null}
+              {error ? (
+                <p role="alert" className="text-sm text-red-700">
+                  {error}
+                </p>
+              ) : null}
+              {submitMessage ? (
+                <p role="alert" className="text-sm text-red-700">
+                  {submitMessage}
+                </p>
+              ) : null}
 
               <button
                 type="button"

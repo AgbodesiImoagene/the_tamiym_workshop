@@ -407,4 +407,59 @@ describe('DashboardCheckoutPage', () => {
     expect(initiateOrderPayment).not.toHaveBeenCalled();
     expect(getCart()?.lines ?? []).toHaveLength(0);
   });
+
+  describe('address outside every shipping zone (TTW-086)', () => {
+    const notCovered = {
+      statusCode: 400,
+      code: 'SHIPPING_ADDRESS_NOT_COVERED',
+      message: 'server wording',
+    };
+    const shownMessage = /We don't deliver to this address yet/;
+
+    it('explains the refused quote, shows no shipping price and keeps the cart', async () => {
+      addCartItem(cartLine());
+      (quoteOrder as jest.Mock).mockRejectedValueOnce(notCovered);
+
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(shownMessage);
+      expect(screen.getAllByText('Quote first')).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+      expect(getCart()?.lines).toHaveLength(1);
+    });
+
+    it('quotes again once the customer corrects the address', async () => {
+      addCartItem(cartLine());
+      (quoteOrder as jest.Mock).mockRejectedValueOnce(notCovered);
+
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+      await screen.findByRole('alert');
+
+      fireEvent.change(screen.getByLabelText('State'), { target: { value: 'Lagos State' } });
+      await reviewQuote();
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByText('NGN 2000')).toBeInTheDocument();
+    });
+
+    it('explains a refused order without clearing the cart or redirecting', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockRejectedValueOnce(notCovered);
+
+      renderCheckout();
+      await reviewQuote();
+      await placeOrder();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(shownMessage);
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+      expect(initiateOrderPayment).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+      expect(getCart()?.lines).toHaveLength(1);
+      expect(getCart()?.pendingOrderId ?? null).toBeNull();
+    });
+  });
 });
