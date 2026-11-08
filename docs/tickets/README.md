@@ -153,7 +153,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)  | P0       | High     | Complete | Hash password-reset and email-verification tokens                        | 1.7            |
 | [TTW-084](ttw-084-create-default-site-settings.md)                 | P0       | High     | Complete | Create default site settings so VAT is never silently 0%                 | 8.6            |
 | [TTW-085](ttw-085-validate-production-mail-settings.md)            | P0       | Standard | Complete | Validate production mail settings at startup                             | 10.5           |
-| [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)      | P0       | High     | Scoped   | Reject addresses outside every shipping zone                             | 5.6            |
+| [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)      | P0       | High     | Complete | Reject addresses outside every shipping zone                             | 5.6            |
 | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)            | P0       | High     | Scoped   | Offer Nigerian states and LGAs as lists at checkout                      | 4.9            |
 | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)  | P0       | Critical | Scoped   | Refund payments captured after an order was cancelled                    | 4.6            |
 | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)          | P1       | High     | Scoped   | Add forgot-password and reset-password pages                             | 1.1            |

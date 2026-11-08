@@ -1,7 +1,7 @@
 # TTW-086 — Reject addresses outside every shipping zone
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress (implemented on its branch, not merged)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-087, TTW-098
@@ -147,6 +147,8 @@ Run on 2026-11-08 in the worktree, against the isolated test database `tamiym_wo
 
 ## Completion summary
 
+**State: Verified.** Merged into `main` at the owner's request (merge commit `f7f6fff`, change `0a1b369`) and pushed. On the merged `main` (with TTW-083), before the push: `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm openapi:check` passed. `pnpm test`: api 1329, app 45 and web 43 tests passed. The API e2e suites `shipping-zone-coverage`, `pricing-quote`, `order-create-idempotency` and `site-settings-default` passed (25 tests). The push also carried the TTW-181 merge (`102fd9e`), which another session had merged locally in the meantime. GitHub CI run 42532976181 on `102fd9e`: success, all 18 jobs (including Unit Tests, API Integration, Coverage, OpenAPI Contracts, Migration Baseline and Playwright Smoke). Playwright Comprehensive run 42532976039: success.
+
 **Done.**
 
 - API: `PricingService.computeShipping` refuses an uncovered address (no zone, or a zone without an active rate) with 400 `SHIPPING_ADDRESS_NOT_COVERED` (`apps/api/src/shipping/shipping.errors.ts`), and logs a PII-free warning. The two quote routes and the two order-creation routes all refuse. Nothing is written, and a retry with the same key after the address is corrected works. An explicit ₦0 rate stays valid.
@@ -166,5 +168,3 @@ Run on 2026-11-08 in the worktree, against the isolated test database `tamiym_wo
 - Automated fundraiser checkout journey: TTW-039.
 - Stale `stateCode` on address edit: TTW-087 or a new ticket.
 - Pre-existing local failure of `campaign-authoring.comprehensive.spec.ts` (500 on `/v1/organiser/applications/eligibility`), which passes in CI: not investigated here.
-- Backlog state in `docs/tickets/README.md`: set it when the ticket is closed on `main`. Changing it here would reformat the whole table and conflict with `main`.
-- Merge into `main`, push and CI: only when the user asks.
