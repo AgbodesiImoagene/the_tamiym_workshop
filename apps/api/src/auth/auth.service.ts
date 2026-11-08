@@ -10,7 +10,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
@@ -24,6 +23,7 @@ import {
 import { AuditAction, AuthSurface } from '../generated/prisma/enums';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { isRoleAllowedForSurface } from './auth-surface';
+import { hashAuthToken, mintAuthToken } from './auth-token.crypto';
 import {
   MAIL_QUEUE_NAME,
   JOB_VERIFICATION_EMAIL,
@@ -145,8 +145,12 @@ export class AuthService {
    * @throws BadRequestException if token invalid or expired
    */
   async verifyEmail(token: string): Promise<{ message: string }> {
+    // Only the digest is stored (TTW-083).
     const record = await this.prisma.authToken.findFirst({
-      where: { token, tokenType: TokenType.EMAIL_VERIFICATION },
+      where: {
+        tokenHash: hashAuthToken(token),
+        tokenType: TokenType.EMAIL_VERIFICATION,
+      },
       include: { user: { select: { id: true, role: true } } },
     });
 
@@ -154,17 +158,25 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired verification token');
     }
     if (record.expiresAt < new Date()) {
-      await this.prisma.authToken.delete({ where: { id: record.id } });
+      await this.prisma.authToken.deleteMany({ where: { id: record.id } });
       throw new BadRequestException('Invalid or expired verification token');
     }
 
     const verifiedAt = new Date();
     await this.prisma.$transaction(async (tx) => {
+      // Consume first, and only while the row is still unexpired: a
+      // concurrent request that already deleted it wins, and this one is
+      // refused without writing anything.
+      const consumed = await tx.authToken.deleteMany({
+        where: { id: record.id, expiresAt: { gt: new Date() } },
+      });
+      if (consumed.count === 0) {
+        throw new BadRequestException('Invalid or expired verification token');
+      }
       await tx.user.update({
         where: { id: record.userId },
         data: { emailVerifiedAt: verifiedAt },
       });
-      await tx.authToken.delete({ where: { id: record.id } });
       await this.audit.log(
         {
           eventName: 'auth.email.verified',
@@ -218,12 +230,13 @@ export class AuthService {
       await this.prisma.authToken.deleteMany({
         where: { userId: user.id, tokenType: TokenType.PASSWORD_RESET },
       });
-      const token = crypto.randomBytes(32).toString('hex');
+      // Store only the digest; the raw token goes in the email (TTW-083).
+      const token = mintAuthToken();
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
       await this.prisma.authToken.create({
         data: {
           userId: user.id,
-          token,
+          tokenHash: hashAuthToken(token),
           tokenType: TokenType.PASSWORD_RESET,
           expiresAt,
         },
@@ -253,8 +266,12 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
+    // Only the digest is stored (TTW-083).
     const record = await this.prisma.authToken.findFirst({
-      where: { token, tokenType: TokenType.PASSWORD_RESET },
+      where: {
+        tokenHash: hashAuthToken(token),
+        tokenType: TokenType.PASSWORD_RESET,
+      },
       include: { user: { select: { id: true, role: true } } },
     });
 
@@ -262,17 +279,25 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
     if (record.expiresAt < new Date()) {
-      await this.prisma.authToken.delete({ where: { id: record.id } });
+      await this.prisma.authToken.deleteMany({ where: { id: record.id } });
       throw new BadRequestException('Invalid or expired reset token');
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.prisma.$transaction(async (tx) => {
+      // Consume first, and only while the row is still unexpired: a
+      // concurrent request that already deleted it wins, and this one is
+      // refused without writing anything.
+      const consumed = await tx.authToken.deleteMany({
+        where: { id: record.id, expiresAt: { gt: new Date() } },
+      });
+      if (consumed.count === 0) {
+        throw new BadRequestException('Invalid or expired reset token');
+      }
       await tx.user.update({
         where: { id: record.userId },
         data: { passwordHash },
       });
-      await tx.authToken.delete({ where: { id: record.id } });
       // Close all hashed sessions after password recovery (TTW-023).
       await this.authSession.revokeAllForUser(record.userId, tx);
       // Safety: clear any leftover legacy plaintext REFRESH rows.
@@ -362,12 +387,13 @@ export class AuthService {
     await this.prisma.authToken.deleteMany({
       where: { userId, tokenType: TokenType.EMAIL_VERIFICATION },
     });
-    const token = crypto.randomBytes(32).toString('hex');
+    // Store only the digest; the raw token goes in the email (TTW-083).
+    const token = mintAuthToken();
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
     await this.prisma.authToken.create({
       data: {
         userId,
-        token,
+        tokenHash: hashAuthToken(token),
         tokenType: TokenType.EMAIL_VERIFICATION,
         expiresAt,
       },

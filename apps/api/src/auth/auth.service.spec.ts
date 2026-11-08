@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
 import { ObservabilityService } from '../observability/observability.service';
@@ -29,6 +30,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let prisma: {
     user: {
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
@@ -82,6 +84,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     prisma = {
       user: {
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
@@ -1374,6 +1377,197 @@ describe('AuthService', () => {
 
       expect(audit.log).not.toHaveBeenCalled();
       expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reset and verification tokens are stored hashed (TTW-083)', () => {
+    const sha256 = (value: string): string =>
+      createHash('sha256').update(value, 'utf8').digest('hex');
+
+    /** Raw token carried by the last link put on the mail queue. */
+    function emailedToken(urlKey: 'resetUrl' | 'verifyUrl'): string {
+      const calls = mailQueue.add.mock.calls as Array<
+        [string, Record<string, string>]
+      >;
+      const payload = calls[calls.length - 1][1];
+      const url = new URL(payload[urlKey]);
+      const token = url.searchParams.get('token');
+      if (!token) throw new Error('no token in emailed link');
+      return token;
+    }
+
+    function storedRow(): Record<string, unknown> {
+      const calls = prisma.authToken.create.mock.calls as Array<
+        [{ data: Record<string, unknown> }]
+      >;
+      return calls[calls.length - 1][0].data;
+    }
+
+    function liveRecord(tokenType: TokenType) {
+      return {
+        id: 'tok-1',
+        userId: 'user-1',
+        tokenType,
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: 'user-1', role: UserRole.CUSTOMER },
+      };
+    }
+
+    beforeEach(() => {
+      prisma.authToken.create.mockResolvedValue({});
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue({});
+    });
+
+    it('stores only the digest of a password-reset token and emails the raw token', async () => {
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'user-1',
+        email: 'a@example.com',
+      });
+
+      await service.forgotPassword('a@example.com');
+
+      const raw = emailedToken('resetUrl');
+      const row = storedRow();
+      expect(row.tokenHash).toBe(sha256(raw));
+      expect(row.tokenType).toBe(TokenType.PASSWORD_RESET);
+      expect(Object.values(row)).not.toContain(raw);
+    });
+
+    it('stores only the digest of a verification token and emails the raw token', async () => {
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'user-1',
+        email: 'a@example.com',
+        emailVerifiedAt: null,
+      });
+
+      await service.resendVerification('a@example.com');
+
+      const raw = emailedToken('verifyUrl');
+      const row = storedRow();
+      expect(row.tokenHash).toBe(sha256(raw));
+      expect(row.tokenType).toBe(TokenType.EMAIL_VERIFICATION);
+      expect(Object.values(row)).not.toContain(raw);
+    });
+
+    it('looks a reset token up by its digest', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        liveRecord(TokenType.PASSWORD_RESET),
+      );
+
+      await service.resetPassword('raw-reset', 'NewPassword123!');
+
+      expect(prisma.authToken.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tokenHash: sha256('raw-reset'),
+            tokenType: TokenType.PASSWORD_RESET,
+          },
+        }),
+      );
+    });
+
+    it('looks a verification token up by its digest', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        liveRecord(TokenType.EMAIL_VERIFICATION),
+      );
+
+      await service.verifyEmail('raw-verify');
+
+      expect(prisma.authToken.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tokenHash: sha256('raw-verify'),
+            tokenType: TokenType.EMAIL_VERIFICATION,
+          },
+        }),
+      );
+    });
+
+    it('rejects an unknown reset token without writing anything', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('unknown', 'NewPassword123!'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired reset token and removes it', async () => {
+      prisma.authToken.findFirst.mockResolvedValue({
+        ...liveRecord(TokenType.PASSWORD_RESET),
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+
+      await expect(
+        service.resetPassword('raw-reset', 'NewPassword123!'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'tok-1' },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired verification token and removes it', async () => {
+      prisma.authToken.findFirst.mockResolvedValue({
+        ...liveRecord(TokenType.EMAIL_VERIFICATION),
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+
+      await expect(service.verifyEmail('raw-verify')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'tok-1' },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('consumes a token only while the database still holds it unexpired', async () => {
+      prisma.authToken.findFirst
+        .mockResolvedValueOnce(liveRecord(TokenType.PASSWORD_RESET))
+        .mockResolvedValueOnce(liveRecord(TokenType.EMAIL_VERIFICATION));
+
+      await service.resetPassword('raw-reset', 'NewPassword123!');
+      await service.verifyEmail('raw-verify');
+
+      const consume = {
+        where: { id: 'tok-1', expiresAt: { gt: expect.any(Date) as Date } },
+      };
+      expect(prisma.authToken.deleteMany).toHaveBeenNthCalledWith(1, consume);
+      expect(prisma.authToken.deleteMany).toHaveBeenLastCalledWith(consume);
+    });
+
+    it('refuses a reset whose token was consumed by a concurrent request', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        liveRecord(TokenType.PASSWORD_RESET),
+      );
+      prisma.authToken.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.resetPassword('raw-reset', 'NewPassword123!'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('refuses a verification whose token was consumed by a concurrent request', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(
+        liveRecord(TokenType.EMAIL_VERIFICATION),
+      );
+      prisma.authToken.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.verifyEmail('raw-verify')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
     });
   });
 });
