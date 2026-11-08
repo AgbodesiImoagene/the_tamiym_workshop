@@ -18,6 +18,7 @@ import {
 } from '../src/constants';
 import {
   OAuthProvider,
+  TokenType,
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/client';
@@ -216,5 +217,152 @@ describe('Google sign-in account linking (TTW-082)', () => {
 
     expect(res.headers.location).not.toContain('error=');
     expect(setCookieValue(res, CUSTOMER_ACCESS_COOKIE_NAME)).toBeTruthy();
+  });
+
+  describe('onto an account whose email was never confirmed (TTW-179)', () => {
+    const PASSWORD = 'TestPassword1!';
+    const ORIGIN = 'http://localhost:3000';
+
+    async function createUnconfirmedAccount(suffix: string) {
+      return prisma.user.create({
+        data: {
+          email: `google-prehijack-${suffix}@example.com`,
+          passwordHash: await bcrypt.hash(PASSWORD, 10),
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Pre',
+          lastName: 'Registered',
+          phone: '+2348000000179',
+          emailVerifiedAt: null,
+        },
+      });
+    }
+
+    function passwordLogin(email: string) {
+      return request(app.getHttpServer())
+        .post('/v1/auth/login')
+        .set('Origin', ORIGIN)
+        .send({ email, password: PASSWORD });
+    }
+
+    it('removes the old password, rejects the old session and deletes pending links, keeping the rest', async () => {
+      const suffix = `${Date.now()}`;
+      const user = await createUnconfirmedAccount(suffix);
+      // The pre-registered password works and opens a session before the link.
+      const before = await passwordLogin(user.email).expect(200);
+      const oldAccess = setCookieValue(before, CUSTOMER_ACCESS_COOKIE_NAME);
+      const oldRefresh = setCookieValue(before, CUSTOMER_REFRESH_COOKIE_NAME);
+      expect(oldAccess).toBeTruthy();
+      expect(oldRefresh).toBeTruthy();
+      await prisma.authToken.createMany({
+        data: [
+          {
+            userId: user.id,
+            token: `reset-${suffix}`,
+            tokenType: TokenType.PASSWORD_RESET,
+            expiresAt: new Date(Date.now() + 3_600_000),
+          },
+          {
+            userId: user.id,
+            token: `verify-${suffix}`,
+            tokenType: TokenType.EMAIL_VERIFICATION,
+            expiresAt: new Date(Date.now() + 3_600_000),
+          },
+        ],
+      });
+      const address = await prisma.address.create({
+        data: {
+          userId: user.id,
+          addressLine1: '1 Test Street',
+          city: 'Ikeja',
+          state: 'Lagos',
+        },
+      });
+      google.nextProfile = {
+        providerAccountId: `sub-prehijack-${suffix}`,
+        email: user.email,
+        emailVerified: true,
+      };
+
+      const res = await callback().expect(302);
+
+      expect(res.headers.location).not.toContain('error=');
+      const newAccess = setCookieValue(res, CUSTOMER_ACCESS_COOKIE_NAME);
+      expect(newAccess).toBeTruthy();
+
+      // Old password no longer logs in.
+      await passwordLogin(user.email).expect(401);
+      // Old session is rejected, for both its access and refresh token.
+      await request(app.getHttpServer())
+        .get('/v1/auth/me')
+        .set('Authorization', `Bearer ${oldAccess as string}`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .post('/v1/auth/refresh')
+        .send({ refresh_token: oldRefresh })
+        .expect(401);
+      // The new Google session works.
+      await request(app.getHttpServer())
+        .get('/v1/auth/me')
+        .set('Authorization', `Bearer ${newAccess as string}`)
+        .expect(200);
+
+      const after = await prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(after.passwordHash).toBeNull();
+      expect(after.emailVerifiedAt).toBeInstanceOf(Date);
+      expect(after.phone).toBe('+2348000000179');
+      expect(after.firstName).toBe('Pre');
+      await expect(
+        prisma.authToken.count({
+          where: {
+            userId: user.id,
+            tokenType: {
+              in: [TokenType.PASSWORD_RESET, TokenType.EMAIL_VERIFICATION],
+            },
+          },
+        }),
+      ).resolves.toBe(0);
+      await expect(
+        prisma.address.findUnique({ where: { id: address.id } }),
+      ).resolves.not.toBeNull();
+      await expect(
+        prisma.userOAuthAccount.count({
+          where: {
+            userId: user.id,
+            providerAccountId: `sub-prehijack-${suffix}`,
+          },
+        }),
+      ).resolves.toBe(1);
+      await expect(
+        prisma.auditLog.count({
+          where: {
+            entityId: user.id,
+            eventName: 'auth.password.removed_on_google_link',
+          },
+        }),
+      ).resolves.toBe(1);
+    });
+
+    it('keeps the password and session of an account whose email is confirmed', async () => {
+      const suffix = `confirmed-${Date.now()}`;
+      const user = await createPasswordAccount(suffix);
+      const before = await passwordLogin(user.email).expect(200);
+      const oldAccess = setCookieValue(before, CUSTOMER_ACCESS_COOKIE_NAME);
+      google.nextProfile = {
+        providerAccountId: `sub-${suffix}`,
+        email: user.email,
+        emailVerified: true,
+      };
+
+      await callback().expect(302);
+
+      await passwordLogin(user.email).expect(200);
+      await request(app.getHttpServer())
+        .get('/v1/auth/me')
+        .set('Authorization', `Bearer ${oldAccess as string}`)
+        .expect(200);
+    });
   });
 });

@@ -6,11 +6,13 @@ import {
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
+  JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
 } from '../../constants';
 import {
   MailService,
   SendVerificationEmailPayload,
   SendPasswordResetEmailPayload,
+  SendGoogleLinkedPasswordRemovedEmailPayload,
 } from '../mail.service';
 import { ObservabilityService } from '../../observability/observability.service';
 import { runWithRequestContext } from '../../request-context/request-context.store';
@@ -37,6 +39,7 @@ export class MailProcessor extends WorkerHost {
     job: Job<
       | SendVerificationEmailPayload
       | SendPasswordResetEmailPayload
+      | SendGoogleLinkedPasswordRemovedEmailPayload
       | NotificationOutboxJobData,
       void,
       string
@@ -65,6 +68,15 @@ export class MailProcessor extends WorkerHost {
               );
               this.logger.log(
                 `Sent password reset email to ${(job.data as SendPasswordResetEmailPayload).to}`,
+              );
+              break;
+            case JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL:
+              await this.mailService.sendGoogleLinkedPasswordRemovedEmail(
+                job.data as SendGoogleLinkedPasswordRemovedEmailPayload,
+              );
+              // No address in the log line (TTW-179).
+              this.logger.log(
+                `Sent Google-linked password-removed notice (job ${job.id ?? 'unknown'})`,
               );
               break;
             case JOB_NOTIFICATION_OUTBOX:

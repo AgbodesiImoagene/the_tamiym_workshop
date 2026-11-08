@@ -40,6 +40,7 @@ describe('AuthService', () => {
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
+  let mailQueue: { add: jest.Mock };
   let observability: { recordAuthLogin: jest.Mock };
   let jwtService: { sign: jest.Mock };
   let authSession: {
@@ -105,6 +106,7 @@ describe('AuthService', () => {
       }),
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    mailQueue = { add: jest.fn().mockResolvedValue(undefined) };
     observability = { recordAuthLogin: jest.fn() };
     jwtService = { sign: jest.fn().mockReturnValue('jwt') };
     authSession = {
@@ -148,7 +150,7 @@ describe('AuthService', () => {
         },
         {
           provide: getQueueToken(MAIL_QUEUE_NAME),
-          useValue: { add: jest.fn() },
+          useValue: mailQueue,
         },
         { provide: AuthSessionService, useValue: authSession },
         { provide: AdminMfaService, useValue: adminMfa },
@@ -923,5 +925,299 @@ describe('AuthService', () => {
       expect(logged).not.toContain('g-secret-sub');
       warn.mockRestore();
     });
+  });
+
+  describe('loginWithGoogleProfile onto an unconfirmed account (TTW-179)', () => {
+    const NOTICE_JOB = 'google-linked-password-removed-email';
+    const unconfirmedUser = {
+      id: 'user-9',
+      email: 'owner@example.com',
+      passwordHash: 'attacker-hash',
+      firstName: 'Someone',
+      lastName: 'Else',
+      phone: '+2348000000000',
+      role: UserRole.CUSTOMER as UserRole,
+      status: UserStatus.ACTIVE as UserStatus,
+      emailVerifiedAt: null as Date | null,
+    };
+    const confirmedProfile = {
+      providerAccountId: 'g-owner',
+      email: 'Owner@Example.com',
+      emailVerified: true,
+    };
+
+    function givenExistingAccount(user: typeof unconfirmedUser) {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(user);
+      prisma.userOAuthAccount.create.mockResolvedValue({});
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...user, ...data }),
+      );
+    }
+
+    it('links, removes the password, revokes sessions and deletes pending tokens in one transaction', async () => {
+      givenExistingAccount(unconfirmedUser);
+      authSession.revokeAllForUser.mockResolvedValue(2);
+
+      const result = await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(result).toMatchObject({ refresh_token: 'refresh-plain' });
+      expect(prisma.userOAuthAccount.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          providerAccountId: 'g-owner',
+          userId: 'user-9',
+        }),
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-9' },
+        data: expect.objectContaining({
+          passwordHash: null,
+          emailVerifiedAt: expect.any(Date),
+        }),
+      });
+      // Revoked inside the transaction (a tx client is passed), before the
+      // new Google session is created.
+      expect(authSession.revokeAllForUser).toHaveBeenCalledWith(
+        'user-9',
+        expect.anything(),
+      );
+      expect(
+        authSession.revokeAllForUser.mock.invocationCallOrder[0],
+      ).toBeLessThan(authSession.createSession.mock.invocationCallOrder[0]);
+      expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-9',
+          tokenType: {
+            in: [TokenType.PASSWORD_RESET, TokenType.EMAIL_VERIFICATION],
+          },
+        },
+      });
+    });
+
+    it('makes every clean-up write through the transaction client, none through the root client', async () => {
+      givenExistingAccount(unconfirmedUser);
+      const tx = {
+        userOAuthAccount: { create: jest.fn().mockResolvedValue({}) },
+        user: {
+          update: jest.fn().mockResolvedValue({
+            ...unconfirmedUser,
+            passwordHash: null,
+            emailVerifiedAt: new Date(),
+          }),
+        },
+        authToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        auditLog: { create: jest.fn() },
+      };
+      // First transaction is the clean-up; the session one keeps the default mock.
+      prisma.$transaction.mockImplementationOnce(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(tx.userOAuthAccount.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ userId: 'user-9' }),
+      });
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-9' },
+        data: expect.objectContaining({ passwordHash: null }),
+      });
+      expect(tx.authToken.deleteMany).toHaveBeenCalled();
+      expect(authSession.revokeAllForUser).toHaveBeenCalledWith('user-9', tx);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: 'auth.password.removed_on_google_link',
+        }),
+        tx,
+      );
+      expect(prisma.userOAuthAccount.create).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ passwordHash: null }),
+        }),
+      );
+    });
+
+    it('also secures an unconfirmed organiser account, which signs in on the customer surface', async () => {
+      givenExistingAccount({ ...unconfirmedUser, role: UserRole.ORGANIZER });
+
+      const result = await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(result).toMatchObject({ refresh_token: 'refresh-plain' });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-9' },
+        data: expect.objectContaining({ passwordHash: null }),
+      });
+      expect(authSession.revokeAllForUser).toHaveBeenCalled();
+      expect(mailQueue.add).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes an audit entry for the password removal without the email or provider id', async () => {
+      givenExistingAccount(unconfirmedUser);
+      authSession.revokeAllForUser.mockResolvedValue(2);
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      const entry = audit.log.mock.calls.find(
+        ([input]: [{ eventName: string }]) =>
+          input.eventName === 'auth.password.removed_on_google_link',
+      );
+      expect(entry).toBeDefined();
+      expect(entry?.[0]).toMatchObject({
+        entityType: 'User',
+        entityId: 'user-9',
+        actorUserId: 'user-9',
+        after: { hadPassword: true, revokedSessions: 2 },
+      });
+      expect(entry?.[1]).toBeDefined();
+      const serialized = JSON.stringify(entry?.[0]);
+      expect(serialized).not.toContain('owner@example.com');
+      expect(serialized).not.toContain('g-owner');
+      expect(serialized).not.toContain('attacker-hash');
+    });
+
+    it('queues the notice email after the transaction commits, with no secret in it', async () => {
+      givenExistingAccount(unconfirmedUser);
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(mailQueue.add).toHaveBeenCalledTimes(1);
+      expect(mailQueue.add).toHaveBeenCalledWith(NOTICE_JOB, {
+        to: 'owner@example.com',
+        settingsUrl: 'http://localhost:3000/dashboard/settings',
+      });
+      const auditCall = audit.log.mock.calls.findIndex(
+        ([input]: [{ eventName: string }]) =>
+          input.eventName === 'auth.password.removed_on_google_link',
+      );
+      expect(mailQueue.add.mock.invocationCallOrder[0]).toBeGreaterThan(
+        audit.log.mock.invocationCallOrder[auditCall],
+      );
+    });
+
+    it('keeps addresses, phone, name and designs: deletes nothing else', async () => {
+      givenExistingAccount(unconfirmedUser);
+      const deleteAddresses = jest.fn();
+      const deleteDesigns = jest.fn();
+      Object.assign(prisma, {
+        address: { deleteMany: deleteAddresses, delete: deleteAddresses },
+        design: { deleteMany: deleteDesigns, delete: deleteDesigns },
+      });
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(deleteAddresses).not.toHaveBeenCalled();
+      expect(deleteDesigns).not.toHaveBeenCalled();
+      for (const [args] of prisma.user.update.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]) {
+        expect(args.data).not.toHaveProperty('phone');
+        expect(args.data).not.toHaveProperty('firstName');
+        expect(args.data).not.toHaveProperty('lastName');
+      }
+    });
+
+    it('does not sign in or send the email when the transaction fails', async () => {
+      givenExistingAccount(unconfirmedUser);
+      audit.log.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(
+        service.loginWithGoogleProfile(confirmedProfile),
+      ).rejects.toThrow('db down');
+
+      expect(mailQueue.add).not.toHaveBeenCalled();
+      expect(authSession.createSession).not.toHaveBeenCalled();
+    });
+
+    it('still signs in when the notice email cannot be queued, and logs no address', async () => {
+      givenExistingAccount(unconfirmedUser);
+      mailQueue.add.mockRejectedValueOnce(new Error('redis down'));
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      const result = await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(result).toMatchObject({ refresh_token: 'refresh-plain' });
+      expect(warn).toHaveBeenCalled();
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(
+        'owner@example.com',
+      );
+      warn.mockRestore();
+    });
+
+    it('leaves a confirmed account untouched: password, sessions, tokens, no email', async () => {
+      givenExistingAccount({
+        ...unconfirmedUser,
+        emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(prisma.userOAuthAccount.create).toHaveBeenCalled();
+      for (const [args] of prisma.user.update.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]) {
+        expect(args.data).not.toHaveProperty('passwordHash');
+      }
+      expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+      expect(prisma.authToken.deleteMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tokenType: expect.objectContaining({
+              in: expect.arrayContaining([TokenType.PASSWORD_RESET]),
+            }),
+          }),
+        }),
+      );
+      expect(mailQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('leaves an already-linked account untouched even if its email is unconfirmed', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue({
+        user: unconfirmedUser,
+      });
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...unconfirmedUser, ...data }),
+      );
+
+      await service.loginWithGoogleProfile(confirmedProfile);
+
+      expect(prisma.userOAuthAccount.create).not.toHaveBeenCalled();
+      for (const [args] of prisma.user.update.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]) {
+        expect(args.data).not.toHaveProperty('passwordHash');
+      }
+      expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+      expect(mailQueue.add).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a suspended customer', { status: UserStatus.SUSPENDED }],
+      ['an admin', { role: UserRole.ADMIN }],
+    ])(
+      'does not remove the password of %s whose Google sign-in is refused anyway',
+      async (_label, override) => {
+        givenExistingAccount({ ...unconfirmedUser, ...override });
+
+        await expect(
+          service.loginWithGoogleProfile(confirmedProfile),
+        ).rejects.toThrow(UnauthorizedException);
+
+        for (const [args] of prisma.user.update.mock.calls as [
+          { data: Record<string, unknown> },
+        ][]) {
+          expect(args.data).not.toHaveProperty('passwordHash');
+        }
+        expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+        expect(mailQueue.add).not.toHaveBeenCalled();
+      },
+    );
   });
 });

@@ -16,6 +16,11 @@ export interface SendPasswordResetEmailPayload {
   resetUrl: string;
 }
 
+export interface SendGoogleLinkedPasswordRemovedEmailPayload {
+  to: string;
+  settingsUrl: string;
+}
+
 export interface SendTemplatedEmailParams {
   to: string;
   subject: string;
@@ -78,6 +83,18 @@ export class MailService {
       subject: 'Reset your password',
       template: 'password-reset',
       context: { resetUrl },
+    });
+  }
+
+  async sendGoogleLinkedPasswordRemovedEmail(
+    payload: SendGoogleLinkedPasswordRemovedEmailPayload,
+  ): Promise<void> {
+    const { to, settingsUrl } = payload;
+    await this.sendTemplatedEmail({
+      to,
+      subject: 'Your account is now linked to Google',
+      template: 'google-linked-password-removed',
+      context: { settingsUrl },
     });
   }
 }

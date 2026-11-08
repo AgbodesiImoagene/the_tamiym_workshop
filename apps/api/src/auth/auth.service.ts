@@ -28,6 +28,7 @@ import {
   MAIL_QUEUE_NAME,
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
+  JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
   VERIFICATION_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
 } from '../constants';
@@ -601,16 +602,28 @@ export class AuthService {
           this.observability.recordAuthLogin({ outcome: 'failure' });
           throw new UnauthorizedException('Account is unavailable');
         }
-        await this.prisma.userOAuthAccount.create({
-          data: {
-            provider: OAuthProvider.GOOGLE,
-            providerAccountId: profile.providerAccountId,
-            userId: existingByEmail.id,
-          },
-        });
-        user = await this.prisma.user.findUniqueOrThrow({
-          where: { id: existingByEmail.id },
-        });
+        if (this.isUnconfirmedSignableCustomer(existingByEmail)) {
+          user = await this.linkGoogleAndSecureUnconfirmedAccount(
+            existingByEmail,
+            profile.providerAccountId,
+          );
+          // Ids only: no email or provider id in logs.
+          this.logger.log(
+            `Google sign-in secured unconfirmed account ${user.id}: password removed, sessions revoked`,
+          );
+          await this.enqueueGoogleLinkedPasswordRemovedEmail(user.email);
+        } else {
+          await this.prisma.userOAuthAccount.create({
+            data: {
+              provider: OAuthProvider.GOOGLE,
+              providerAccountId: profile.providerAccountId,
+              userId: existingByEmail.id,
+            },
+          });
+          user = await this.prisma.user.findUniqueOrThrow({
+            where: { id: existingByEmail.id },
+          });
+        }
       } else {
         const firstName = profile.firstName?.trim() || 'Customer';
         const lastName = profile.lastName?.trim() || 'User';
@@ -694,6 +707,111 @@ export class AuthService {
       AuthSurface.CUSTOMER,
       opts,
     );
+  }
+
+  /**
+   * TTW-179: an account whose email was never confirmed, and that this Google
+   * sign-in will actually sign in (customer-surface role, ACTIVE). Other
+   * accounts are refused after the link anyway, so they keep today's
+   * behaviour and their password.
+   */
+  private isUnconfirmedSignableCustomer(user: {
+    emailVerifiedAt: Date | null;
+    status: UserStatus;
+    role: UserRole;
+  }): boolean {
+    return (
+      user.emailVerifiedAt === null &&
+      user.status === UserStatus.ACTIVE &&
+      isRoleAllowedForSurface(user.role, AuthSurface.CUSTOMER)
+    );
+  }
+
+  /**
+   * TTW-179 (account pre-hijacking): Google confirms an email that the
+   * existing account never confirmed, so whoever set its password may not own
+   * the address. Link and, in the same transaction, remove that password,
+   * revoke every session and delete pending reset/verification links. Nothing
+   * else is deleted: addresses, phone, name and designs stay.
+   */
+  private async linkGoogleAndSecureUnconfirmedAccount(
+    existing: { id: string; role: UserRole; passwordHash: string | null },
+    providerAccountId: string,
+  ) {
+    const now = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      await tx.userOAuthAccount.create({
+        data: {
+          provider: OAuthProvider.GOOGLE,
+          providerAccountId,
+          userId: existing.id,
+        },
+      });
+      const updated = await tx.user.update({
+        where: { id: existing.id },
+        data: { passwordHash: null, emailVerifiedAt: now },
+      });
+      const revokedSessions = await this.authSession.revokeAllForUser(
+        existing.id,
+        tx,
+      );
+      await tx.authToken.deleteMany({
+        where: {
+          userId: existing.id,
+          tokenType: {
+            in: [TokenType.PASSWORD_RESET, TokenType.EMAIL_VERIFICATION],
+          },
+        },
+      });
+      await this.audit.log(
+        {
+          eventName: 'auth.password.removed_on_google_link',
+          action: AuditAction.UPDATE,
+          entityType: 'User',
+          entityId: existing.id,
+          actorUserId: existing.id,
+          actorRole: existing.role,
+          before: {
+            hasPassword: existing.passwordHash !== null,
+            emailVerified: false,
+          },
+          after: {
+            hasPassword: false,
+            emailVerified: true,
+            hadPassword: existing.passwordHash !== null,
+            revokedSessions,
+          },
+          note: 'Google sign-in confirmed an unconfirmed email: password removed, sessions revoked, pending reset/verification links deleted',
+        },
+        tx,
+      );
+      return updated;
+    });
+  }
+
+  /**
+   * Queued after the commit. A queue failure must not undo a sign-in whose
+   * protection is already committed, so it is logged (without the address).
+   */
+  private async enqueueGoogleLinkedPasswordRemovedEmail(
+    email: string,
+  ): Promise<void> {
+    const baseUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    try {
+      await this.mailQueue.add(JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL, {
+        to: email,
+        settingsUrl: `${baseUrl}/dashboard/settings`,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not queue the Google-linked password-removed notice: ${
+          err instanceof Error ? err.name : 'unknown error'
+        }`,
+      );
+    }
   }
 
   private async completeLoginSession(

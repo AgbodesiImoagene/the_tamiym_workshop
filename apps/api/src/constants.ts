@@ -16,6 +16,9 @@ export const MAIL_QUEUE_NAME = 'mail';
 export const JOB_VERIFICATION_EMAIL = 'verification-email';
 export const JOB_PASSWORD_RESET_EMAIL = 'password-reset-email';
 export const JOB_NOTIFICATION_OUTBOX = 'notification-outbox';
+/** TTW-179: notice sent after Google sign-in removed a pre-confirmation password. */
+export const JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL =
+  'google-linked-password-removed-email';
 
 /** Payout execution queue (BullMQ) */
 export const PAYOUT_QUEUE_NAME = 'payout-execution';

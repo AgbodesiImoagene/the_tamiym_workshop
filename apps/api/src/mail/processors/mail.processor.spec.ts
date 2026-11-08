@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Job } from 'bullmq';
 import { MailProcessor } from './mail.processor';
@@ -5,6 +6,7 @@ import { MailService } from '../mail.service';
 import { ObservabilityService } from '../../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../notification-outbox-delivery.service';
 import {
+  JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
   JOB_PASSWORD_RESET_EMAIL,
   JOB_VERIFICATION_EMAIL,
@@ -13,7 +15,12 @@ import {
 describe('MailProcessor', () => {
   let processor: MailProcessor;
   let mailService: jest.Mocked<
-    Pick<MailService, 'sendVerificationEmail' | 'sendPasswordResetEmail'>
+    Pick<
+      MailService,
+      | 'sendVerificationEmail'
+      | 'sendPasswordResetEmail'
+      | 'sendGoogleLinkedPasswordRemovedEmail'
+    >
   >;
   let delivery: jest.Mocked<
     Pick<NotificationOutboxDeliveryService, 'deliverOutbox'>
@@ -24,6 +31,9 @@ describe('MailProcessor', () => {
     mailService = {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+      sendGoogleLinkedPasswordRemovedEmail: jest
+        .fn()
+        .mockResolvedValue(undefined),
     };
     delivery = {
       deliverOutbox: jest.fn().mockResolvedValue(undefined),
@@ -77,6 +87,34 @@ describe('MailProcessor', () => {
     expect(observability.recordQueueJob).toHaveBeenCalledWith(
       expect.objectContaining({ outcome: 'success' }),
     );
+  });
+
+  it('sends the Google-linked password-removed notice without logging the address (TTW-179)', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+
+    await processor.process(
+      makeJob(JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL, {
+        to: 'owner@example.com',
+        settingsUrl: 'http://x/dashboard/settings',
+      }),
+    );
+
+    expect(
+      mailService.sendGoogleLinkedPasswordRemovedEmail,
+    ).toHaveBeenCalledWith({
+      to: 'owner@example.com',
+      settingsUrl: 'http://x/dashboard/settings',
+    });
+    expect(observability.recordQueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobName: JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
+        outcome: 'success',
+      }),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain('owner@example.com');
+    log.mockRestore();
   });
 
   it('delivers notification outbox', async () => {
