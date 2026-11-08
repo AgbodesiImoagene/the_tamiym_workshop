@@ -115,6 +115,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)           | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086      |
 | [ ]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md) | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16 |
 | [ ]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)    | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —            |
+| [ ]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)            | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083      |
 
 ## Phase 2 : Comptes et achat d'un produit
 
