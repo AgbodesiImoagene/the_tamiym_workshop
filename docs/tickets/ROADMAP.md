@@ -72,6 +72,8 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q17      | Fin de campagne et production                                       | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
 | Q18      | Livraison des campagnes                                             | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
 | Q39      | Délai de l'option express                                           | TTW-153          | Attendre la réponse                                                                               |
+| Nouvelle | Fichiers et licence web des polices Mundial et Neuffila Grotesk     | TTW-177          | Attendre la réponse ; sans licence, lui demander une police de remplacement validée               |
+| Nouvelle | Logos de paiement du pied de page (PayPal non accepté)              | TTW-178          | Retirer PayPal, garder les cartes acceptées par Paystack en version lisible sur fond bleu         |
 
 ### Déjà répondues : rien à attendre
 
@@ -180,6 +182,8 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 52  | [TTW-124](ttw-124-add-audience-measurement.md)              | 6B  | Mesure d'audience                                  | 12.4  | Standard | 4–8    | —                |
 | [ ]  | 53  | [TTW-117](ttw-117-draft-and-publish-legal-texts.md)         | 6C  | Rédiger et intégrer les textes légaux              | 11.4  | Standard | 2–4    | Q19              |
 | [ ]  | 54  | [TTW-125](ttw-125-replace-fake-social-links.md)             | 6C  | Vrais liens sociaux et contacts                    | 12.2  | Faible   | 1      | Q46              |
+| [ ]  | —   | [TTW-177](ttw-177-ship-brand-fonts.md)                      | 6C  | Charger les polices de la marque sur tout le site  | —     | Standard | —      | Polices (client) |
+| [ ]  | —   | [TTW-178](ttw-178-fix-footer-payment-logos.md)              | 6C  | Logos de paiement lisibles, sans PayPal            | —     | Faible   | 1–2    | Logos (client)   |
 
 ## Phase 7 : Fundraising
 
