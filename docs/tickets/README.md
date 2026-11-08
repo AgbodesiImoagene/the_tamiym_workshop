@@ -229,6 +229,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-162](ttw-162-darken-green-button-colour.md)                   | P2       | Low      | Scoped | Darken the green buttons for contrast                     | 12.8           |
 | [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)         | P1       | High     | Scoped | Stop variant changes silently deleting linked images      | Not in review  |
 | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)          | P1       | High     | Scoped | Keep existing variants when an option is added            | Not in review  |
+| [TTW-177](ttw-177-ship-brand-fonts.md)                             | P2       | Standard | Scoped | Ship the brand fonts (Mundial, Neuffila Grotesk)          | Not in review  |
 
 ## Explicitly deferred post-v1 backlog
 

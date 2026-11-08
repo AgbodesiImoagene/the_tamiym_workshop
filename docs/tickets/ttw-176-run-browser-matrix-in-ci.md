@@ -1,7 +1,7 @@
 # TTW-176 — Run the Playwright browser matrix in CI
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** In progress (Partial: workflow and mobile WebKit project committed locally on the ticket branch, no CI run yet)  
+**Status:** In progress (Partial: workflow merged into `main`, baselines committed on the ticket branch, no matrix run yet)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -75,7 +75,7 @@ To be confirmed at design review once the decision is made:
 - [x] The owner's decisions are recorded. → schedule: nightly; mobile Safari: added in this ticket (both 2026-11-07).
 - [ ] A mobile WebKit project runs as part of the matrix. → Partial: `mobile-webkit-web` is selected by `test:e2e:matrix` (41 tests listed); not yet seen running in CI.
 - [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one.
-- [ ] Visual baselines are committed after an intentional review.
+- [x] Visual baselines are committed after an intentional review. → run 42430477854, reviewed 2026-11-08 (see evidence); first attempt rejected.
 - [ ] Every failure from the first run is fixed or quarantined with an owner and a ticket.
 - [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they describe the workflow as Implemented-unverified; to be moved to "Running in CI" only after a run is seen.
 - [ ] Required quality gates pass with evidence recorded below.
@@ -141,19 +141,28 @@ Local, 2026-11-07, worktree on `codex/ttw-176-run-browser-matrix-in-ci` (Node 24
 - `pnpm docs:validate` → `Documentation validation passed.`; `pnpm playwright:validate` → `Playwright manifest validation passed.`
 - `pnpm format:check` → `All matched files use Prettier code style!`
 - `pnpm lint` → 6/6 tasks successful; `pnpm typecheck` → 6/6 tasks successful.
-- Not run: the matrix itself (no Docker/PostgreSQL on this machine, port 3001 taken by another project; see design review). No CI run: nothing pushed, by the owner's instruction.
+- Not run: the matrix itself (no Docker/PostgreSQL on this machine, port 3001 taken by another project; see design review).
+
+CI, after the owner asked to merge and push (2026-11-07/08):
+
+- Merge `c135789` pushed to `main`. CI run 42416104237: success, all 18 jobs (including Playwright Smoke, Documentation, Lint, Type Check, Format). Playwright Comprehensive run 42416104240: success (invariant 1 holds). `gh workflow list` shows `Playwright Matrix` active, so GitHub accepted the file.
+- Baselines, first attempt: dispatch with `update_snapshots=true` on `main`, run 42429329537, success; only the baseline steps ran (Chromium-only install, matrix step skipped). Review rejected both images: lazily loaded footer images (logo, social icons, payment logos on desktop; payment logos on mobile) were missing because a full-page screenshot does not scroll. Not committed.
+- Fix: `tests/e2e/fixtures/visual.ts` `waitForAllImages()` makes every image eager, polls until each has loaded (the failure message lists the missing URLs) and waits for `document.fonts.ready`; both visual specs call it before `toHaveScreenshot`. Commit `24178ef`, pushed to the ticket branch only.
+- Baselines, second attempt: dispatch on `codex/ttw-176-run-browser-matrix-in-ci`, run 42430477854 at `24178ef`, success. Reviewed on purpose: both pages complete, footers complete (logo, social icons, Mastercard, Visa, PayPal, divider). Committed as `tests/e2e/visual/web-home.visual.spec.ts-snapshots/web-home-desktop-chromium-visual-linux.png` (1280×4656) and `tests/e2e/visual/web-home-mobile.visual.spec.ts-snapshots/web-home-mobile-mobile-visual-web-linux.png` (393×4404).
+- Seen in review, outside this ticket: the brand fonts are never loaded, so text uses a system fallback (DejaVu Sans on CI) → TTW-177. The baselines will change on purpose when TTW-177 ships.
 
 ## Completion summary
 
-**Done (local commit, not pushed):** `mobile-webkit-web` project (iPhone 13) added to `playwright.config.ts` and `test:e2e:matrix`; `.github/workflows/playwright-matrix.yml` (nightly 03:00 UTC + manual dispatch, `update_snapshots` input for Linux baselines, concurrency without cancellation, `--fail-on-flaky-tests`, report upload on failure); strategy, interim policy and `docs/12-testing-strategy.md` describe it as Implemented-unverified.
+**Done:** `mobile-webkit-web` project (iPhone 13) added to `playwright.config.ts` and `test:e2e:matrix`; `.github/workflows/playwright-matrix.yml` (nightly 03:00 UTC + manual dispatch, `update_snapshots` input for Linux baselines, concurrency without cancellation, `--fail-on-flaky-tests`, report upload on failure); strategy, interim policy and `docs/12-testing-strategy.md` describe it as Implemented-unverified.
 
-**Deviation from plan:** no local matrix run (environment, see design review). The visual-baseline step is a workflow input instead of a separate local generation.
+Merged into `main` (`c135789`) and pushed. Visual specs made deterministic and Linux baselines reviewed and committed on the ticket branch (see evidence).
+
+**Deviation from plan:** no local matrix run (environment, see design review). The visual-baseline step is a workflow input instead of a separate local generation. The visual specs needed a wait for lazily loaded images before the baselines could be trusted.
 
 **Remaining, in order (each needs the owner's go-ahead to push):**
 
-1. Merge into `main` and push. Until step 3 is done, the nightly run is expected to be red on the two visual tests (no baselines).
-2. `gh workflow run playwright-matrix.yml -f update_snapshots=true`, download the `playwright-visual-baselines` artefact, review the two images on purpose, commit them under `tests/e2e/visual/*-snapshots/`.
-3. Dispatch the matrix: record the first full run. Expected first-run failure to check: Firefox does not support `isMobile`, so the tablet/mobile `describeViewportMatrix` blocks of the web `*.comprehensive.spec.ts` specs will probably fail under `firefox-web`. Every failure gets its own ticket or a quarantine with owner, ticket and expiry.
-4. Prove failure detection: one dispatch on a deliberately broken spec (red), then the good one (green); watch one scheduled run.
-5. Tune the job/step timeouts from the measured run; move the documents to "Running in CI"; tick the remaining criteria.
-6. Once TTW-085 has landed, update `docs/11-development-setup.md:92` (the matrix line misses mobile WebKit, accessibility and visual projects).
+1. Merge the ticket branch (spec fix and baselines) into `main` and push. Until then, the nightly run on `main` is expected to be red on the two visual tests (no baselines there).
+2. Dispatch the matrix: record the first full run. Expected first-run failure to check: Firefox does not support `isMobile`, so the tablet/mobile `describeViewportMatrix` blocks of the web `*.comprehensive.spec.ts` specs will probably fail under `firefox-web`. Every failure gets its own ticket or a quarantine with owner, ticket and expiry.
+3. Prove failure detection: one dispatch on a deliberately broken spec (red), then the good one (green); watch one scheduled run.
+4. Tune the job/step timeouts from the measured run; move the documents to "Running in CI"; tick the remaining criteria.
+5. Once TTW-085 has landed, update `docs/11-development-setup.md:92` (the matrix line misses mobile WebKit, accessibility and visual projects).
