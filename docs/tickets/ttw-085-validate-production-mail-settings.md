@@ -1,7 +1,7 @@
 # TTW-085 — Validate production mail settings at startup
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not merged)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-147
@@ -52,7 +52,7 @@ Client answers:
 
 - [x] Booting with `NODE_ENV=production` and a localhost mail host fails with a clear message. → real boot of `dist/main`, see Verification evidence.
 - [x] Swagger, shared contracts, migrations and docs are updated where applicable. → no endpoint, DTO or schema change; `apps/api/.env.example` and `infra/runtime/secrets/.env.example` updated; `docs/11-development-setup.md` does not list mail settings.
-- [x] Required quality gates pass, with evidence recorded below.
+- [x] Required quality gates pass, with evidence recorded below. CI green on `main` at `d4ba5f2` (runs 42429444049 and 42429444034).
 
 ## Out of scope
 
@@ -133,9 +133,8 @@ No endpoint or DTO changed, so `pnpm openapi:generate` was not needed. No schema
 
 **Deviations from the plan.** `MAIL_FROM` added to the required set (owner approved at design review). Local-host detection extended after review finding 1. `docs/infrastructure/ttw-065-identity-secrets.md` also updated (finding 3).
 
-**Status.** Committed locally on `codex/ttw-085-validate-production-mail-settings`; not pushed, not merged, so CI has not run it.
+**State: Verified.** Merged into `main` at the owner's request (`d4ba5f2`, merge of `c82baab`, on top of the TTW-176 merge `c135789`) and pushed. CI is green on `d4ba5f2`: run 42429444049 (CI) and run 42429444034 (Playwright Comprehensive) both succeeded. The ticket branch and worktree were deleted at the owner's request.
 
 **Remaining.**
 
-- Merge into `main` and read CI, when the owner asks.
 - TTW-147 must configure a real provider before any `NODE_ENV=production` deployment, and should fix `MAIL_SECURE` for port 587 (finding 4).
