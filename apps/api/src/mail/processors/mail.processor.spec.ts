@@ -6,6 +6,7 @@ import { MailService } from '../mail.service';
 import { ObservabilityService } from '../../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../notification-outbox-delivery.service';
 import {
+  JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL,
   JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
   JOB_PASSWORD_RESET_EMAIL,
@@ -20,6 +21,7 @@ describe('MailProcessor', () => {
       | 'sendVerificationEmail'
       | 'sendPasswordResetEmail'
       | 'sendGoogleLinkedPasswordRemovedEmail'
+      | 'sendGoogleLinkedAccountSuspendedEmail'
     >
   >;
   let delivery: jest.Mocked<
@@ -32,6 +34,9 @@ describe('MailProcessor', () => {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
       sendGoogleLinkedPasswordRemovedEmail: jest
+        .fn()
+        .mockResolvedValue(undefined),
+      sendGoogleLinkedAccountSuspendedEmail: jest
         .fn()
         .mockResolvedValue(undefined),
     };
@@ -110,6 +115,30 @@ describe('MailProcessor', () => {
     expect(observability.recordQueueJob).toHaveBeenCalledWith(
       expect.objectContaining({
         jobName: JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
+        outcome: 'success',
+      }),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain('owner@example.com');
+    log.mockRestore();
+  });
+
+  it('sends the Google-linked account-suspended notice without logging the address (TTW-179)', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+
+    await processor.process(
+      makeJob(JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL, {
+        to: 'owner@example.com',
+      }),
+    );
+
+    expect(
+      mailService.sendGoogleLinkedAccountSuspendedEmail,
+    ).toHaveBeenCalledWith({ to: 'owner@example.com' });
+    expect(observability.recordQueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobName: JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL,
         outcome: 'success',
       }),
     );

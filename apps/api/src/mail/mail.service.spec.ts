@@ -81,4 +81,46 @@ describe('MailService', () => {
       }
     });
   });
+
+  describe('Google-linked account-suspended notice (TTW-179)', () => {
+    it('sends the suspended notice template to the account address', async () => {
+      const mailer = {
+        sendMail: jest.fn().mockResolvedValue(undefined),
+      } as unknown as MailTransportService;
+      const service = new MailService(mailer);
+
+      await service.sendGoogleLinkedAccountSuspendedEmail({
+        to: 'owner@example.com',
+      });
+
+      expect(mailer.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'owner@example.com',
+          subject: 'Your account is linked to Google and currently blocked',
+          template: 'google-linked-account-suspended',
+          context: {},
+        }),
+      );
+    });
+
+    it('renders English text: linked to Google, password removed, blocked, contact support', () => {
+      const previousEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      try {
+        const renderer = buildMailTemplateRenderer(
+          join(__dirname, 'templates'),
+        );
+        const html = renderer.render('google-linked-account-suspended', {});
+        const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+        expect(text).toContain('linked to Google');
+        expect(text).toMatch(/password .*removed/i);
+        expect(text).toMatch(/blocked/i);
+        expect(text).toMatch(/contact our support team/i);
+        expect(html).not.toMatch(/token=|reset-password/i);
+      } finally {
+        process.env.NODE_ENV = previousEnv;
+      }
+    });
+  });
 });

@@ -29,6 +29,7 @@ import {
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
   JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
+  JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL,
   VERIFICATION_TOKEN_TTL_MS,
   PASSWORD_RESET_TOKEN_TTL_MS,
 } from '../constants';
@@ -325,11 +326,17 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
+    const checkedHash = user.passwordHash;
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
+      // Only if the password checked above is still the stored one (TTW-179):
+      // a password removed or changed in between must not be overwritten.
+      const changed = await tx.user.updateMany({
+        where: { id: userId, passwordHash: checkedHash },
         data: { passwordHash },
       });
+      if (changed.count !== 1) {
+        throw new BadRequestException('Current password is incorrect');
+      }
       await this.authSession.revokeAllForUser(userId, tx);
       await tx.authToken.deleteMany({
         where: { userId, tokenType: TokenType.REFRESH },
@@ -489,6 +496,7 @@ export class AuthService {
       'User authenticated successfully',
       surface,
       opts,
+      user.passwordHash,
     );
   }
 
@@ -602,7 +610,7 @@ export class AuthService {
           this.observability.recordAuthLogin({ outcome: 'failure' });
           throw new UnauthorizedException('Account is unavailable');
         }
-        if (this.isUnconfirmedSignableCustomer(existingByEmail)) {
+        if (this.needsPreHijackCleanup(existingByEmail)) {
           user = await this.linkGoogleAndSecureUnconfirmedAccount(
             existingByEmail,
             profile.providerAccountId,
@@ -611,7 +619,9 @@ export class AuthService {
           this.logger.log(
             `Google sign-in secured unconfirmed account ${user.id}: password removed, sessions revoked`,
           );
-          await this.enqueueGoogleLinkedPasswordRemovedEmail(user.email);
+          // A suspended account is still refused below; its owner is told to
+          // contact support instead of being sent to the account page.
+          await this.enqueueGoogleLinkedNotice(user);
         } else {
           await this.prisma.userOAuthAccount.create({
             data: {
@@ -710,19 +720,21 @@ export class AuthService {
   }
 
   /**
-   * TTW-179: an account whose email was never confirmed, and that this Google
-   * sign-in will actually sign in (customer-surface role, ACTIVE). Other
-   * accounts are refused after the link anyway, so they keep today's
-   * behaviour and their password.
+   * TTW-179: a customer-surface account (CUSTOMER, ORGANIZER) whose email was
+   * never confirmed, ACTIVE or SUSPENDED (DELETED is refused earlier). A
+   * suspended one is secured too, so a later reactivation does not bring the
+   * pre-registered password back (user decision 2026-11-08). Admin accounts
+   * keep today's behaviour (TTW-113).
    */
-  private isUnconfirmedSignableCustomer(user: {
+  private needsPreHijackCleanup(user: {
     emailVerifiedAt: Date | null;
     status: UserStatus;
     role: UserRole;
   }): boolean {
     return (
       user.emailVerifiedAt === null &&
-      user.status === UserStatus.ACTIVE &&
+      (user.status === UserStatus.ACTIVE ||
+        user.status === UserStatus.SUSPENDED) &&
       isRoleAllowedForSurface(user.role, AuthSurface.CUSTOMER)
     );
   }
@@ -735,7 +747,12 @@ export class AuthService {
    * else is deleted: addresses, phone, name and designs stay.
    */
   private async linkGoogleAndSecureUnconfirmedAccount(
-    existing: { id: string; role: UserRole; passwordHash: string | null },
+    existing: {
+      id: string;
+      role: UserRole;
+      status: UserStatus;
+      passwordHash: string | null;
+    },
     providerAccountId: string,
   ) {
     const now = new Date();
@@ -780,6 +797,7 @@ export class AuthService {
             emailVerified: true,
             hadPassword: existing.passwordHash !== null,
             revokedSessions,
+            accountSuspended: existing.status === UserStatus.SUSPENDED,
           },
           note: 'Google sign-in confirmed an unconfirmed email: password removed, sessions revoked, pending reset/verification links deleted',
         },
@@ -790,24 +808,31 @@ export class AuthService {
   }
 
   /**
-   * Queued after the commit. A queue failure must not undo a sign-in whose
-   * protection is already committed, so it is logged (without the address).
+   * Queued after the commit. A queue failure must not undo what is already
+   * committed, so it is logged (without the address) and the flow goes on.
    */
-  private async enqueueGoogleLinkedPasswordRemovedEmail(
-    email: string,
-  ): Promise<void> {
-    const baseUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+  private async enqueueGoogleLinkedNotice(user: {
+    email: string;
+    status: UserStatus;
+  }): Promise<void> {
     try {
-      await this.mailQueue.add(JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL, {
-        to: email,
-        settingsUrl: `${baseUrl}/dashboard/settings`,
-      });
+      if (user.status === UserStatus.ACTIVE) {
+        const baseUrl = this.configService.get<string>(
+          'FRONTEND_URL',
+          'http://localhost:3000',
+        );
+        await this.mailQueue.add(JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL, {
+          to: user.email,
+          settingsUrl: `${baseUrl}/dashboard/settings`,
+        });
+      } else if (user.status === UserStatus.SUSPENDED) {
+        await this.mailQueue.add(JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL, {
+          to: user.email,
+        });
+      }
     } catch (err) {
       this.logger.warn(
-        `Could not queue the Google-linked password-removed notice: ${
+        `Could not queue the Google-linked account notice: ${
           err instanceof Error ? err.name : 'unknown error'
         }`,
       );
@@ -827,16 +852,35 @@ export class AuthService {
     auditNote: string,
     surface: AuthSurface,
     opts: LoginSessionOptions = {},
+    /**
+     * Password logins pass the hash they checked. The session is only opened
+     * if it is still the stored one (TTW-179): a password removed or changed
+     * in between (e.g. by a Google link securing the account) wins. The row
+     * update also locks the user row, so a concurrent clean-up either runs
+     * first (no match) or waits and then revokes this new session.
+     */
+    checkedPasswordHash?: string,
   ): Promise<LoginSessionResult> {
     const loggedInAt = new Date();
     let sessionId = '';
     let refreshToken = '';
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: loggedInAt },
-      });
+      if (checkedPasswordHash === undefined) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: loggedInAt },
+        });
+      } else {
+        const stamped = await tx.user.updateMany({
+          where: { id: user.id, passwordHash: checkedPasswordHash },
+          data: { lastLoginAt: loggedInAt },
+        });
+        if (stamped.count !== 1) {
+          this.observability.recordAuthLogin({ outcome: 'failure' });
+          throw new UnauthorizedException('Invalid credentials');
+        }
+      }
       // Named hashed session; createSession revokes other-surface sessions.
       const created = await this.authSession.createSession(user.id, surface, {
         deviceLabel: opts.deviceLabel,

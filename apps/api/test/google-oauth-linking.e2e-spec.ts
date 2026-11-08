@@ -345,6 +345,52 @@ describe('Google sign-in account linking (TTW-082)', () => {
       ).resolves.toBe(1);
     });
 
+    it('secures a suspended unconfirmed account: refused now, old password dead after reactivation', async () => {
+      const suffix = `suspended-${Date.now()}`;
+      const user = await createUnconfirmedAccount(suffix);
+      const before = await passwordLogin(user.email).expect(200);
+      const oldRefresh = setCookieValue(before, CUSTOMER_REFRESH_COOKIE_NAME);
+      expect(oldRefresh).toBeTruthy();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: UserStatus.SUSPENDED },
+      });
+      google.nextProfile = {
+        providerAccountId: `sub-prehijack-${suffix}`,
+        email: user.email,
+        emailVerified: true,
+      };
+
+      const res = await callback().expect(302);
+
+      // Sign-in still refused: the account is suspended.
+      expect(res.headers.location).toContain('/auth/login?error=google_failed');
+      expect(setCookieValue(res, CUSTOMER_ACCESS_COOKIE_NAME)).toBeFalsy();
+      const after = await prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(after.passwordHash).toBeNull();
+      await expect(
+        prisma.authSession.count({
+          where: { userId: user.id, revokedAt: null },
+        }),
+      ).resolves.toBe(0);
+
+      // Support reactivates the account: the pre-registered password is dead,
+      // the old session too, and the owner signs in with Google.
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: UserStatus.ACTIVE },
+      });
+      await passwordLogin(user.email).expect(401);
+      await request(app.getHttpServer())
+        .post('/v1/auth/refresh')
+        .send({ refresh_token: oldRefresh })
+        .expect(401);
+      const again = await callback().expect(302);
+      expect(again.headers.location).not.toContain('error=');
+    });
+
     it('keeps the password and session of an account whose email is confirmed', async () => {
       const suffix = `confirmed-${Date.now()}`;
       const user = await createPasswordAccount(suffix);
@@ -363,6 +409,96 @@ describe('Google sign-in account linking (TTW-082)', () => {
         .get('/v1/auth/me')
         .set('Authorization', `Bearer ${oldAccess as string}`)
         .expect(200);
+    });
+  });
+
+  /**
+   * TTW-179 races: the password is checked, then removed (as a Google link
+   * securing the account does) before the request writes. The removal is
+   * slipped in right before the request's transaction starts, against the
+   * real database.
+   */
+  describe('password removed between the check and the write (TTW-179 races)', () => {
+    const PASSWORD = 'TestPassword1!';
+    const ORIGIN = 'http://localhost:3000';
+
+    async function createAccount(suffix: string) {
+      return prisma.user.create({
+        data: {
+          email: `google-race-${suffix}@example.com`,
+          passwordHash: await bcrypt.hash(PASSWORD, 10),
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Race',
+          lastName: 'Window',
+          emailVerifiedAt: new Date(),
+        },
+      });
+    }
+
+    function removePasswordJustBeforeNextTransaction(userId: string) {
+      const original = prisma.$transaction.bind(prisma) as (
+        ...args: unknown[]
+      ) => Promise<unknown>;
+      return jest.spyOn(prisma, '$transaction').mockImplementationOnce((async (
+        ...args: unknown[]
+      ) => {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash: null },
+        });
+        return original(...args);
+      }) as never);
+    }
+
+    it('opens no session for a password login whose password was removed meanwhile', async () => {
+      const user = await createAccount(`login-${Date.now()}`);
+      const spy = removePasswordJustBeforeNextTransaction(user.id);
+
+      try {
+        const res = await request(app.getHttpServer())
+          .post('/v1/auth/login')
+          .set('Origin', ORIGIN)
+          .send({ email: user.email, password: PASSWORD })
+          .expect(401);
+
+        expect(setCookieValue(res, CUSTOMER_ACCESS_COOKIE_NAME)).toBeFalsy();
+        expect(spy).toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+      await expect(
+        prisma.authSession.count({ where: { userId: user.id } }),
+      ).resolves.toBe(0);
+    });
+
+    it('does not set a new password when the checked one was removed meanwhile', async () => {
+      const user = await createAccount(`change-${Date.now()}`);
+      const login = await request(app.getHttpServer())
+        .post('/v1/auth/login')
+        .set('Origin', ORIGIN)
+        .send({ email: user.email, password: PASSWORD })
+        .expect(200);
+      const access = setCookieValue(login, CUSTOMER_ACCESS_COOKIE_NAME);
+      const spy = removePasswordJustBeforeNextTransaction(user.id);
+
+      try {
+        await request(app.getHttpServer())
+          .post('/v1/auth/change-password')
+          .set('Authorization', `Bearer ${access as string}`)
+          .send({
+            currentPassword: PASSWORD,
+            newPassword: 'AttackerPassword9!',
+          })
+          .expect(400);
+        expect(spy).toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+      const after = await prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(after.passwordHash).toBeNull();
     });
   });
 });

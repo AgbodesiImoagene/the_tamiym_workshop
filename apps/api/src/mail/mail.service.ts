@@ -21,6 +21,10 @@ export interface SendGoogleLinkedPasswordRemovedEmailPayload {
   settingsUrl: string;
 }
 
+export interface SendGoogleLinkedAccountSuspendedEmailPayload {
+  to: string;
+}
+
 export interface SendTemplatedEmailParams {
   to: string;
   subject: string;
@@ -95,6 +99,17 @@ export class MailService {
       subject: 'Your account is now linked to Google',
       template: 'google-linked-password-removed',
       context: { settingsUrl },
+    });
+  }
+
+  async sendGoogleLinkedAccountSuspendedEmail(
+    payload: SendGoogleLinkedAccountSuspendedEmailPayload,
+  ): Promise<void> {
+    await this.sendTemplatedEmail({
+      to: payload.to,
+      subject: 'Your account is linked to Google and currently blocked',
+      template: 'google-linked-account-suspended',
+      context: {},
     });
   }
 }

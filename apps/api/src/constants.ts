@@ -19,6 +19,9 @@ export const JOB_NOTIFICATION_OUTBOX = 'notification-outbox';
 /** TTW-179: notice sent after Google sign-in removed a pre-confirmation password. */
 export const JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL =
   'google-linked-password-removed-email';
+/** TTW-179: same clean-up on a suspended account; tells the owner to contact support. */
+export const JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL =
+  'google-linked-account-suspended-email';
 
 /** Payout execution queue (BullMQ) */
 export const PAYOUT_QUEUE_NAME = 'payout-execution';

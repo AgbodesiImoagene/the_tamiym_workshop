@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { getQueueToken } from '@nestjs/bullmq';
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
@@ -28,6 +32,7 @@ describe('AuthService', () => {
       findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       create: jest.Mock;
     };
     userOAuthAccount: { findUnique: jest.Mock; create: jest.Mock };
@@ -80,6 +85,7 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
       },
       userOAuthAccount: {
@@ -1198,26 +1204,176 @@ describe('AuthService', () => {
       expect(mailQueue.add).not.toHaveBeenCalled();
     });
 
-    it.each([
-      ['a suspended customer', { status: UserStatus.SUSPENDED }],
-      ['an admin', { role: UserRole.ADMIN }],
-    ])(
-      'does not remove the password of %s whose Google sign-in is refused anyway',
-      async (_label, override) => {
-        givenExistingAccount({ ...unconfirmedUser, ...override });
+    it('does not remove the password of an admin whose Google sign-in is refused anyway (TTW-113)', async () => {
+      givenExistingAccount({ ...unconfirmedUser, role: UserRole.ADMIN });
+
+      await expect(
+        service.loginWithGoogleProfile(confirmedProfile),
+      ).rejects.toThrow(UnauthorizedException);
+
+      for (const [args] of prisma.user.update.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]) {
+        expect(args.data).not.toHaveProperty('passwordHash');
+      }
+      expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+      expect(mailQueue.add).not.toHaveBeenCalled();
+    });
+
+    describe('when the unconfirmed account is suspended (user decision 2026-11-08)', () => {
+      const suspendedUser = {
+        ...unconfirmedUser,
+        status: UserStatus.SUSPENDED as UserStatus,
+      };
+
+      it('links and secures the account, then still refuses the sign-in', async () => {
+        givenExistingAccount(suspendedUser);
+        authSession.revokeAllForUser.mockResolvedValue(1);
 
         await expect(
           service.loginWithGoogleProfile(confirmedProfile),
         ).rejects.toThrow(UnauthorizedException);
 
-        for (const [args] of prisma.user.update.mock.calls as [
-          { data: Record<string, unknown> },
-        ][]) {
-          expect(args.data).not.toHaveProperty('passwordHash');
-        }
-        expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
-        expect(mailQueue.add).not.toHaveBeenCalled();
-      },
-    );
+        expect(prisma.userOAuthAccount.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ userId: 'user-9' }),
+        });
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: 'user-9' },
+          data: expect.objectContaining({ passwordHash: null }),
+        });
+        expect(authSession.revokeAllForUser).toHaveBeenCalledWith(
+          'user-9',
+          expect.anything(),
+        );
+        expect(prisma.authToken.deleteMany).toHaveBeenCalledWith({
+          where: {
+            userId: 'user-9',
+            tokenType: {
+              in: [TokenType.PASSWORD_RESET, TokenType.EMAIL_VERIFICATION],
+            },
+          },
+        });
+        expect(audit.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventName: 'auth.password.removed_on_google_link',
+            after: expect.objectContaining({ accountSuspended: true }),
+          }),
+          expect.anything(),
+        );
+        expect(authSession.createSession).not.toHaveBeenCalled();
+      });
+
+      it('queues the "account blocked, contact support" notice instead of the linked notice', async () => {
+        givenExistingAccount(suspendedUser);
+
+        await expect(
+          service.loginWithGoogleProfile(confirmedProfile),
+        ).rejects.toThrow(UnauthorizedException);
+
+        expect(mailQueue.add).toHaveBeenCalledTimes(1);
+        expect(mailQueue.add).toHaveBeenCalledWith(
+          'google-linked-account-suspended-email',
+          { to: 'owner@example.com' },
+        );
+      });
+
+      it('gives the same generic refusal when the notice cannot be queued', async () => {
+        givenExistingAccount(suspendedUser);
+        mailQueue.add.mockRejectedValueOnce(new Error('redis down'));
+        const warn = jest
+          .spyOn(Logger.prototype, 'warn')
+          .mockImplementation(() => undefined);
+
+        await expect(
+          service.loginWithGoogleProfile(confirmedProfile),
+        ).rejects.toThrow(UnauthorizedException);
+
+        expect(JSON.stringify(warn.mock.calls)).not.toContain(
+          'owner@example.com',
+        );
+        warn.mockRestore();
+      });
+    });
+  });
+
+  describe('password checked, then changed or removed before the write (TTW-179 races)', () => {
+    const passwordUser = {
+      id: 'user-7',
+      email: 'racer@example.com',
+      passwordHash: 'hash-checked',
+      firstName: 'Race',
+      lastName: 'Condition',
+      phone: null,
+      role: UserRole.CUSTOMER,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+    };
+
+    beforeEach(() => {
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.update.mockResolvedValue({});
+    });
+
+    it('opens the password-login session only if the checked password is still the stored one', async () => {
+      prisma.user.findUnique.mockResolvedValue(passwordUser);
+
+      await service.login(
+        { email: 'racer@example.com', password: 'pw' },
+        AuthSurface.CUSTOMER,
+      );
+
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-7', passwordHash: 'hash-checked' },
+        data: { lastLoginAt: expect.any(Date) },
+      });
+    });
+
+    it('refuses the password login and opens no session when the password changed meanwhile', async () => {
+      prisma.user.findUnique.mockResolvedValue(passwordUser);
+      prisma.user.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.login(
+          { email: 'racer@example.com', password: 'pw' },
+          AuthSurface.CUSTOMER,
+        ),
+      ).rejects.toThrow('Invalid credentials');
+
+      expect(audit.log).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+      expect(observability.recordAuthLogin).toHaveBeenCalledWith({
+        outcome: 'failure',
+      });
+      expect(observability.recordAuthLogin).not.toHaveBeenCalledWith({
+        outcome: 'success',
+      });
+    });
+
+    it('changes the password only if the checked current password is still the stored one', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        passwordHash: 'hash-checked',
+      });
+
+      await service.changePassword('user-7', 'old-pass', 'new-pass-123');
+
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 'user-7', passwordHash: 'hash-checked' },
+        data: { passwordHash: 'hashed-password' },
+      });
+    });
+
+    it('refuses the change and writes nothing else when the password was removed meanwhile', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        passwordHash: 'hash-checked',
+      });
+      prisma.user.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.changePassword('user-7', 'old-pass', 'new-pass-123'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(audit.log).not.toHaveBeenCalled();
+      expect(authSession.revokeAllForUser).not.toHaveBeenCalled();
+    });
   });
 });
