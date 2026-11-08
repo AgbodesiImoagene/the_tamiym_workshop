@@ -39,7 +39,7 @@ At a high level, the current pipeline is:
 2. validate shipping address ownership
 3. compute each line item
 4. aggregate subtotal and discount
-5. compute shipping fee
+5. compute shipping fee from the zone and rate that match the address. If no active zone matches, or the zone has no active rate, the quote and the order fail with 400 `SHIPPING_ADDRESS_NOT_COVERED` instead of a ₦0 fee (TTW-086). An explicit ₦0 rate set by an admin is still valid. Admins must enter every zone they deliver to: see `docs/runbooks/shipping-zone-coverage.md`
 6. compute VAT
 7. compute total
 8. round order total to display granularity

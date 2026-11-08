@@ -59,6 +59,7 @@ import {
   computeOrderRequestFingerprint,
   type FingerprintAddress,
 } from './order-idempotency';
+import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 
 type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
 
@@ -655,7 +656,8 @@ export class OrdersService {
     shippingBreakdown: Prisma.JsonValue | null,
   ): asserts shippingBreakdown is Prisma.JsonObject {
     if (!shippingBreakdown) {
-      throw new BadRequestException(
+      // Defence in depth: PricingService already refuses (TTW-086).
+      throw shippingAddressNotCovered(
         'Shipping destination could not be resolved for this address',
       );
     }

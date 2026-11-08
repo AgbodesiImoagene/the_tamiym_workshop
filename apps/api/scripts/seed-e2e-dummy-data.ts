@@ -386,6 +386,17 @@ async function main() {
       update: { name: 'Lagos', isActive: true },
       create: { code: 'LA', name: 'Lagos', isActive: true },
     });
+    // TTW-086: a real state with no shipping zone, so checkout can show the
+    // "not covered" refusal. Same name as prisma/seed.ts.
+    await prisma.geoState.upsert({
+      where: { code: 'FC' },
+      update: { isActive: true },
+      create: {
+        code: 'FC',
+        name: 'Abuja Federal Capital Territory',
+        isActive: true,
+      },
+    });
     await prisma.geoLga.upsert({
       where: {
         stateCode_name: {

@@ -21,6 +21,7 @@ import {
   type CampaignOrderQuote,
 } from '@/lib/campaign-checkout';
 import { getPublicFundraiser } from '@/lib/fundraisers';
+import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
 import { webLoginWithNext, webRegisterWithNext } from '@/lib/site';
 
 interface CheckoutFormState {
@@ -185,6 +186,11 @@ export default function FundraiserCheckoutPage() {
       });
       setQuote(nextQuote);
     } catch (err) {
+      if (isShippingNotCovered(err)) {
+        setQuote(null);
+        setError(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       if (apiError.code === 'EMAIL_NOT_VERIFIED') {
         router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
@@ -214,6 +220,13 @@ export default function FundraiserCheckoutPage() {
       const payment = await initiateOrderPayment(createdOrder.id, user?.email);
       window.location.assign(payment.authorizationUrl);
     } catch (err) {
+      // Nothing was created: the customer corrects the address, the cart stays (TTW-086).
+      if (isShippingNotCovered(err)) {
+        setQuote(null);
+        setQuoteAccepted(false);
+        setError(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       if (apiError.code === 'EMAIL_NOT_VERIFIED') {
         router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
@@ -267,7 +280,10 @@ export default function FundraiserCheckoutPage() {
       </div>
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
           {error}
         </div>
       ) : null}

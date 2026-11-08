@@ -139,7 +139,10 @@
       "feature": "Customer checkout address, quote and payment",
       "prd_ref": "Checkout & Orders",
       "automation": "automated",
-      "tests": ["tests/e2e/app/checkout-idempotency.spec.ts"],
+      "tests": [
+        "tests/e2e/app/checkout-idempotency.spec.ts",
+        "tests/e2e/app/checkout-shipping-coverage.spec.ts"
+      ],
       "browser_tiers": ["matrix", "journey"],
       "tags": ["@app", "@journey", "@critical"]
     },

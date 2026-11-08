@@ -27,6 +27,7 @@ import {
 } from './campaign-line-price';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
+import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 import {
   CampaignStatus,
   ModerationStatus,
@@ -297,7 +298,7 @@ export class PricingService {
       siteSettings.vatAppliesToShipping,
       shipmentSummary,
     );
-    const shippingFee = shippingBreakdown ? shippingBreakdown.appliedFee : 0;
+    const shippingFee = shippingBreakdown.appliedFee;
     // subtotal is pre-discount; net merchandise = subtotal - discount (= sum of lineTotals).
     const merchandiseNet = roundToMinor(
       subtotalAmount - discountAmount,
@@ -1046,23 +1047,48 @@ export class PricingService {
     return filtered.length ? Math.max(...filtered) : null;
   }
 
+  /**
+   * TTW-086: an address outside every zone, or in a zone without an active
+   * rate, is refused. Never fall back to a ₦0 fee: the workshop would pay for
+   * delivery. An explicit ₦0 rate set by an admin is a real breakdown and
+   * stays valid.
+   */
   private async computeShipping(
     address: CanonicalShippingAddress,
     currency: string,
     vatAppliedToShipping: boolean,
     shipment: ShipmentSummary,
-  ): Promise<ShippingBreakdown | null> {
+  ): Promise<ShippingBreakdown> {
     const destination =
       await this.shippingDestinationResolver.resolveAddress(address);
     if (!destination) {
-      return null;
+      this.logShippingNotCovered('NO_ZONE', address, null);
+      throw shippingAddressNotCovered();
     }
 
-    return this.shippingRateEngine.quote({
+    const breakdown = await this.shippingRateEngine.quote({
       destination,
       currency,
       shipment,
       vatAppliedToShipping,
     });
+    if (!breakdown) {
+      this.logShippingNotCovered('NO_RATE', address, destination.zoneId);
+      throw shippingAddressNotCovered();
+    }
+    return breakdown;
+  }
+
+  /** Coarse location only (country, state code, zone): no street, city or user. */
+  private logShippingNotCovered(
+    reason: 'NO_ZONE' | 'NO_RATE',
+    address: CanonicalShippingAddress,
+    zoneId: string | null,
+  ) {
+    this.logger.warn(
+      `Quote refused: address not covered by any shipping rate ` +
+        `(reason=${reason}, country=${address.countryCode}, ` +
+        `state=${address.stateCode ?? 'none'}, zone=${zoneId ?? 'none'})`,
+    );
   }
 }

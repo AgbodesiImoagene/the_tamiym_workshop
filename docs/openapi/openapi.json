@@ -14984,7 +14984,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock"
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
           },
           "401": {
             "description": "Unauthorized"
@@ -15086,7 +15086,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address"
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
           },
           "401": {
             "description": "Unauthorized"
@@ -16415,7 +16415,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock"
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
           },
           "401": {
             "description": "Unauthorized"
@@ -16504,7 +16504,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address"
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
           },
           "401": {
             "description": "Unauthorized"

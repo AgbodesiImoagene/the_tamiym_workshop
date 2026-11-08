@@ -436,6 +436,28 @@ describe('OrdersService', () => {
       );
     });
 
+    it('gives the stable SHIPPING_ADDRESS_NOT_COVERED code when shipping is unresolved (TTW-086)', async () => {
+      (pricingService.quoteStandard as jest.Mock).mockResolvedValue({
+        ...mockQuote,
+        shippingBreakdown: null,
+      });
+
+      const error: unknown = await service
+        .create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        })
+        .then(
+          () => undefined,
+          (e: unknown) => e,
+        );
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        code: 'SHIPPING_ADDRESS_NOT_COVERED',
+      });
+    });
+
     it('should throw ForbiddenException when address belongs to another user', async () => {
       (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
         new ForbiddenException('Access denied to this address'),
