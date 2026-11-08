@@ -1,7 +1,7 @@
 # TTW-176 — Run the Playwright browser matrix in CI
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** In progress (Partial: workflow merged into `main`, baselines committed on the ticket branch, no matrix run yet)  
+**Status:** In progress (Partial: on `main`, first full matrix run green by manual dispatch; nightly and broken-spec proof pending)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -73,11 +73,11 @@ To be confirmed at design review once the decision is made:
 ## Acceptance criteria
 
 - [x] The owner's decisions are recorded. → schedule: nightly; mobile Safari: added in this ticket (both 2026-11-07).
-- [ ] A mobile WebKit project runs as part of the matrix. → Partial: `mobile-webkit-web` is selected by `test:e2e:matrix` (41 tests listed); not yet seen running in CI.
-- [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one.
+- [x] A mobile WebKit project runs as part of the matrix. → run 42431599230: 41/41 `mobile-webkit-web` tests passed.
+- [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one. → Partial: manual dispatch green (run 42431599230); nightly run and broken-spec run not yet seen.
 - [x] Visual baselines are committed after an intentional review. → run 42430477854, reviewed 2026-11-08 (see evidence); first attempt rejected.
-- [ ] Every failure from the first run is fixed or quarantined with an owner and a ticket.
-- [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they describe the workflow as Implemented-unverified; to be moved to "Running in CI" only after a run is seen.
+- [x] Every failure from the first run is fixed or quarantined with an owner and a ticket. → the first full run (42431599230) had no failure and no flaky test; nothing to quarantine.
+- [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they say the matrix ran green by manual dispatch and that the nightly run is not yet observed; to move to "Running in CI" once a scheduled run is seen.
 - [ ] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
@@ -149,20 +149,27 @@ CI, after the owner asked to merge and push (2026-11-07/08):
 - Baselines, first attempt: dispatch with `update_snapshots=true` on `main`, run 42429329537, success; only the baseline steps ran (Chromium-only install, matrix step skipped). Review rejected both images: lazily loaded footer images (logo, social icons, payment logos on desktop; payment logos on mobile) were missing because a full-page screenshot does not scroll. Not committed.
 - Fix: `tests/e2e/fixtures/visual.ts` `waitForAllImages()` makes every image eager, polls until each has loaded (the failure message lists the missing URLs) and waits for `document.fonts.ready`; both visual specs call it before `toHaveScreenshot`. Commit `24178ef`, pushed to the ticket branch only.
 - Baselines, second attempt: dispatch on `codex/ttw-176-run-browser-matrix-in-ci`, run 42430477854 at `24178ef`, success. Reviewed on purpose: both pages complete, footers complete (logo, social icons, Mastercard, Visa, PayPal, divider). Committed as `tests/e2e/visual/web-home.visual.spec.ts-snapshots/web-home-desktop-chromium-visual-linux.png` (1280×4656) and `tests/e2e/visual/web-home-mobile.visual.spec.ts-snapshots/web-home-mobile-mobile-visual-web-linux.png` (393×4404).
-- Seen in review, outside this ticket: the brand fonts are never loaded, so text uses a system fallback (DejaVu Sans on CI) → TTW-177. The baselines will change on purpose when TTW-177 ships.
+- Seen in review, outside this ticket: the brand fonts are never loaded, so text uses a system fallback (DejaVu Sans on CI) → TTW-177. The Visa logo is nearly invisible on the dark footer and PayPal is shown although Paystack is the only provider → TTW-178. The baselines will change on purpose when either ships.
+
+First full matrix run (2026-11-08), after the owner asked to merge and launch:
+
+- Merge `c4171ce` pushed to `main` (on top of TTW-085's `dc0e11e`; one conflict in `docs/tickets/README.md`, resolved by keeping `main`'s table and adding the TTW-177/178 rows). CI run 42431587853: success. Playwright Comprehensive run 42431587891: success.
+- Matrix by manual dispatch on `main`, run 42431599230 at `c4171ce`: **success**. Log: `Running 319 tests using 2 workers` → `316 passed (4.4m)`, `3 skipped`, no failure, no flaky test (`--fail-on-flaky-tests` was on). Per project: firefox-web 41/41, mobile-webkit-web 41/41 passed; `chromium-visual` and `mobile-visual-web` passed against the committed baselines. The 3 skipped tests are the existing conditional skip in `tests/e2e/app/campaign-authoring.comprehensive.spec.ts:29` ("No draft campaign seeded for organiser", `chromium-app`), not a matrix browser.
+- The expected Firefox `isMobile` failure (design review, point 3) did not happen.
+- Durations: job 7 min (00:50:37 → 00:57:33 UTC), matrix step 4 min 27 s, browser install 45 s, build 52 s. The 75/55 min timeouts are far above this; tightening them is the remaining step 3.
 
 ## Completion summary
 
 **Done:** `mobile-webkit-web` project (iPhone 13) added to `playwright.config.ts` and `test:e2e:matrix`; `.github/workflows/playwright-matrix.yml` (nightly 03:00 UTC + manual dispatch, `update_snapshots` input for Linux baselines, concurrency without cancellation, `--fail-on-flaky-tests`, report upload on failure); strategy, interim policy and `docs/12-testing-strategy.md` describe it as Implemented-unverified.
 
-Merged into `main` (`c135789`) and pushed. Visual specs made deterministic and Linux baselines reviewed and committed on the ticket branch (see evidence).
+Merged into `main` (`c135789`, then `c4171ce` with the deterministic visual specs, the reviewed Linux baselines and tickets TTW-177/TTW-178) and pushed. First full matrix run green by manual dispatch (see evidence).
 
 **Deviation from plan:** no local matrix run (environment, see design review). The visual-baseline step is a workflow input instead of a separate local generation. The visual specs needed a wait for lazily loaded images before the baselines could be trusted.
 
 **Remaining, in order (each needs the owner's go-ahead to push):**
 
-1. Merge the ticket branch (spec fix and baselines) into `main` and push. Until then, the nightly run on `main` is expected to be red on the two visual tests (no baselines there).
-2. Dispatch the matrix: record the first full run. Expected first-run failure to check: Firefox does not support `isMobile`, so the tablet/mobile `describeViewportMatrix` blocks of the web `*.comprehensive.spec.ts` specs will probably fail under `firefox-web`. Every failure gets its own ticket or a quarantine with owner, ticket and expiry.
-3. Prove failure detection: one dispatch on a deliberately broken spec (red), then the good one (green); watch one scheduled run.
-4. Tune the job/step timeouts from the measured run; move the documents to "Running in CI"; tick the remaining criteria.
-5. Once TTW-085 has landed, update `docs/11-development-setup.md:92` (the matrix line misses mobile WebKit, accessibility and visual projects).
+1. Watch one scheduled run (first one: 2026-11-08 03:00 UTC) and record it.
+2. Prove failure detection: one dispatch on a throwaway branch with a deliberately broken spec (red), then the good one (green). The throwaway branch is deleted afterwards and never merged.
+3. Tighten the timeouts from the measured run (job 7 min, step 4.5 min): for example job 30 min, matrix step 20 min.
+4. Update `docs/11-development-setup.md:92` (TTW-085 has landed; the matrix line misses mobile WebKit, accessibility and visual projects).
+5. Move the documents to "Running in CI", tick the last criteria, close the ticket.
