@@ -5094,7 +5094,7 @@ export interface components {
             /** @default true */
             vatAppliesToShipping: boolean;
             /**
-             * @description VAT rate (e.g. 0.075 for 7.5%)
+             * @description VAT rate (e.g. 0.075 for 7.5%). At most 4 decimal places, the stored precision; finer values are rejected rather than rounded (TTW-084).
              * @example 0.075
              */
             vatRate?: number;
@@ -10025,7 +10025,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Site settings */
+            /** @description Site settings. When no settings exist yet, vatRate is null (never 0) so the admin must enter a rate before saving (TTW-084). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10090,7 +10090,7 @@ export interface operations {
                     /** @default true */
                     vatAppliesToShipping?: boolean;
                     /**
-                     * @description VAT rate (e.g. 0.075 for 7.5%)
+                     * @description VAT rate (e.g. 0.075 for 7.5%). At most 4 decimal places, the stored precision; finer values are rejected rather than rounded (TTW-084).
                      * @example 0.075
                      */
                     vatRate?: number;

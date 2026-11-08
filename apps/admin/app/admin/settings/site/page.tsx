@@ -39,7 +39,8 @@ type SiteSettingsForm = {
 };
 
 const defaultForm: SiteSettingsForm = {
-  vatRatePercent: '0',
+  // Empty until settings load, never a placeholder 0% (TTW-084).
+  vatRatePercent: '',
   pricesIncludeVat: true,
   vatAppliesToShipping: true,
   currency: CurrencyCode.NGN,
@@ -52,7 +53,9 @@ const defaultForm: SiteSettingsForm = {
 
 function toFormState(settings: SiteSettings): SiteSettingsForm {
   return {
-    vatRatePercent: String(Number(settings.vatRate) * 100),
+    // TTW-084: an unset rate stays empty so it is never saved back as 0%.
+    vatRatePercent:
+      settings.vatRate == null ? '' : String(Number((Number(settings.vatRate) * 100).toFixed(2))),
     pricesIncludeVat: settings.pricesIncludeVat,
     vatAppliesToShipping: settings.vatAppliesToShipping,
     currency: settings.currency as CurrencyCode,
@@ -65,11 +68,26 @@ function toFormState(settings: SiteSettings): SiteSettingsForm {
   };
 }
 
+/**
+ * Returns the VAT rate as a fraction, or null when the field is empty, out of
+ * range, or finer than 2 decimals (the stored precision, Decimal(5,4)).
+ */
+function parseVatRate(vatRatePercent: string): number | null {
+  const trimmed = vatRatePercent.trim();
+  // Plain decimal with at most 2 decimals; checked on the text to avoid float error.
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(trimmed)) return null;
+  const percent = Number(trimmed);
+  if (percent > 100) return null;
+  // toFixed keeps the fraction at 4 decimals (e.g. 7.55 -> 0.0755, not 0.07550000000000001).
+  return Number((percent / 100).toFixed(4));
+}
+
 export default function AdminSiteSettingsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<SiteSettingsForm>(defaultForm);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [vatRateInvalid, setVatRateInvalid] = useState(false);
 
   const settingsQuery = useQuery({
     queryKey: ['admin-site-settings'],
@@ -88,14 +106,15 @@ export default function AdminSiteSettingsPage() {
   );
   const normalizedCurrent = JSON.stringify(form);
   const isDirty = normalizedInitial != null && normalizedInitial !== normalizedCurrent;
+  const vatRateNotConfigured = settingsQuery.data != null && settingsQuery.data.vatRate == null;
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (vatRate: number) => {
       const minimumPayoutAmount =
         form.minimumPayoutAmount.trim() === '' ? null : Number(form.minimumPayoutAmount);
 
       return updateAdminSiteSettings({
-        vatRate: Number(form.vatRatePercent) / 100,
+        vatRate,
         pricesIncludeVat: form.pricesIncludeVat,
         vatAppliesToShipping: form.vatAppliesToShipping,
         currency: form.currency,
@@ -145,10 +164,28 @@ export default function AdminSiteSettingsPage() {
                   type="number"
                   min="0"
                   max="100"
-                  step="0.1"
+                  step="0.01"
+                  required
+                  aria-invalid={vatRateInvalid || undefined}
+                  aria-describedby={
+                    [
+                      vatRateNotConfigured ? 'vatRateNotConfigured' : null,
+                      vatRateInvalid ? 'siteSettingsError' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                   value={form.vatRatePercent}
-                  onChange={(event) => updateField('vatRatePercent', event.target.value)}
+                  onChange={(event) => {
+                    setVatRateInvalid(false);
+                    updateField('vatRatePercent', event.target.value);
+                  }}
                 />
+                {vatRateNotConfigured ? (
+                  <p id="vatRateNotConfigured" role="alert" className="text-sm text-destructive">
+                    No VAT rate is set. Checkout is paused until you enter one and save.
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
@@ -309,7 +346,15 @@ export default function AdminSiteSettingsPage() {
                       onClick={() => {
                         setMessage(null);
                         setError(null);
-                        saveMutation.mutate();
+                        const vatRate = parseVatRate(form.vatRatePercent);
+                        if (vatRate == null) {
+                          setVatRateInvalid(true);
+                          setError(
+                            'Enter a VAT rate between 0 and 100, with at most 2 decimals, before saving.'
+                          );
+                          return;
+                        }
+                        saveMutation.mutate(vatRate);
                       }}
                       disabled={saveMutation.isPending || !isDirty}
                     >
@@ -331,7 +376,11 @@ export default function AdminSiteSettingsPage() {
                     </Button>
                   </div>
                   {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-                  {error ? <p className="text-sm text-red-700">{error}</p> : null}
+                  {error ? (
+                    <p id="siteSettingsError" role="alert" className="text-sm text-red-700">
+                      {error}
+                    </p>
+                  ) : null}
                 </>
               )}
             </CardContent>

@@ -81,6 +81,22 @@ describe('AdminSiteSettingsController VAT on first save (TTW-084)', () => {
 
   const admin = { id: 'admin', role: 'ADMIN' } as never;
 
+  it('reports no VAT rate, instead of 0, when the settings row is missing', async () => {
+    const { controller } = await build(null);
+    const settings = await controller.findOne();
+    expect(settings.vatRate).toBeNull();
+  });
+
+  it('reports the saved VAT rate as a number', async () => {
+    const { controller } = await build({
+      id: 'default',
+      vatRate: '0.0750',
+      minimumPayoutAmount: null,
+    });
+    const settings = await controller.findOne();
+    expect(settings.vatRate).toBe(0.075);
+  });
+
   it('refuses to create the settings row without a VAT rate', async () => {
     const { prisma, controller } = await build(null);
     await expect(

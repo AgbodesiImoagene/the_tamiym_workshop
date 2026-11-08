@@ -42,7 +42,11 @@ export class AdminSiteSettingsController {
   @ApiOperation({ summary: 'Get site settings' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiResponse({ status: 200, description: 'Site settings' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Site settings. When no settings exist yet, vatRate is null (never 0) so the admin must enter a rate before saving (TTW-084).',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async findOne() {
@@ -50,9 +54,11 @@ export class AdminSiteSettingsController {
       where: { id: SITE_SETTINGS_ID },
     });
     if (!settings) {
+      // TTW-084: no VAT rate has been set. Report null rather than 0 so the
+      // admin form cannot silently save 0% back.
       return {
         id: SITE_SETTINGS_ID,
-        vatRate: 0,
+        vatRate: null,
         pricesIncludeVat: true,
         vatAppliesToShipping: true,
         currency: 'NGN',

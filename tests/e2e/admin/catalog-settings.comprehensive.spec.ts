@@ -34,6 +34,28 @@ describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () =>
     await assertVisibleControlsEnabled(adminPage.locator('main'));
   });
 
+  test('site settings refuse to save an empty VAT rate (TTW-084)', async ({ adminPage }) => {
+    await adminPage.goto('/admin/settings/site');
+    const saveButton = adminPage.getByRole('button', { name: /Save site settings/i });
+    // The Save button only renders once settings have loaded, so the field
+    // now holds the saved rate rather than a loading placeholder.
+    await expect(saveButton).toBeVisible();
+    const vatRate = adminPage.getByLabel('VAT rate (%)');
+    await expect(vatRate).not.toHaveValue('');
+    const savedVatRate = await vatRate.inputValue();
+
+    await vatRate.fill('');
+    await saveButton.click();
+
+    await expect(
+      adminPage.getByRole('alert').filter({ hasText: /Enter a VAT rate/ })
+    ).toBeVisible();
+    await expect(vatRate).toHaveAttribute('aria-invalid', 'true');
+    await adminPage.reload();
+    await expect(adminPage.getByRole('button', { name: /Save site settings/i })).toBeVisible();
+    await expect(adminPage.getByLabel('VAT rate (%)')).toHaveValue(savedVatRate);
+  });
+
   test('payout runs workspace create panel', async ({ adminPage }) => {
     await adminPage.goto('/admin/payouts/runs');
     await expect(adminPage.getByRole('heading', { name: /Payout runs/i })).toBeVisible();

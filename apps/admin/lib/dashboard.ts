@@ -243,7 +243,8 @@ export interface AdminPayoutRunPreview {
 
 export interface SiteSettings {
   id: string;
-  vatRate: number;
+  /** Null when no VAT rate has been saved yet (TTW-084). */
+  vatRate: number | null;
   pricesIncludeVat: boolean;
   vatAppliesToShipping: boolean;
   currency: string;
