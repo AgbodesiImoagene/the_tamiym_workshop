@@ -42,7 +42,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)         | P2       | Standard | Complete    | Align the Playwright CI gates with the written strategy                                  | Not in review |
 | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                     | P2       | Standard | In progress | Run the Playwright browser matrix (Firefox, WebKit, mobile, visual) in CI                | Not in review |
 | [TTW-181](ttw-181-seed-the-real-vat-rate-in-e2e-data.md)           | P2       | Low      | Scoped      | Seed the real 7.5% VAT rate in the e2e data instead of 7%                                | Not in review |
-| [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | P2       | Low      | Scoped      | Stop the customer app unit tests failing at random under parallel load                   | Not in review |
+| [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | P2       | Low      | Complete    | Stop the customer app unit tests failing at random under parallel load                   | Not in review |
 | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)         | P2       | Standard | Scoped      | Move the admin site settings form to Zod and React Hook Form                             | Not in review |
 
 ## Epic 1 — Financial and inventory integrity

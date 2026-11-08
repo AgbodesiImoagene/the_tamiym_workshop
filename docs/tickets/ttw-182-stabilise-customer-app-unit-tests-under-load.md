@@ -180,7 +180,7 @@ Gates:
 
 ## Completion summary
 
-**State: Complete on branch `codex/ttw-182-stabilise-app-unit-tests`, not merged into `main`.**
+**State: Complete.** Merged into `main` at the owner's request (merge of `7e99d08` onto `f4133f2`).
 
 Test-only change in `apps/app`: no production code, contract, migration or observability change.
 
@@ -189,7 +189,6 @@ Test-only change in `apps/app`: no production code, contract, migration or obser
 - `jest.config.ts`: `testTimeout: 30_000`, the only wall-clock limit left, as a hang detector.
 - `order-confirm-page.test.tsx`: the local 5 s `LOAD_TIMEOUT` is removed.
 
-Not done here:
+Merge with TTW-086: `main` had meanwhile added three checkout tests (`address outside every shipping zone`) to `checkout-page.test.tsx`. Git merged the file without conflict, and the new tests run under the fake timers. They queue `quoteOrder.mockRejectedValueOnce`, so `quoteOrder` is now reset before each test too (`012f7a4`). On the merged code, at load average ~650: `npx jest` in `apps/app` 45/45, then `npx jest __tests__/checkout` 18/18 after the reset.
 
-- `docs/tickets/README.md` and `ROADMAP.md` still show TTW-182 as open. The TTW-181 and TTW-183 rows sit on the next lines and those tickets are being worked in parallel, so the index is better updated at merge time to avoid a conflict.
-- Out of scope, not checked: `apps/web` (node environment, no `waitFor`) and `apps/admin` (no unit runner).
+Out of scope, not checked: `apps/web` (node environment, no `waitFor`) and `apps/admin` (no unit runner).
