@@ -106,6 +106,7 @@ beforeEach(() => {
   // into the next one and turn one failure into several (TTW-182).
   (createOrder as jest.Mock).mockReset();
   (initiateOrderPayment as jest.Mock).mockReset();
+  (quoteOrder as jest.Mock).mockReset();
   window.localStorage.clear();
   (getUserAddresses as jest.Mock).mockResolvedValue([savedAddress]);
   (upsertPrimaryAddress as jest.Mock).mockResolvedValue(savedAddress);
