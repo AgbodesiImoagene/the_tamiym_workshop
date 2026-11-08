@@ -1,7 +1,7 @@
 # TTW-083 — Hash password-reset and email-verification tokens
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-005\
 **Blocks:** TTW-089
@@ -130,5 +130,7 @@ Not verified: no browser journey (no visible change; the forgot/reset pages are 
 - Reset and verification tokens are stored only as `sha256(token)` in `auth_tokens.tokenHash`; the raw token exists only in the emailed link (`apps/api/src/auth/auth-token.crypto.ts`, `auth.service.ts`).
 - Consumption is single-use and race-safe: a replay, a simultaneous click or a token that expired meanwhile gets a 400 and writes nothing (previously a 500 on the simultaneous click).
 - Migration `20261108115106_ttw083_hash_auth_tokens` removes every existing row: outstanding links stop working.
-- State: committed locally on `codex/ttw-083-hash-password-reset-and-verification-tok`. Not pushed or merged. `README.md` / `ROADMAP.md` to be updated when the ticket is closed.
-- Remaining: the out-of-scope observations listed under Implementation reviews (raw link in Redis job data is the main one), to be ticketed if wanted. TTW-089 (forgot/reset pages) is unblocked once this is merged.
+- The raw link left in Redis job data is handled by TTW-184. The other out-of-scope observations under Implementation reviews stay open without a ticket. TTW-089 (forgot/reset pages) is unblocked.
+- Local databases created before this change need `pnpm --filter api exec prisma migrate deploy` before the API is restarted.
+
+**State: Verified.** Merged into `main` at the owner's request (merge commit `b157db5`, change `0eeee5d`) and pushed. On the merged `main`, before the push: `pnpm --filter api typecheck` and `lint` exit 0, `pnpm --filter api test` 148 suites / 1322 tests passed, `pnpm migrations:check` and `pnpm openapi:check` passed. GitHub CI run 42495781578 on `b157db5`: success, all 18 jobs (including API Integration, Unit Tests, Coverage, Migration Baseline, OpenAPI Contracts, Playwright Smoke, container builds). Playwright Comprehensive run 42495781554: success.
