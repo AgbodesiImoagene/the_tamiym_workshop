@@ -90,15 +90,17 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 0 : Fiabiliser la base et la CI
 
-| Fait | N°  | Ticket                                                        | Lot | Travail                                                           | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------- | --- | ----------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md) | 0A  | Aligner le schéma de la base et les migrations                    | —     | Élevé    | —      | —      |
-| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)        | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué    | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)              | 0A  | Refuser les quantités de palier que la base ne peut pas stocker   | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)  | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)    | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite | —     | Standard | —      | —      |
-| [x]  | —   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)      | 0A  | Interdire deux remboursements pour un même identifiant Paystack   | —     | Critique | —      | —      |
-| [ ]  | 2   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI              | —     | Standard | —      | —      |
+| Fait | N°  | Ticket                                                             | Lot | Travail                                                                      | Excel | Risque   | Heures | Attend |
+| ---- | --- | ------------------------------------------------------------------ | --- | ---------------------------------------------------------------------------- | ----- | -------- | ------ | ------ |
+| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)      | 0A  | Aligner le schéma de la base et les migrations                               | —     | Élevé    | —      | —      |
+| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)             | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué               | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                   | 0A  | Refuser les quantités de palier que la base ne peut pas stocker              | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)       | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés            | —     | Faible   | —      | —      |
+| [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)         | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite            | —     | Standard | —      | —      |
+| [x]  | —   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)           | 0A  | Interdire deux remboursements pour un même identifiant Paystack              | —     | Critique | —      | —      |
+| [ ]  | 2   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                     | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI                         | —     | Standard | —      | —      |
+| [ ]  | —   | [TTW-181](ttw-181-seed-the-real-vat-rate-in-e2e-data.md)           | 0A  | Données de test : TVA à 7,5 % au lieu de 7 %                                 | —     | Faible   | 1      | —      |
+| [ ]  | —   | [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | 0A  | Tests de l'app client qui échouent au hasard quand tout tourne en même temps | —     | Faible   | 1–3    | —      |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
@@ -167,6 +169,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 41  | [TTW-168](ttw-168-report-failed-admin-product-saves.md)      | 5C  | Fiche produit admin : signaler les changements refusés                | —     | Faible   | —      | —       |
 | [ ]  | 42  | [TTW-173](ttw-173-document-image-update-contract.md)         | 5C  | Documenter dans l'API comment délier une image d'une variante         | —     | Faible   | —      | —       |
 | [ ]  | 43  | [TTW-169](ttw-169-tighten-image-variant-journey.md)          | 5D  | Resserrer le test image et variante                                   | —     | Faible   | —      | —       |
+| [ ]  | —   | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)   | 5C  | Réglages du site admin : formulaire avec Zod et React Hook Form       | —     | Standard | 2–4    | —       |
 
 ## Phase 6 : Données personnelles, légal, site public
 

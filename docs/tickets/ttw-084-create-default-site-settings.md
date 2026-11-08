@@ -206,7 +206,7 @@ Deviations from the proposal:
 
 Remaining:
 
-- Pre-existing bug, outside this ticket: `apps/api/scripts/seed-e2e-dummy-data.ts:407` stores `toAmount(0.075)`, and `toAmount` uses `toFixed(2)`, so `seed:e2e` writes VAT 7% (`0.0700`), not 7.5%.
-- Pre-existing: `apps/app` unit tests are flaky under parallel turbo load (see evidence).
-- The admin page still uses `useState` rather than Zod and React Hook Form.
+- Pre-existing bug, outside this ticket: `apps/api/scripts/seed-e2e-dummy-data.ts:407` stores `toAmount(0.075)`, and `toAmount` uses `toFixed(2)`, so `seed:e2e` writes VAT 7% (`0.0700`), not 7.5%. → TTW-181.
+- Pre-existing: `apps/app` unit tests are flaky under parallel turbo load (see evidence). → TTW-182.
+- The admin page still uses `useState` rather than Zod and React Hook Form. → TTW-183.
 - Out of scope: the payout fallbacks in `apps/api/src/payouts/*`.
