@@ -613,11 +613,13 @@ model UserOAuthAccount {
 
 /// Centralised one-time auth tokens: password reset, email verification.
 /// Refresh credentials live in AuthSession (hashed) — TTW-023.
+/// The raw token is never stored — only sha256(token) (TTW-083); it exists in
+/// the emailed link alone, so a database read cannot produce a working link.
 model AuthToken {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String    @unique
+  tokenHash String    @unique
   tokenType TokenType
 
   /// Legacy surface column from TTW-020 refresh rows. Null for RESET/VERIFY.
@@ -629,7 +631,6 @@ model AuthToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
-  @@index([token])
   @@index([tokenType])
   @@index([expiresAt])
   @@index([authSurface])

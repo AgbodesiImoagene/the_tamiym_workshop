@@ -258,13 +258,13 @@ describe('Google sign-in account linking (TTW-082)', () => {
         data: [
           {
             userId: user.id,
-            token: `reset-${suffix}`,
+            tokenHash: `reset-${suffix}`,
             tokenType: TokenType.PASSWORD_RESET,
             expiresAt: new Date(Date.now() + 3_600_000),
           },
           {
             userId: user.id,
-            token: `verify-${suffix}`,
+            tokenHash: `verify-${suffix}`,
             tokenType: TokenType.EMAIL_VERIFICATION,
             expiresAt: new Date(Date.now() + 3_600_000),
           },
