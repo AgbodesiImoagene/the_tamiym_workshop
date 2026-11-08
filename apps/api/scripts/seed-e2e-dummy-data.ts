@@ -37,6 +37,7 @@ import {
   closePrismaScriptContext,
   createPrismaScriptContext,
 } from './_prisma-script-client';
+import { seedE2eSiteSettings } from './seed-e2e-site-settings';
 import {
   decodeMfaEncryptionKey,
   encryptTotpSecret,
@@ -412,32 +413,7 @@ async function main() {
       },
     });
 
-    await prisma.siteSettings.upsert({
-      where: { id: 'default' },
-      update: {
-        vatRate: toAmount(0.075),
-        pricesIncludeVat: true,
-        vatAppliesToShipping: true,
-        currency: CurrencyCode.NGN,
-        payoutMode: PayoutMode.AUTO_APPROVAL_REQUIRED,
-        payoutCadenceDays: 7,
-        payoutSettlementHoldDays: 7,
-        minimumPayoutAmount: toAmount(1000),
-        autoRetryFailedPayouts: true,
-      },
-      create: {
-        id: 'default',
-        vatRate: toAmount(0.075),
-        pricesIncludeVat: true,
-        vatAppliesToShipping: true,
-        currency: CurrencyCode.NGN,
-        payoutMode: PayoutMode.AUTO_APPROVAL_REQUIRED,
-        payoutCadenceDays: 7,
-        payoutSettlementHoldDays: 7,
-        minimumPayoutAmount: toAmount(1000),
-        autoRetryFailedPayouts: true,
-      },
-    });
+    await seedE2eSiteSettings(prisma);
 
     await prisma.shippingZone.create({
       data: {
