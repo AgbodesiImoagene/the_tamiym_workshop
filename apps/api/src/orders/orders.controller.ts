@@ -54,6 +54,11 @@ export class OrdersController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input or address' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'Pricing unavailable: site settings are not configured (TTW-084)',
+  })
   async quote(@CurrentUser() user: RequestUser, @Body() dto: QuoteRequestDto) {
     return this.pricingService.quoteStandard(user.id, dto);
   }
@@ -82,6 +87,11 @@ export class OrdersController {
     status: 409,
     description:
       'IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'Pricing unavailable: site settings are not configured (TTW-084)',
   })
   async create(
     @CurrentUser() user: RequestUser,

@@ -5094,7 +5094,7 @@ export interface components {
             /** @default true */
             vatAppliesToShipping: boolean;
             /**
-             * @description VAT rate (e.g. 0.075 for 7.5%)
+             * @description VAT rate (e.g. 0.075 for 7.5%). At most 4 decimal places, the stored precision; finer values are rejected rather than rounded (TTW-084).
              * @example 0.075
              */
             vatRate?: number;
@@ -10025,7 +10025,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Site settings */
+            /** @description Site settings. When no settings exist yet, vatRate is null (never 0) so the admin must enter a rate before saving (TTW-084). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10090,7 +10090,7 @@ export interface operations {
                     /** @default true */
                     vatAppliesToShipping?: boolean;
                     /**
-                     * @description VAT rate (e.g. 0.075 for 7.5%)
+                     * @description VAT rate (e.g. 0.075 for 7.5%). At most 4 decimal places, the stored precision; finer values are rejected rather than rounded (TTW-084).
                      * @example 0.075
                      */
                     vatRate?: number;
@@ -10100,6 +10100,13 @@ export interface operations {
         responses: {
             /** @description Updated site settings */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid input, AUTO_EXECUTE not allowed, or vatRate missing while site settings do not exist yet */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11673,6 +11680,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     CampaignsController_quoteCampaignOrder: {
@@ -11737,6 +11751,13 @@ export interface operations {
             };
             /** @description Campaign not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12816,6 +12837,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     OrdersController_quote: {
@@ -12863,6 +12891,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

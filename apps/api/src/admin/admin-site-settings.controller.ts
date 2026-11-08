@@ -1,4 +1,11 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -35,7 +42,11 @@ export class AdminSiteSettingsController {
   @ApiOperation({ summary: 'Get site settings' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiResponse({ status: 200, description: 'Site settings' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Site settings. When no settings exist yet, vatRate is null (never 0) so the admin must enter a rate before saving (TTW-084).',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async findOne() {
@@ -43,9 +54,11 @@ export class AdminSiteSettingsController {
       where: { id: SITE_SETTINGS_ID },
     });
     if (!settings) {
+      // TTW-084: no VAT rate has been set. Report null rather than 0 so the
+      // admin form cannot silently save 0% back.
       return {
         id: SITE_SETTINGS_ID,
-        vatRate: 0,
+        vatRate: null,
         pricesIncludeVat: true,
         vatAppliesToShipping: true,
         currency: 'NGN',
@@ -73,6 +86,11 @@ export class AdminSiteSettingsController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiResponse({ status: 200, description: 'Updated site settings' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input, AUTO_EXECUTE not allowed, or vatRate missing while site settings do not exist yet',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async update(
@@ -105,11 +123,20 @@ export class AdminSiteSettingsController {
     const before = await this.prisma.siteSettings.findUnique({
       where: { id: SITE_SETTINGS_ID },
     });
+    // TTW-084: never create the row with a VAT rate nobody set. If the row
+    // vanished between this read and the upsert, recreate it with the rate
+    // that was just read.
+    const createVatRate = dto.vatRate ?? before?.vatRate;
+    if (createVatRate === undefined) {
+      throw new BadRequestException(
+        'vatRate is required when site settings do not exist yet',
+      );
+    }
     const updated = await this.prisma.siteSettings.upsert({
       where: { id: SITE_SETTINGS_ID },
       create: {
         id: SITE_SETTINGS_ID,
-        vatRate: dto.vatRate ?? 0,
+        vatRate: createVatRate,
         pricesIncludeVat: dto.pricesIncludeVat ?? true,
         vatAppliesToShipping: dto.vatAppliesToShipping ?? true,
         currency: (dto.currency ?? 'NGN') as 'NGN',

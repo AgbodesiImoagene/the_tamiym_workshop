@@ -12,10 +12,11 @@ import { CurrencyCode, PayoutMode } from '../../generated/prisma/enums';
 export class UpdateSiteSettingsDto {
   @ApiPropertyOptional({
     example: 0.075,
-    description: 'VAT rate (e.g. 0.075 for 7.5%)',
+    description:
+      'VAT rate (e.g. 0.075 for 7.5%). At most 4 decimal places, the stored precision; finer values are rejected rather than rounded (TTW-084).',
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)
   @Max(1)
   vatRate?: number;
