@@ -35,7 +35,7 @@ Mode-specific behavior:
 
 At a high level, the current pipeline is:
 
-1. load site settings and currency
+1. load site settings and currency (the `default` row is created by migration with 7.5% inclusive VAT; if it is missing, the quote fails with 503 rather than pricing at 0% VAT, TTW-084)
 2. validate shipping address ownership
 3. compute each line item
 4. aggregate subtotal and discount

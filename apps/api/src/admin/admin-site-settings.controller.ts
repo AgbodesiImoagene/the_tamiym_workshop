@@ -1,4 +1,11 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -73,6 +80,11 @@ export class AdminSiteSettingsController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiResponse({ status: 200, description: 'Updated site settings' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input, AUTO_EXECUTE not allowed, or vatRate missing while site settings do not exist yet',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async update(
@@ -105,11 +117,20 @@ export class AdminSiteSettingsController {
     const before = await this.prisma.siteSettings.findUnique({
       where: { id: SITE_SETTINGS_ID },
     });
+    // TTW-084: never create the row with a VAT rate nobody set. If the row
+    // vanished between this read and the upsert, recreate it with the rate
+    // that was just read.
+    const createVatRate = dto.vatRate ?? before?.vatRate;
+    if (createVatRate === undefined) {
+      throw new BadRequestException(
+        'vatRate is required when site settings do not exist yet',
+      );
+    }
     const updated = await this.prisma.siteSettings.upsert({
       where: { id: SITE_SETTINGS_ID },
       create: {
         id: SITE_SETTINGS_ID,
-        vatRate: dto.vatRate ?? 0,
+        vatRate: createVatRate,
         pricesIncludeVat: dto.pricesIncludeVat ?? true,
         vatAppliesToShipping: dto.vatAppliesToShipping ?? true,
         currency: (dto.currency ?? 'NGN') as 'NGN',

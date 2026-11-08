@@ -10105,6 +10105,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Invalid input, AUTO_EXECUTE not allowed, or vatRate missing while site settings do not exist yet */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Unauthorized */
             401: {
                 headers: {
@@ -11673,6 +11680,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     CampaignsController_quoteCampaignOrder: {
@@ -11737,6 +11751,13 @@ export interface operations {
             };
             /** @description Campaign not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12816,6 +12837,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     OrdersController_quote: {
@@ -12863,6 +12891,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pricing unavailable: site settings are not configured (TTW-084) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

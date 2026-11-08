@@ -16,6 +16,7 @@ Use with the immutable release manifest artefact for a specific candidate SHA. *
 - [ ] Target environment identity confirmed (project, region, hostnames — not production)
 - [ ] Backup of any pre-existing tmpval data if reusing environment (or fresh create documented)
 - [ ] `prisma migrate deploy` executed against tmpval database; exit 0; no pending migrations
+- [ ] Site settings row present after migrate (TTW-084): Admin → Settings shows the expected VAT rate (default 7.5%, prices include VAT, VAT on shipping). Without the row, quotes and orders fail with 503 instead of pricing at 0% VAT
 - [ ] Candidate images deployed by **digest** (not tag alone)
 - [ ] API health `/v1/health` green; Redis and PostgreSQL connectivity confirmed
 - [ ] Playwright smoke (`pnpm test:e2e:smoke`) on candidate builds — CI evidence or repeated run

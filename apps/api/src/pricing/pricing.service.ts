@@ -2,10 +2,11 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEFAULT_CURRENCY } from '../constants';
 import type {
   PricingLineItemInput,
   PricingLineItemOutput,
@@ -153,6 +154,8 @@ type ComputedLineItem = {
  */
 @Injectable()
 export class PricingService {
+  private readonly logger = new Logger(PricingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly shippingDestinationResolver: ShippingDestinationResolver,
@@ -360,12 +363,14 @@ export class PricingService {
       where: { id: 'default' },
     });
     if (!settings) {
-      return {
-        vatRate: 0,
-        pricesIncludeVat: true,
-        vatAppliesToShipping: true,
-        currency: DEFAULT_CURRENCY,
-      };
+      // TTW-084: never price with a VAT rate nobody set. The row is created
+      // by migration; if it is missing, refuse rather than charge 0% VAT.
+      this.logger.error(
+        'Pricing refused: site settings row "default" is missing',
+      );
+      throw new ServiceUnavailableException(
+        'Pricing is temporarily unavailable. Please try again later.',
+      );
     }
     return {
       vatRate: Number(settings.vatRate),

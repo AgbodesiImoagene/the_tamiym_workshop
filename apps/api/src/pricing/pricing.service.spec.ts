@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PricingService } from './pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
@@ -344,6 +348,49 @@ describe('PricingService', () => {
       expect(
         result.totalBeforeDisplayRounding + result.roundingAdjustment,
       ).toBe(result.totalAmount);
+    });
+  });
+
+  describe('missing site settings (TTW-084)', () => {
+    beforeEach(() => {
+      (prisma.siteSettings.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 9050 }],
+      });
+      (prisma.discountCampaign.findMany as jest.Mock).mockResolvedValue([]);
+    });
+
+    it('refuses a standard quote instead of pricing at 0% VAT', async () => {
+      await expect(
+        service.quoteStandard('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('refuses a campaign quote instead of pricing at 0% VAT', async () => {
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('reads the default settings row by its fixed id and keeps configuration details out of the client message', async () => {
+      await expect(
+        service.quoteStandard('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+        }),
+      ).rejects.toThrow(
+        'Pricing is temporarily unavailable. Please try again later.',
+      );
+      expect(prisma.siteSettings.findUnique).toHaveBeenCalledWith({
+        where: { id: 'default' },
+      });
     });
   });
 
