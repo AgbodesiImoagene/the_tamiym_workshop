@@ -149,7 +149,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 
 | Ticket                                                             | Priority | Risk     | State    | Outcome                                                   | Review         |
 | ------------------------------------------------------------------ | -------- | -------- | -------- | --------------------------------------------------------- | -------------- |
-| [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)      | P0       | High     | Scoped   | Link Google sign-in only to confirmed emails              | 1.8            |
+| [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)      | P0       | High     | Complete | Link Google sign-in only to confirmed emails              | 1.8            |
 | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)  | P0       | High     | Scoped   | Hash password-reset and email-verification tokens         | 1.7            |
 | [TTW-084](ttw-084-create-default-site-settings.md)                 | P0       | High     | Complete | Create default site settings so VAT is never silently 0%  | 8.6            |
 | [TTW-085](ttw-085-validate-production-mail-settings.md)            | P0       | Standard | Complete | Validate production mail settings at startup              | 10.5           |
@@ -234,6 +234,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)          | P1       | High     | Scoped   | Keep existing variants when an option is added            | Not in review  |
 | [TTW-177](ttw-177-ship-brand-fonts.md)                             | P2       | Standard | Scoped   | Ship the brand fonts (Mundial, Neuffila Grotesk)          | Not in review  |
 | [TTW-178](ttw-178-fix-footer-payment-logos.md)                     | P2       | Low      | Scoped   | Show only accepted, legible payment logos in the footer   | Not in review  |
+| [TTW-179](ttw-179-close-google-account-prehijacking.md)            | P0       | High     | Complete | Secure unconfirmed accounts on Google linking             | Not in review  |
 | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)     | P1       | High     | Scoped   | Refuse known public MFA encryption keys in production     | Not in review  |
 
 ## Explicitly deferred post-v1 backlog

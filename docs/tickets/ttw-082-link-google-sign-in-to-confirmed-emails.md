@@ -1,7 +1,7 @@
 # TTW-082 — Link Google sign-in only to confirmed emails
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (committed on the ticket branch, not merged into `main`)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -130,4 +130,6 @@ Not run: Playwright and a browser run. Real Google sign-in cannot be played loca
 - Tests: 7 new unit tests in `auth.service.spec.ts`, 4 in the new `google-oauth.service.spec.ts`, 4 integration tests in the new `test/google-oauth-linking.e2e-spec.ts`.
 - Docs: new threat-model row in `docs/14-auth-and-session-architecture.md`.
 - No deviation from the plan. No endpoint, DTO, schema, migration or OpenAPI change.
-- Left to do: merge into `main` and read CI when the user asks; open a ticket for the account pre-hijacking finding above if the user agrees. `docs/tickets/ROADMAP.md` is not ticked yet, to avoid a conflict with parallel ticket work.
+- The account pre-hijacking finding above is handled by TTW-179.
+
+**State: Verified.** Merged into `main` at the owner's request and pushed. A parallel session's `git pull --rebase` flattened the merge commit, so the change landed as `aaa197b` (same content as `df4b451`). CI green on `main` at `f9bdf0b` (run 42476342450, all 18 jobs; Playwright Comprehensive run 42476342523).

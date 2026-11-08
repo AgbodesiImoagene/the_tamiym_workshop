@@ -1,9 +1,9 @@
 # TTW-179 — Close account pre-hijacking through Google sign-in
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented (committed on the ticket branch, not merged into `main`)\
+**Status:** Complete\
 **Risk:** High\
-**Blocked by:** TTW-082 (this branch is cut from `codex/ttw-082-link-google-sign-in-to-confirmed-emails` at `df4b451`, not from `main`; merge TTW-082 into `main` first)\
+**Blocked by:** None (TTW-082 is on `main`)\
 **Blocks:** None
 
 ## Background
@@ -256,6 +256,5 @@ Not run: Playwright or a browser run. A real Google sign-in cannot be played loc
 - Docs: threat-model row in `docs/14-auth-and-session-architecture.md`.
 - No endpoint, DTO, schema, migration or OpenAPI change.
 - Deviations: the round-2 scope (suspended accounts, races) was added at the user's request after the first review; one first-round test pinning "suspended keeps its password" was replaced because the rule changed.
-- Left to do:
-  - merge TTW-082 then TTW-179 into `main` and read CI, when the user asks;
-  - `docs/tickets/ROADMAP.md` was not touched, to avoid conflicts with parallel ticket work.
+
+**State: Verified.** Merged into `main` after TTW-082 at the owner's request and pushed. A parallel session's `git pull --rebase` flattened the merge commit, so the change landed as `520b08d` and `6ddfb84` (same content as `ff3f8d8` and `4c6bcf4`). CI green on `main` at `f9bdf0b` (run 42476342450, all 18 jobs; Playwright Comprehensive run 42476342523).
