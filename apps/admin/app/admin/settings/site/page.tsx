@@ -1,9 +1,18 @@
 'use client';
 
-/* eslint-disable react-hooks/set-state-in-effect -- Loaded settings intentionally initialize the local edit form. */
-
 import { AdminShell } from '@/components/admin-shell';
-import { getAdminSiteSettings, updateAdminSiteSettings, type SiteSettings } from '@/lib/dashboard';
+import {
+  getAdminSiteSettings,
+  updateAdminSiteSettings,
+  type UpdateSiteSettingsInput,
+} from '@/lib/dashboard';
+import {
+  defaultSiteSettingsForm,
+  siteSettingsFormSchema,
+  toSiteSettingsForm,
+  type SiteSettingsFormValues,
+} from '@/lib/site-settings-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { CurrencyCode, PayoutMode } from '@tamiym/types';
 import {
   Button,
@@ -13,7 +22,6 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
-  EmptyState,
   Input,
   Label,
   Select,
@@ -24,70 +32,21 @@ import {
   Skeleton,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-
-type SiteSettingsForm = {
-  vatRatePercent: string;
-  pricesIncludeVat: boolean;
-  vatAppliesToShipping: boolean;
-  currency: CurrencyCode;
-  payoutMode: PayoutMode;
-  payoutCadenceDays: string;
-  payoutSettlementHoldDays: string;
-  minimumPayoutAmount: string;
-  autoRetryFailedPayouts: boolean;
-};
-
-const defaultForm: SiteSettingsForm = {
-  // Empty until settings load, never a placeholder 0% (TTW-084).
-  vatRatePercent: '',
-  pricesIncludeVat: true,
-  vatAppliesToShipping: true,
-  currency: CurrencyCode.NGN,
-  payoutMode: PayoutMode.MANUAL,
-  payoutCadenceDays: '7',
-  payoutSettlementHoldDays: '7',
-  minimumPayoutAmount: '',
-  autoRetryFailedPayouts: true,
-};
-
-function toFormState(settings: SiteSettings): SiteSettingsForm {
-  return {
-    // TTW-084: an unset rate stays empty so it is never saved back as 0%.
-    vatRatePercent:
-      settings.vatRate == null ? '' : String(Number((Number(settings.vatRate) * 100).toFixed(2))),
-    pricesIncludeVat: settings.pricesIncludeVat,
-    vatAppliesToShipping: settings.vatAppliesToShipping,
-    currency: settings.currency as CurrencyCode,
-    payoutMode: settings.payoutMode as PayoutMode,
-    payoutCadenceDays: String(settings.payoutCadenceDays),
-    payoutSettlementHoldDays: String(settings.payoutSettlementHoldDays),
-    minimumPayoutAmount:
-      settings.minimumPayoutAmount != null ? String(settings.minimumPayoutAmount) : '',
-    autoRetryFailedPayouts: settings.autoRetryFailedPayouts,
-  };
-}
-
-/**
- * Returns the VAT rate as a fraction, or null when the field is empty, out of
- * range, or finer than 2 decimals (the stored precision, Decimal(5,4)).
- */
-function parseVatRate(vatRatePercent: string): number | null {
-  const trimmed = vatRatePercent.trim();
-  // Plain decimal with at most 2 decimals; checked on the text to avoid float error.
-  if (!/^\d{1,3}(\.\d{1,2})?$/.test(trimmed)) return null;
-  const percent = Number(trimmed);
-  if (percent > 100) return null;
-  // toFixed keeps the fraction at 4 decimals (e.g. 7.55 -> 0.0755, not 0.07550000000000001).
-  return Number((percent / 100).toFixed(4));
-}
+import { useEffect } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 
 export default function AdminSiteSettingsPage() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<SiteSettingsForm>(defaultForm);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [vatRateInvalid, setVatRateInvalid] = useState(false);
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isDirty },
+  } = useForm<SiteSettingsFormValues, unknown, UpdateSiteSettingsInput>({
+    resolver: zodResolver(siteSettingsFormSchema),
+    defaultValues: defaultSiteSettingsForm,
+  });
 
   const settingsQuery = useQuery({
     queryKey: ['admin-site-settings'],
@@ -96,50 +55,27 @@ export default function AdminSiteSettingsPage() {
 
   useEffect(() => {
     if (settingsQuery.data) {
-      setForm(toFormState(settingsQuery.data));
+      reset(toSiteSettingsForm(settingsQuery.data));
     }
-  }, [settingsQuery.data]);
+  }, [settingsQuery.data, reset]);
 
-  const normalizedInitial = useMemo(
-    () => (settingsQuery.data ? JSON.stringify(toFormState(settingsQuery.data)) : null),
-    [settingsQuery.data]
-  );
-  const normalizedCurrent = JSON.stringify(form);
-  const isDirty = normalizedInitial != null && normalizedInitial !== normalizedCurrent;
   const vatRateNotConfigured = settingsQuery.data != null && settingsQuery.data.vatRate == null;
 
   const saveMutation = useMutation({
-    mutationFn: async (vatRate: number) => {
-      const minimumPayoutAmount =
-        form.minimumPayoutAmount.trim() === '' ? null : Number(form.minimumPayoutAmount);
-
-      return updateAdminSiteSettings({
-        vatRate,
-        pricesIncludeVat: form.pricesIncludeVat,
-        vatAppliesToShipping: form.vatAppliesToShipping,
-        currency: form.currency,
-        payoutMode: form.payoutMode,
-        payoutCadenceDays: Number(form.payoutCadenceDays),
-        payoutSettlementHoldDays: Number(form.payoutSettlementHoldDays),
-        minimumPayoutAmount,
-        autoRetryFailedPayouts: form.autoRetryFailedPayouts,
-      });
-    },
+    mutationFn: updateAdminSiteSettings,
     onSuccess: async (updated) => {
       queryClient.setQueryData(['admin-site-settings'], updated);
       await queryClient.invalidateQueries({ queryKey: ['admin-site-settings'] });
-      setMessage('Site settings saved.');
-      setError(null);
-    },
-    onError: (mutationError: { message?: string }) => {
-      setError(mutationError.message || 'We could not save site settings.');
-      setMessage(null);
     },
   });
 
-  function updateField<K extends keyof SiteSettingsForm>(key: K, value: SiteSettingsForm[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
+  const vatRateError = errors.vatRatePercent?.message;
+  const message = saveMutation.isSuccess ? 'Site settings saved.' : null;
+  const error =
+    vatRateError ??
+    (saveMutation.isError
+      ? saveMutation.error.message || 'We could not save site settings.'
+      : null);
 
   return (
     <AdminShell
@@ -166,20 +102,16 @@ export default function AdminSiteSettingsPage() {
                   max="100"
                   step="0.01"
                   required
-                  aria-invalid={vatRateInvalid || undefined}
+                  aria-invalid={vatRateError ? true : undefined}
                   aria-describedby={
                     [
                       vatRateNotConfigured ? 'vatRateNotConfigured' : null,
-                      vatRateInvalid ? 'siteSettingsError' : null,
+                      vatRateError ? 'siteSettingsError' : null,
                     ]
                       .filter(Boolean)
                       .join(' ') || undefined
                   }
-                  value={form.vatRatePercent}
-                  onChange={(event) => {
-                    setVatRateInvalid(false);
-                    updateField('vatRatePercent', event.target.value);
-                  }}
+                  {...register('vatRatePercent')}
                 />
                 {vatRateNotConfigured ? (
                   <p id="vatRateNotConfigured" role="alert" className="text-sm text-destructive">
@@ -189,28 +121,40 @@ export default function AdminSiteSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
-                <Select
-                  value={form.currency}
-                  onValueChange={(val) => updateField('currency', val as CurrencyCode)}
-                >
-                  <SelectTrigger id="currency" className="h-11 w-full rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(CurrencyCode).map((currency) => (
-                      <SelectItem key={currency} value={currency}>
-                        {currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={control}
+                  name="currency"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => field.onChange(val as CurrencyCode)}
+                    >
+                      <SelectTrigger id="currency" className="h-11 w-full rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(CurrencyCode).map((currency) => (
+                          <SelectItem key={currency} value={currency}>
+                            {currency}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <label className="flex items-start gap-3 rounded-2xl border border-black/8 bg-[#f7f9fc] p-4">
-                <Checkbox
-                  className="mt-1"
-                  checked={form.pricesIncludeVat}
-                  onCheckedChange={(checked) => updateField('pricesIncludeVat', checked as boolean)}
+                <Controller
+                  control={control}
+                  name="pricesIncludeVat"
+                  render={({ field }) => (
+                    <Checkbox
+                      className="mt-1"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  )}
                 />
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-black">Prices include VAT</p>
@@ -221,12 +165,16 @@ export default function AdminSiteSettingsPage() {
               </label>
 
               <label className="flex items-start gap-3 rounded-2xl border border-black/8 bg-[#f7f9fc] p-4">
-                <Checkbox
-                  className="mt-1"
-                  checked={form.vatAppliesToShipping}
-                  onCheckedChange={(checked) =>
-                    updateField('vatAppliesToShipping', checked as boolean)
-                  }
+                <Controller
+                  control={control}
+                  name="vatAppliesToShipping"
+                  render={({ field }) => (
+                    <Checkbox
+                      className="mt-1"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  )}
                 />
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-black">VAT applies to shipping</p>
@@ -248,21 +196,27 @@ export default function AdminSiteSettingsPage() {
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="payoutMode">Default payout mode</Label>
-                <Select
-                  value={form.payoutMode}
-                  onValueChange={(val) => updateField('payoutMode', val as PayoutMode)}
-                >
-                  <SelectTrigger id="payoutMode" className="h-11 w-full rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(PayoutMode).map((mode) => (
-                      <SelectItem key={mode} value={mode}>
-                        {mode.replaceAll('_', ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={control}
+                  name="payoutMode"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => field.onChange(val as PayoutMode)}
+                    >
+                      <SelectTrigger id="payoutMode" className="h-11 w-full rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(PayoutMode).map((mode) => (
+                          <SelectItem key={mode} value={mode}>
+                            {mode.replaceAll('_', ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="minimumPayoutAmount">Minimum payout amount</Label>
@@ -271,8 +225,7 @@ export default function AdminSiteSettingsPage() {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={form.minimumPayoutAmount}
-                  onChange={(event) => updateField('minimumPayoutAmount', event.target.value)}
+                  {...register('minimumPayoutAmount')}
                   placeholder="Leave blank for no minimum"
                 />
               </div>
@@ -283,8 +236,7 @@ export default function AdminSiteSettingsPage() {
                   type="number"
                   min="1"
                   max="90"
-                  value={form.payoutCadenceDays}
-                  onChange={(event) => updateField('payoutCadenceDays', event.target.value)}
+                  {...register('payoutCadenceDays')}
                 />
               </div>
               <div className="space-y-2">
@@ -294,18 +246,21 @@ export default function AdminSiteSettingsPage() {
                   type="number"
                   min="0"
                   max="365"
-                  value={form.payoutSettlementHoldDays}
-                  onChange={(event) => updateField('payoutSettlementHoldDays', event.target.value)}
+                  {...register('payoutSettlementHoldDays')}
                 />
               </div>
 
               <label className="md:col-span-2 flex items-start gap-3 rounded-2xl border border-black/8 bg-[#f7f9fc] p-4">
-                <Checkbox
-                  className="mt-1"
-                  checked={form.autoRetryFailedPayouts}
-                  onCheckedChange={(checked) =>
-                    updateField('autoRetryFailedPayouts', checked as boolean)
-                  }
+                <Controller
+                  control={control}
+                  name="autoRetryFailedPayouts"
+                  render={({ field }) => (
+                    <Checkbox
+                      className="mt-1"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  )}
                 />
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-black">
@@ -344,17 +299,8 @@ export default function AdminSiteSettingsPage() {
                     <Button
                       className="w-full"
                       onClick={() => {
-                        setMessage(null);
-                        setError(null);
-                        const vatRate = parseVatRate(form.vatRatePercent);
-                        if (vatRate == null) {
-                          setVatRateInvalid(true);
-                          setError(
-                            'Enter a VAT rate between 0 and 100, with at most 2 decimals, before saving.'
-                          );
-                          return;
-                        }
-                        saveMutation.mutate(vatRate);
+                        saveMutation.reset();
+                        void handleSubmit((payload) => saveMutation.mutate(payload))();
                       }}
                       disabled={saveMutation.isPending || !isDirty}
                     >
@@ -365,10 +311,11 @@ export default function AdminSiteSettingsPage() {
                       className="w-full"
                       onClick={() => {
                         if (settingsQuery.data) {
-                          setForm(toFormState(settingsQuery.data));
+                          reset(toSiteSettingsForm(settingsQuery.data));
                         }
-                        setMessage(null);
-                        setError(null);
+                        // Clear the last outcome, but never detach an in-flight save:
+                        // its result must still show once it lands.
+                        if (!saveMutation.isPending) saveMutation.reset();
                       }}
                       disabled={!isDirty}
                     >

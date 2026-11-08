@@ -170,7 +170,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 41  | [TTW-168](ttw-168-report-failed-admin-product-saves.md)      | 5C  | Fiche produit admin : signaler les changements refusés                | —     | Faible   | —      | —       |
 | [ ]  | 42  | [TTW-173](ttw-173-document-image-update-contract.md)         | 5C  | Documenter dans l'API comment délier une image d'une variante         | —     | Faible   | —      | —       |
 | [ ]  | 43  | [TTW-169](ttw-169-tighten-image-variant-journey.md)          | 5D  | Resserrer le test image et variante                                   | —     | Faible   | —      | —       |
-| [ ]  | —   | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)   | 5C  | Réglages du site admin : formulaire avec Zod et React Hook Form       | —     | Standard | 2–4    | —       |
+| [x]  | —   | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)   | 5C  | Réglages du site admin : formulaire avec Zod et React Hook Form       | —     | Standard | 2–4    | —       |
 
 ## Phase 6 : Données personnelles, légal, site public
 
