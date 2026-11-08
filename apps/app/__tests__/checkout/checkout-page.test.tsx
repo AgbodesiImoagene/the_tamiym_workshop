@@ -97,12 +97,23 @@ afterAll(() => {
   jest.restoreAllMocks();
 });
 
+// Fake timers make waitFor/findBy count their timeout in fake time (Testing Library
+// advances it 50 ms per check), so a busy CPU cannot make them give up early (TTW-182).
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.clearAllMocks();
+  // clearAllMocks keeps unconsumed `...Once` values: after a failed test they would leak
+  // into the next one and turn one failure into several (TTW-182).
+  (createOrder as jest.Mock).mockReset();
+  (initiateOrderPayment as jest.Mock).mockReset();
   window.localStorage.clear();
   (getUserAddresses as jest.Mock).mockResolvedValue([savedAddress]);
   (upsertPrimaryAddress as jest.Mock).mockResolvedValue(savedAddress);
   (quoteOrder as jest.Mock).mockResolvedValue(quote);
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 function renderCheckout() {

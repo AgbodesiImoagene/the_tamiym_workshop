@@ -61,9 +61,6 @@ function seedPendingCart() {
   setCartPendingOrder('order-1');
 }
 
-// The page loads the user, then the order; allow for a busy CI machine.
-const LOAD_TIMEOUT = { timeout: 5000 };
-
 let client: QueryClient;
 
 function renderConfirm() {
@@ -75,13 +72,17 @@ function renderConfirm() {
   );
 }
 
+// Fake timers make waitFor/findBy count their timeout in fake time (Testing Library
+// advances it 50 ms per check), so a busy CPU cannot make them give up early (TTW-182).
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.clearAllMocks();
   window.localStorage.clear();
 });
 
 afterEach(() => {
   client?.clear();
+  jest.useRealTimers();
 });
 
 describe('OrderConfirmPage cart clearing', () => {
@@ -91,7 +92,7 @@ describe('OrderConfirmPage cart clearing', () => {
 
     renderConfirm();
 
-    await screen.findByRole('heading', { name: 'SUCCEEDED' }, LOAD_TIMEOUT);
+    await screen.findByRole('heading', { name: 'SUCCEEDED' });
     await waitFor(() => expect(getCart()?.lines ?? []).toHaveLength(0));
   });
 
@@ -103,7 +104,7 @@ describe('OrderConfirmPage cart clearing', () => {
 
     renderConfirm();
 
-    await screen.findByRole('heading', { name: 'FAILED' }, LOAD_TIMEOUT);
+    await screen.findByRole('heading', { name: 'FAILED' });
     expect(getCart()?.lines).toHaveLength(1);
     expect(getCart()?.pendingOrderId).toBe('order-1');
   });
