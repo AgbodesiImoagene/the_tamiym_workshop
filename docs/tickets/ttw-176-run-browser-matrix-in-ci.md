@@ -1,7 +1,7 @@
 # TTW-176 — Run the Playwright browser matrix in CI
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** In progress (Partial: on `main`, first full matrix run green by manual dispatch; nightly and broken-spec proof pending)  
+**Status:** In progress (Partial: on `main`, green by manual dispatch and on its first nightly run; broken-spec proof pending)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -74,10 +74,10 @@ To be confirmed at design review once the decision is made:
 
 - [x] The owner's decisions are recorded. → schedule: nightly; mobile Safari: added in this ticket (both 2026-11-07).
 - [x] A mobile WebKit project runs as part of the matrix. → run 42431599230: 41/41 `mobile-webkit-web` tests passed.
-- [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one. → Partial: manual dispatch green (run 42431599230); nightly run and broken-spec run not yet seen.
+- [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one. → Partial: manual dispatch green (run 42431599230), nightly schedule green (run 42469100727); broken-spec run not yet seen.
 - [x] Visual baselines are committed after an intentional review. → run 42430477854, reviewed 2026-11-08 (see evidence); first attempt rejected.
 - [x] Every failure from the first run is fixed or quarantined with an owner and a ticket. → the first full run (42431599230) had no failure and no flaky test; nothing to quarantine.
-- [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they say the matrix ran green by manual dispatch and that the nightly run is not yet observed; to move to "Running in CI" once a scheduled run is seen.
+- [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they say "Running in CI" with both runs, and that the broken-spec proof is still missing; to tick once that proof is recorded.
 - [ ] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
@@ -156,7 +156,12 @@ First full matrix run (2026-11-08), after the owner asked to merge and launch:
 - Merge `c4171ce` pushed to `main` (on top of TTW-085's `dc0e11e`; one conflict in `docs/tickets/README.md`, resolved by keeping `main`'s table and adding the TTW-177/178 rows). CI run 42431587853: success. Playwright Comprehensive run 42431587891: success.
 - Matrix by manual dispatch on `main`, run 42431599230 at `c4171ce`: **success**. Log: `Running 319 tests using 2 workers` → `316 passed (4.4m)`, `3 skipped`, no failure, no flaky test (`--fail-on-flaky-tests` was on). Per project: firefox-web 41/41, mobile-webkit-web 41/41 passed; `chromium-visual` and `mobile-visual-web` passed against the committed baselines. The 3 skipped tests are the existing conditional skip in `tests/e2e/app/campaign-authoring.comprehensive.spec.ts:29` ("No draft campaign seeded for organiser", `chromium-app`), not a matrix browser.
 - The expected Firefox `isMobile` failure (design review, point 3) did not happen.
-- Durations: job 7 min (00:50:37 → 00:57:33 UTC), matrix step 4 min 27 s, browser install 45 s, build 52 s. The 75/55 min timeouts are far above this; tightening them is the remaining step 3.
+- Durations: job 7 min (00:50:37 → 00:57:33 UTC), matrix step 4 min 27 s, browser install 45 s, build 52 s. The 75/55 min timeouts are far above this; tightening them is a remaining step.
+
+First nightly run (2026-11-08), checked at the owner's request:
+
+- Run 42469100727, event `schedule`, at `0425227` (current `main`): **success**. Log: `Running 319 tests using 2 workers` → `316 passed (4.3m)`, `3 skipped` (the same conditional skip as above). Run time 7 min (09:53:49 → 10:00:41 UTC).
+- GitHub started the 03:00 UTC schedule at 09:53 UTC, almost 7 hours late. The comprehensive workflow shows the same pattern (02:00 UTC cron, started between 07:57 and 09:38 UTC over the last ten days, `gh run list --event schedule`). The documents now say so, so nobody waits for a result at 03:00.
 
 ## Completion summary
 
@@ -168,8 +173,7 @@ Merged into `main` (`c135789`, then `c4171ce` with the deterministic visual spec
 
 **Remaining, in order (each needs the owner's go-ahead to push):**
 
-1. Watch one scheduled run (first one: 2026-11-08 03:00 UTC) and record it.
-2. Prove failure detection: one dispatch on a throwaway branch with a deliberately broken spec (red), then the good one (green). The throwaway branch is deleted afterwards and never merged.
-3. Tighten the timeouts from the measured run (job 7 min, step 4.5 min): for example job 30 min, matrix step 20 min.
-4. Update `docs/11-development-setup.md:92` (TTW-085 has landed; the matrix line misses mobile WebKit, accessibility and visual projects).
-5. Move the documents to "Running in CI", tick the last criteria, close the ticket.
+1. Prove failure detection: one dispatch on a throwaway branch with a deliberately broken spec (red), then the good one (green). The throwaway branch is deleted afterwards and never merged.
+2. Tighten the timeouts from the measured run (job 7 min, step 4.5 min): for example job 30 min, matrix step 20 min.
+3. Update `docs/11-development-setup.md:92` (TTW-085 has landed; the matrix line misses mobile WebKit, accessibility and visual projects).
+4. Tick the last criteria (the documents already say "Running in CI") and close the ticket.
