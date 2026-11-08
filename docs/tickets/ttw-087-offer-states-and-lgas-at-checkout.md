@@ -3,7 +3,7 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-086\
+**Blocked by:** TTW-086, TTW-185 (server stops keeping a stale state code on address edits)\
 **Blocks:** None
 
 ## Background
