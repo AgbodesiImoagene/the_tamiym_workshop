@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { getQueueToken } from '@nestjs/bullmq';
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
@@ -744,6 +744,184 @@ describe('AuthService', () => {
       await expect(
         service.adminMfaRecover('tok', 'AAAA-BBBB'),
       ).resolves.toMatchObject({ refresh_token: 'refresh-plain' });
+    });
+  });
+  describe('loginWithGoogleProfile (TTW-082)', () => {
+    const existingPasswordUser = {
+      id: 'user-1',
+      email: 'victim@example.com',
+      passwordHash: 'hash',
+      firstName: 'Victim',
+      lastName: 'User',
+      phone: null,
+      role: UserRole.CUSTOMER,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+    };
+
+    beforeEach(() => {
+      prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.user.update.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...existingPasswordUser, ...data }),
+      );
+    });
+
+    it('links an existing account when Google confirms the email', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(existingPasswordUser);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(existingPasswordUser);
+      prisma.userOAuthAccount.create.mockResolvedValue({});
+
+      const result = await service.loginWithGoogleProfile({
+        providerAccountId: 'g-sub-1',
+        email: 'Victim@Example.com',
+        emailVerified: true,
+      });
+
+      expect(prisma.userOAuthAccount.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          providerAccountId: 'g-sub-1',
+          userId: 'user-1',
+        }),
+      });
+      expect(result).toMatchObject({ refresh_token: 'refresh-plain' });
+    });
+
+    it('creates a confirmed account when Google confirms an unknown email', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...data, id: 'user-new' }),
+      );
+      prisma.userOAuthAccount.create.mockResolvedValue({});
+
+      await service.loginWithGoogleProfile({
+        providerAccountId: 'g-sub-2',
+        email: 'new@example.com',
+        emailVerified: true,
+        firstName: 'New',
+        lastName: 'Person',
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          email: 'new@example.com',
+          emailVerifiedAt: expect.any(Date),
+        }),
+      });
+      expect(prisma.userOAuthAccount.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          providerAccountId: 'g-sub-2',
+          userId: 'user-new',
+        }),
+      });
+    });
+
+    it('refuses to link an existing account when Google has not confirmed the email', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(existingPasswordUser);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(existingPasswordUser);
+
+      await expect(
+        service.loginWithGoogleProfile({
+          providerAccountId: 'g-attacker',
+          email: 'victim@example.com',
+          emailVerified: false,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.userOAuthAccount.create).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(authSession.createSession).not.toHaveBeenCalled();
+      expect(observability.recordAuthLogin).toHaveBeenCalledWith({
+        outcome: 'denied',
+      });
+    });
+
+    it('refuses to create an account when Google has not confirmed the email', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.loginWithGoogleProfile({
+          providerAccountId: 'g-sub-3',
+          email: 'nobody@example.com',
+          emailVerified: false,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.userOAuthAccount.create).not.toHaveBeenCalled();
+      expect(authSession.createSession).not.toHaveBeenCalled();
+    });
+
+    it('gives the same refusal whether or not an account exists for the email', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(existingPasswordUser);
+
+      prisma.user.findUnique.mockResolvedValue(existingPasswordUser);
+      const withAccount = await service
+        .loginWithGoogleProfile({
+          providerAccountId: 'g-a',
+          email: 'victim@example.com',
+          emailVerified: false,
+        })
+        .catch((err: unknown) => err);
+
+      prisma.user.findUnique.mockResolvedValue(null);
+      const withoutAccount = await service
+        .loginWithGoogleProfile({
+          providerAccountId: 'g-b',
+          email: 'nobody@example.com',
+          emailVerified: false,
+        })
+        .catch((err: unknown) => err);
+
+      expect(withAccount).toBeInstanceOf(UnauthorizedException);
+      expect(withoutAccount).toBeInstanceOf(UnauthorizedException);
+      expect((withAccount as Error).message).toBe(
+        (withoutAccount as Error).message,
+      );
+    });
+
+    it('keeps an already-linked account signing in even if the claim is now false', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue({
+        user: existingPasswordUser,
+      });
+
+      const result = await service.loginWithGoogleProfile({
+        providerAccountId: 'g-linked',
+        email: 'victim@example.com',
+        emailVerified: false,
+      });
+
+      expect(result).toMatchObject({ refresh_token: 'refresh-plain' });
+      expect(prisma.userOAuthAccount.create).not.toHaveBeenCalled();
+    });
+
+    it('logs the refusal without the email address or provider id', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(existingPasswordUser);
+
+      await expect(
+        service.loginWithGoogleProfile({
+          providerAccountId: 'g-secret-sub',
+          email: 'victim@example.com',
+          emailVerified: false,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(warn).toHaveBeenCalled();
+      const logged = JSON.stringify(warn.mock.calls);
+      expect(logged).not.toContain('victim@example.com');
+      expect(logged).not.toContain('g-secret-sub');
+      warn.mockRestore();
     });
   });
 });

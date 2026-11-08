@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   BadRequestException,
@@ -80,6 +81,8 @@ export function isMfaChallengeResponse(
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -544,7 +547,13 @@ export class AuthService {
   }
 
   /**
-   * Sign in or register via Google OAuth (account linking by verified email).
+   * Sign in or register via Google OAuth.
+   *
+   * A Google account that is already linked keeps signing in. Linking to an
+   * existing account by email, or creating a new one, only happens when Google
+   * confirms the email address (TTW-082): otherwise anyone holding a Google
+   * account with an unconfirmed copy of the address could take over the
+   * existing account.
    */
   async loginWithGoogleProfile(
     profile: GoogleOAuthProfile,
@@ -574,6 +583,15 @@ export class AuthService {
     }
 
     if (!user) {
+      if (profile.emailVerified !== true) {
+        // No email or provider id here: logs must not carry PII.
+        this.logger.warn(
+          'Google sign-in refused: email not confirmed by Google',
+        );
+        this.observability.recordAuthLogin({ outcome: 'denied' });
+        throw new UnauthorizedException('Google sign-in failed');
+      }
+
       const existingByEmail = await this.prisma.user.findUnique({
         where: { email },
       });
@@ -607,7 +625,7 @@ export class AuthService {
               phone: null,
               role: UserRole.CUSTOMER,
               status: UserStatus.ACTIVE,
-              emailVerifiedAt: profile.emailVerified ? new Date() : null,
+              emailVerifiedAt: new Date(),
             },
           });
           await tx.userOAuthAccount.create({
