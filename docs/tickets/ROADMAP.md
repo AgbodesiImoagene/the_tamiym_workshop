@@ -106,7 +106,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | ---- | --- | ----------------------------------------------------------------- | --- | --------------------------------------------------------------------------- | ----- | -------- | ------ | ------------ |
 | [x]  | —   | [TTW-085](ttw-085-validate-production-mail-settings.md)           | 1A  | Vérifier au démarrage les réglages e-mail de production                     | 10.5  | Standard | 1–2    | —            |
 | [ ]  | 4   | [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)     | 1A  | Google : ne relier un compte que si l'e-mail est confirmé                   | 1.8   | Élevé    | 1–2    | —            |
-| [ ]  | 5   | [TTW-084](ttw-084-create-default-site-settings.md)                | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —            |
+| [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —            |
 | [ ]  | 6   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)     | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —            |
 | [ ]  | 7   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md) | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —            |
 | [ ]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)           | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086      |

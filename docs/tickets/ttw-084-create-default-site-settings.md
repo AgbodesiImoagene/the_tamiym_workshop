@@ -1,7 +1,7 @@
 # TTW-084 — Create default site settings so VAT is never silently 0%
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, CI not run)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -49,7 +49,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 - [x] A fresh deployment quotes the configured VAT rate before any admin opens Settings. Evidence: `site-settings-default.e2e-spec.ts` › "quotes 7.5% VAT on a fresh deployment before anyone opens Settings".
 - [x] Swagger, shared contracts, migrations and docs are updated where applicable.
-- [x] Required quality gates pass, with evidence recorded below (local; CI runs only once `main` is pushed).
+- [x] Required quality gates pass, with evidence recorded below. CI green on `main` at `1ee04e9`, which contains the TTW-084 merge `a21ca54` (run 42472249437; Playwright Comprehensive run 42470024156 on `a21ca54`).
 
 ## Out of scope
 
@@ -188,6 +188,8 @@ Under the parallel `pnpm test` (turbo), `apps/app` showed 3 and then 5 failures 
 
 ## Completion summary
 
+**State: Verified.** Merged into `main` at the owner's request (`a21ca54`, merge of `b97c424`) and pushed. The first CI run on `a21ca54` (42470024159) failed only in Infra Validate, on a 504 from github.com while OpenTofu downloaded the DigitalOcean provider; the next push (`1ee04e9`) hit the same network error. After a re-run of that job, run 42472249437 on `1ee04e9` is fully green. Playwright Comprehensive passed on `a21ca54` (run 42470024156).
+
 Done:
 
 - Migration `20261108014827_ttw084_default_site_settings` creates the `default` row (7.5%, prices include VAT, VAT on shipping, NGN) and never overwrites an existing row.
@@ -208,5 +210,3 @@ Remaining:
 - Pre-existing: `apps/app` unit tests are flaky under parallel turbo load (see evidence).
 - The admin page still uses `useState` rather than Zod and React Hook Form.
 - Out of scope: the payout fallbacks in `apps/api/src/payouts/*`.
-- CI evidence after the merge to `main`.
-- The `ROADMAP.md` checkbox is left for the merge, to avoid a conflict with TTW-082.
