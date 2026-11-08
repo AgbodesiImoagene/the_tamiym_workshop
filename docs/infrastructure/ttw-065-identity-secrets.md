@@ -73,6 +73,12 @@ OpenTofu plans/state **outputs**, CI logs, or ordinary deployment evidence.
 Metadata (key names, owners, last-rotated dates) may live in docs and the owner
 vault inventory.
 
+**Mail settings are required in production (TTW-085):** the API, worker and
+scheduler refuse to start with `NODE_ENV=production` unless `MAIL_HOST`,
+`MAIL_USER`, `MAIL_PASSWORD` and `MAIL_FROM` are set to real values. A
+`PLACEHOLDER_*` value or a `MAIL_HOST` naming the local machine is rejected
+(`apps/api/src/config/env-validation.ts`).
+
 ## Rotation schedule
 
 | Class                       | Cadence (production)           | Procedure outline                                                                 | Owner       |
