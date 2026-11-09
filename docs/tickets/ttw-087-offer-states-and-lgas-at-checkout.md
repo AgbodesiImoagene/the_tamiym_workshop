@@ -1,7 +1,7 @@
 # TTW-087 — Offer Nigerian states and LGAs as lists at checkout
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, committed on a local branch, not merged\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-086, TTW-185 (server stops keeping a stale state code on address edits)\
 **Blocks:** None

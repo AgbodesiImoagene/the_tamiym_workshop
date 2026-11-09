@@ -114,13 +114,13 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —                |
 | [x]  | —   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)     | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —                |
 | [x]  | —   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md) | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —                |
-| [ ]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)           | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
+| [x]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)           | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
 | [ ]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md) | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16     |
 | [ ]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)    | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —                |
 | [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)            | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
 | [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)            | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
 | [ ]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)            | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
-| [ ]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)       | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
+| [x]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)       | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
 
 ## Phase 2 : Comptes et achat d'un produit
 

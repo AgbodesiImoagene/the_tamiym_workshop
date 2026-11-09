@@ -1,7 +1,7 @@
 # TTW-192 — Offer the state and LGA lists in the customer settings address form
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented on a branch cut from the unmerged TTW-087 branch; to rebase on `main` after TTW-087 merges\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** TTW-087\
 **Blocks:** None
