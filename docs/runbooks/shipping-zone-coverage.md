@@ -41,3 +41,5 @@ Quote refused: address not covered by any shipping rate (reason=NO_ZONE|NO_RATE,
 - `NO_RATE`: a zone matches, but it has no active rate today. Add a rate or fix its dates.
 
 The log carries no street, city, name or user id. Repeated warnings for the same state usually mean that a zone is missing.
+
+`state=none` means the address names a state the platform does not recognise. When a customer edits a saved address to a new state that is not recognised (for example "Abuja" or "FCT" while the reference name is "Abuja Federal Capital Territory"), the address loses its old state code and LGA, so it is refused rather than priced at the old state's rate (TTW-185). Resending the same state, or editing only the phone or street, keeps the saved state and LGA.
