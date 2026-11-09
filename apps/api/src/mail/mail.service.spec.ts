@@ -21,7 +21,6 @@ describe('MailService', () => {
 
     await service.sendVerificationEmail({
       to: 'user@example.com',
-      token: 't',
       verifyUrl: 'https://example.com/v',
     });
     expect(mailer.sendMail).toHaveBeenCalledWith(

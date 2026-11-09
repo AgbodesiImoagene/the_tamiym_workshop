@@ -7,7 +7,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export interface SendVerificationEmailPayload {
   to: string;
-  token: string;
   verifyUrl: string;
 }
 

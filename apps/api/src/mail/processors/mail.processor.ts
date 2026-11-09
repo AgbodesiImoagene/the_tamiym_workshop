@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
   MAIL_QUEUE_NAME,
+  AUTH_LINK_JOB_NAMES,
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
@@ -61,8 +62,9 @@ export class MailProcessor extends WorkerHost {
               await this.mailService.sendVerificationEmail(
                 job.data as SendVerificationEmailPayload,
               );
+              // No address in the log line (TTW-184, as TTW-179).
               this.logger.log(
-                `Sent verification email to ${(job.data as SendVerificationEmailPayload).to}`,
+                `Sent verification email (job ${job.id ?? 'unknown'})`,
               );
               break;
             case JOB_PASSWORD_RESET_EMAIL:
@@ -70,7 +72,7 @@ export class MailProcessor extends WorkerHost {
                 job.data as SendPasswordResetEmailPayload,
               );
               this.logger.log(
-                `Sent password reset email to ${(job.data as SendPasswordResetEmailPayload).to}`,
+                `Sent password reset email (job ${job.id ?? 'unknown'})`,
               );
               break;
             case JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL:
@@ -115,9 +117,33 @@ export class MailProcessor extends WorkerHost {
             outcome: 'failure',
             durationMs: Number(process.hrtime.bigint() - startedAt) / 1_000_000,
           });
+          this.warnIfAuthLinkJobGaveUp(job, error);
           throw error;
         }
       },
+    );
+  }
+
+  /**
+   * TTW-184: a reset or verification job is removed from Redis at its final
+   * failure (`removeOnFail: true`), so this line is what operations see. It
+   * names the job and the error's name/code only: the error message can carry
+   * the address, and the job data carries the link.
+   * Not covered: a job BullMQ fails without calling `process()` (stalled too
+   * often) or an `UnrecoverableError` before the last attempt. Both are still
+   * removed by `removeOnFail: true`; only this line is missing for them.
+   */
+  private warnIfAuthLinkJobGaveUp(job: Job, error: unknown): void {
+    if (!AUTH_LINK_JOB_NAMES.has(job.name)) return;
+    const attempts = job.opts?.attempts ?? 1;
+    if (job.attemptsMade + 1 < attempts) return;
+    const name = error instanceof Error ? error.name : typeof error;
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String((error as { code: unknown }).code)
+        : 'none';
+    this.logger.warn(
+      `Gave up on ${job.name} (job ${job.id ?? 'unknown'}) after ${attempts} attempts (${name}, code ${code}); job removed from Redis`,
     );
   }
 }

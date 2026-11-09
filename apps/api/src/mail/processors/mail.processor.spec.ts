@@ -59,29 +59,48 @@ describe('MailProcessor', () => {
     processor = module.get(MailProcessor);
   });
 
-  function makeJob(name: string, data: object): Job {
-    return { name, data, id: 'job-1' } as unknown as Job;
+  function makeJob(
+    name: string,
+    data: object,
+    extra: { attemptsMade?: number; opts?: object } = {},
+  ): Job {
+    return {
+      name,
+      data,
+      id: 'job-1',
+      attemptsMade: extra.attemptsMade ?? 0,
+      opts: extra.opts ?? { attempts: 8 },
+    } as unknown as Job;
   }
 
-  it('sends verification email', async () => {
+  it('sends verification email without logging the address (TTW-184)', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+
     await processor.process(
       makeJob(JOB_VERIFICATION_EMAIL, {
         to: 'a@b.com',
-        token: 't',
         verifyUrl: 'http://x/verify',
       }),
     );
     expect(mailService.sendVerificationEmail).toHaveBeenCalledWith({
       to: 'a@b.com',
-      token: 't',
       verifyUrl: 'http://x/verify',
     });
     expect(observability.recordQueueJob).toHaveBeenCalledWith(
       expect.objectContaining({ outcome: 'success' }),
     );
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain('a@b.com');
+    log.mockRestore();
   });
 
-  it('sends password reset email', async () => {
+  it('sends password reset email without logging the address (TTW-184)', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+
     await processor.process(
       makeJob(JOB_PASSWORD_RESET_EMAIL, {
         to: 'a@b.com',
@@ -92,6 +111,113 @@ describe('MailProcessor', () => {
     expect(observability.recordQueueJob).toHaveBeenCalledWith(
       expect.objectContaining({ outcome: 'success' }),
     );
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain('a@b.com');
+    log.mockRestore();
+  });
+
+  describe('final failure of a token-bearing job (TTW-184)', () => {
+    const ADDRESS = 'owner@example.com';
+    const RAW_TOKEN = 'RAW-TOKEN-0123456789';
+    const LINK = `http://x/reset-password?token=${RAW_TOKEN}`;
+    let warn: jest.SpyInstance;
+
+    function failingSend(): Error {
+      // Messages can carry the address or the link: none of it may be logged.
+      return Object.assign(
+        new Error(`Invalid email address: ${ADDRESS} (${LINK})`),
+        { code: 'EENVELOPE' },
+      );
+    }
+
+    beforeEach(() => {
+      warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      mailService.sendVerificationEmail.mockRejectedValue(failingSend());
+      mailService.sendPasswordResetEmail.mockRejectedValue(failingSend());
+      mailService.sendGoogleLinkedAccountSuspendedEmail.mockRejectedValue(
+        failingSend(),
+      );
+    });
+
+    afterEach(() => warn.mockRestore());
+
+    it.each([
+      [JOB_PASSWORD_RESET_EMAIL, { to: ADDRESS, resetUrl: LINK }],
+      [JOB_VERIFICATION_EMAIL, { to: ADDRESS, verifyUrl: LINK }],
+    ])(
+      'logs a warning for %s without the address, link, token or error message, then rethrows',
+      async (name, data) => {
+        await expect(
+          processor.process(
+            makeJob(name, data, {
+              attemptsMade: 7,
+              opts: { attempts: 8, removeOnFail: true },
+            }),
+          ),
+        ).rejects.toThrow('Invalid email address');
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const logged = JSON.stringify(warn.mock.calls);
+        expect(logged).toContain(name);
+        expect(logged).toContain('job-1');
+        expect(logged).toContain('8 attempts');
+        expect(logged).toContain('EENVELOPE');
+        expect(logged).not.toContain(ADDRESS);
+        expect(logged).not.toContain(RAW_TOKEN);
+        expect(logged).not.toContain('http://x');
+        expect(logged).not.toContain('Invalid email address');
+        expect(observability.recordQueueJob).toHaveBeenCalledWith(
+          expect.objectContaining({ jobName: name, outcome: 'failure' }),
+        );
+      },
+    );
+
+    it('treats a job with no attempts option as on its final attempt', async () => {
+      await expect(
+        processor.process(
+          makeJob(
+            JOB_PASSWORD_RESET_EMAIL,
+            { to: ADDRESS, resetUrl: LINK },
+            { attemptsMade: 0, opts: {} },
+          ),
+        ),
+      ).rejects.toThrow();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not log the final warning while retries remain', async () => {
+      await expect(
+        processor.process(
+          makeJob(
+            JOB_PASSWORD_RESET_EMAIL,
+            { to: ADDRESS, resetUrl: LINK },
+            { attemptsMade: 6, opts: { attempts: 8 } },
+          ),
+        ),
+      ).rejects.toThrow();
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(observability.recordQueueJob).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'failure' }),
+      );
+    });
+
+    it('leaves other mail jobs to the queue defaults (no final warning)', async () => {
+      await expect(
+        processor.process(
+          makeJob(
+            JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL,
+            { to: ADDRESS },
+            { attemptsMade: 7, opts: { attempts: 8 } },
+          ),
+        ),
+      ).rejects.toThrow();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 
   it('sends the Google-linked password-removed notice without logging the address (TTW-179)', async () => {
