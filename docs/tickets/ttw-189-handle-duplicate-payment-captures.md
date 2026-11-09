@@ -38,6 +38,8 @@ Rejected alternatives: refunding inside the webhook transaction (would hold a tr
 | D3  | Which customer message, if any, should say "you paid twice, we refund you"? None exists today.                                             | No customer e-mail in this ticket. Admins contact the customer until D1 is settled.                                                 | Nothing (out of scope unless the user asks) | User                                       |
 | D4  | Should the extra capture reuse an existing `PaymentStatus` value or need a new one (schema migration)?                                     | Decide in the design review from the actual enum and TTW-088's changes. Prefer no new status if a flag or the refund row is enough. | Step 1 (migration)                          | Design review (technical, no client input) |
 
+**Update (user, 2026-11-09, later): D1 and D2 are settled as manual refund by an admin for v1 because of the deadline; automatic refund is v2 (TTW-191, deferred).**
+
 **User answer (2026-11-09):** the user approved the recommendations for D1, D2 and D3. So, until the client says otherwise: every extra capture is recorded, counted and reported to an admin, the refund stays manual (listed as "to refund"), and no customer e-mail is sent. The client has not been asked yet: automatic refund of extra captures stays blocked on the client's answer to D1 and D2. D4 is still open (design review).
 
 D1 and D2 are business decisions, so they go to the client through the user. This ticket does not edit `revue-client/`; add them to `docs/tickets/ROADMAP.md` "Décisions à obtenir du client" (done) and to the next client message when the user decides to send one.

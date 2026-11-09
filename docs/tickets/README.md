@@ -160,7 +160,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | P0       | Critical | Scoped    | Refund payments captured after an order was cancelled                    | 4.6              |
 | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | P0       | Critical | Complete  | Record a second payment captured for the same order                      | Found in TTW-088 |
 | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | P1       | High     | In review | Make extra payment captures visible to reconciliation and alerts         | Found in TTW-189 |
-| [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | P0       | Critical | Scoped    | Refund extra payment captures (blocked on client D1/D2)                  | Found in TTW-189 |
+| [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | P2       | Critical | Deferred  | Refund extra payment captures automatically (deferred to v2)             | Found in TTW-189 |
 | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)           | P1       | High     | Scoped    | Add forgot-password and reset-password pages                             | 1.1              |
 | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)      | P1       | High     | Scoped    | Show the email-verification state and offer a resend                     | 1.4              |
 | [TTW-091](ttw-091-remove-fake-profile-picture.md)                   | P1       | Low      | Scoped    | Remove the fake profile picture and its button                           | 1.2              |
