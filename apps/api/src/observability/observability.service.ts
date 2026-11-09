@@ -273,7 +273,12 @@ export class ObservabilityService {
   }
 
   recordChargeSettlement(
-    outcome: 'settled' | 'duplicate' | 'rejected' | 'late_captured',
+    outcome:
+      | 'settled'
+      | 'duplicate'
+      | 'rejected'
+      | 'late_captured'
+      | 'extra_capture',
   ): void {
     this.chargeSettlements.add(1, { outcome });
   }

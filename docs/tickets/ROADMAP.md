@@ -56,24 +56,25 @@ Comment les tickets sont classés dans une phase :
 
 Ces questions restent ouvertes : le client doit répondre ou demande d'abord du contexte. Elles bloquent des tickets, ou changent ce qu'ils doivent faire. La dernière colonne indique ce que je propose si on doit avancer sans réponse. Le message à lui envoyer est dans `revue-client/client-message-open-questions.md`.
 
-| Question | Sujet                                                               | Bloque           | Par défaut proposé                                                                                |
-| -------- | ------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
-| Q23, Q25 | **Le fundraising est-il repoussé après le lancement ?**             | Toute la phase 7 | Le garder en phase 7. S'il est repoussé, faire seulement TTW-146                                  |
-| Q16      | Paiement tardif : le client demande du contexte                     | TTW-088          | Rembourser un paiement arrivé après annulation, sans changer le délai de 30 min                   |
-| Q38      | Paliers de prix : le client demande du contexte                     | TTW-095          | Palier calculé sur le total du produit, toutes tailles et couleurs. Le supplément de taille reste |
-| Q5       | Saisie du vrai catalogue : la question a été mal comprise           | Phase 8          | Reposer la question : qui saisit les produits de base, photos et prix ?                           |
-| Q46      | Réseaux sociaux et contacts officiels                               | TTW-125          | Masquer les icônes tant qu'on n'a pas les adresses                                                |
-| Q41      | Délai de modération et personne qui modère                          | —                | Sans effet sur le code, à noter pour la remise au client                                          |
-| Q19      | Retours : 7 jours, pas de « changement d'avis » sur le personnalisé | TTW-117, TTW-149 | Écrire cette règle dans le texte légal, le client la fait confirmer                               |
-| Q36, Q34 | Compte Paystack, frais de virement                                  | TTW-131          | Frais déduits de l'organisateur et affichés (réponse Q34)                                         |
-| Q30      | Remboursement après versement à l'organisateur                      | TTW-132          | Déduire des prochains versements                                                                  |
-| Q33      | Vérification d'identité des organisateurs                           | TTW-128          | À trancher avec Q23                                                                               |
-| Q35      | Rythme des versements                                               | TTW-134, TTW-141 | Hebdomadaire, comme le client le suggère                                                          |
-| Q17      | Fin de campagne et production                                       | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
-| Q18      | Livraison des campagnes                                             | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
-| Q39      | Délai de l'option express                                           | TTW-153          | Attendre la réponse                                                                               |
-| Nouvelle | Fichiers et licence web des polices Mundial et Neuffila Grotesk     | TTW-177          | Attendre la réponse ; sans licence, lui demander une police de remplacement validée               |
-| Nouvelle | Logos de paiement du pied de page (PayPal non accepté)              | TTW-178          | Retirer PayPal, garder les cartes acceptées par Paystack en version lisible sur fond bleu         |
+| Question | Sujet                                                                                                                   | Bloque           | Par défaut proposé                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
+| Q23, Q25 | **Le fundraising est-il repoussé après le lancement ?**                                                                 | Toute la phase 7 | Le garder en phase 7. S'il est repoussé, faire seulement TTW-146                                  |
+| Q16      | Paiement tardif : le client demande du contexte                                                                         | TTW-088          | Rembourser un paiement arrivé après annulation, sans changer le délai de 30 min                   |
+| D1, D2   | Second encaissement sur une commande déjà payée, ou plusieurs sur une commande annulée : rembourser seul ou à la main ? | TTW-191          | Tout tracer et notifier un admin ; remboursement automatique seulement après accord du client     |
+| Q38      | Paliers de prix : le client demande du contexte                                                                         | TTW-095          | Palier calculé sur le total du produit, toutes tailles et couleurs. Le supplément de taille reste |
+| Q5       | Saisie du vrai catalogue : la question a été mal comprise                                                               | Phase 8          | Reposer la question : qui saisit les produits de base, photos et prix ?                           |
+| Q46      | Réseaux sociaux et contacts officiels                                                                                   | TTW-125          | Masquer les icônes tant qu'on n'a pas les adresses                                                |
+| Q41      | Délai de modération et personne qui modère                                                                              | —                | Sans effet sur le code, à noter pour la remise au client                                          |
+| Q19      | Retours : 7 jours, pas de « changement d'avis » sur le personnalisé                                                     | TTW-117, TTW-149 | Écrire cette règle dans le texte légal, le client la fait confirmer                               |
+| Q36, Q34 | Compte Paystack, frais de virement                                                                                      | TTW-131          | Frais déduits de l'organisateur et affichés (réponse Q34)                                         |
+| Q30      | Remboursement après versement à l'organisateur                                                                          | TTW-132          | Déduire des prochains versements                                                                  |
+| Q33      | Vérification d'identité des organisateurs                                                                               | TTW-128          | À trancher avec Q23                                                                               |
+| Q35      | Rythme des versements                                                                                                   | TTW-134, TTW-141 | Hebdomadaire, comme le client le suggère                                                          |
+| Q17      | Fin de campagne et production                                                                                           | TTW-141          | Production au fil de l'eau tant que Q17 est ouverte                                               |
+| Q18      | Livraison des campagnes                                                                                                 | TTW-138          | Envoi à chaque soutien (hypothèse du client)                                                      |
+| Q39      | Délai de l'option express                                                                                               | TTW-153          | Attendre la réponse                                                                               |
+| Nouvelle | Fichiers et licence web des polices Mundial et Neuffila Grotesk                                                         | TTW-177          | Attendre la réponse ; sans licence, lui demander une police de remplacement validée               |
+| Nouvelle | Logos de paiement du pied de page (PayPal non accepté)                                                                  | TTW-178          | Retirer PayPal, garder les cartes acceptées par Paystack en version lisible sur fond bleu         |
 
 ### Déjà répondues : rien à attendre
 
@@ -106,21 +107,24 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
-| Fait | N°  | Ticket                                                            | Lot | Travail                                                                     | Excel | Risque   | Heures | Attend           |
-| ---- | --- | ----------------------------------------------------------------- | --- | --------------------------------------------------------------------------- | ----- | -------- | ------ | ---------------- |
-| [x]  | —   | [TTW-085](ttw-085-validate-production-mail-settings.md)           | 1A  | Vérifier au démarrage les réglages e-mail de production                     | 10.5  | Standard | 1–2    | —                |
-| [x]  | —   | [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)     | 1A  | Google : ne relier un compte que si l'e-mail est confirmé                   | 1.8   | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-179](ttw-179-close-google-account-prehijacking.md)           | 1A  | Google : sécuriser un compte non confirmé qu'on relie                       | —     | Élevé    | 3–5    | —                |
-| [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)     | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —                |
-| [x]  | —   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md) | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —                |
-| [x]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)           | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
-| [ ]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md) | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16     |
-| [ ]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)    | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)            | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
-| [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)            | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
-| [ ]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)            | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
-| [x]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)       | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
+| Fait | N°  | Ticket                                                              | Lot | Travail                                                                     | Excel | Risque   | Heures | Attend           |
+| ---- | --- | ------------------------------------------------------------------- | --- | --------------------------------------------------------------------------- | ----- | -------- | ------ | ---------------- |
+| [x]  | —   | [TTW-085](ttw-085-validate-production-mail-settings.md)             | 1A  | Vérifier au démarrage les réglages e-mail de production                     | 10.5  | Standard | 1–2    | —                |
+| [x]  | —   | [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)       | 1A  | Google : ne relier un compte que si l'e-mail est confirmé                   | 1.8   | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-179](ttw-179-close-google-account-prehijacking.md)             | 1A  | Google : sécuriser un compte non confirmé qu'on relie                       | —     | Élevé    | 3–5    | —                |
+| [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                  | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)       | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —                |
+| [x]  | —   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)   | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —                |
+| [x]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)             | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
+| [ ]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16     |
+| [ ]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)              | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
+| [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
+| [ ]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
+| [x]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)         | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
+| [x]  | —   | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | 1D  | Tracer et signaler un second encaissement pour une même commande            | —     | Critique | 6–10   | TTW-088          |
+| [ ]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte   | —     | Élevé    | 4–8    | TTW-189          |
+| [ ]  | —   | [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | 1D  | Rembourser les encaissements en trop (attend le client)                     | —     | Critique | 6–10   | TTW-190, D1, D2  |
 
 ## Phase 2 : Comptes et achat d'un produit
 

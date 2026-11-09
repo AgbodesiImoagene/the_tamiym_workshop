@@ -12,6 +12,7 @@ import * as crypto from 'node:crypto';
 import { ObservabilityService } from '../observability/observability.service';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
+import { ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER } from '../admin-notifications/admin-notification-events';
 import { RefundsService } from './refunds.service';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
@@ -20,6 +21,7 @@ describe('PaystackWebhookService', () => {
   let service: PaystackWebhookService;
   let prisma: jest.Mocked<PrismaService>;
   let config: ConfigService;
+  let adminNotify: { emit: jest.Mock };
   let observability: {
     recordChargeSettlement: jest.Mock;
     recordWebhook: jest.Mock;
@@ -145,6 +147,7 @@ describe('PaystackWebhookService', () => {
     service = module.get<PaystackWebhookService>(PaystackWebhookService);
     prisma = module.get(PrismaService);
     config = module.get(ConfigService);
+    adminNotify = module.get(AdminNotifyService);
   });
 
   it('should be defined', () => {
@@ -246,24 +249,187 @@ describe('PaystackWebhookService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('should skip when order already PAID', async () => {
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
-        id: 'pay-1',
-        providerRef: 'ref-123',
-        status: PaymentStatus.INITIATED,
-        settlementClaim: null,
-        order: { id: 'order-1', status: OrderStatus.PAID },
+    describe('extra capture on an order that is not awaiting payment (TTW-189)', () => {
+      const orderIn = (status: OrderStatus) => ({
+        id: 'order-1',
+        status,
+        totalAmount: 100,
+        currency: 'NGN',
+        campaignId: 'camp-1',
+        items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
       });
-
-      await service.processChargeSuccess({
+      const event = {
         event: 'charge.success',
-        data: { reference: 'ref-123' },
+        data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
+      };
+
+      it.each([
+        OrderStatus.PAID,
+        OrderStatus.PROCESSING,
+        OrderStatus.FULFILLED,
+      ])(
+        'records the capture, counts it and notifies an admin when the order is %s',
+        async (status) => {
+          (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+            id: 'pay-2',
+            providerRef: 'ref-123',
+            status: PaymentStatus.INITIATED,
+            settlementClaim: null,
+            order: orderIn(status),
+          });
+
+          await service.processChargeSuccess(event);
+
+          expect(mockTx.chargeSettlementClaim.create).toHaveBeenCalledTimes(1);
+          expect(mockTx.chargeSettlementClaim.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+              businessKey: 'charge.success:ref-123',
+              paymentId: 'pay-2',
+              orderId: 'order-1',
+            }),
+          });
+          // The order and the settling payment are untouched.
+          expect(mockTx.order.updateMany).not.toHaveBeenCalled();
+          expect(mockTx.order.update).not.toHaveBeenCalled();
+          expect(mockTx.campaign.update).not.toHaveBeenCalled();
+          // The extra capture must never look like the settling payment.
+          expect(mockTx.payment.update).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                status: PaymentStatus.SUCCEEDED,
+              }),
+            }),
+          );
+          expect(observability.recordWebhook).toHaveBeenCalledWith(
+            'charge.success.extra_capture',
+            'denied',
+          );
+          expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+            'extra_capture',
+          );
+          expect(adminNotify.emit).toHaveBeenCalledTimes(1);
+          expect(adminNotify.emit).toHaveBeenCalledWith(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            expect.objectContaining({
+              orderId: 'order-1',
+              reference: 'ref-123',
+              amount: 10000,
+              reason: expect.stringContaining('refund'),
+            }),
+          );
+        },
+      );
+
+      it('still records and reports a capture whose amount differs from the order total', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-2',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          order: orderIn(OrderStatus.PAID),
+        });
+
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 5000, currency: 'NGN' },
+        });
+
+        expect(mockTx.chargeSettlementClaim.create).toHaveBeenCalledTimes(1);
+        expect(adminNotify.emit).toHaveBeenCalledTimes(1);
       });
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
-        'duplicate',
-      );
+      it('treats a lost claim race as a duplicate: no second notification', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-2',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          order: orderIn(OrderStatus.PAID),
+        });
+        mockTx.chargeSettlementClaim.create.mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+            code: 'P2002',
+            clientVersion: 'test',
+          }),
+        );
+
+        await expect(
+          service.processChargeSuccess(event),
+        ).resolves.toBeUndefined();
+
+        expect(adminNotify.emit).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'duplicate',
+        );
+        expect(observability.recordChargeSettlement).not.toHaveBeenCalledWith(
+          'extra_capture',
+        );
+      });
+
+      it('ignores a redelivery once the extra capture is recorded', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-2',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: { id: 'claim-2' },
+          order: orderIn(OrderStatus.PAID),
+        });
+
+        await service.processChargeSuccess(event);
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(adminNotify.emit).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'duplicate',
+        );
+      });
+
+      it('does not record a charge that Paystack did not report as successful', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-2',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          order: orderIn(OrderStatus.PAID),
+        });
+
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', status: 'failed' },
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(adminNotify.emit).not.toHaveBeenCalled();
+      });
+
+      it('never opens a transaction while notifying (no network call inside a transaction)', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-2',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          order: orderIn(OrderStatus.PAID),
+        });
+        let open = false;
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (fn: (tx: typeof mockTx) => Promise<unknown>) => {
+            open = true;
+            try {
+              return await fn(mockTx);
+            } finally {
+              open = false;
+            }
+          },
+        );
+        adminNotify.emit.mockImplementation(() => {
+          expect(open).toBe(false);
+          return Promise.resolve();
+        });
+
+        await service.processChargeSuccess(event);
+
+        expect(adminNotify.emit).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('should skip when order is CANCELLED', async () => {
