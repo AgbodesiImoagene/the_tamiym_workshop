@@ -26,7 +26,8 @@ test.describe('Customer checkout retry @app @journey', () => {
     await customerPage.route('**/v1/orders/*/initiate-payment', async (route) => {
       initiateCalls += 1;
       if (initiateCalls === 1) {
-        // Dropped connection; the strict page guard tolerates ERR_ABORTED only.
+        // Dropped connection; the strict page guard tolerates cancellations only
+        // (net::ERR_ABORTED on Chromium, where this spec runs).
         await route.abort('aborted');
         return;
       }
