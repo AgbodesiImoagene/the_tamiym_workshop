@@ -32,7 +32,8 @@ jobs:
   playwright-matrix:
     name: Playwright Browser Matrix
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # Measured on the first runs (2026-11-08): whole job 7 min, matrix step 4.5 min.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -113,13 +114,13 @@ jobs:
         run: pnpm build
       - name: Run Playwright browser matrix
         if: ${{ inputs.update_snapshots != true }}
-        timeout-minutes: 55
+        timeout-minutes: 20
         # CI keeps retries: 1 (playwright.config.ts). A test that passes only on
         # its retry is a flake: fail the run instead of reporting green.
         run: pnpm test:e2e:matrix --fail-on-flaky-tests
       - name: Regenerate visual baselines
         if: ${{ inputs.update_snapshots == true }}
-        timeout-minutes: 15
+        timeout-minutes: 10
         run: pnpm exec playwright test --project=setup --project=chromium-visual --project=mobile-visual-web --update-snapshots=all
       - name: Upload visual baselines for review
         if: ${{ inputs.update_snapshots == true }}

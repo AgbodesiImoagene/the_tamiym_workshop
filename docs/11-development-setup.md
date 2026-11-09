@@ -89,7 +89,7 @@ The repo should provide these root-level scripts:
 - `pnpm lint` — read-only ESLint across workspaces
 - `pnpm lint:fix` — intentional ESLint autofix (not a CI verify command)
 - `pnpm test:e2e:smoke` — Chromium Playwright smoke across `web` / `app` / `admin` (requires build + test DB seed; see `tests/e2e/README.md`)
-- `pnpm test:e2e:matrix` — Playwright full-matrix script (Chromium + Firefox/WebKit web projects)
+- `pnpm test:e2e:matrix` — Playwright full matrix: Chromium (web, app, admin, journeys), Firefox, WebKit, mobile Chromium (Pixel 5) and mobile WebKit (iPhone 13) web projects, accessibility and visual baselines. CI runs it nightly and on manual dispatch (`.github/workflows/playwright-matrix.yml`)
 - `pnpm format:check` / `pnpm format`
 - `pnpm typecheck`
 - `pnpm test` — unit tests

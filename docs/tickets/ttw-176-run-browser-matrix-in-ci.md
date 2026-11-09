@@ -1,7 +1,7 @@
 # TTW-176 — Run the Playwright browser matrix in CI
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** In progress (Partial: on `main`, green by manual dispatch and on its first nightly run; broken-spec proof pending)  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -74,11 +74,11 @@ To be confirmed at design review once the decision is made:
 
 - [x] The owner's decisions are recorded. → schedule: nightly; mobile Safari: added in this ticket (both 2026-11-07).
 - [x] A mobile WebKit project runs as part of the matrix. → run 42431599230: 41/41 `mobile-webkit-web` tests passed.
-- [ ] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one. → Partial: manual dispatch green (run 42431599230), nightly schedule green (run 42469100727); broken-spec run not yet seen.
+- [x] The matrix is seen running in CI on its nightly schedule and by manual dispatch, failing on a broken spec and passing on a good one. → manual dispatch green (42431599230, 42483905699), nightly schedule green (42469100727), broken spec red in all five web projects (42483902366).
 - [x] Visual baselines are committed after an intentional review. → run 42430477854, reviewed 2026-11-08 (see evidence); first attempt rejected.
 - [x] Every failure from the first run is fixed or quarantined with an owner and a ticket. → the first full run (42431599230) had no failure and no flaky test; nothing to quarantine.
-- [ ] The strategy, the interim policy and the manifest match what runs. → Partial: they say "Running in CI" with both runs, and that the broken-spec proof is still missing; to tick once that proof is recorded.
-- [ ] Required quality gates pass with evidence recorded below.
+- [x] The strategy, the interim policy and the manifest match what runs. → strategy, interim policy, `docs/12-testing-strategy.md` and `docs/11-development-setup.md` say "Running in CI" with the run ids; the manifest's `"matrix"` rows are now checked nightly and need no change.
+- [x] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
 
@@ -163,17 +163,28 @@ First nightly run (2026-11-08), checked at the owner's request:
 - Run 42469100727, event `schedule`, at `0425227` (current `main`): **success**. Log: `Running 319 tests using 2 workers` → `316 passed (4.3m)`, `3 skipped` (the same conditional skip as above). Run time 7 min (09:53:49 → 10:00:41 UTC).
 - GitHub started the 03:00 UTC schedule at 09:53 UTC, almost 7 hours late. The comprehensive workflow shows the same pattern (02:00 UTC cron, started between 07:57 and 09:38 UTC over the last ten days, `gh run list --event schedule`). The documents now say so, so nobody waits for a result at 03:00.
 
+Failure detection and final changes (2026-11-08):
+
+- Timeouts sized from the measured runs (`339b4b6`): job 75 → 30 min, matrix step 55 → 20 min, baseline step 15 → 10 min. `docs/11-development-setup.md:92` now lists every matrix project and the workflow.
+- Throwaway branch `codex/ttw-176-broken-spec-proof` (`c402ac9`, never merged) adds `tests/e2e/web/ttw-176-broken-proof.spec.ts`, which waits for a heading that does not exist. Matrix run 42483902366 on it: **failure**, as intended. `Running 327 tests` → `5 failed`, `1 flaky`, `3 skipped`, `318 passed`. The 5 failures are exactly the broken spec in `chromium-web`, `firefox-web`, `webkit-web`, `mobile-chromium-web` and `mobile-webkit-web`. The `playwright-matrix-report` artefact (75.7 MB, HTML report and traces) was uploaded.
+- The same run found a real flake: `[firefox-web] fundraiser-checkout.comprehensive.spec.ts:87` failed once, then passed on retry. Cause: the strict page guard (`tests/e2e/fixtures/test.ts:45`) ignores Chromium's `net::ERR_ABORTED` but not Firefox's `NS_BINDING_ABORTED`, so Next.js prefetches cancelled at the end of a test count as failures. Ticketed as TTW-188, not fixed here (out of scope: one ticket per failure). Until TTW-188 lands, a nightly run can go red on it at random, and `--fail-on-flaky-tests` makes that visible on purpose.
+- Matrix run 42483905699 on the ticket branch at `339b4b6` (new timeouts): **success**, `Running 322 tests` → `319 passed (4.3m)`, `3 skipped`, job 7 min (13:13:15 → 13:20:13 UTC).
+- Local gates at `339b4b6` plus the closing docs: `pnpm format:check` → `All matched files use Prettier code style!`; `pnpm docs:validate` → passed; `pnpm playwright:validate` → passed; `pnpm workflows:validate` → passed; `pnpm workflows:validate:test` → 6 pass, 0 fail; `pnpm lint` → 6/6 tasks successful; `pnpm typecheck` → 6/6 tasks successful; `CI=1 pnpm test:e2e:matrix --list` → `Total: 322 tests in 35 files`.
+
 ## Completion summary
 
-**Done:** `mobile-webkit-web` project (iPhone 13) added to `playwright.config.ts` and `test:e2e:matrix`; `.github/workflows/playwright-matrix.yml` (nightly 03:00 UTC + manual dispatch, `update_snapshots` input for Linux baselines, concurrency without cancellation, `--fail-on-flaky-tests`, report upload on failure); strategy, interim policy and `docs/12-testing-strategy.md` describe it as Implemented-unverified.
+**Shipped:**
 
-Merged into `main` (`c135789`, then `c4171ce` with the deterministic visual specs, the reviewed Linux baselines and tickets TTW-177/TTW-178) and pushed. First full matrix run green by manual dispatch (see evidence).
+- `mobile-webkit-web` project (iPhone 13, public web specs) in `playwright.config.ts` and `test:e2e:matrix`.
+- `.github/workflows/playwright-matrix.yml`: nightly (cron 03:00 UTC, started hours late by GitHub) and manual dispatch; `update_snapshots` input that regenerates the visual baselines on Linux as an artefact for review; queued, never cancelled, runs per ref (baselines in their own group); `--fail-on-flaky-tests`; report and traces uploaded on failure; timeouts 30/20/10 min.
+- `tests/e2e/fixtures/visual.ts` `waitForAllImages()`, used by both visual specs, and the two reviewed Linux baselines.
+- Strategy, interim policy, `docs/12-testing-strategy.md` and `docs/11-development-setup.md` describe what runs, with run ids.
+- Proven in CI: manual runs green (42431599230, 42483905699), first nightly run green (42469100727), a broken spec turns it red in all five web projects (42483902366).
 
-**Deviation from plan:** no local matrix run (environment, see design review). The visual-baseline step is a workflow input instead of a separate local generation. The visual specs needed a wait for lazily loaded images before the baselines could be trusted.
+Merged into `main` in steps (`c135789`, `c4171ce`, `0425227`, `1ee04e9`); the last changes (timeouts, `docs/11`, closing docs, TTW-188) are on the ticket branch, to merge when the owner asks.
 
-**Remaining, in order (each needs the owner's go-ahead to push):**
+**Deviations from plan:** no local matrix run (no Docker or PostgreSQL on the machine, port 3001 taken); the baselines come from a workflow input instead of a local generation; the visual specs needed a wait for lazily loaded images before their baselines could be trusted.
 
-1. Prove failure detection: one dispatch on a throwaway branch with a deliberately broken spec (red), then the good one (green). The throwaway branch is deleted afterwards and never merged.
-2. Tighten the timeouts from the measured run (job 7 min, step 4.5 min): for example job 30 min, matrix step 20 min.
-3. Update `docs/11-development-setup.md:92` (TTW-085 has landed; the matrix line misses mobile WebKit, accessibility and visual projects).
-4. Tick the last criteria (the documents already say "Running in CI") and close the ticket.
+**Follow-up tickets:** TTW-177 (brand fonts never loaded), TTW-178 (footer payment logos: Visa invisible, PayPal shown), TTW-188 (Firefox flake from cancelled prefetches).
+
+**Cleanup:** the throwaway branch `codex/ttw-176-broken-spec-proof` exists locally and on GitHub; delete it when the owner asks.
