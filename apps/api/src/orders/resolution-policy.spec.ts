@@ -268,3 +268,77 @@ describe('resolution-policy (TTW-041)', () => {
     });
   });
 });
+
+describe('late payment on a cancelled order (TTW-088)', () => {
+  const base = {
+    hasCustomizedLine: false,
+    activeOutboundShipmentStatus: null as ShipmentStatus | null,
+  };
+
+  it('allows a refund for LATE_PAYMENT_AFTER_CANCELLATION when money was captured', () => {
+    const d = evaluateRefundEligibility({
+      ...base,
+      orderStatus: OrderStatus.CANCELLED,
+      hasCapturedPayment: true,
+      reasonCode: RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+    });
+    expect(d.allowed).toBe(true);
+    expect(d.code).toBe(ResolutionCode.REFUND_ALLOWED_LATE_PAYMENT);
+  });
+
+  it('keeps a cancelled order without captured money non-refundable', () => {
+    const d = evaluateRefundEligibility({
+      ...base,
+      orderStatus: OrderStatus.CANCELLED,
+      hasCapturedPayment: false,
+      reasonCode: RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+    });
+    expect(d.allowed).toBe(false);
+    expect(d.code).toBe(ResolutionCode.REFUND_NOT_ALLOWED_TERMINAL);
+  });
+
+  it('does not open other reasons on a cancelled order, even with captured money', () => {
+    for (const reasonCode of [
+      RefundReasonCode.ADMIN_GOODWILL,
+      RefundReasonCode.CHANGE_OF_MIND,
+      RefundReasonCode.DUPLICATE_OR_PRICING_ERROR,
+    ]) {
+      const d = evaluateRefundEligibility({
+        ...base,
+        orderStatus: OrderStatus.CANCELLED,
+        hasCapturedPayment: true,
+        reasonCode,
+      });
+      expect(d.allowed).toBe(false);
+      expect(d.code).toBe(ResolutionCode.REFUND_NOT_ALLOWED_TERMINAL);
+    }
+  });
+
+  it('refuses the late-payment reason on an order that is not cancelled', () => {
+    for (const orderStatus of [
+      OrderStatus.PAID,
+      OrderStatus.PROCESSING,
+      OrderStatus.DELIVERED,
+    ]) {
+      const d = evaluateRefundEligibility({
+        ...base,
+        orderStatus,
+        hasCapturedPayment: true,
+        reasonCode: RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+      });
+      expect(d.allowed).toBe(false);
+      expect(d.code).toBe(ResolutionCode.REFUND_NOT_ALLOWED_REASON_FOR_STATUS);
+    }
+  });
+
+  it('keeps a REFUNDED order terminal', () => {
+    const d = evaluateRefundEligibility({
+      ...base,
+      orderStatus: OrderStatus.REFUNDED,
+      hasCapturedPayment: true,
+      reasonCode: RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+    });
+    expect(d.allowed).toBe(false);
+    expect(d.code).toBe(ResolutionCode.REFUND_NOT_ALLOWED_TERMINAL);
+  });
+});

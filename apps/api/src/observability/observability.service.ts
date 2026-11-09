@@ -272,7 +272,9 @@ export class ObservabilityService {
     this.webhookEvents.add(1, { event: eventName, outcome });
   }
 
-  recordChargeSettlement(outcome: 'settled' | 'duplicate' | 'rejected'): void {
+  recordChargeSettlement(
+    outcome: 'settled' | 'duplicate' | 'rejected' | 'late_captured',
+  ): void {
     this.chargeSettlements.add(1, { outcome });
   }
 

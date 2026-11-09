@@ -22,6 +22,7 @@ import {
   ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
 } from '../admin-notifications/admin-notification-events';
 import { RefundsService } from './refunds.service';
+import { RefundReasonCode } from './resolution-policy';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
@@ -125,14 +126,29 @@ export class PaystackWebhookService {
           return;
         }
         if (order.status === OrderStatus.CANCELLED) {
+          // TTW-088: record the captured money so an admin can refund it.
+          const outcome = await this.recordLateCapture(
+            payment,
+            order,
+            event,
+            reference,
+          );
+          if (outcome === 'duplicate') {
+            return;
+          }
           this.logger.error(
-            `charge.success received for CANCELLED order ${order.id} (ref: ${reference}). Manual refund required.`,
+            `charge.success received for CANCELLED order ${order.id} (ref: ${reference}). ` +
+              (outcome === 'recorded'
+                ? 'Capture recorded; refund required.'
+                : 'Capture NOT recorded; manual refund required.'),
           );
           this.observability.recordWebhook(
             'charge.success.cancelled_order',
             'denied',
           );
-          this.observability.recordChargeSettlement('rejected');
+          this.observability.recordChargeSettlement(
+            outcome === 'recorded' ? 'late_captured' : 'rejected',
+          );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
             {
@@ -140,23 +156,41 @@ export class PaystackWebhookService {
               reference,
               amount: event.data?.amount,
               currency: event.data?.currency ?? order.currency,
-              reason: 'Order was already CANCELLED',
+              reason:
+                outcome === 'recorded'
+                  ? `Order was already CANCELLED. Payment recorded: refund it in full with reason ${RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION}`
+                  : 'Order was already CANCELLED',
             },
           );
           return;
         }
         if (order.expiresAt && order.expiresAt < new Date()) {
+          await this.cancelPendingAndReleaseInventory(
+            order,
+            'charge_success_expired_reject',
+          );
+          // TTW-088: the order is now cancelled; record the captured money.
+          const outcome = await this.recordLateCapture(
+            payment,
+            order,
+            event,
+            reference,
+          );
+          if (outcome === 'duplicate') {
+            return;
+          }
           this.logger.error(
-            `charge.success received for expired order ${order.id} (ref: ${reference}). Manual refund required.`,
+            `charge.success received for expired order ${order.id} (ref: ${reference}). ` +
+              (outcome === 'recorded'
+                ? 'Capture recorded; refund required.'
+                : 'Capture NOT recorded; manual refund required.'),
           );
           this.observability.recordWebhook(
             'charge.success.expired_order',
             'denied',
           );
-          this.observability.recordChargeSettlement('rejected');
-          await this.cancelPendingAndReleaseInventory(
-            order,
-            'charge_success_expired_reject',
+          this.observability.recordChargeSettlement(
+            outcome === 'recorded' ? 'late_captured' : 'rejected',
           );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
@@ -165,7 +199,10 @@ export class PaystackWebhookService {
               reference,
               amount: event.data?.amount,
               currency: event.data?.currency ?? order.currency,
-              reason: 'Order was already expired',
+              reason:
+                outcome === 'recorded'
+                  ? `Order was already expired. Payment recorded: refund it in full with reason ${RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION}`
+                  : 'Order was already expired',
             },
           );
           return;
@@ -405,6 +442,84 @@ export class PaystackWebhookService {
         });
       },
     );
+  }
+
+  /**
+   * TTW-088: a charge captured for an order that is already cancelled. Records
+   * the money (claim + payment SUCCEEDED) in one transaction so an admin can
+   * refund it. The order stays CANCELLED; stock, campaign totals and ledger are
+   * untouched because none of them was ever applied for this payment.
+   * Only records when Paystack's amount and currency match the order, so a
+   * mismatching capture keeps going through manual handling.
+   */
+  private async recordLateCapture(
+    payment: { id: string; provider: PaymentProvider | null },
+    order: { id: string; totalAmount: unknown; currency: string },
+    event: PaystackWebhookEvent,
+    reference: string,
+  ): Promise<'recorded' | 'duplicate' | 'skipped'> {
+    const amount = event.data?.amount;
+    const currency = event.data?.currency;
+    if (amount == null || currency == null) {
+      return 'skipped';
+    }
+    if (event.data?.status != null && event.data.status !== 'success') {
+      return 'skipped';
+    }
+    const expectedKobo = Math.round(Number(order.totalAmount) * 100);
+    if (amount !== expectedKobo || currency !== order.currency) {
+      return 'skipped';
+    }
+
+    const businessKey = `charge.success:${reference}`;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.chargeSettlementClaim.create({
+          data: {
+            provider: payment.provider ?? PaymentProvider.PAYSTACK,
+            businessKey,
+            paymentId: payment.id,
+            orderId: order.id,
+          },
+        });
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.SUCCEEDED,
+            rawEvent: event as unknown as object,
+          },
+        });
+        await this.audit.log(
+          {
+            eventName: 'webhook.payment.late_capture_recorded',
+            action: AuditAction.STATUS_CHANGE,
+            entityType: 'Order',
+            entityId: order.id,
+            before: { status: OrderStatus.CANCELLED },
+            after: {
+              status: OrderStatus.CANCELLED,
+              paymentStatus: PaymentStatus.SUCCEEDED,
+              providerRef: reference,
+              settlementBusinessKey: businessKey,
+            },
+            metadata: event as unknown as object,
+            note: 'Paystack charge.success captured after cancellation; refund required',
+            source: AuditSource.WEBHOOK,
+          },
+          tx,
+        );
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        this.observability.recordChargeSettlement('duplicate');
+        this.logger.log(
+          `Duplicate late charge.success ignored for ref ${reference} (settlement claim already exists)`,
+        );
+        return 'duplicate';
+      }
+      throw error;
+    }
+    return 'recorded';
   }
 
   /**

@@ -1011,6 +1011,7 @@
               "CHANGE_OF_MIND",
               "DEFECT_OR_NOT_AS_DESCRIBED",
               "DUPLICATE_OR_PRICING_ERROR",
+              "LATE_PAYMENT_AFTER_CANCELLATION",
               "PRODUCTION_FAILURE"
             ],
             "example": "DEFECT_OR_NOT_AS_DESCRIBED",
@@ -8548,6 +8549,7 @@
                       "CHANGE_OF_MIND",
                       "DEFECT_OR_NOT_AS_DESCRIBED",
                       "DUPLICATE_OR_PRICING_ERROR",
+                      "LATE_PAYMENT_AFTER_CANCELLATION",
                       "PRODUCTION_FAILURE"
                     ],
                     "example": "DEFECT_OR_NOT_AS_DESCRIBED",

@@ -3715,7 +3715,7 @@ export interface components {
              * @example DEFECT_OR_NOT_AS_DESCRIBED
              * @enum {string}
              */
-            reasonCode: "ADDRESS_FAILURE_PLATFORM" | "ADMIN_GOODWILL" | "CARRIER_LOSS_OR_DAMAGE" | "CHANGE_OF_MIND" | "DEFECT_OR_NOT_AS_DESCRIBED" | "DUPLICATE_OR_PRICING_ERROR" | "PRODUCTION_FAILURE";
+            reasonCode: "ADDRESS_FAILURE_PLATFORM" | "ADMIN_GOODWILL" | "CARRIER_LOSS_OR_DAMAGE" | "CHANGE_OF_MIND" | "DEFECT_OR_NOT_AS_DESCRIBED" | "DUPLICATE_OR_PRICING_ERROR" | "LATE_PAYMENT_AFTER_CANCELLATION" | "PRODUCTION_FAILURE";
         };
         CreateShipmentDto: {
             /**
@@ -7391,7 +7391,7 @@ export interface operations {
                      * @example DEFECT_OR_NOT_AS_DESCRIBED
                      * @enum {string}
                      */
-                    reasonCode: "ADDRESS_FAILURE_PLATFORM" | "ADMIN_GOODWILL" | "CARRIER_LOSS_OR_DAMAGE" | "CHANGE_OF_MIND" | "DEFECT_OR_NOT_AS_DESCRIBED" | "DUPLICATE_OR_PRICING_ERROR" | "PRODUCTION_FAILURE";
+                    reasonCode: "ADDRESS_FAILURE_PLATFORM" | "ADMIN_GOODWILL" | "CARRIER_LOSS_OR_DAMAGE" | "CHANGE_OF_MIND" | "DEFECT_OR_NOT_AS_DESCRIBED" | "DUPLICATE_OR_PRICING_ERROR" | "LATE_PAYMENT_AFTER_CANCELLATION" | "PRODUCTION_FAILURE";
                 };
             };
         };
