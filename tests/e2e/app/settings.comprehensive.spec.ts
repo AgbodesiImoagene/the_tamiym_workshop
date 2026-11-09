@@ -45,10 +45,15 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await expect(state).toBeEnabled();
     await customerPage.getByLabel('City').fill('Ikeja');
     await customerPage.getByLabel('Street Address').fill('1 Settings Street');
-    await state.selectOption({ label: 'Ogun' });
+    // CI seeds only Lagos (with the LGA Ikeja) and Abuja (no LGA): seed:e2e.
+    await state.selectOption({ label: 'Lagos' });
     await expect(lga).toBeEnabled();
-    await expect(lga.locator('option', { hasText: 'Abeokuta North' })).toHaveCount(1);
-    // Choosing another state clears the LGA.
+    await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(1);
+    await lga.selectOption({ label: 'Ikeja' });
+    // Choosing another state clears the LGA, and Lagos's LGAs are no longer offered.
+    await state.selectOption({ label: 'Abuja Federal Capital Territory' });
+    await expect(lga).toHaveValue('');
+    await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(0);
     await state.selectOption({ label: 'Lagos' });
     await expect(lga).toHaveValue('');
     await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(1);
