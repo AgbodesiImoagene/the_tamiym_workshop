@@ -9,6 +9,10 @@ function omit<T extends Record<string, unknown>>(
   return clone;
 }
 
+const TEST_MFA_KEY = 'zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=';
+const ZERO_MFA_KEY = Buffer.alloc(32, 0).toString('base64');
+const RANDOM_MFA_KEY = '8ri/JBw+XjiGja6Ba+9DLZo1gLA51g74CIeb5nN2unA=';
+
 describe('env-validation', () => {
   const originalEnv = { ...process.env };
   const originalNodeEnv = process.env.NODE_ENV;
@@ -122,11 +126,21 @@ describe('env-validation', () => {
           'Environment variable MFA_TOTP_ENCRYPTION_KEY must decode to exactly 32 bytes',
         );
       });
+
+      it.each([
+        ['the committed test key', TEST_MFA_KEY],
+        ['32 zero bytes', ZERO_MFA_KEY],
+      ])('still accepts %s outside production (TTW-180)', (_label, key) => {
+        const config = { ...validBaseConfig, MFA_TOTP_ENCRYPTION_KEY: key };
+        expect(validateEnv(config)).toEqual(config);
+      });
     });
 
     describe('production', () => {
       const validProductionConfig = {
         ...validBaseConfig,
+        // A fresh key: the committed test key is refused in production.
+        MFA_TOTP_ENCRYPTION_KEY: RANDOM_MFA_KEY,
         AUTH_ADMIN_ORIGINS: 'https://admin.example.com',
         AUTH_CUSTOMER_ORIGINS: 'https://shop.example.com',
         CLAMAV_HOST: 'clamav.internal',
@@ -146,6 +160,49 @@ describe('env-validation', () => {
         expect(validateEnv(validProductionConfig)).toEqual(
           validProductionConfig,
         );
+      });
+
+      describe('public MFA encryption keys (TTW-180)', () => {
+        it.each([
+          ['the committed test key', TEST_MFA_KEY],
+          [
+            'the committed test key with surrounding whitespace',
+            `  ${TEST_MFA_KEY}\n`,
+          ],
+          ['32 zero bytes', ZERO_MFA_KEY],
+          [
+            '32 identical non-zero bytes',
+            Buffer.alloc(32, 0x41).toString('base64'),
+          ],
+        ])('refuses %s', (_label, key) => {
+          expect(() =>
+            validateEnv({
+              ...validProductionConfig,
+              MFA_TOTP_ENCRYPTION_KEY: key,
+            }),
+          ).toThrow(/MFA_TOTP_ENCRYPTION_KEY.*openssl rand -base64 32/);
+        });
+
+        it('does not print the key value in the error', () => {
+          let message = '';
+          try {
+            validateEnv({
+              ...validProductionConfig,
+              MFA_TOTP_ENCRYPTION_KEY: TEST_MFA_KEY,
+            });
+          } catch (error) {
+            message = (error as Error).message;
+          }
+          expect(message).not.toBe('');
+          expect(message).not.toContain(TEST_MFA_KEY);
+          expect(message).not.toContain(TEST_MFA_KEY.slice(0, 12));
+        });
+
+        it('accepts a random 32-byte key', () => {
+          expect(validateEnv(validProductionConfig)).toEqual(
+            validProductionConfig,
+          );
+        });
       });
 
       it('throws when NOTIFICATION_UNSUBSCRIBE_SECRET is missing', () => {

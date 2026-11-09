@@ -93,7 +93,7 @@ ADMIN console login requires TOTP (or a single-use recovery code) before an `Aut
    - `ENROLLMENT_REQUIRED` when MFA is not yet enabled; `CHALLENGE_REQUIRED` when it is.
 2. Enrollment: `POST /auth/admin/mfa/enroll/start` → otpauth URI + recovery codes (plaintext once); `POST /auth/admin/mfa/enroll/confirm` with TOTP → enable MFA and set admin session cookies.
 3. Challenge: `POST /auth/admin/mfa/challenge` (TOTP) or `POST /auth/admin/mfa/recover` (one recovery code) → set admin session cookies.
-4. TOTP secrets are AES-256-GCM encrypted with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64) and a `keyVersion` column for rotation. Recovery codes are stored as sha256 hashes only.
+4. TOTP secrets are AES-256-GCM encrypted with `MFA_TOTP_ENCRYPTION_KEY` (32-byte base64) and a `keyVersion` column for rotation. Recovery codes are stored as sha256 hashes only. Under `NODE_ENV=production`, `validateEnv` refuses the committed test key and any key made of one repeated byte (for example 32 zero bytes), so a public value cannot protect real admin secrets (TTW-180).
 5. Another admin may `POST /admin/users/:id/mfa/reset` (audited) to clear MFA and revoke sessions.
 
 ## Auth abuse throttles (TTW-023)

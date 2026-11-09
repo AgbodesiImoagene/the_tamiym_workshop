@@ -76,6 +76,24 @@ export const forbiddenPlaceholders = new Set([
 ]);
 
 /**
+ * The MFA key committed in `.env.test.example`, CI workflows and specs
+ * (TTW-180). Compared on decoded bytes so whitespace or padding variants of
+ * the same key are caught too.
+ */
+const COMMITTED_TEST_MFA_KEY = Buffer.from(
+  'zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=',
+  'base64',
+);
+
+/** True for the committed test key or any key made of one repeated byte. */
+function isPublicMfaKey(decoded: Buffer): boolean {
+  return (
+    decoded.equals(COMMITTED_TEST_MFA_KEY) ||
+    decoded.every((byte) => byte === decoded[0])
+  );
+}
+
+/**
  * Parse a comma-separated list of Origin URLs into their normalized
  * `origin` form (scheme + host + port), dropping blank and unparsable
  * entries.
@@ -146,6 +164,12 @@ export function validateEnv(
     if (decoded.length !== 32) {
       throw new Error(
         'Environment variable MFA_TOTP_ENCRYPTION_KEY must decode to exactly 32 bytes',
+      );
+    }
+    if (process.env.NODE_ENV === 'production' && isPublicMfaKey(decoded)) {
+      // Never print the value: it is either a committed key or a filler.
+      throw new Error(
+        'Environment variable MFA_TOTP_ENCRYPTION_KEY is a publicly known or filler key and is refused in production; generate a fresh one with `openssl rand -base64 32`',
       );
     }
   }
