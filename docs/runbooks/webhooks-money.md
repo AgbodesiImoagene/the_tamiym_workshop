@@ -1,11 +1,11 @@
 # Runbook — Webhooks & money
 
-| Field     | Value                                                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Owner     | payments                                                                                                                                         |
-| Severity  | critical                                                                                                                                         |
-| Alerts    | `TamiymWebhookFailureSpike`, `TamiymWebhookDeniedSpike`, `TamiymChargeSettlementRejected`, `TamiymRefundSettlementFailed`, `TamiymPayoutFailure` |
-| Dashboard | Grafana `Money & Webhooks` (`ttw-051-money-webhooks`)                                                                                            |
+| Field     | Value                                                                                                                                                                         |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner     | payments                                                                                                                                                                      |
+| Severity  | critical                                                                                                                                                                      |
+| Alerts    | `TamiymWebhookFailureSpike`, `TamiymWebhookDeniedSpike`, `TamiymChargeSettlementRejected`, `TamiymExtraPaymentCapture`, `TamiymRefundSettlementFailed`, `TamiymPayoutFailure` |
+| Dashboard | Grafana `Money & Webhooks` (`ttw-051-money-webhooks`)                                                                                                                         |
 
 ## User / business impact
 
@@ -41,6 +41,15 @@ sum by (outcome) (rate(tamiym_payout_transfer_event_total[5m]))
 1. Fix root cause (payload mapping, idempotency key, provider outage).
 2. Run approved reconciliation jobs / admin repair flows (TTW-015 scope).
 3. Re-execute payout runs only through `PayoutRunsService` idempotent paths.
+
+## Extra or late payment captures (`TamiymExtraPaymentCapture`)
+
+A customer paid for an order that cannot use the money: a second payment on an order that is already paid (`extra_capture`, TTW-189) or a payment after cancellation (`late_captured`, TTW-088).
+
+1. Find the order and reference in the error log (`charge.success captured again…` / `charge.success received for CANCELLED order…`) or in the open reconciliation findings (payment domain, entity key `payment:<id>:extra_capture`).
+2. Refund the customer. A late payment on a cancelled order with one captured payment can be refunded with reason `LATE_PAYMENT_AFTER_CANCELLATION`; an extra capture is refunded from the Paystack dashboard until TTW-191 exists.
+3. The admin notification is sent after the database commit and can be lost if the notification step fails; this alert and the reconciliation finding are the safety net.
+4. Acknowledge the reconciliation finding once the refund is done.
 
 ## Verification
 

@@ -1,7 +1,7 @@
 # TTW-190 — Make extra payment captures visible to reconciliation and alerts
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** In review (implemented; e2e test written but not run; independent review pending)\
 **Risk:** High\
 **Blocked by:** None (TTW-189 is done)\
 **Blocks:** TTW-191
@@ -51,8 +51,8 @@ Rejected alternative: moving the admin outbox write into the settlement transact
 
 ## Acceptance criteria
 
-- [ ] An extra capture appears as a reconciliation finding until it is refunded.
-- [ ] An alert exists for the extra-capture and cancelled-order capture metrics.
+- [x] An extra capture appears as a reconciliation finding until it is refunded (unit tests; note: it stays open until acknowledged, see Design review).
+- [x] An alert exists for the extra-capture and late-capture metrics (`TamiymExtraPaymentCapture`), with a runbook section.
 - [ ] Integration test proves one claim and one audit entry under serial and concurrent delivery.
 - [ ] Required quality gates pass with evidence recorded below.
 
@@ -63,16 +63,33 @@ Rejected alternative: moving the admin outbox write into the settlement transact
 
 ## Design review
 
-Not started.
+**Reviewer:** Claude (self-review), 2026-11-09. Verdict: PASS, to be confirmed by the independent review.
+
+- **Reconciliation:** one new check inside `checkPayments`: every `ChargeSettlementClaim` whose `Payment.status` is not `SUCCEEDED` becomes a finding (`MISMATCH`, severity `HIGH`, entity key `payment:<id>:extra_capture`, evidence `extra_capture_awaiting_refund` with the amount). No schema change and no new enum value. Why this identifies an extra capture: every normal settlement and every TTW-088 late capture sets the payment `SUCCEEDED` in the same transaction as the claim, so a claim on a non-`SUCCEEDED` payment can only come from `handleExtraCapture`. The check pages by claim id like the other checks.
+- **Severity HIGH, not CRITICAL:** money is held and an admin was told, but nothing is corrupt.
+- **Until TTW-191 exists the finding cannot close by itself:** it stays `OPEN`; an admin acknowledges it after refunding by hand (documented in the runbook). The fingerprint is per payment, so reruns deduplicate.
+- **Alert:** `TamiymExtraPaymentCapture` in `docker/observability/prometheus/alerts.yml`: `increase(tamiym_charge_settlement_total{outcome=~"extra_capture|late_captured"}[15m]) > 0`, no `for` delay because the event is rare and one occurrence is enough. Limit: Prometheus `increase` ignores the very first sample of a counter that did not exist before, so the first-ever event after a fresh deploy may not alert; the reconciliation finding covers it.
+- **`FAILED` guard:** `failIfStillPendingOrInitiated` now only updates a payment with no settlement claim (`settlementClaim: null`). The path was not shown reachable for a paid order (initiation is refused first), so this is defence in depth.
+- **No transaction/network concerns:** nothing here calls Paystack.
 
 ## Implementation reviews
 
-Not started.
+Independent review: **not done yet**.
 
 ## Verification evidence
 
-Not started.
+- Failing first: `npx jest src/reconciliation/reconciliation-runs.service.spec.ts` → 2 failed (`flags a claim whose payment never became SUCCEEDED…`, `does not flag a claim whose payment is SUCCEEDED…`, no check existed); `npx jest src/orders/payments.service.spec.ts` → 1 failed (`never fails an attempt that already has a settlement claim`).
+- After the change: reconciliation suite 38/38; payments service suite 34/34.
+- Existing reconciliation test mocks gained a `chargeSettlementClaim.findMany` stub (additive; no assertion weakened).
+- `node scripts/quality/validate-observability-artefacts.mjs` → "Prometheus alerts OK (7 groups, 19 rules)", "Observability artefact validation passed.".
+- E2E: `apps/api/test/paystack-extra-capture.e2e-spec.ts` written (2 tests: attempt B settles once and attempt A is recorded once under 21 parallel deliveries with a single admin notification; the extra capture is returned by the reconciliation query). **Not run**: no Postgres/Docker in this session. It type-checks and lints.
+
+Final gates (from `apps/api`, 2026-11-09):
+
+- `npx tsc --noEmit` → exit 0.
+- `npx eslint src/reconciliation src/orders/payments.service.ts src/orders/payments.service.spec.ts test/paystack-extra-capture.e2e-spec.ts` → exit 0, no output.
+- `npx jest` (full API unit suite) → Test Suites: 148 passed, 148 total; Tests: 1374 passed, 1374 total.
 
 ## Completion summary
 
-Not started.
+In progress. Implemented, uncommitted. Open: run the e2e test with Postgres, independent review, merge decisions.

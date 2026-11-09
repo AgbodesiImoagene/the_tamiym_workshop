@@ -55,6 +55,7 @@ describe('ReconciliationRunsService payout checks', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       payment: { findMany: jest.fn().mockResolvedValue([]) },
+      chargeSettlementClaim: { findMany: jest.fn().mockResolvedValue([]) },
       refund: { findMany: jest.fn().mockResolvedValue([]) },
       campaign: { findMany: jest.fn().mockResolvedValue([]) },
       inventoryItem: { findMany: jest.fn().mockResolvedValue([]) },
@@ -109,6 +110,7 @@ describe('ReconciliationRunsService payout checks', () => {
         count: jest.fn().mockResolvedValue(1),
       },
       payment: { findMany: jest.fn().mockResolvedValue([]) },
+      chargeSettlementClaim: { findMany: jest.fn().mockResolvedValue([]) },
       refund: { findMany: jest.fn().mockResolvedValue([]) },
       campaign: { findMany: jest.fn().mockResolvedValue([]) },
       inventoryItem: { findMany: jest.fn().mockResolvedValue([]) },
@@ -168,6 +170,7 @@ describe('ReconciliationRunsService payout checks', () => {
         count: jest.fn().mockResolvedValue(1),
       },
       payment: { findMany: jest.fn().mockResolvedValue([]) },
+      chargeSettlementClaim: { findMany: jest.fn().mockResolvedValue([]) },
       refund: { findMany: jest.fn().mockResolvedValue([]) },
       campaign: { findMany: jest.fn().mockResolvedValue([]) },
       inventoryItem: { findMany: jest.fn().mockResolvedValue([]) },
@@ -398,6 +401,7 @@ function emptyPrismaForRun(runId = 'runX') {
       findUniqueOrThrow: jest.fn(),
     },
     payment: { findMany: jest.fn().mockResolvedValue([]) },
+    chargeSettlementClaim: { findMany: jest.fn().mockResolvedValue([]) },
     refund: { findMany: jest.fn().mockResolvedValue([]) },
     payout: { findMany: jest.fn().mockResolvedValue([]) },
     campaign: { findMany: jest.fn().mockResolvedValue([]) },
@@ -640,6 +644,70 @@ describe('ReconciliationRunsService internal domain findings', () => {
     );
     await service.runInternal(new Date('2026-08-20'));
     expect(prisma.reconciliationFinding.create).toHaveBeenCalled();
+  });
+
+  describe('extra payment captures (TTW-190)', () => {
+    const makeService = (claims: unknown[]) => {
+      const prisma = emptyPrismaForRun('run-extra');
+      prisma.chargeSettlementClaim.findMany = jest
+        .fn()
+        .mockResolvedValueOnce(claims)
+        .mockResolvedValue([]);
+      const service = new ReconciliationRunsService(
+        prisma as never,
+        {
+          startSpan: (_n: string, _a: unknown, fn: () => unknown) => fn(),
+        } as never,
+        {} as never,
+      );
+      return { prisma, service };
+    };
+
+    it('flags a claim whose payment never became SUCCEEDED as an extra capture awaiting refund', async () => {
+      const { prisma, service } = makeService([
+        {
+          id: 'claim-2',
+          orderId: 'o1',
+          paymentId: 'p2',
+          payment: {
+            id: 'p2',
+            orderId: 'o1',
+            amount: 100,
+            currency: 'NGN',
+            status: 'INITIATED',
+          },
+        },
+      ]);
+
+      await service.runInternal(new Date('2026-08-20'));
+
+      expect(prisma.reconciliationFinding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            outcome: ReconciliationOutcome.MISMATCH,
+            severity: ReconciliationSeverity.HIGH,
+            leftLabel: 'chargeSettlementClaim',
+            rightLabel: 'payment.status',
+            rightValue: 'INITIATED',
+          }),
+        }),
+      );
+    });
+
+    it('does not flag a claim whose payment is SUCCEEDED (the settling payment)', async () => {
+      const { prisma, service } = makeService([]);
+
+      await service.runInternal(new Date('2026-08-20'));
+
+      expect(prisma.chargeSettlementClaim.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            payment: { status: { not: 'SUCCEEDED' } },
+          }),
+        }),
+      );
+      expect(prisma.reconciliationFinding.create).not.toHaveBeenCalled();
+    });
   });
 
   it('flags refund claim and ledger issues', async () => {

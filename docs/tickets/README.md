@@ -149,101 +149,101 @@ See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 
 One ticket per piece of work from the client review, in the order of [ROADMAP.md](ROADMAP.md).
 
-| Ticket                                                              | Priority | Risk     | State    | Outcome                                                                  | Review           |
-| ------------------------------------------------------------------- | -------- | -------- | -------- | ------------------------------------------------------------------------ | ---------------- |
-| [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)       | P0       | High     | Complete | Link Google sign-in only to confirmed emails                             | 1.8              |
-| [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)   | P0       | High     | Complete | Hash password-reset and email-verification tokens                        | 1.7              |
-| [TTW-084](ttw-084-create-default-site-settings.md)                  | P0       | High     | Complete | Create default site settings so VAT is never silently 0%                 | 8.6              |
-| [TTW-085](ttw-085-validate-production-mail-settings.md)             | P0       | Standard | Complete | Validate production mail settings at startup                             | 10.5             |
-| [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)       | P0       | High     | Complete | Reject addresses outside every shipping zone                             | 5.6              |
-| [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)             | P0       | High     | Scoped   | Offer Nigerian states and LGAs as lists at checkout                      | 4.9              |
-| [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | P0       | Critical | Scoped   | Refund payments captured after an order was cancelled                    | 4.6              |
-| [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | P0       | Critical | Complete | Record a second payment captured for the same order                      | Found in TTW-088 |
-| [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | P1       | High     | Scoped   | Make extra payment captures visible to reconciliation and alerts         | Found in TTW-189 |
-| [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | P0       | Critical | Scoped   | Refund extra payment captures (blocked on client D1/D2)                  | Found in TTW-189 |
-| [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)           | P1       | High     | Scoped   | Add forgot-password and reset-password pages                             | 1.1              |
-| [TTW-090](ttw-090-show-email-verification-state-and-resend.md)      | P1       | High     | Scoped   | Show the email-verification state and offer a resend                     | 1.4              |
-| [TTW-091](ttw-091-remove-fake-profile-picture.md)                   | P1       | Low      | Scoped   | Remove the fake profile picture and its button                           | 1.2              |
-| [TTW-092](ttw-092-build-product-detail-page.md)                     | P0       | Standard | Scoped   | Build the product detail page                                            | 2.2, 2.1         |
-| [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)    | P1       | Standard | Scoped   | Use real categories and paginate the customer catalogue                  | 2.3              |
-| [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)    | P1       | High     | Scoped   | Let admins enter size and print-side surcharges                          | 2.7              |
-| [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md)  | P1       | High     | Scoped   | Compute bulk tiers on a product's total quantity                         | 8.5              |
-| [TTW-096](ttw-096-apply-product-and-order-discounts.md)             | P1       | High     | Scoped   | Apply product, variant and order discounts                               | 8.1              |
-| [TTW-097](ttw-097-complete-shipping-zone-administration.md)         | P1       | High     | Scoped   | Complete shipping zone and rate administration                           | 8.2              |
-| [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md)  | P1       | High     | Scoped   | Make shipping rates configurable by weight or quantity                   | 5.7              |
-| [TTW-099](ttw-099-make-customer-uploads-private.md)                 | P1       | High     | Scoped   | Make customer uploads private with signed links                          | 11.3, 9.7        |
-| [TTW-100](ttw-100-validate-design-content-on-the-server.md)         | P0       | High     | Scoped   | Validate design content on the server                                    | 3.7              |
-| [TTW-101](ttw-101-give-the-workshop-its-print-files.md)             | P0       | High     | Scoped   | Give the print shop its print files                                      | 3.2              |
-| [TTW-102](ttw-102-add-delete-undo-and-layers-to-the-workshop.md)    | P1       | Standard | Scoped   | Add delete, undo and a layer list to the Design Workshop                 | 3.3              |
-| [TTW-103](ttw-103-load-the-fonts-the-workshop-offers.md)            | P1       | Standard | Scoped   | Load the fonts the Design Workshop offers                                | 3.11             |
-| [TTW-104](ttw-104-warn-about-low-resolution-images.md)              | P1       | Standard | Scoped   | Warn about low-resolution images in the workshop                         | 3.10             |
-| [TTW-105](ttw-105-align-workshop-layout-with-figma.md)              | P1       | Standard | Scoped   | Align the Design Workshop layout with Figma                              | 3.4              |
-| [TTW-106](ttw-106-build-the-admin-shipment-screen.md)               | P0       | High     | Scoped   | Build the admin shipment screen                                          | 5.1              |
-| [TTW-107](ttw-107-let-customers-cancel-unpaid-orders.md)            | P1       | Critical | Scoped   | Let customers cancel their unpaid orders                                 | 5.2              |
-| [TTW-108](ttw-108-add-downloadable-vat-invoices.md)                 | P1       | High     | Scoped   | Add downloadable VAT invoices                                            | 4.8              |
-| [TTW-109](ttw-109-send-design-approved-and-rejected-emails.md)      | P1       | Standard | Scoped   | Send design approved and rejected emails                                 | 9.2              |
-| [TTW-110](ttw-110-build-failed-email-screens.md)                    | P1       | High     | Scoped   | Build the failed-email screens                                           | 10.2             |
-| [TTW-111](ttw-111-let-admins-suspend-users.md)                      | P1       | High     | Scoped   | Let admins suspend and reinstate users                                   | 1.9              |
-| [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)             | P1       | High     | Scoped   | Add the admin two-factor reset screen                                    | 1.10             |
-| [TTW-113](ttw-113-fix-admin-google-sign-in.md)                      | P1       | High     | Scoped   | Fix or remove admin Google sign-in                                       | 1.3              |
-| [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)         | P1       | High     | Scoped   | Build the Paystack reconciliation screens                                | 10.1             |
-| [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md)        | P1       | Standard | Scoped   | Show moderation queue counters on the admin dashboard                    | 9.6              |
-| [TTW-116](ttw-116-add-missing-admin-alerts.md)                      | P1       | Standard | Scoped   | Add the missing admin alerts                                             | 10.8             |
-| [TTW-117](ttw-117-draft-and-publish-legal-texts.md)                 | P0       | Standard | Scoped   | Draft and publish the legal texts                                        | 11.4             |
-| [TTW-118](ttw-118-remove-unproven-about-page-figures.md)            | P0       | Low      | Scoped   | Remove the unproven About page figures                                   | 12.6             |
-| [TTW-119](ttw-119-build-data-rights-screens.md)                     | P1       | High     | Scoped   | Build the data-rights and preference screens                             | 11.1             |
-| [TTW-120](ttw-120-erase-files-of-deleted-accounts.md)               | P1       | High     | Scoped   | Erase stored files of deleted accounts                                   | 11.2             |
-| [TTW-121](ttw-121-recalibrate-account-deletion-blockers.md)         | P1       | High     | Scoped   | Recalibrate account-deletion blockers                                    | 11.6             |
-| [TTW-122](ttw-122-add-unsubscribe-links.md)                         | P1       | Standard | Scoped   | Add unsubscribe links to marketing emails                                | 10.9             |
-| [TTW-123](ttw-123-add-public-catalogue-and-site-menu.md)            | P1       | Standard | Scoped   | Add the public catalogue and align the site menu                         | 2.4              |
-| [TTW-124](ttw-124-add-audience-measurement.md)                      | P1       | Standard | Scoped   | Add audience measurement to the public site                              | 12.4             |
-| [TTW-125](ttw-125-replace-fake-social-links.md)                     | P1       | Low      | Scoped   | Replace the fake social links                                            | 12.2             |
-| [TTW-126](ttw-126-compress-homepage-photos.md)                      | P1       | Low      | Scoped   | Compress the homepage photos                                             | 12.5             |
-| [TTW-127](ttw-127-add-global-error-page.md)                         | P1       | Low      | Scoped   | Add a global error page to the public site                               | 12.7             |
-| [TTW-128](ttw-128-build-organiser-approval-screen.md)               | P0       | High     | Scoped   | Build the organiser approval screen                                      | 6.1, 7.7         |
-| [TTW-129](ttw-129-build-bank-account-verification-queue.md)         | P0       | Critical | Scoped   | Build the bank-account verification queue                                | 7.1, 6.11        |
-| [TTW-130](ttw-130-check-account-holder-name-with-paystack.md)       | P1       | High     | Scoped   | Check the account holder name with Paystack                              | 7.2              |
-| [TTW-131](ttw-131-correct-the-campaign-money-split.md)              | P0       | Critical | Scoped   | Correct the campaign money split                                         | 6.2, 6.14, 7.6   |
-| [TTW-132](ttw-132-define-refund-recovery-after-payout.md)           | P0       | Critical | Scoped   | Define refund recovery after a payout                                    | 6.13             |
-| [TTW-133](ttw-133-cap-one-off-payouts.md)                           | P0       | Critical | Scoped   | Cap one-off payouts and require a second admin                           | 7.8              |
-| [TTW-134](ttw-134-show-organisers-their-money.md)                   | P1       | High     | Scoped   | Show organisers their balance and payouts                                | 7.9              |
-| [TTW-135](ttw-135-let-organisers-edit-bank-accounts.md)             | P1       | High     | Scoped   | Let organisers edit or delete their bank account                         | 7.3              |
-| [TTW-136](ttw-136-allow-guest-fundraiser-checkout.md)               | P1       | Critical | Scoped   | Allow guest checkout for fundraiser supporters                           | 4.7              |
-| [TTW-137](ttw-137-add-fundraiser-donations.md)                      | P1       | Critical | Scoped   | Add donations to fundraiser checkout                                     | 4.5              |
-| [TTW-138](ttw-138-add-campaign-delivery-options.md)                 | P1       | High     | Scoped   | Add campaign delivery options                                            | 5.4              |
-| [TTW-139](ttw-139-show-organisers-their-campaign-orders.md)         | P1       | High     | Scoped   | Show organisers their campaign orders                                    | 5.9              |
-| [TTW-140](ttw-140-add-campaign-resume-button.md)                    | P1       | Low      | Scoped   | Add the admin button to resume a paused campaign                         | 6.10             |
-| [TTW-141](ttw-141-complete-campaign-end-handling.md)                | P1       | High     | Scoped   | Complete campaign end handling                                           | 6.12             |
-| [TTW-142](ttw-142-freeze-live-campaigns.md)                         | P1       | High     | Scoped   | Freeze live campaigns and their approved designs                         | 9.5              |
-| [TTW-143](ttw-143-show-moderators-a-real-render.md)                 | P1       | High     | Scoped   | Show moderators a real design render                                     | 9.3              |
-| [TTW-144](ttw-144-show-campaign-end-date-and-sales.md)              | P2       | Standard | Scoped   | Show end date and sales on the public campaign page                      | 6.9              |
-| [TTW-145](ttw-145-add-campaign-headline-and-video.md)               | P2       | Standard | Scoped   | Add a campaign headline and optional video                               | 6.8              |
-| [TTW-146](ttw-146-hide-fundraising-until-launch.md)                 | P0       | High     | Scoped   | Hide fundraising and payouts for launch                                  | Not in review    |
-| [TTW-147](ttw-147-choose-and-configure-email-provider.md)           | P0       | High     | Scoped   | Choose and configure the production email provider                       | Not in review    |
-| [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)    | P0       | High     | Scoped   | Run end-to-end tests and client acceptance                               | 13.3             |
-| [TTW-149](ttw-149-add-returns-and-claims.md)                        | P2       | Critical | Scoped   | Add returns and claims                                                   | 5.3              |
-| [TTW-150](ttw-150-build-moderation-appeal-screens.md)               | P2       | High     | Scoped   | Build the moderation appeal screens                                      | 9.1              |
-| [TTW-151](ttw-151-complete-admin-analytics.md)                      | P2       | Standard | Scoped   | Complete the admin analytics screens                                     | 10.3             |
-| [TTW-152](ttw-152-add-workshop-earnings-metric.md)                  | P2       | Standard | Scoped   | Add a workshop earnings metric                                           | 10.7             |
-| [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md)     | P2       | High     | Scoped   | Show the delivery estimate and express option at checkout                | 8.7              |
-| [TTW-154](ttw-154-add-audit-log-screen.md)                          | P2       | High     | Scoped   | Add the audit log route and screen                                       | 10.4             |
-| [TTW-155](ttw-155-paginate-admin-orders.md)                         | P2       | Standard | Scoped   | Paginate the admin order list                                            | 5.8              |
-| [TTW-156](ttw-156-add-search-to-admin-products.md)                  | P2       | Low      | Scoped   | Add search and pagination to the admin product list                      | 2.8              |
-| [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)           | P2       | Low      | Scoped   | Expose catalogue search, sort and price filter                           | 2.6              |
-| [TTW-158](ttw-158-add-active-sessions-screen.md)                    | P2       | High     | Scoped   | Add the active sessions screen                                           | 1.5              |
-| [TTW-159](ttw-159-add-share-link-management.md)                     | P2       | Standard | Scoped   | Add the share-link management screen                                     | 3.6              |
-| [TTW-160](ttw-160-align-order-summary-with-figma.md)                | P2       | Low      | Scoped   | Align the order summary and confirmation with Figma                      | 4.4              |
-| [TTW-161](ttw-161-allow-local-courier-tracking-links.md)            | P2       | Standard | Scoped   | Allow local courier tracking links                                       | 5.10             |
-| [TTW-162](ttw-162-darken-green-button-colour.md)                    | P2       | Low      | Scoped   | Darken the green buttons for contrast                                    | 12.8             |
-| [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)          | P1       | High     | Scoped   | Stop variant changes silently deleting linked images                     | Not in review    |
-| [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)           | P1       | High     | Scoped   | Keep existing variants when an option is added                           | Not in review    |
-| [TTW-177](ttw-177-ship-brand-fonts.md)                              | P2       | Standard | Scoped   | Ship the brand fonts (Mundial, Neuffila Grotesk)                         | Not in review    |
-| [TTW-178](ttw-178-fix-footer-payment-logos.md)                      | P2       | Low      | Scoped   | Show only accepted, legible payment logos in the footer                  | Not in review    |
-| [TTW-179](ttw-179-close-google-account-prehijacking.md)             | P0       | High     | Complete | Secure unconfirmed accounts on Google linking                            | Not in review    |
-| [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | P1       | High     | Scoped   | Refuse known public MFA encryption keys in production                    | Not in review    |
-| [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)              | P1       | High     | Complete | Keep raw reset and verification links out of retained Redis jobs         | Not in review    |
-| [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | P0       | High     | Complete | Drop the old state and LGA when an edited address names an unknown state | Not in review    |
-| [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | P0       | High     | Scoped   | Refuse an LGA that contradicts the address's state                       | Not in review    |
+| Ticket                                                              | Priority | Risk     | State     | Outcome                                                                  | Review           |
+| ------------------------------------------------------------------- | -------- | -------- | --------- | ------------------------------------------------------------------------ | ---------------- |
+| [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)       | P0       | High     | Complete  | Link Google sign-in only to confirmed emails                             | 1.8              |
+| [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)   | P0       | High     | Complete  | Hash password-reset and email-verification tokens                        | 1.7              |
+| [TTW-084](ttw-084-create-default-site-settings.md)                  | P0       | High     | Complete  | Create default site settings so VAT is never silently 0%                 | 8.6              |
+| [TTW-085](ttw-085-validate-production-mail-settings.md)             | P0       | Standard | Complete  | Validate production mail settings at startup                             | 10.5             |
+| [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)       | P0       | High     | Complete  | Reject addresses outside every shipping zone                             | 5.6              |
+| [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)             | P0       | High     | Scoped    | Offer Nigerian states and LGAs as lists at checkout                      | 4.9              |
+| [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | P0       | Critical | Scoped    | Refund payments captured after an order was cancelled                    | 4.6              |
+| [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | P0       | Critical | Complete  | Record a second payment captured for the same order                      | Found in TTW-088 |
+| [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | P1       | High     | In review | Make extra payment captures visible to reconciliation and alerts         | Found in TTW-189 |
+| [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | P0       | Critical | Scoped    | Refund extra payment captures (blocked on client D1/D2)                  | Found in TTW-189 |
+| [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)           | P1       | High     | Scoped    | Add forgot-password and reset-password pages                             | 1.1              |
+| [TTW-090](ttw-090-show-email-verification-state-and-resend.md)      | P1       | High     | Scoped    | Show the email-verification state and offer a resend                     | 1.4              |
+| [TTW-091](ttw-091-remove-fake-profile-picture.md)                   | P1       | Low      | Scoped    | Remove the fake profile picture and its button                           | 1.2              |
+| [TTW-092](ttw-092-build-product-detail-page.md)                     | P0       | Standard | Scoped    | Build the product detail page                                            | 2.2, 2.1         |
+| [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)    | P1       | Standard | Scoped    | Use real categories and paginate the customer catalogue                  | 2.3              |
+| [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)    | P1       | High     | Scoped    | Let admins enter size and print-side surcharges                          | 2.7              |
+| [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md)  | P1       | High     | Scoped    | Compute bulk tiers on a product's total quantity                         | 8.5              |
+| [TTW-096](ttw-096-apply-product-and-order-discounts.md)             | P1       | High     | Scoped    | Apply product, variant and order discounts                               | 8.1              |
+| [TTW-097](ttw-097-complete-shipping-zone-administration.md)         | P1       | High     | Scoped    | Complete shipping zone and rate administration                           | 8.2              |
+| [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md)  | P1       | High     | Scoped    | Make shipping rates configurable by weight or quantity                   | 5.7              |
+| [TTW-099](ttw-099-make-customer-uploads-private.md)                 | P1       | High     | Scoped    | Make customer uploads private with signed links                          | 11.3, 9.7        |
+| [TTW-100](ttw-100-validate-design-content-on-the-server.md)         | P0       | High     | Scoped    | Validate design content on the server                                    | 3.7              |
+| [TTW-101](ttw-101-give-the-workshop-its-print-files.md)             | P0       | High     | Scoped    | Give the print shop its print files                                      | 3.2              |
+| [TTW-102](ttw-102-add-delete-undo-and-layers-to-the-workshop.md)    | P1       | Standard | Scoped    | Add delete, undo and a layer list to the Design Workshop                 | 3.3              |
+| [TTW-103](ttw-103-load-the-fonts-the-workshop-offers.md)            | P1       | Standard | Scoped    | Load the fonts the Design Workshop offers                                | 3.11             |
+| [TTW-104](ttw-104-warn-about-low-resolution-images.md)              | P1       | Standard | Scoped    | Warn about low-resolution images in the workshop                         | 3.10             |
+| [TTW-105](ttw-105-align-workshop-layout-with-figma.md)              | P1       | Standard | Scoped    | Align the Design Workshop layout with Figma                              | 3.4              |
+| [TTW-106](ttw-106-build-the-admin-shipment-screen.md)               | P0       | High     | Scoped    | Build the admin shipment screen                                          | 5.1              |
+| [TTW-107](ttw-107-let-customers-cancel-unpaid-orders.md)            | P1       | Critical | Scoped    | Let customers cancel their unpaid orders                                 | 5.2              |
+| [TTW-108](ttw-108-add-downloadable-vat-invoices.md)                 | P1       | High     | Scoped    | Add downloadable VAT invoices                                            | 4.8              |
+| [TTW-109](ttw-109-send-design-approved-and-rejected-emails.md)      | P1       | Standard | Scoped    | Send design approved and rejected emails                                 | 9.2              |
+| [TTW-110](ttw-110-build-failed-email-screens.md)                    | P1       | High     | Scoped    | Build the failed-email screens                                           | 10.2             |
+| [TTW-111](ttw-111-let-admins-suspend-users.md)                      | P1       | High     | Scoped    | Let admins suspend and reinstate users                                   | 1.9              |
+| [TTW-112](ttw-112-add-admin-two-factor-reset-screen.md)             | P1       | High     | Scoped    | Add the admin two-factor reset screen                                    | 1.10             |
+| [TTW-113](ttw-113-fix-admin-google-sign-in.md)                      | P1       | High     | Scoped    | Fix or remove admin Google sign-in                                       | 1.3              |
+| [TTW-114](ttw-114-build-paystack-reconciliation-screens.md)         | P1       | High     | Scoped    | Build the Paystack reconciliation screens                                | 10.1             |
+| [TTW-115](ttw-115-show-queue-counters-on-admin-dashboard.md)        | P1       | Standard | Scoped    | Show moderation queue counters on the admin dashboard                    | 9.6              |
+| [TTW-116](ttw-116-add-missing-admin-alerts.md)                      | P1       | Standard | Scoped    | Add the missing admin alerts                                             | 10.8             |
+| [TTW-117](ttw-117-draft-and-publish-legal-texts.md)                 | P0       | Standard | Scoped    | Draft and publish the legal texts                                        | 11.4             |
+| [TTW-118](ttw-118-remove-unproven-about-page-figures.md)            | P0       | Low      | Scoped    | Remove the unproven About page figures                                   | 12.6             |
+| [TTW-119](ttw-119-build-data-rights-screens.md)                     | P1       | High     | Scoped    | Build the data-rights and preference screens                             | 11.1             |
+| [TTW-120](ttw-120-erase-files-of-deleted-accounts.md)               | P1       | High     | Scoped    | Erase stored files of deleted accounts                                   | 11.2             |
+| [TTW-121](ttw-121-recalibrate-account-deletion-blockers.md)         | P1       | High     | Scoped    | Recalibrate account-deletion blockers                                    | 11.6             |
+| [TTW-122](ttw-122-add-unsubscribe-links.md)                         | P1       | Standard | Scoped    | Add unsubscribe links to marketing emails                                | 10.9             |
+| [TTW-123](ttw-123-add-public-catalogue-and-site-menu.md)            | P1       | Standard | Scoped    | Add the public catalogue and align the site menu                         | 2.4              |
+| [TTW-124](ttw-124-add-audience-measurement.md)                      | P1       | Standard | Scoped    | Add audience measurement to the public site                              | 12.4             |
+| [TTW-125](ttw-125-replace-fake-social-links.md)                     | P1       | Low      | Scoped    | Replace the fake social links                                            | 12.2             |
+| [TTW-126](ttw-126-compress-homepage-photos.md)                      | P1       | Low      | Scoped    | Compress the homepage photos                                             | 12.5             |
+| [TTW-127](ttw-127-add-global-error-page.md)                         | P1       | Low      | Scoped    | Add a global error page to the public site                               | 12.7             |
+| [TTW-128](ttw-128-build-organiser-approval-screen.md)               | P0       | High     | Scoped    | Build the organiser approval screen                                      | 6.1, 7.7         |
+| [TTW-129](ttw-129-build-bank-account-verification-queue.md)         | P0       | Critical | Scoped    | Build the bank-account verification queue                                | 7.1, 6.11        |
+| [TTW-130](ttw-130-check-account-holder-name-with-paystack.md)       | P1       | High     | Scoped    | Check the account holder name with Paystack                              | 7.2              |
+| [TTW-131](ttw-131-correct-the-campaign-money-split.md)              | P0       | Critical | Scoped    | Correct the campaign money split                                         | 6.2, 6.14, 7.6   |
+| [TTW-132](ttw-132-define-refund-recovery-after-payout.md)           | P0       | Critical | Scoped    | Define refund recovery after a payout                                    | 6.13             |
+| [TTW-133](ttw-133-cap-one-off-payouts.md)                           | P0       | Critical | Scoped    | Cap one-off payouts and require a second admin                           | 7.8              |
+| [TTW-134](ttw-134-show-organisers-their-money.md)                   | P1       | High     | Scoped    | Show organisers their balance and payouts                                | 7.9              |
+| [TTW-135](ttw-135-let-organisers-edit-bank-accounts.md)             | P1       | High     | Scoped    | Let organisers edit or delete their bank account                         | 7.3              |
+| [TTW-136](ttw-136-allow-guest-fundraiser-checkout.md)               | P1       | Critical | Scoped    | Allow guest checkout for fundraiser supporters                           | 4.7              |
+| [TTW-137](ttw-137-add-fundraiser-donations.md)                      | P1       | Critical | Scoped    | Add donations to fundraiser checkout                                     | 4.5              |
+| [TTW-138](ttw-138-add-campaign-delivery-options.md)                 | P1       | High     | Scoped    | Add campaign delivery options                                            | 5.4              |
+| [TTW-139](ttw-139-show-organisers-their-campaign-orders.md)         | P1       | High     | Scoped    | Show organisers their campaign orders                                    | 5.9              |
+| [TTW-140](ttw-140-add-campaign-resume-button.md)                    | P1       | Low      | Scoped    | Add the admin button to resume a paused campaign                         | 6.10             |
+| [TTW-141](ttw-141-complete-campaign-end-handling.md)                | P1       | High     | Scoped    | Complete campaign end handling                                           | 6.12             |
+| [TTW-142](ttw-142-freeze-live-campaigns.md)                         | P1       | High     | Scoped    | Freeze live campaigns and their approved designs                         | 9.5              |
+| [TTW-143](ttw-143-show-moderators-a-real-render.md)                 | P1       | High     | Scoped    | Show moderators a real design render                                     | 9.3              |
+| [TTW-144](ttw-144-show-campaign-end-date-and-sales.md)              | P2       | Standard | Scoped    | Show end date and sales on the public campaign page                      | 6.9              |
+| [TTW-145](ttw-145-add-campaign-headline-and-video.md)               | P2       | Standard | Scoped    | Add a campaign headline and optional video                               | 6.8              |
+| [TTW-146](ttw-146-hide-fundraising-until-launch.md)                 | P0       | High     | Scoped    | Hide fundraising and payouts for launch                                  | Not in review    |
+| [TTW-147](ttw-147-choose-and-configure-email-provider.md)           | P0       | High     | Scoped    | Choose and configure the production email provider                       | Not in review    |
+| [TTW-148](ttw-148-run-end-to-end-tests-and-client-acceptance.md)    | P0       | High     | Scoped    | Run end-to-end tests and client acceptance                               | 13.3             |
+| [TTW-149](ttw-149-add-returns-and-claims.md)                        | P2       | Critical | Scoped    | Add returns and claims                                                   | 5.3              |
+| [TTW-150](ttw-150-build-moderation-appeal-screens.md)               | P2       | High     | Scoped    | Build the moderation appeal screens                                      | 9.1              |
+| [TTW-151](ttw-151-complete-admin-analytics.md)                      | P2       | Standard | Scoped    | Complete the admin analytics screens                                     | 10.3             |
+| [TTW-152](ttw-152-add-workshop-earnings-metric.md)                  | P2       | Standard | Scoped    | Add a workshop earnings metric                                           | 10.7             |
+| [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md)     | P2       | High     | Scoped    | Show the delivery estimate and express option at checkout                | 8.7              |
+| [TTW-154](ttw-154-add-audit-log-screen.md)                          | P2       | High     | Scoped    | Add the audit log route and screen                                       | 10.4             |
+| [TTW-155](ttw-155-paginate-admin-orders.md)                         | P2       | Standard | Scoped    | Paginate the admin order list                                            | 5.8              |
+| [TTW-156](ttw-156-add-search-to-admin-products.md)                  | P2       | Low      | Scoped    | Add search and pagination to the admin product list                      | 2.8              |
+| [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)           | P2       | Low      | Scoped    | Expose catalogue search, sort and price filter                           | 2.6              |
+| [TTW-158](ttw-158-add-active-sessions-screen.md)                    | P2       | High     | Scoped    | Add the active sessions screen                                           | 1.5              |
+| [TTW-159](ttw-159-add-share-link-management.md)                     | P2       | Standard | Scoped    | Add the share-link management screen                                     | 3.6              |
+| [TTW-160](ttw-160-align-order-summary-with-figma.md)                | P2       | Low      | Scoped    | Align the order summary and confirmation with Figma                      | 4.4              |
+| [TTW-161](ttw-161-allow-local-courier-tracking-links.md)            | P2       | Standard | Scoped    | Allow local courier tracking links                                       | 5.10             |
+| [TTW-162](ttw-162-darken-green-button-colour.md)                    | P2       | Low      | Scoped    | Darken the green buttons for contrast                                    | 12.8             |
+| [TTW-166](ttw-166-stop-variant-changes-deleting-images.md)          | P1       | High     | Scoped    | Stop variant changes silently deleting linked images                     | Not in review    |
+| [TTW-174](ttw-174-keep-variants-when-adding-an-option.md)           | P1       | High     | Scoped    | Keep existing variants when an option is added                           | Not in review    |
+| [TTW-177](ttw-177-ship-brand-fonts.md)                              | P2       | Standard | Scoped    | Ship the brand fonts (Mundial, Neuffila Grotesk)                         | Not in review    |
+| [TTW-178](ttw-178-fix-footer-payment-logos.md)                      | P2       | Low      | Scoped    | Show only accepted, legible payment logos in the footer                  | Not in review    |
+| [TTW-179](ttw-179-close-google-account-prehijacking.md)             | P0       | High     | Complete  | Secure unconfirmed accounts on Google linking                            | Not in review    |
+| [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | P1       | High     | Scoped    | Refuse known public MFA encryption keys in production                    | Not in review    |
+| [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)              | P1       | High     | Complete  | Keep raw reset and verification links out of retained Redis jobs         | Not in review    |
+| [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | P0       | High     | Complete  | Drop the old state and LGA when an edited address names an unknown state | Not in review    |
+| [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | P0       | High     | Scoped    | Refuse an LGA that contradicts the address's state                       | Not in review    |
 
 ## Explicitly deferred post-v1 backlog
 
