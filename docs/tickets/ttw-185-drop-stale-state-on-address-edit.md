@@ -4,7 +4,7 @@
 **Status:** Implemented — awaiting merge\
 **Risk:** High\
 **Blocked by:** TTW-086\
-**Blocks:** TTW-087
+**Blocks:** TTW-087, TTW-186
 
 ## Background
 
@@ -38,7 +38,7 @@ Rejected for now: refusing the save with a 400 "unknown state". It would block c
 
 ## Invariants
 
-- An edit that changes the state never leaves a `stateCode` or `lgaId` that the edit contradicts. (LGA-only edits are a follow-up, see Completion summary.)
+- An edit that changes the state never leaves a `stateCode` or `lgaId` that the edit contradicts. (LGA-only edits → TTW-186.)
 - An address whose state is unknown is never priced with another state's rate.
 - An edit that does not touch the state keeps the saved `stateCode` and `lgaId`.
 - Create behaviour is unchanged (it already stores `null` for an unknown state).
@@ -107,8 +107,8 @@ Charter: merge-rule correctness against the four invariants, edge cases (explici
 
 **Verdict: PASS**, nothing blocking. Findings and outcome:
 
-1. Non-blocking, existing bug. `resolveLga` looks up an explicit `lgaId` with no state filter when `stateCode` is null (`address-normalization.service.ts`, `resolveLga`). An API client sending `lgaId` on an address whose state is unknown and unchanged (or on create) can still store an LGA of another state, and an ADMIN2 rule on that LGA id with no `matchContext` would price it. The app forms never send `lgaId`. The fix touches create, so it is **left for a follow-up** (see Completion summary).
-2. Non-blocking. An edit that changes only the LGA text to an unknown name keeps the saved `lgaId` (same state, so invariant 2 holds, but invariant 1 read literally does not). **Left for a follow-up**; invariant 1 is scoped to state changes in this ticket.
+1. Non-blocking, existing bug. `resolveLga` looks up an explicit `lgaId` with no state filter when `stateCode` is null (`address-normalization.service.ts`, `resolveLga`). An API client sending `lgaId` on an address whose state is unknown and unchanged (or on create) can still store an LGA of another state, and an ADMIN2 rule on that LGA id with no `matchContext` would price it. The app forms never send `lgaId`. The fix touches create, so it is **moved to TTW-186**.
+2. Non-blocking. An edit that changes only the LGA text to an unknown name keeps the saved `lgaId` (same state, so invariant 2 holds, but invariant 1 read literally does not). **Moved to TTW-186**; invariant 1 is scoped to state changes in this ticket.
 3. Nit. A country-only edit keeps the saved `stateCode`/`lgaId`. No pricing impact (rules filter on `countryCode`). Not changed.
 4. Nit. When `administrativeAreaLevel1` and `state` are both sent, `administrativeAreaLevel1` decides, as in `resolveState`. No front end sends both. Not changed.
 5. Nit, test gaps. **Fixed**: added unit tests "clears the saved LGA when an explicit stateCode moves to another known state", "keeps the saved LGA when a different text resolves to the same state" and "refuses an old-state lgaId sent with a new known state" (the last one uses a mock that honours `where`, and the tests assert the LGA lookup arguments).
@@ -149,8 +149,8 @@ Done:
 
 Deviation from the plan: "sends a state" was narrowed to "sends a different state" (see Design review), and two extra edge cases (explicit `lgaId` with an unknown state; saved LGA without a code) were added.
 
-Remaining / follow-ups (not done here):
+Remaining / follow-ups, moved to [TTW-186](ttw-186-refuse-lga-outside-address-state.md):
 
-- Explicit `lgaId` with a null `stateCode` is still accepted without a state filter on create and on edits that keep an unknown state (review finding 1). Proposed fix: refuse it or derive `stateCode` from the LGA row. Fits TTW-087 (strict state/LGA on save) or a small new ticket.
-- An LGA-only edit to an unknown LGA name keeps the saved `lgaId` (review finding 2). Same family; same destination.
+- Explicit `lgaId` with a null `stateCode` is still accepted without a state filter on create and on edits that keep an unknown state (review finding 1). Proposed fix: refuse it or derive `stateCode` from the LGA row. → TTW-186.
+- An LGA-only edit to an unknown LGA name keeps the saved `lgaId` (review finding 2). → TTW-186.
 - Aliases "FCT"/"Abuja" for FC remain out of scope.
