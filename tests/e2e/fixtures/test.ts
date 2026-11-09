@@ -18,6 +18,17 @@ const FIRST_PARTY_HOSTS = new Set(
   [urls.api, urls.web, urls.app, urls.admin].map((value) => new URL(value).host)
 );
 
+/**
+ * How each engine words a request the browser cancelled itself (for example a
+ * Next.js `_rsc` prefetch still in flight when the test ends). These are the
+ * same texts Playwright uses to classify a cancellation: Chromium
+ * `net::ERR_ABORTED`, Firefox `NS_BINDING_ABORTED`, WebKit any text containing
+ * `cancelled` ("Load request cancelled" on Linux, "cancelled" on macOS).
+ * Only cancellations belong here: refused connections, DNS errors and other
+ * failures must still fail the test.
+ */
+const CANCELLED_REQUEST_ERRORS = ['net::ERR_ABORTED', 'NS_BINDING_ABORTED', 'cancelled'];
+
 export interface StrictPageGuardOptions {
   /**
    * Narrow opt-in for a console error the test provokes on purpose (for example
@@ -56,7 +67,7 @@ export function attachStrictPageGuards(
     }
     if (!FIRST_PARTY_HOSTS.has(host)) return;
     const failure = request.failure()?.errorText ?? 'unknown';
-    if (failure.includes('net::ERR_ABORTED')) return;
+    if (CANCELLED_REQUEST_ERRORS.some((text) => failure.includes(text))) return;
     failures.push(`First-party request failed: ${request.method()} ${request.url()} (${failure})`);
   });
 
