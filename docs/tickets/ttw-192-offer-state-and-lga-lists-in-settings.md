@@ -132,7 +132,6 @@ Not verified: the new Playwright test was not seen failing on the old form (the 
 
 **Remaining.**
 
-- Rebase this commit on `main` once TTW-087 is merged (this branch was cut from the unmerged `codex/ttw-087-offer-states-and-lgas-at-checkout`).
-- Independent review not yet run.
+- Done since: the commit was rebased on `main` after TTW-087 was merged, the independent review ran (see Implementation reviews), and the work was merged and pushed with TTW-087. The CI then failed on two test setups of this work and TTW-087 (tests that used Ogun, which the CI seed does not load; the auth rate-limit counter filled by the new suites) and was fixed in `88b85e8`. `CI` and `Playwright Comprehensive` are green on `cfd703c`.
 - Out of scope, unchanged: clearing a saved LGA, refusing a deactivated state on the server, moving the checkouts to theme tokens, a country list, and sharing the state-matching code between the two apps and the web helper.
-- Not pushed, no PR, not merged.
+- No PR, by project rule.

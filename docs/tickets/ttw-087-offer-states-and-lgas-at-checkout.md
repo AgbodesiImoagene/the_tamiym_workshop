@@ -107,4 +107,4 @@ Not verified: the Settings form (out of scope); a run of the whole Playwright co
 - The web fundraiser page has no component test (no jsdom or Testing Library there). The selection logic is in pure helpers with Jest tests; the page is covered by Playwright.
 - The new routes call a small `GeoService` rather than `ShippingAdminService`, because the admin service returns full rows.
 
-**Remaining.** The six follow-ups listed under "Implementation reviews". Not merged or pushed, as requested. The ROADMAP checkbox is left unchecked until the merge.
+**Remaining.** The six follow-ups listed under "Implementation reviews"; the Settings form is TTW-192. Done since: merged into `main` and pushed with TTW-192. The CI then failed on two test setups (tests that used Ogun, which the CI seed does not load; the auth rate-limit counter filled by the new API suites) and was fixed in `88b85e8`. `CI` and `Playwright Comprehensive` are green on `cfd703c`.
