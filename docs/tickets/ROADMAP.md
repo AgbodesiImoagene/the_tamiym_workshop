@@ -120,7 +120,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)            | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
 | [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)            | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
 | [ ]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)            | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
-| [ ]  | —   | [TTW-189](ttw-189-offer-state-and-lga-lists-in-settings.md)       | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
+| [ ]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)       | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
 
 ## Phase 2 : Comptes et achat d'un produit
 
