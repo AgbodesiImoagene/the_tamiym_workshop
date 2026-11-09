@@ -121,8 +121,13 @@ export class PaystackWebhookService {
         }
 
         const order = payment.order;
-        if (order.status === OrderStatus.PAID) {
-          this.observability.recordChargeSettlement('duplicate');
+        if (
+          order.status !== OrderStatus.PENDING_PAYMENT &&
+          order.status !== OrderStatus.CANCELLED
+        ) {
+          // TTW-189: the order is already paid (or past payment). This money
+          // is an extra capture: record it, count it and tell an admin.
+          await this.handleExtraCapture(payment, order, event, reference);
           return;
         }
         if (order.status === OrderStatus.CANCELLED) {
@@ -207,10 +212,6 @@ export class PaystackWebhookService {
           );
           return;
         }
-        if (order.status !== OrderStatus.PENDING_PAYMENT) {
-          return;
-        }
-
         if (event.data?.amount != null) {
           const expectedKobo = Math.round(Number(order.totalAmount) * 100);
           if (event.data.amount !== expectedKobo) {
@@ -442,6 +443,84 @@ export class PaystackWebhookService {
         });
       },
     );
+  }
+
+  /**
+   * TTW-189: a second charge captured for an order that is already paid or
+   * past payment. Nothing is settled. The capture is recorded with a
+   * ChargeSettlementClaim only (database-enforced once per payment), the
+   * Payment keeps its status so refund tooling and reconciliation keep
+   * pointing at the settling payment, and an admin is told to refund it.
+   * Records whatever Paystack captured, even if the amount differs, because
+   * the money is held either way. No Paystack call is made here.
+   */
+  private async handleExtraCapture(
+    payment: { id: string; provider: PaymentProvider | null },
+    order: { id: string; status: OrderStatus; currency: string },
+    event: PaystackWebhookEvent,
+    reference: string,
+  ): Promise<void> {
+    if (event.data?.status != null && event.data.status !== 'success') {
+      return;
+    }
+    const businessKey = `charge.success:${reference}`;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.chargeSettlementClaim.create({
+          data: {
+            provider: payment.provider ?? PaymentProvider.PAYSTACK,
+            businessKey,
+            paymentId: payment.id,
+            orderId: order.id,
+          },
+        });
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { rawEvent: event as unknown as object },
+        });
+        await this.audit.log(
+          {
+            eventName: 'webhook.payment.extra_capture_recorded',
+            action: AuditAction.STATUS_CHANGE,
+            entityType: 'Order',
+            entityId: order.id,
+            before: { status: order.status },
+            after: {
+              status: order.status,
+              extraCaptureProviderRef: reference,
+              settlementBusinessKey: businessKey,
+            },
+            metadata: event as unknown as object,
+            note: 'Paystack charge.success captured again for an order that is not awaiting payment; refund required',
+            source: AuditSource.WEBHOOK,
+          },
+          tx,
+        );
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        this.observability.recordChargeSettlement('duplicate');
+        this.logger.log(
+          `Duplicate extra charge.success ignored for ref ${reference} (settlement claim already exists)`,
+        );
+        return;
+      }
+      throw error;
+    }
+
+    this.logger.error(
+      `charge.success captured again for ${order.status} order ${order.id} (ref: ${reference}). ` +
+        'Extra capture recorded; refund required.',
+    );
+    this.observability.recordWebhook('charge.success.extra_capture', 'denied');
+    this.observability.recordChargeSettlement('extra_capture');
+    await this.adminNotify.emit(ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER, {
+      orderId: order.id,
+      reference,
+      amount: event.data?.amount,
+      currency: event.data?.currency ?? order.currency,
+      reason: `Order is ${order.status}: this is an extra capture and the customer was charged twice. Payment recorded: refund it in full from the Paystack dashboard`,
+    });
   }
 
   /**

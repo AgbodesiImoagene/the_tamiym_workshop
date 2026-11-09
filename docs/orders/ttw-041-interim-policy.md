@@ -63,6 +63,16 @@ Interim rule, pending the client's answer to Q16: the 30 minute payment window i
 - There is no automatic refund and no re-confirmation of the order.
 - Limit: if several captured payments exist on the same order, the late-payment refund is refused (manual handling), so no captured payment is left behind by refunding another.
 
+### Extra capture on an order that is not awaiting payment (TTW-189)
+
+When `charge.success` arrives for a `Payment` whose order is already `PAID` or any other status except `PENDING_PAYMENT` and `CANCELLED`, the money is an **extra capture** (the customer was charged twice).
+
+- It is **recorded**: one `ChargeSettlementClaim` for that payment (database-enforced once), the webhook payload stored on the `Payment`, and an audit entry `webhook.payment.extra_capture_recorded`. `Payment.status` is **not** changed, so refund tooling and reconciliation keep targeting the settling payment.
+- It is **counted** (`charge.success.extra_capture` webhook metric, `extra_capture` settlement outcome), logged at error level, and reported to an admin with `admin.payment.captured_on_cancelled_order`.
+- The order, stock, campaign totals and ledger are untouched. A redelivery is a duplicate.
+- **Limit:** because `Payment.status` is unchanged, an extra capture does not appear in reconciliation (TTW-015) or in analytics that count `SUCCEEDED` payments. Admins track it through the notification, the audit entry and the claim.
+- **Refund is manual** for now (Paystack dashboard); no customer e-mail. Automatic refund waits for the client's answer (decisions D1 and D2 of TTW-189).
+
 ### Refund status gates
 
 | Condition                                            | Code                                       |
