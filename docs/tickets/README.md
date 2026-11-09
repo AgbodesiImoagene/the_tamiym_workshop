@@ -45,7 +45,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | P2       | Low      | Complete | Stop the customer app unit tests failing at random under parallel load                   | Not in review |
 | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)         | P2       | Standard | Complete | Move the admin site settings form to Zod and React Hook Form                             | Not in review |
 | [TTW-187](ttw-187-make-infra-validate-survive-network-errors.md)   | P2       | Standard | Scoped   | Make the Infra Validate CI job survive transient network errors                          | Not in review |
-| [TTW-188](ttw-188-ignore-cancelled-prefetches-in-firefox.md)       | P1       | Low      | Scoped   | Stop the page guard flagging prefetches that Firefox cancels (flaky nightly matrix)      | Not in review |
+| [TTW-188](ttw-188-ignore-cancelled-prefetches-in-firefox.md)       | P1       | Low      | Complete | Stop the page guard flagging prefetches that Firefox cancels (flaky nightly matrix)      | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 
