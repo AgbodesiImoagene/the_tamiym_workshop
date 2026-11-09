@@ -241,7 +241,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)             | P1       | High     | Complete | Keep raw reset and verification links out of retained Redis jobs         | Not in review  |
 | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)             | P0       | High     | Complete | Drop the old state and LGA when an edited address names an unknown state | Not in review  |
 | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)             | P0       | High     | Scoped   | Refuse an LGA that contradicts the address's state                       | Not in review  |
-| [TTW-189](ttw-189-offer-state-and-lga-lists-in-settings.md)        | P1       | Standard | Scoped   | Offer the state and LGA lists in the customer settings address form      | Not in review  |
+| [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)        | P1       | Standard | Scoped   | Offer the state and LGA lists in the customer settings address form      | Not in review  |
 
 ## Explicitly deferred post-v1 backlog
 
