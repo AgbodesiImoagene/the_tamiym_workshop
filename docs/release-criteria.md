@@ -5,6 +5,7 @@ Before releasing to production, ensure:
 ## Security
 
 - [ ] No insecure secret defaults (JWT_ACCESS_SECRET, JWT_REFRESH_SECRET validated at startup)
+- [ ] MFA_TOTP_ENCRYPTION_KEY is a freshly generated key (the API refuses the public test keys at startup)
 - [ ] No public privilege escalation (registration is CUSTOMER-only; organizer/admin routes protected)
 - [ ] Paystack webhooks verified against raw request body (x-paystack-signature)
 
