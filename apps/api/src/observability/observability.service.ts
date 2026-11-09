@@ -272,6 +272,16 @@ export class ObservabilityService {
     this.webhookEvents.add(1, { event: eventName, outcome });
   }
 
+  /**
+   * Prometheus `increase()` cannot see a series that appears directly at 1, so
+   * the alert on rare outcomes (TTW-190) would miss the very first event.
+   * Export them at 0 from startup.
+   */
+  constructor() {
+    this.chargeSettlements.add(0, { outcome: 'late_captured' });
+    this.chargeSettlements.add(0, { outcome: 'extra_capture' });
+  }
+
   recordChargeSettlement(
     outcome:
       | 'settled'

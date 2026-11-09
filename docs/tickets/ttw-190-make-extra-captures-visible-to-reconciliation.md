@@ -1,7 +1,7 @@
 # TTW-190 — Make extra payment captures visible to reconciliation and alerts
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Complete (merge into main pending)\
 **Risk:** High\
 **Blocked by:** None (TTW-189 is done)\
 **Blocks:** TTW-191
@@ -51,9 +51,9 @@ Rejected alternative: moving the admin outbox write into the settlement transact
 
 ## Acceptance criteria
 
-- [ ] An extra capture appears as a reconciliation finding until it is refunded.
-- [ ] An alert exists for the extra-capture and cancelled-order capture metrics.
-- [ ] Integration test proves one claim and one audit entry under serial and concurrent delivery.
+- [x] An extra capture appears as a reconciliation finding until it is refunded (unit tests; note: it stays open until acknowledged, see Design review).
+- [x] An alert exists for the extra-capture and late-capture metrics (`TamiymExtraPaymentCapture`), with a runbook section.
+- [x] Integration test proves one claim and one settling payment under serial and concurrent delivery (audit-entry count is not asserted).
 - [ ] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
@@ -63,16 +63,45 @@ Rejected alternative: moving the admin outbox write into the settlement transact
 
 ## Design review
 
-Not started.
+**Reviewer:** Claude (self-review), 2026-11-09. Verdict: PASS, to be confirmed by the independent review.
+
+- **Reconciliation:** one new check inside `checkPayments`: every `ChargeSettlementClaim` whose `Payment.status` is not `SUCCEEDED` becomes a finding (`MISMATCH`, severity `HIGH`, entity key `payment:<id>:extra_capture`, evidence `extra_capture_awaiting_refund` with the amount). No schema change and no new enum value. Why this identifies an extra capture: every normal settlement and every TTW-088 late capture sets the payment `SUCCEEDED` in the same transaction as the claim, so a claim on a non-`SUCCEEDED` payment can only come from `handleExtraCapture`. The check pages by claim id like the other checks.
+- **Severity HIGH, not CRITICAL:** money is held and an admin was told, but nothing is corrupt.
+- **Until TTW-191 exists the finding cannot close by itself:** it stays `OPEN`; an admin acknowledges it after refunding by hand (documented in the runbook). The fingerprint is per payment, so reruns deduplicate.
+- **Alert:** `TamiymExtraPaymentCapture` in `docker/observability/prometheus/alerts.yml`: `increase(tamiym_charge_settlement_total{outcome=~"extra_capture|late_captured"}[15m]) > 0`, no `for` delay because the event is rare and one occurrence is enough. The two outcomes are exported at 0 from startup so the first-ever event is seen by `increase()` (found by the independent review).
+- **`FAILED` guard:** `failIfStillPendingOrInitiated` now only updates a payment with no settlement claim (`settlementClaim: null`). The path was not shown reachable for a paid order (initiation is refused first), so this is defence in depth.
+- **No transaction/network concerns:** nothing here calls Paystack.
 
 ## Implementation reviews
 
-Not started.
+**Review 1 — independent subagent (read-only), 2026-11-09. Verdict: PASS (conditional, no blocking finding).** Correction PASS, concurrency/data PASS, tests PASS with reserves, docs PASS with a minor reserve, observability partial until finding 1 was fixed. It re-ran `npx jest src/reconciliation src/orders/payments.service.spec.ts` → 5 suites, 72 tests passed.
+
+Findings and fixes:
+
+1. **Medium — the alert could miss the first-ever event** (a Prometheus series that appears directly at 1 gives `increase()` nothing to compare). **Fixed:** `ObservabilityService` now exports `late_captured` and `extra_capture` at 0 from startup (`observability.service.ts`, constructor). The earlier "known limit" in the Design review no longer applies. Not asserted by a dedicated test (the OTel meter has no read-back in unit tests); `npx jest src/observability` passes.
+2. **Low — the e2e re-implemented the reconciliation query instead of running the service.** **Fixed:** the e2e now calls `ReconciliationRunsService.runInternal` twice and asserts exactly one finding for the payment (label, severity `HIGH`, `evidence.kind`, order id), which also proves deduplication.
+3. **Low — the unit test `does not flag a SUCCEEDED payment` is partly tautological** (mock returns `[]`; only the `where` clause assertion is meaningful). Accepted; the e2e covers the real behaviour.
+4. **Low — the runbook cited an internal entity key.** **Fixed:** it now names the fields an admin sees (`leftLabel`, `evidence.kind`, `sourceIds`).
+5. **Info — the finding never closes by itself** (no `REFUNDED` payment status); an admin acknowledges it. Known, documented.
 
 ## Verification evidence
 
-Not started.
+- Failing first: `npx jest src/reconciliation/reconciliation-runs.service.spec.ts` → 2 failed (`flags a claim whose payment never became SUCCEEDED…`, `does not flag a claim whose payment is SUCCEEDED…`, no check existed); `npx jest src/orders/payments.service.spec.ts` → 1 failed (`never fails an attempt that already has a settlement claim`).
+- After the change: reconciliation suite 38/38; payments service suite 34/34.
+- Existing reconciliation test mocks gained a `chargeSettlementClaim.findMany` stub (additive; no assertion weakened).
+- `node scripts/quality/validate-observability-artefacts.mjs` → "Prometheus alerts OK (7 groups, 19 rules)", "Observability artefact validation passed.".
+- E2E, run against a real PostgreSQL 17 (`tamiym_workshop_e2e_190`, migrations applied with `prisma migrate deploy`): `npx jest --config ./test/jest-e2e.json --runInBand test/paystack-extra-capture.e2e-spec.ts` → 2 passed (`settles attempt B once and records attempt A as one extra capture under parallel delivery` — 21 deliveries, one claim, one `SUCCEEDED` payment, one admin notification; `reports the extra capture as a reconciliation-visible claim on a non-SUCCEEDED payment`).
+- Neighbouring e2e suites on the same database: `paystack-charge-settlement`, `paystack-late-payment-refund`, `reconciliation`, `payment-initiation`, `paystack-refund-lifecycle` → 5 suites, 26 tests passed.
+- **Finding from the real database:** a unique index allows only one active attempt per order (TTW-012). In reality the expired attempt A is therefore already `FAILED` when it is paid at Paystack, so an extra capture's `Payment.status` is usually `FAILED`, not `INITIATED`. The recording and the reconciliation query (status not `SUCCEEDED`) are unaffected; the `FAILED` guard added here is defence in depth, not a fix for a reachable path. The e2e test was corrected to seed A as `FAILED`.
+
+Final gates (from `apps/api`, 2026-11-09):
+
+- `npx tsc --noEmit` → exit 0.
+- `npx eslint src/reconciliation src/orders/payments.service.ts src/orders/payments.service.spec.ts test/paystack-extra-capture.e2e-spec.ts` → exit 0, no output.
+- `npx jest` (full API unit suite) → Test Suites: 148 passed, 148 total; Tests: 1374 passed, 1374 total.
 
 ## Completion summary
 
-Not started.
+Implemented on `codex/ttw-190-extra-captures-reconciliation`. E2E run on PostgreSQL: passed. Independent review: PASS, findings fixed. Open: merge into `main`.
+
+Latest gates after the review fixes (from `apps/api`): `npx tsc --noEmit` exit 0; `npx eslint` on touched files exit 0; `npx jest` → 148 suites, 1374 tests passed; e2e `paystack-extra-capture` → 2 passed (the second test is now `makes the reconciliation run raise one finding for the extra capture`).

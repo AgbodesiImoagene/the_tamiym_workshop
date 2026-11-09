@@ -459,7 +459,9 @@ export class PaymentsService {
 
   private async failIfStillPendingOrInitiated(id: string): Promise<void> {
     await this.prisma.payment.updateMany({
-      where: { id, status: { in: ACTIVE_STATUSES } },
+      // A payment with a settlement claim holds captured money (TTW-189/190):
+      // it must never be failed, even if it is an extra capture.
+      where: { id, status: { in: ACTIVE_STATUSES }, settlementClaim: null },
       data: { status: PaymentStatus.FAILED },
     });
   }

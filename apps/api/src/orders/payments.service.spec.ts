@@ -317,6 +317,32 @@ describe('PaymentsService (TTW-012)', () => {
     expect(result.attemptOutcome).toBe('created');
   });
 
+  it('never fails an attempt that already has a settlement claim (TTW-190)', async () => {
+    prisma.payment.findFirst
+      .mockResolvedValueOnce({
+        id: 'pay_old',
+        status: PaymentStatus.INITIATED,
+        providerRef: 'ref_old',
+        authorizationUrl: 'https://checkout.paystack.com/old',
+        accessCode: 'ac_old',
+        expiresAt: new Date(Date.now() - 1_000),
+        createdAt: new Date(Date.now() - 120_000),
+      })
+      .mockResolvedValueOnce(null);
+
+    await service.initiatePayment('ord_1', 'user_1', undefined);
+
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'pay_old',
+          settlementClaim: null,
+        }),
+        data: { status: PaymentStatus.FAILED },
+      }),
+    );
+  });
+
   it('treats null expiresAt as expired when createdAt is old', async () => {
     prisma.payment.findFirst
       .mockResolvedValueOnce({

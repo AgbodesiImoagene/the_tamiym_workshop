@@ -1,9 +1,9 @@
-# TTW-191 — Refund extra payment captures
+# TTW-191 — Refund extra payment captures automatically (v2)
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Deferred (v2)\
 **Risk:** Critical\
-**Blocked by:** client answers D1 and D2 (listed in `docs/tickets/ROADMAP.md`, "Décisions à obtenir du client"); TTW-190 for the reconciliation finding\
+**Blocked by:** deferred to v2 by the user (2026-11-09); TTW-190 for the reconciliation finding\
 **Blocks:** None
 
 ## Background
@@ -14,7 +14,9 @@ TTW-088 refuses the automatic late-payment refund when an order has more than on
 
 ## Proposal
 
-Do not start before the client answers. The user approved the interim recommendation (record, notify, refund by hand, no customer e-mail) on 2026-11-09; the client has not been asked yet.
+**Decision (user, 2026-11-09), because of the delivery deadline: D1 and D2 are settled as manual refund by an admin for v1; automatic refund is v2.** Nothing in this ticket is needed for v1: the recording, the admin notification, the reconciliation finding and the alert (TTW-189, TTW-190) cover it, and the admin refunds from the Paystack dashboard then acknowledges the reconciliation finding. The text below describes the v2 work; reopen it only when the user decides to build it.
+
+Original note: The user approved the interim recommendation (record, notify, refund by hand, no customer e-mail) on 2026-11-09; the client has not been asked yet.
 
 - D1: refund an extra capture on a paid order automatically, or by an admin action?
 - D2: same question for several captures on one cancelled order.
@@ -50,7 +52,7 @@ Do not start before the client answers. The user approved the interim recommenda
 
 ## Acceptance criteria
 
-- [ ] Client answers D1 and D2 recorded in this ticket.
+- [x] D1 and D2 answered for v1: manual refund (user decision, 2026-11-09). v2 automatic refund still to specify with the client.
 - [ ] Each extra capture is refunded exactly once, for its own amount.
 - [ ] Duplicate and concurrent requests produce at most one refund per payment.
 - [ ] No transaction is open during a Paystack call (asserted in a test).

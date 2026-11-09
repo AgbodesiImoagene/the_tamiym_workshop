@@ -470,7 +470,63 @@ export class ReconciliationRunsService {
         }
       },
     );
-    return { findings, checked };
+
+    // TTW-189/190: an extra capture is a settlement claim on a payment that
+    // never became SUCCEEDED. The money is held at Paystack but belongs to no
+    // settled order, so it stays a finding until it is refunded and handled.
+    const extraChecked = await this.paginateIds(
+      (cursorId) =>
+        this.prisma.chargeSettlementClaim.findMany({
+          where: {
+            createdAt: { lte: cutoffAt },
+            payment: { status: { not: PaymentStatus.SUCCEEDED } },
+          },
+          select: {
+            id: true,
+            orderId: true,
+            paymentId: true,
+            payment: {
+              select: {
+                id: true,
+                orderId: true,
+                amount: true,
+                currency: true,
+                status: true,
+              },
+            },
+          },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+        }),
+      (claim) => {
+        findings.push({
+          domain: ReconciliationDomain.PAYMENT,
+          outcome: ReconciliationOutcome.MISMATCH,
+          severity: ReconciliationSeverity.HIGH,
+          fingerprint: fingerprintFinding({
+            domain: ReconciliationDomain.PAYMENT,
+            outcome: ReconciliationOutcome.MISMATCH,
+            entityKey: `payment:${claim.paymentId}:extra_capture`,
+          }),
+          leftLabel: 'chargeSettlementClaim',
+          leftValue: 'captured',
+          rightLabel: 'payment.status',
+          rightValue: claim.payment.status,
+          currency: claim.payment.currency,
+          sourceIds: {
+            paymentId: claim.paymentId,
+            orderId: claim.orderId,
+            claimId: claim.id,
+          },
+          evidence: {
+            kind: 'extra_capture_awaiting_refund',
+            amount: String(claim.payment.amount),
+          },
+        });
+      },
+    );
+    return { findings, checked: checked + extraChecked };
   }
 
   private async checkRefunds(cutoffAt: Date) {

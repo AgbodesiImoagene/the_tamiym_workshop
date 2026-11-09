@@ -118,6 +118,21 @@ groups:
             Runbook: docs/runbooks/webhooks-money.md
           runbook_path: docs/runbooks/webhooks-money.md
 
+      - alert: TamiymExtraPaymentCapture
+        expr: sum(increase(tamiym_charge_settlement_total{outcome=~"extra_capture|late_captured"}[15m])) > 0
+        labels:
+          severity: critical
+          owner: payments
+          family: webhooks-money
+        annotations:
+          summary: A customer was charged for an order that cannot use the money
+          description: >-
+            charge_settlement_total outcome=extra_capture (second payment on a paid order) or late_captured
+            (payment after cancellation) increased. An admin must refund the customer; the admin
+            notification may have been lost, so check the open reconciliation findings.
+            Runbook: docs/runbooks/webhooks-money.md
+          runbook_path: docs/runbooks/webhooks-money.md
+
       - alert: TamiymRefundSettlementFailed
         expr: sum(rate(tamiym_refund_settlement_total{outcome="failed"}[5m])) > 0
         for: 5m
