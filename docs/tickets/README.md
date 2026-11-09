@@ -236,7 +236,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-178](ttw-178-fix-footer-payment-logos.md)                     | P2       | Low      | Scoped   | Show only accepted, legible payment logos in the footer                  | Not in review  |
 | [TTW-179](ttw-179-close-google-account-prehijacking.md)            | P0       | High     | Complete | Secure unconfirmed accounts on Google linking                            | Not in review  |
 | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)     | P1       | High     | Scoped   | Refuse known public MFA encryption keys in production                    | Not in review  |
-| [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)             | P1       | High     | Scoped   | Keep raw reset and verification links out of retained Redis jobs         | Not in review  |
+| [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)             | P1       | High     | Complete | Keep raw reset and verification links out of retained Redis jobs         | Not in review  |
 | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)             | P0       | High     | Complete | Drop the old state and LGA when an edited address names an unknown state | Not in review  |
 | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)             | P0       | High     | Scoped   | Refuse an LGA that contradicts the address's state                       | Not in review  |
 

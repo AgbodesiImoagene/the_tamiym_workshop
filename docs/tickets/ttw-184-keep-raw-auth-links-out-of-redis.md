@@ -1,7 +1,8 @@
 # TTW-184 — Keep raw reset and verification links out of retained Redis jobs
 
 **Epic:** 8 — Client review delivery  
-**Status:** Done (local commit on `codex/ttw-184-keep-raw-auth-links-out-of-redis`, not pushed)  
+**Status:** Complete  
+**State: Verified.** Merged into `main` at the owner's request (merge commit `43ca6d2`, change `768bf4a`, on top of `f3eafd1` with TTW-182 and TTW-185) and pushed. On the merged tree, before the push: `pnpm typecheck` (6 tasks), `pnpm lint` (0 errors), `pnpm openapi:check` ("OpenAPI contract drift check passed") passed; `pnpm test`: api 1348, app 45 and web 43 tests passed; API e2e `auth-link-retention`, `auth-token-hashing`, `google-oauth-linking`, `auth-rate-limit`, `auth-surface`: 5 suites, 52 tests passed. GitHub Actions on `43ca6d2`: CI run `42565699276` success (all 18 jobs, including API Integration, Playwright Smoke, OpenAPI Contracts, Coverage), Playwright Comprehensive run `42565699277` success.  
 **Risk:** High  
 **Blocked by:** TTW-083 (must be merged first: same files and the same invariant)  
 **Blocks:** None
@@ -133,7 +134,7 @@ Local database `tamiym_workshop_test_ttw184` (created with `pg`), Redis DB 13, N
 - Tests: `auth.service.spec.ts`, `mail.processor.spec.ts` (+ `mail.service.spec.ts` drops the removed field), new `apps/api/test/auth-link-retention.e2e-spec.ts`.
 - Docs: `docs/14-auth-and-session-architecture.md` (threat table row and a paragraph on the mail job).
 - Deviation from the proposal: `removeOnFail: true` instead of `{ age: <TTL> }`, because BullMQ trims by age only when another job fails (Design review).
-- Left: merge into `main` and push when the user asks, read CI, then move TTW-184 to Complete in `docs/tickets/README.md` and `ROADMAP.md` (closing commit).
+- Merged and pushed (`43ca6d2`); CI and Playwright Comprehensive green. Nothing left in scope; the out-of-scope observations below remain open.
 
 ### Out-of-scope observations (not fixed)
 
