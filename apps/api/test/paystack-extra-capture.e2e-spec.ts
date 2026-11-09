@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PaystackWebhookService } from '../src/orders/paystack-webhook.service';
+import { ReconciliationRunsService } from '../src/reconciliation/reconciliation-runs.service';
 import { AdminNotifyService } from '../src/admin-notifications/admin-notify.service';
 import {
   OrderStatus,
@@ -23,6 +24,7 @@ describe('Extra payment capture on a paid order (e2e)', () => {
   let prisma: PrismaService;
   let webhooks: PaystackWebhookService;
   let adminNotify: AdminNotifyService;
+  let reconciliation: ReconciliationRunsService;
 
   const TOTAL = 10_000;
 
@@ -31,6 +33,7 @@ describe('Extra payment capture on a paid order (e2e)', () => {
     prisma = app.get(PrismaService);
     webhooks = app.get(PaystackWebhookService);
     adminNotify = app.get(AdminNotifyService);
+    reconciliation = app.get(ReconciliationRunsService);
   });
 
   afterEach(() => {
@@ -159,19 +162,27 @@ describe('Extra payment capture on a paid order (e2e)', () => {
     expect(extraEmits).toHaveLength(1);
   });
 
-  it('reports the extra capture as a reconciliation-visible claim on a non-SUCCEEDED payment', async () => {
+  it('makes the reconciliation run raise one finding for the extra capture', async () => {
     const { order, paymentA, refA, refB } = await createOrderWithTwoAttempts(
       `rec-${Date.now()}`,
     );
     await webhooks.processChargeSuccess(chargeEvent(refB));
     await webhooks.processChargeSuccess(chargeEvent(refA));
 
-    const claims = await prisma.chargeSettlementClaim.findMany({
+    await reconciliation.runInternal(new Date());
+    await reconciliation.runInternal(new Date());
+
+    const findings = await prisma.reconciliationFinding.findMany({
       where: {
-        orderId: order.id,
-        payment: { status: { not: PaymentStatus.SUCCEEDED } },
+        sourceIds: { path: ['paymentId'], equals: paymentA.id },
       },
     });
-    expect(claims.map((c) => c.paymentId)).toEqual([paymentA.id]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].leftLabel).toBe('chargeSettlementClaim');
+    expect(findings[0].severity).toBe('HIGH');
+    expect((findings[0].evidence as { kind: string }).kind).toBe(
+      'extra_capture_awaiting_refund',
+    );
+    expect(findings[0].sourceIds).toMatchObject({ orderId: order.id });
   });
 });

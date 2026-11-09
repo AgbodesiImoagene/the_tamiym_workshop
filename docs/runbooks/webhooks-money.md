@@ -46,7 +46,7 @@ sum by (outcome) (rate(tamiym_payout_transfer_event_total[5m]))
 
 A customer paid for an order that cannot use the money: a second payment on an order that is already paid (`extra_capture`, TTW-189) or a payment after cancellation (`late_captured`, TTW-088).
 
-1. Find the order and reference in the error log (`charge.success captured again…` / `charge.success received for CANCELLED order…`) or in the open reconciliation findings (payment domain, entity key `payment:<id>:extra_capture`).
+1. Find the order and reference in the error log (`charge.success captured again…` / `charge.success received for CANCELLED order…`) or in the open reconciliation findings (payment domain; `leftLabel` is `chargeSettlementClaim`, `evidence.kind` is `extra_capture_awaiting_refund`, `sourceIds` holds the payment and order ids).
 2. Refund the customer. A late payment on a cancelled order with one captured payment can be refunded with reason `LATE_PAYMENT_AFTER_CANCELLATION`; an extra capture is refunded from the Paystack dashboard until TTW-191 exists.
 3. The admin notification is sent after the database commit and can be lost if the notification step fails; this alert and the reconciliation finding are the safety net.
 4. Acknowledge the reconciliation finding once the refund is done.

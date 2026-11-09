@@ -122,7 +122,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
 | [ ]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
 | [x]  | —   | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | 1D  | Tracer et signaler un second encaissement pour une même commande            | —     | Critique | 6–10   | TTW-088          |
-| [ ]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte   | —     | Élevé    | 4–8    | TTW-189          |
+| [x]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte   | —     | Élevé    | 4–8    | TTW-189          |
 | [ ]  | —   | [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | 1D  | Rembourser automatiquement les encaissements en trop (v2, reporté)          | —     | Critique | 6–10   | TTW-190 (v2)     |
 
 ## Phase 2 : Comptes et achat d'un produit
