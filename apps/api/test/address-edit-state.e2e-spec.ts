@@ -5,7 +5,6 @@ import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { OrdersService } from '../src/orders/orders.service';
 import {
   CurrencyCode,
   ProductStatus,
@@ -17,7 +16,6 @@ import {
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
 const PASSWORD = 'TestPassword1!';
-const NOT_COVERED = 'SHIPPING_ADDRESS_NOT_COVERED';
 
 function cookieValue(res: Response, name: string): string | undefined {
   const setCookie = res.headers['set-cookie'];
@@ -35,21 +33,19 @@ function cookieValue(res: Response, name: string): string | undefined {
 }
 
 /**
- * TTW-185: a saved Lagos address edited to a state the platform does not
- * recognise must lose its old state code and LGA, so it is refused with
- * SHIPPING_ADDRESS_NOT_COVERED (TTW-086) instead of being priced at the
- * Lagos rate. The edit goes through the real PATCH route, as the checkout
- * and settings forms send it (free-text `state`, no `stateCode`).
+ * TTW-185, changed by TTW-087: a saved Lagos address edited to a state the
+ * platform does not recognise is refused with ADDRESS_STATE_UNKNOWN and keeps
+ * its state code and LGA, so it is never priced at the wrong rate. (TTW-185
+ * first saved the edit with the codes dropped and refused it at the quote.)
+ * The edit goes through the real PATCH route, as the forms send it.
  */
 describe('Address edit to an unknown state (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
-  let orders: OrdersService;
 
   beforeAll(async () => {
     app = await createE2eApp();
     prisma = app.get(PrismaService);
-    orders = app.get(OrdersService);
   });
 
   afterAll(async () => {
@@ -151,7 +147,7 @@ describe('Address edit to an unknown state (e2e)', () => {
     return { agent, csrf };
   }
 
-  it('refuses the quote and the order once a Lagos address is edited to an unknown state', async () => {
+  it('refuses an edit of a Lagos address to an unknown state and keeps the saved codes', async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     await seedLagosCoverage(suffix);
     const { customer, variant } = await seedCustomerWithVariant(suffix);
@@ -186,8 +182,11 @@ describe('Address edit to an unknown state (e2e)', () => {
     expect([200, 201]).toContain(lagosQuote.status);
     expect(Number(lagosQuote.body.shippingFee)).toBeGreaterThan(0);
 
+    // TTW-087: the edit is refused when saved, so the address keeps its state
+    // code and LGA and the Lagos quote keeps working (before, the edit was
+    // saved with its codes dropped and refused later, at the quote).
     const unknownState = `Atlantis ${suffix}`;
-    const edited = await agent
+    const refused = await agent
       .patch(`/v1/users/addresses/${addressId}`)
       .set('Origin', CUSTOMER_ORIGIN)
       .set('x-csrf-token', csrf)
@@ -197,45 +196,27 @@ describe('Address edit to an unknown state (e2e)', () => {
         state: unknownState,
         country: 'Nigeria',
       })
-      .expect(200);
+      .expect(400);
+    expect(refused.body).toMatchObject({ code: 'ADDRESS_STATE_UNKNOWN' });
 
-    const refusedQuote = await agent
+    const saved = await prisma.address.findUniqueOrThrow({
+      where: { id: addressId },
+    });
+    expect(saved).toMatchObject({ state: 'Lagos', stateCode: 'LA' });
+    expect(saved.lgaId).toEqual(expect.any(String));
+
+    const stillQuoted = await agent
       .post('/v1/orders/quote')
       .set('Origin', CUSTOMER_ORIGIN)
       .set('x-csrf-token', csrf)
       .send(quoteBody);
-    expect({
-      status: refusedQuote.status,
-      code: refusedQuote.body.code,
-      shippingFee: refusedQuote.body.shippingFee,
-    }).toEqual({ status: 400, code: NOT_COVERED, shippingFee: undefined });
+    expect([200, 201]).toContain(stillQuoted.status);
+    expect(Number(stillQuoted.body.shippingFee)).toBeGreaterThan(0);
 
-    expect(edited.body).toMatchObject({
-      state: unknownState,
-      stateCode: null,
-      lgaId: null,
-      administrativeAreaLevel2: null,
+    const orderRows = await prisma.order.count({
+      where: { userId: customer.id },
     });
-
-    const orderError: unknown = await orders
-      .create(customer.id, { ...quoteBody, idempotencyKey: `key-${suffix}` })
-      .then(
-        () => undefined,
-        (e: unknown) => e,
-      );
-    expect(
-      (orderError as { getResponse?: () => unknown })?.getResponse?.(),
-    ).toMatchObject({ code: NOT_COVERED });
-    const [orderRows, inventory] = await Promise.all([
-      prisma.order.count({ where: { userId: customer.id } }),
-      prisma.inventoryItem.findUniqueOrThrow({
-        where: { variantId: variant.id },
-      }),
-    ]);
-    expect({ orderRows, reserved: inventory.reserved }).toEqual({
-      orderRows: 0,
-      reserved: 0,
-    });
+    expect(orderRows).toBe(0);
   });
 
   it('keeps the Lagos rate when the checkout resends the same address with a new phone', async () => {

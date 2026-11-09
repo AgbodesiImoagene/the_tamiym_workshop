@@ -35,6 +35,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { ProductsModule } from './products/products.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { GeoModule } from './geo/geo.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
 import { ObservabilityModule } from './observability/observability.module';
@@ -168,6 +169,7 @@ import { redactPublicDesignShareUrl } from './designs/design-share.redact';
     NotificationsModule,
     ProductsModule,
     ShippingModule,
+    GeoModule,
     ObservabilityModule,
     PrismaModule,
     UsersModule,

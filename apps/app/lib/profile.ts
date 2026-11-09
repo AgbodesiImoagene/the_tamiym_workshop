@@ -20,6 +20,8 @@ export interface ShippingAddress {
   phone?: string | null;
   city: string;
   state: string;
+  stateCode?: string | null;
+  lgaId?: string | null;
   postalCode?: string | null;
   country?: string | null;
   landmark?: string | null;
@@ -45,6 +47,8 @@ export interface UpsertAddressInput {
   addressLine2?: string;
   city: string;
   state: string;
+  stateCode?: string;
+  lgaId?: string;
   country?: string;
   postalCode?: string;
   landmark?: string;

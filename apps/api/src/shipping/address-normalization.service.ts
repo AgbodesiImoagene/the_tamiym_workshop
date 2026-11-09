@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AddressProvider } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
+import { addressStateUnknown } from './shipping.errors';
 
 type AddressNormalizationInput = {
   addressLine1?: string;
@@ -111,6 +112,16 @@ export class AddressNormalizationService {
     // checkout sends the whole address on every save) is not a change.
     const stateChanged =
       existing !== null && this.isStateChange(input, existing);
+    // TTW-087: a Nigerian address cannot be saved with a state we do not know.
+    // An edit that leaves a saved unknown state untouched is still allowed, so
+    // older addresses load and can be corrected.
+    if (
+      countryCode === 'NG' &&
+      !resolvedState &&
+      (existing === null || stateChanged || existing.countryCode !== 'NG')
+    ) {
+      throw addressStateUnknown();
+    }
     const stateCode = stateChanged
       ? (resolvedState?.code ?? null)
       : (resolvedState?.code ?? existing?.stateCode ?? null);

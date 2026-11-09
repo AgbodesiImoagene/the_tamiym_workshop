@@ -2628,6 +2628,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/geo/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the states offered in address forms */
+        get: operations["GeoController_listStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/states/{code}/lgas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the LGAs of a state */
+        get: operations["GeoController_listLgas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/health": {
         parameters: {
             query?: never;
@@ -4168,6 +4202,21 @@ export interface components {
         ForgotPasswordDto: {
             /** @example user@example.com */
             email: string;
+        };
+        GeoLgaResponseDto: {
+            /** @description LGA id to send as `lgaId` on an address */
+            id: string;
+            /** @example Ikeja */
+            name: string;
+        };
+        GeoStateResponseDto: {
+            /**
+             * @description State code used in addresses
+             * @example LA
+             */
+            code: string;
+            /** @example Lagos */
+            name: string;
         };
         GrantMarketingConsentDto: {
             /** @enum {string} */
@@ -12513,6 +12562,81 @@ export interface operations {
             };
         };
     };
+    GeoController_listStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description State code used in addresses
+                         * @example LA
+                         */
+                        code: string;
+                        /** @example Lagos */
+                        name: string;
+                    }[];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GeoController_listLgas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description State code (e.g. LA) */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description LGA id to send as `lgaId` on an address */
+                        id: string;
+                        /** @example Ikeja */
+                        name: string;
+                    }[];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown state code (GEO_STATE_NOT_FOUND) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AppController_getHealth: {
         parameters: {
             query?: never;
@@ -14169,7 +14293,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data */
+            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14403,7 +14527,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data */
+            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
             400: {
                 headers: {
                     [name: string]: unknown;

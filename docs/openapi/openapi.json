@@ -2307,6 +2307,41 @@
         ],
         "type": "object"
       },
+      "GeoLgaResponseDto": {
+        "properties": {
+          "id": {
+            "description": "LGA id to send as `lgaId` on an address",
+            "type": "string"
+          },
+          "name": {
+            "example": "Ikeja",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "GeoStateResponseDto": {
+        "properties": {
+          "code": {
+            "description": "State code used in addresses",
+            "example": "LA",
+            "type": "string"
+          },
+          "name": {
+            "example": "Lagos",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object"
+      },
       "GrantMarketingConsentDto": {
         "properties": {
           "channel": {
@@ -16022,6 +16057,120 @@
         ]
       }
     },
+    "/v1/geo/states": {
+      "get": {
+        "operationId": "GeoController_listStates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "code": {
+                        "description": "State code used in addresses",
+                        "example": "LA",
+                        "type": "string"
+                      },
+                      "name": {
+                        "example": "Lagos",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List the states offered in address forms",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
+    "/v1/geo/states/{code}/lgas": {
+      "get": {
+        "operationId": "GeoController_listLgas",
+        "parameters": [
+          {
+            "description": "State code (e.g. LA)",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "description": "LGA id to send as `lgaId` on an address",
+                        "type": "string"
+                      },
+                      "name": {
+                        "example": "Ikeja",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "description": "Not signed in"
+          },
+          "404": {
+            "description": "Unknown state code (GEO_STATE_NOT_FOUND)"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List the LGAs of a state",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
     "/v1/health": {
       "get": {
         "operationId": "AppController_getHealth",
@@ -18960,7 +19109,7 @@
             "description": "Address created successfully"
           },
           "400": {
-            "description": "Invalid input data"
+            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
           },
           "401": {
             "description": "Unauthorized"
@@ -19403,7 +19552,7 @@
             "description": "Address updated successfully"
           },
           "400": {
-            "description": "Invalid input data"
+            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
           },
           "401": {
             "description": "Unauthorized"

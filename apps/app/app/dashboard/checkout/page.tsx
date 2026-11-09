@@ -13,6 +13,7 @@ import {
 } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
+import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -26,6 +27,8 @@ interface CheckoutFormState {
   addressLine2: string;
   city: string;
   state: string;
+  stateCode: string;
+  lgaId: string;
   postalCode: string;
   country: string;
 }
@@ -38,6 +41,8 @@ function addressToForm(address?: ShippingAddress | null): CheckoutFormState {
     addressLine2: address?.addressLine2 || '',
     city: address?.city || '',
     state: address?.state || '',
+    stateCode: address?.stateCode || '',
+    lgaId: address?.lgaId || '',
     postalCode: address?.postalCode || '',
     country: address?.country || 'Nigeria',
   };
@@ -119,9 +124,44 @@ export default function DashboardCheckoutPage() {
 
   const orderItems = useMemo(() => toOrderItems(items), [items]);
 
+  // TTW-087: the state is chosen from our list. A saved address that has only the
+  // state text (no code yet) is matched to the list by name.
+  const statesQuery = useQuery({
+    queryKey: ['geo-states'],
+    queryFn: getGeoStates,
+    staleTime: 5 * 60 * 1000,
+    enabled: !!user,
+  });
+  const states = statesQuery.data;
+  const selectedState = useMemo(() => {
+    if (!states) return undefined;
+    if (form.stateCode) return states.find((item) => item.code === form.stateCode);
+    const typed = form.state.trim().toLowerCase();
+    return typed ? states.find((item) => item.name.toLowerCase() === typed) : undefined;
+  }, [states, form.stateCode, form.state]);
+  const lgasQuery = useQuery({
+    queryKey: ['geo-lgas', selectedState?.code],
+    queryFn: () => getGeoLgas(selectedState!.code),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!selectedState,
+  });
+  const lgas = lgasQuery.data ?? [];
+  const savedStateNotListed = !!states && !selectedState && form.state.trim() !== '';
+
   // Editing the address invalidates the quote, so the edited address is saved and priced.
   function updateField(field: keyof CheckoutFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    setQuote(null);
+  }
+
+  function selectState(code: string) {
+    const next = states?.find((item) => item.code === code);
+    setForm((current) => ({
+      ...current,
+      state: next?.name ?? '',
+      stateCode: next?.code ?? '',
+      lgaId: '',
+    }));
     setQuote(null);
   }
 
@@ -132,7 +172,9 @@ export default function DashboardCheckoutPage() {
       addressLine1: form.addressLine1,
       addressLine2: form.addressLine2 || undefined,
       city: form.city,
-      state: form.state,
+      state: selectedState?.name ?? form.state,
+      ...(selectedState ? { stateCode: selectedState.code } : {}),
+      ...(form.lgaId ? { lgaId: form.lgaId } : {}),
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
     });
@@ -326,15 +368,80 @@ export default function DashboardCheckoutPage() {
                   />
                 </label>
 
-                <label className="space-y-2 text-sm font-medium text-black">
-                  <span>State</span>
-                  <input
-                    value={form.state}
-                    onChange={(event) => updateField('state', event.target.value)}
-                    className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
-                    placeholder="Enter state"
-                  />
-                </label>
+                <div className="space-y-2 text-sm font-medium text-black">
+                  <label htmlFor="checkout-state" className="block">
+                    State
+                  </label>
+                  <select
+                    id="checkout-state"
+                    value={selectedState?.code ?? ''}
+                    onChange={(event) => selectState(event.target.value)}
+                    disabled={!states}
+                    className="h-12 w-full rounded-xl border border-black/15 bg-white px-4 outline-none"
+                  >
+                    <option value="">{states ? 'Select a state' : 'Loading states...'}</option>
+                    {(states ?? []).map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  {statesQuery.isError ? (
+                    <p className="text-xs font-normal text-red-700">
+                      We could not load the states.{' '}
+                      <button
+                        type="button"
+                        onClick={() => void statesQuery.refetch()}
+                        className="font-semibold underline"
+                      >
+                        Try again
+                      </button>
+                    </p>
+                  ) : null}
+                  {savedStateNotListed ? (
+                    <p className="text-xs font-normal text-red-700">
+                      Choose a state from the list.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2 text-sm font-medium text-black">
+                  <label htmlFor="checkout-lga" className="block">
+                    LGA
+                  </label>
+                  <select
+                    id="checkout-lga"
+                    value={form.lgaId}
+                    onChange={(event) => updateField('lgaId', event.target.value)}
+                    disabled={!selectedState || lgasQuery.isLoading}
+                    className="h-12 w-full rounded-xl border border-black/15 bg-white px-4 outline-none"
+                  >
+                    <option value="">
+                      {!selectedState
+                        ? 'Select a state first'
+                        : lgasQuery.isLoading
+                          ? 'Loading LGAs...'
+                          : 'Select an LGA (optional)'}
+                    </option>
+                    {lgas.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  {lgasQuery.isError ? (
+                    <p className="text-xs font-normal text-red-700">
+                      We could not load the LGAs.{' '}
+                      <button
+                        type="button"
+                        onClick={() => void lgasQuery.refetch()}
+                        className="font-semibold underline"
+                      >
+                        Try again
+                      </button>
+                    </p>
+                  ) : null}
+                </div>
 
                 <label className="space-y-2 text-sm font-medium text-black">
                   <span>Postal Code</span>
@@ -361,7 +468,7 @@ export default function DashboardCheckoutPage() {
                 <button
                   type="button"
                   onClick={() => void handleReviewQuote()}
-                  disabled={isQuoting || isSubmitting}
+                  disabled={isQuoting || isSubmitting || !selectedState}
                   className="inline-flex h-12 items-center justify-center rounded-lg border border-[#004385] px-5 text-sm font-bold text-[#004385] disabled:opacity-60"
                 >
                   {isQuoting ? 'Reviewing...' : 'Review quote'}

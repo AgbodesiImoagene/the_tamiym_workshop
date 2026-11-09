@@ -20,6 +20,14 @@ import {
   quoteCampaignOrder,
   type CampaignOrderQuote,
 } from '@/lib/campaign-checkout';
+import {
+  findSelectedState,
+  getGeoLgas,
+  getGeoStates,
+  stateFormPatch,
+  type GeoLga,
+  type GeoState,
+} from '@/lib/geo';
 import { getPublicFundraiser } from '@/lib/fundraisers';
 import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
 import { webLoginWithNext, webRegisterWithNext } from '@/lib/site';
@@ -31,6 +39,8 @@ interface CheckoutFormState {
   addressLine2: string;
   city: string;
   state: string;
+  stateCode: string;
+  lgaId: string;
   postalCode: string;
   country: string;
 }
@@ -43,6 +53,8 @@ function addressToForm(address?: ShippingAddress | null): CheckoutFormState {
     addressLine2: address?.addressLine2 || '',
     city: address?.city || '',
     state: address?.state || '',
+    stateCode: address?.stateCode || '',
+    lgaId: address?.lgaId || '',
     postalCode: address?.postalCode || '',
     country: address?.country || 'Nigeria',
   };
@@ -154,6 +166,68 @@ export default function FundraiserCheckoutPage() {
     };
   }, [authChecked, user, slug, cartCampaignId]);
 
+  // TTW-087: states and LGAs come from our list; the state is never typed.
+  const [states, setStates] = useState<GeoState[] | undefined>();
+  const [statesFailed, setStatesFailed] = useState(false);
+  const [statesAttempt, setStatesAttempt] = useState(0);
+  // LGAs are kept with the state they were loaded for, so another state never
+  // shows the previous list while the new one loads.
+  const [lgaResult, setLgaResult] = useState<{
+    stateCode: string;
+    attempt: number;
+    lgas?: GeoLga[];
+    failed?: boolean;
+  } | null>(null);
+  const [lgasAttempt, setLgasAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!authChecked || !user) return;
+    let cancelled = false;
+    getGeoStates().then(
+      (list) => {
+        if (!cancelled) setStates(list);
+      },
+      () => {
+        if (!cancelled) setStatesFailed(true);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [authChecked, user, statesAttempt]);
+
+  const selectedState = useMemo(
+    () => findSelectedState(states, form.stateCode, form.state),
+    [states, form.stateCode, form.state]
+  );
+  const selectedStateCode = selectedState?.code;
+  const savedStateNotListed = !!states && !selectedState && form.state.trim() !== '';
+
+  useEffect(() => {
+    if (!selectedStateCode) return;
+    let cancelled = false;
+    getGeoLgas(selectedStateCode).then(
+      (list) => {
+        if (!cancelled)
+          setLgaResult({ stateCode: selectedStateCode, attempt: lgasAttempt, lgas: list });
+      },
+      () => {
+        if (!cancelled)
+          setLgaResult({ stateCode: selectedStateCode, attempt: lgasAttempt, failed: true });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateCode, lgasAttempt]);
+
+  const currentLgaResult =
+    lgaResult && lgaResult.stateCode === selectedStateCode && lgaResult.attempt === lgasAttempt
+      ? lgaResult
+      : null;
+  const lgas = currentLgaResult?.lgas;
+  const lgasFailed = !!currentLgaResult?.failed;
+
   const lineCount = useMemo(
     () => cart?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0,
     [cart]
@@ -166,7 +240,9 @@ export default function FundraiserCheckoutPage() {
       addressLine1: form.addressLine1,
       addressLine2: form.addressLine2 || undefined,
       city: form.city,
-      state: form.state,
+      state: selectedState?.name ?? form.state,
+      ...(selectedState ? { stateCode: selectedState.code } : {}),
+      ...(form.lgaId ? { lgaId: form.lgaId } : {}),
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
     });
@@ -363,7 +439,6 @@ export default function FundraiserCheckoutPage() {
                   ['addressLine1', 'Address line 1'],
                   ['addressLine2', 'Address line 2'],
                   ['city', 'City'],
-                  ['state', 'State'],
                   ['postalCode', 'Postal code'],
                   ['country', 'Country'],
                 ] as const
@@ -379,11 +454,92 @@ export default function FundraiserCheckoutPage() {
                   />
                 </label>
               ))}
+              <div className="space-y-2 text-sm font-medium text-black">
+                <label htmlFor="fundraiser-state" className="block">
+                  State
+                </label>
+                <select
+                  id="fundraiser-state"
+                  value={selectedState?.code ?? ''}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      ...stateFormPatch(states, event.target.value),
+                    }))
+                  }
+                  disabled={!states}
+                  className="h-11 w-full rounded-xl border border-black/15 bg-white px-4 outline-none"
+                >
+                  <option value="">{states ? 'Select a state' : 'Loading states...'}</option>
+                  {(states ?? []).map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                {statesFailed ? (
+                  <p className="text-xs font-normal text-red-700">
+                    We could not load the states.{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatesFailed(false);
+                        setStatesAttempt((n) => n + 1);
+                      }}
+                      className="font-semibold underline"
+                    >
+                      Try again
+                    </button>
+                  </p>
+                ) : null}
+                {savedStateNotListed ? (
+                  <p className="text-xs font-normal text-red-700">Choose a state from the list.</p>
+                ) : null}
+              </div>
+              <div className="space-y-2 text-sm font-medium text-black">
+                <label htmlFor="fundraiser-lga" className="block">
+                  LGA
+                </label>
+                <select
+                  id="fundraiser-lga"
+                  value={form.lgaId}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, lgaId: event.target.value }))
+                  }
+                  disabled={!selectedState || (!lgas && !lgasFailed)}
+                  className="h-11 w-full rounded-xl border border-black/15 bg-white px-4 outline-none"
+                >
+                  <option value="">
+                    {!selectedState
+                      ? 'Select a state first'
+                      : !lgas && !lgasFailed
+                        ? 'Loading LGAs...'
+                        : 'Select an LGA (optional)'}
+                  </option>
+                  {(lgas ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                {lgasFailed ? (
+                  <p className="text-xs font-normal text-red-700">
+                    We could not load the LGAs.{' '}
+                    <button
+                      type="button"
+                      onClick={() => setLgasAttempt((n) => n + 1)}
+                      className="font-semibold underline"
+                    >
+                      Try again
+                    </button>
+                  </p>
+                ) : null}
+              </div>
             </div>
             <button
               type="button"
               onClick={() => void handleReviewQuote()}
-              disabled={isQuoting || !form.addressLine1 || !form.city || !form.state}
+              disabled={isQuoting || !form.addressLine1 || !form.city || !selectedState}
               className="inline-flex rounded-lg bg-tamiym-blue px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {isQuoting ? 'Calculating…' : 'Review authoritative quote'}
