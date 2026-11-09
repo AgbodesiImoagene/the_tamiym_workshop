@@ -23,6 +23,19 @@ export const JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL =
 export const JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL =
   'google-linked-account-suspended-email';
 
+/** Jobs whose data carries a working reset or verification link (TTW-184). */
+export const AUTH_LINK_JOB_NAMES: ReadonlySet<string> = new Set([
+  JOB_VERIFICATION_EMAIL,
+  JOB_PASSWORD_RESET_EMAIL,
+]);
+/**
+ * TTW-184: options for the jobs above. `removeOnFail: true` deletes the job
+ * (and its link) from Redis at its final failure. `{ age }` would not do: BullMQ
+ * only trims by age when another job fails, and it trims the whole failed set.
+ * Every other mail job keeps the queue defaults (`mail.module.ts`).
+ */
+export const AUTH_LINK_JOB_OPTIONS = { removeOnFail: true } as const;
+
 /** Payout execution queue (BullMQ) */
 export const PAYOUT_QUEUE_NAME = 'payout-execution';
 export const JOB_EXECUTE_PAYOUT_RUN = 'execute-payout-run';

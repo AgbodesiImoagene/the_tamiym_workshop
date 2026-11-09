@@ -13,7 +13,11 @@ import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
 import { ObservabilityService } from '../observability/observability.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { MAIL_QUEUE_NAME } from '../constants';
+import {
+  JOB_PASSWORD_RESET_EMAIL,
+  JOB_VERIFICATION_EMAIL,
+  MAIL_QUEUE_NAME,
+} from '../constants';
 import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
 import { AccountPolicyService } from './account-policy.service';
 import { AuthSessionService } from './auth-session.service';
@@ -1448,6 +1452,44 @@ describe('AuthService', () => {
       expect(row.tokenHash).toBe(sha256(raw));
       expect(row.tokenType).toBe(TokenType.EMAIL_VERIFICATION);
       expect(Object.values(row)).not.toContain(raw);
+    });
+
+    describe('token-bearing mail jobs leave Redis at their final failure (TTW-184)', () => {
+      it('queues the reset link as { to, resetUrl } with removeOnFail: true', async () => {
+        prisma.user.findFirst.mockResolvedValue({
+          id: 'user-1',
+          email: 'a@example.com',
+        });
+
+        await service.forgotPassword('a@example.com');
+
+        expect(mailQueue.add).toHaveBeenCalledTimes(1);
+        expect(mailQueue.add).toHaveBeenCalledWith(
+          JOB_PASSWORD_RESET_EMAIL,
+          { to: 'a@example.com', resetUrl: expect.any(String) },
+          { removeOnFail: true },
+        );
+      });
+
+      it('queues the verification link as { to, verifyUrl } (no raw token field) with removeOnFail: true', async () => {
+        prisma.user.findFirst.mockResolvedValue({
+          id: 'user-1',
+          email: 'a@example.com',
+          emailVerifiedAt: null,
+        });
+
+        await service.resendVerification('a@example.com');
+
+        expect(mailQueue.add).toHaveBeenCalledTimes(1);
+        const [name, data, opts] = mailQueue.add.mock.calls[0] as [
+          string,
+          Record<string, unknown>,
+          unknown,
+        ];
+        expect(name).toBe(JOB_VERIFICATION_EMAIL);
+        expect(Object.keys(data).sort()).toEqual(['to', 'verifyUrl']);
+        expect(opts).toEqual({ removeOnFail: true });
+      });
     });
 
     it('looks a reset token up by its digest', async () => {

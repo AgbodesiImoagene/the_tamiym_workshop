@@ -1,7 +1,7 @@
 # TTW-184 — Keep raw reset and verification links out of retained Redis jobs
 
 **Epic:** 8 — Client review delivery  
-**Status:** Scoped  
+**Status:** Done (local commit on `codex/ttw-184-keep-raw-auth-links-out-of-redis`, not pushed)  
 **Risk:** High  
 **Blocked by:** TTW-083 (must be merged first: same files and the same invariant)  
 **Blocks:** None
@@ -53,10 +53,10 @@ To confirm at design review:
 
 ## Acceptance criteria
 
-- [ ] A Redis read alone cannot produce a working reset or verification link once the send has failed for good.
-- [ ] Failed auth emails remain visible to operations without secrets or PII.
-- [ ] Docs (`docs/14-auth-and-session-architecture.md`) are updated.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] A Redis read alone cannot produce a working reset or verification link once the send has failed for good.
+- [x] Failed auth emails remain visible to operations without secrets or PII.
+- [x] Docs (`docs/14-auth-and-session-architecture.md`) are updated.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -66,16 +66,76 @@ To confirm at design review:
 
 ## Design review
 
-Pending.
+**2026-11-08 — approved by the user (plan mode), risk High.**
+
+Finding confirmed on `main` (`102fd9e`): `auth.service.ts:249` queues `{ to, resetUrl }`, `auth.service.ts:414` queues `{ to, token, verifyUrl }`, and `mail.module.ts:21-26` keeps the queue defaults described above. `MailService.sendVerificationEmail` never reads `token`.
+
+New fact from BullMQ 5.67.2 that changes the proposal: `removeOnFail: { age }` is not a timer. `moveToFinished-14.lua:166-186` trims the failed set by age only when another job finishes as failed, and `removeJobsByMaxAge.lua` trims the whole failed set of the queue, so one job's option would also prune other mail jobs. On a quiet queue, a failed reset job with `{ age: 3600 }` would stay until the next failure, possibly for days. `removeOnFail: true` takes the other branch (`removeJobKeys(jobIdKey)`): this job only, atomically, at its final failure.
+
+Decisions:
+
+1. The two token-bearing jobs are added with `removeOnFail: true` (shared constant `AUTH_LINK_JOB_OPTIONS`). Queue defaults are unchanged, so Google notices and outbox jobs keep `{ count: 200 }`.
+2. The `token` field leaves the verification job and `SendVerificationEmailPayload`.
+3. Visibility: on the last failed attempt of a token-bearing job, `MailProcessor` logs a `warn` with the job name, id, attempt count and the error's name/code (`ECONNECTION`, `EAUTH`…). Never the error message (it can carry the address, for example `Invalid email address: …`), the URL, the token or the address. The per-attempt `recordQueueJob(failure)` metric stays.
+4. Folded in (user agreed): the two success log lines for verification and reset no longer print the recipient address, as TTW-179 did for the Google notices. Same file, same rule.
+5. Retries stay as they are: 8 attempts with exponential backoff from 4 s finish in about 8.5 minutes, well inside the 1 h reset lifetime.
+
+Rejected: minting the token in the worker so the job carries no secret. It moves auth logic into the mail worker and is beyond the ticket's proposal.
+
+Accepted residual risks:
+
+- While a job waits or retries, its data holds a working link. That is the job's purpose and lasts at most the retry window (or until the link expires if workers are down).
+- A job that stalls more than `maxStalledCount` is failed by BullMQ outside `process()`: `moveStalledJobsToWait-8.lua:88-89` stores a deferred failure (`defa`) and re-queues the job, then the next worker turns it into an `UnrecoverableError` without calling the processor (`worker.js:561-565`, `job.js:201`). The final `warn` is not logged for it. The job is still removed, because `handleFailed` → `moveToFailed` applies its own `removeOnFail`. The same holds for an `UnrecoverableError` thrown from the send path at attempt N < max (nothing throws one today).
+- The BullMQ event stream keeps `failedReason` (the error message, possibly with the address, never the link). Separate PII issue, listed below.
+
+Tests (written first): unit tests on `AuthService` (job options, no `token` key) and `MailProcessor` (final-failure log without secrets, success logs without address); an e2e spec against real Redis that drives both jobs to their final failure through the real `MailProcessor` worker and scans every `bull:mail:*` key for the raw token, with a Google notice as a control that stays in the failed set.
 
 ## Implementation reviews
 
-Pending.
+**2026-11-08, independent reviewer (fresh subagent, implementation + security charter in one review), read-only: PASS, no blocking or should-fix finding.** Confirmed by reading BullMQ 5.67.2:
+
+- `removeOnFail: true` overrides the queue default: `Job.moveToFailed` passes `this.opts.removeOnFail` (`job.js:532`) to `getKeepJobs` (`scripts.js:465-474`), which maps `true` to `{ count: 0 }`; `moveToFinished-14.lua` then runs `removeJobKeys` (job hash, `:logs`, `:dependencies`, `:processed`, `:failed`, `:unsuccessful`) atomically with the move to failed.
+- The final-attempt check matches BullMQ's own retry rule (`shouldRetryJob`, `job.js:481`: retry only if `attemptsMade + 1 < attempts`).
+- The warn line prints only job name, id, attempts, error name and `String(error.code)`; the success logs no longer print the address; no other place in these jobs logs the token or address.
+- Unit tests fail without the fix; the e2e spec is non-vacuous (asserts the token is in Redis before the failure) and has a control job.
+
+Nits and what was done:
+
+1. The stalled-job residual risk was "not proven by the source". Checked: `moveStalledJobsToWait-8.lua:88-89` sets `defa`, `job.js:201` reads it as `deferredFailure`, and `worker.js:561-565` fails the job with an `UnrecoverableError` without calling the processor. The note is right; the Design review now cites these lines.
+2. `UnrecoverableError` before the last attempt also skips the warn → comment added on `warnIfAuthLinkJobGaveUp` (both cases are still removed from Redis).
+3. Positional `mailAdd.mock.results[2]` in the e2e spec → replaced by a `findIndex` on the control job name.
+4. `queue.drain(true)` empties the shared mail queue → accepted: e2e runs in band, and this worktree uses its own Redis DB (13). Spies end with the app.
+5. The wait for the worker had no timeout → 30 s timeout that names the jobs still pending.
 
 ## Verification evidence
 
-Pending implementation.
+Local database `tamiym_workshop_test_ttw184` (created with `pg`), Redis DB 13, Node 24.22.1, base `main` `102fd9e`.
+
+- Red phase (tests written before the code):
+  - `npx jest src/mail/processors/mail.processor.spec.ts src/auth/auth.service.spec.ts -t "TTW-184"` → `Tests: 7 failed, 65 skipped, 2 passed`. Reasons: `add` called without `{"removeOnFail": true}`; verification payload keys contain `"token"`; success logs `"Sent verification email to a@b.com"` / `"Sent password reset email to a@b.com"`; final warn `Received number of calls: 0` (×3). The 2 passing are the "no warn while retries remain" and "other mail jobs" guards.
+  - `pnpm test:e2e -- auth-link-retention` → `Tests: 1 failed`: `expect(received).toBeUndefined()` received the failed `password-reset-email` job with `"resetUrl": "http://localhost:3000/reset-password?token=…"` and `"removeOnFail": {"count": 200}`.
+- After the fix:
+  - `npx jest src/mail src/auth/auth.service.spec.ts` → `Test Suites: 10 passed`, `Tests: 124 passed`.
+  - `pnpm test:e2e -- auth-link-retention auth-token-hashing google-oauth-linking auth-rate-limit auth-surface` → `Test Suites: 5 passed`, `Tests: 52 passed`.
+  - Full API e2e `pnpm --filter api test:e2e` (includes the new spec) → `Test Suites: 27 passed, 27 total`, `Tests: 155 passed, 155 total`, exit 0.
+  - `pnpm lint` → `Tasks: 6 successful`, exit 0; api: 0 errors, 14 existing warnings in `auth-session.service.spec.ts`, `openapi/application.factory.ts`, `openapi/normalize-openapi-document.ts`, `pricing/pricing.service.ts` (none touched). Targeted `eslint` on the e2e spec and `mail.processor.ts` after the review fixes → exit 0, no output.
+  - `pnpm typecheck` → `Tasks: 6 successful`, exit 0; `npx tsc --noEmit -p apps/api/tsconfig.json` after the review fixes → exit 0.
+  - `pnpm test` → `Tasks: 4 successful`, exit 0 (api `148 suites, 1336 tests passed`; web 43; app 45). The api run prints a Jest "worker process has failed to exit gracefully" notice; the exit code is still 0.
+  - `prettier --check` on every changed and new file → clean.
+- Not run: `openapi:check` (no DTO or HTTP contract changed), Playwright (no UI change).
 
 ## Completion summary
 
-Pending implementation.
+- `apps/api/src/constants.ts`: `AUTH_LINK_JOB_NAMES` and `AUTH_LINK_JOB_OPTIONS = { removeOnFail: true }`.
+- `apps/api/src/auth/auth.service.ts`: reset job `{ to, resetUrl }` and verification job `{ to, verifyUrl }` (no `token` field), both added with `AUTH_LINK_JOB_OPTIONS`.
+- `apps/api/src/mail/mail.service.ts`: `token` removed from `SendVerificationEmailPayload`.
+- `apps/api/src/mail/processors/mail.processor.ts`: final-failure `warn` for the two jobs (name, id, attempts, error name and code only); success logs without the address (folded in, agreed at design review).
+- Tests: `auth.service.spec.ts`, `mail.processor.spec.ts` (+ `mail.service.spec.ts` drops the removed field), new `apps/api/test/auth-link-retention.e2e-spec.ts`.
+- Docs: `docs/14-auth-and-session-architecture.md` (threat table row and a paragraph on the mail job).
+- Deviation from the proposal: `removeOnFail: true` instead of `{ age: <TTL> }`, because BullMQ trims by age only when another job fails (Design review).
+- Left: merge into `main` and push when the user asks, read CI, then move TTW-184 to Complete in `docs/tickets/README.md` and `ROADMAP.md` (closing commit).
+
+### Out-of-scope observations (not fixed)
+
+- The BullMQ event stream (`bull:mail:events`, capped near 10,000 entries) keeps each failure's `failedReason`, which is the error message. `MailService.sendTemplatedEmail` throws `Invalid email address: ${to}`, so an address can sit there and in Nest's error output. Never the link. Worth a small PII ticket (drop the address from that message).
+- An invalid address is a `BadRequestException` that BullMQ retries 8 times; it could be an `UnrecoverableError`. Not changed, so the retry behaviour stays as it was.

@@ -28,6 +28,7 @@ import {
   MAIL_QUEUE_NAME,
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
+  AUTH_LINK_JOB_OPTIONS,
   JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
   JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL,
   VERIFICATION_TOKEN_TTL_MS,
@@ -246,10 +247,11 @@ export class AuthService {
         'http://localhost:3000',
       );
       const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
-      await this.mailQueue.add(JOB_PASSWORD_RESET_EMAIL, {
-        to: user.email,
-        resetUrl,
-      });
+      await this.mailQueue.add(
+        JOB_PASSWORD_RESET_EMAIL,
+        { to: user.email, resetUrl },
+        AUTH_LINK_JOB_OPTIONS,
+      );
     }
 
     return {
@@ -411,11 +413,11 @@ export class AuthService {
       'http://localhost:3000',
     );
     const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
-    await this.mailQueue.add(JOB_VERIFICATION_EMAIL, {
-      to: email,
-      token,
-      verifyUrl,
-    });
+    await this.mailQueue.add(
+      JOB_VERIFICATION_EMAIL,
+      { to: email, verifyUrl },
+      AUTH_LINK_JOB_OPTIONS,
+    );
   }
 
   /**
