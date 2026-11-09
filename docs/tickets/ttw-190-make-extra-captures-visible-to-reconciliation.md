@@ -1,7 +1,7 @@
 # TTW-190 — Make extra payment captures visible to reconciliation and alerts
 
 **Epic:** 8 — Client review delivery\
-**Status:** Complete (merge into main pending)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None (TTW-189 is done)\
 **Blocks:** TTW-191
