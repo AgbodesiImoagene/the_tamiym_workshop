@@ -1,10 +1,12 @@
 # TTW-185 — Drop the old state and LGA when an edited address names an unknown state
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented — awaiting merge\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-086\
 **Blocks:** TTW-087, TTW-186
+
+**State: Verified.** Merged into `main` at the owner's request (merge commit `57e4444`, change `716191e`, TTW-186 opened in `daaa283`) and pushed. On the merged `main` (with TTW-182), before the push: `pnpm typecheck`, `pnpm lint`, `pnpm format:check` and `pnpm openapi:check` passed. `pnpm test`: api 1341, app 45 and web 43 tests passed. The API e2e suites `address-edit-state`, `shipping-zone-coverage`, `pricing-quote` and `order-create-idempotency` passed (22 tests). GitHub CI run 42539469480 on `57e4444`: success, all 18 jobs (including Unit Tests, API Integration, Coverage, OpenAPI Contracts, Migration Baseline and Playwright Smoke). Playwright Comprehensive run 42539469547: success.
 
 ## Background
 
