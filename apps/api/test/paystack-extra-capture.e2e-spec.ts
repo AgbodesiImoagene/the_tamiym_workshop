@@ -41,7 +41,11 @@ describe('Extra payment capture on a paid order (e2e)', () => {
     await closeE2eApp(app);
   });
 
-  /** Order with two attempts: A (expired, INITIATED) and B (INITIATED). */
+  /**
+   * Order with two attempts. The database allows one active attempt per order
+   * (TTW-012), so the expired attempt A is FAILED when B is created, and can
+   * still be paid at Paystack afterwards.
+   */
   async function createOrderWithTwoAttempts(suffix: string) {
     const passwordHash = await bcrypt.hash('TestPassword1!', 10);
     const customer = await prisma.user.create({
@@ -79,13 +83,13 @@ describe('Extra payment capture on a paid order (e2e)', () => {
         shipCountry: 'Nigeria',
       },
     });
-    const makePayment = (ref: string) =>
+    const makePayment = (ref: string, status: PaymentStatus) =>
       prisma.payment.create({
         data: {
           orderId: order.id,
           provider: PaymentProvider.PAYSTACK,
           providerRef: ref,
-          status: PaymentStatus.INITIATED,
+          status,
           currency: 'NGN',
           amount: TOTAL,
           idempotencyKey: ref,
@@ -93,8 +97,8 @@ describe('Extra payment capture on a paid order (e2e)', () => {
       });
     const refA = `psk_ttw189_a_${suffix}`;
     const refB = `psk_ttw189_b_${suffix}`;
-    const paymentA = await makePayment(refA);
-    const paymentB = await makePayment(refB);
+    const paymentA = await makePayment(refA, PaymentStatus.FAILED);
+    const paymentB = await makePayment(refB, PaymentStatus.INITIATED);
     return { order, paymentA, paymentB, refA, refB };
   }
 
@@ -136,7 +140,7 @@ describe('Extra payment capture on a paid order (e2e)', () => {
     const extra = await prisma.payment.findUniqueOrThrow({
       where: { id: paymentA.id },
     });
-    expect(extra.status).toBe(PaymentStatus.INITIATED);
+    expect(extra.status).toBe(PaymentStatus.FAILED);
     expect(
       await prisma.chargeSettlementClaim.count({
         where: { paymentId: paymentA.id },

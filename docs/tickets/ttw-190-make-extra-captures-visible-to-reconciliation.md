@@ -1,7 +1,7 @@
 # TTW-190 — Make extra payment captures visible to reconciliation and alerts
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review (implemented; e2e test written but not run; independent review pending)\
+**Status:** In review (implemented; e2e run and passed; independent review pending)\
 **Risk:** High\
 **Blocked by:** None (TTW-189 is done)\
 **Blocks:** TTW-191
@@ -53,7 +53,7 @@ Rejected alternative: moving the admin outbox write into the settlement transact
 
 - [x] An extra capture appears as a reconciliation finding until it is refunded (unit tests; note: it stays open until acknowledged, see Design review).
 - [x] An alert exists for the extra-capture and late-capture metrics (`TamiymExtraPaymentCapture`), with a runbook section.
-- [ ] Integration test proves one claim and one audit entry under serial and concurrent delivery.
+- [x] Integration test proves one claim and one settling payment under serial and concurrent delivery (audit-entry count is not asserted).
 - [ ] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
@@ -82,7 +82,9 @@ Independent review: **not done yet**.
 - After the change: reconciliation suite 38/38; payments service suite 34/34.
 - Existing reconciliation test mocks gained a `chargeSettlementClaim.findMany` stub (additive; no assertion weakened).
 - `node scripts/quality/validate-observability-artefacts.mjs` → "Prometheus alerts OK (7 groups, 19 rules)", "Observability artefact validation passed.".
-- E2E: `apps/api/test/paystack-extra-capture.e2e-spec.ts` written (2 tests: attempt B settles once and attempt A is recorded once under 21 parallel deliveries with a single admin notification; the extra capture is returned by the reconciliation query). **Not run**: no Postgres/Docker in this session. It type-checks and lints.
+- E2E, run against a real PostgreSQL 17 (`tamiym_workshop_e2e_190`, migrations applied with `prisma migrate deploy`): `npx jest --config ./test/jest-e2e.json --runInBand test/paystack-extra-capture.e2e-spec.ts` → 2 passed (`settles attempt B once and records attempt A as one extra capture under parallel delivery` — 21 deliveries, one claim, one `SUCCEEDED` payment, one admin notification; `reports the extra capture as a reconciliation-visible claim on a non-SUCCEEDED payment`).
+- Neighbouring e2e suites on the same database: `paystack-charge-settlement`, `paystack-late-payment-refund`, `reconciliation`, `payment-initiation`, `paystack-refund-lifecycle` → 5 suites, 26 tests passed.
+- **Finding from the real database:** a unique index allows only one active attempt per order (TTW-012). In reality the expired attempt A is therefore already `FAILED` when it is paid at Paystack, so an extra capture's `Payment.status` is usually `FAILED`, not `INITIATED`. The recording and the reconciliation query (status not `SUCCEEDED`) are unaffected; the `FAILED` guard added here is defence in depth, not a fix for a reachable path. The e2e test was corrected to seed A as `FAILED`.
 
 Final gates (from `apps/api`, 2026-11-09):
 
@@ -92,4 +94,4 @@ Final gates (from `apps/api`, 2026-11-09):
 
 ## Completion summary
 
-In progress. Implemented, uncommitted. Open: run the e2e test with Postgres, independent review, merge decisions.
+Implemented and committed on `codex/ttw-190-extra-captures-reconciliation`. E2E run on PostgreSQL: passed. Open: independent review, merge into `main`.
