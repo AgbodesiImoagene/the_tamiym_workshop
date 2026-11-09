@@ -94,4 +94,38 @@ test.describe('Fundraiser checkout cart @comprehensive @web', () => {
     ).toBeVisible();
     await expect(customerPage.getByRole('button', { name: 'Discard cart' })).toHaveCount(0);
   });
+
+  // TTW-087: the state and LGA are lists, so a supporter cannot misspell them.
+  test('offers the states and the LGAs of the chosen state as lists', async ({ customerPage }) => {
+    const campaign = await activeCampaign();
+    await storeCart(customerPage, campaign.id);
+
+    await customerPage.goto(checkoutUrl);
+
+    const state = customerPage.getByLabel('State');
+    const lga = customerPage.getByLabel('LGA');
+    await expect(state).toBeEnabled();
+    expect(await state.evaluate((node) => node.tagName)).toBe('SELECT');
+    // The seeded customer has a saved Lagos address, which prefills the form.
+    await state.selectOption({ label: 'Select a state' });
+    await expect(lga).toBeDisabled();
+    const review = customerPage.getByRole('button', { name: 'Review authoritative quote' });
+
+    await state.selectOption({ label: 'Lagos' });
+    await expect(lga).toBeEnabled();
+    await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(1);
+    await lga.selectOption({ label: 'Ikeja' });
+    await expect(lga).toHaveValue(/.+/);
+
+    await state.selectOption({ label: 'Ogun' });
+    await expect(lga).toHaveValue('');
+    await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(0);
+
+    // The quote button needs a state from the list.
+    await customerPage.getByLabel('Address line 1').fill('1 Test Street');
+    await customerPage.getByLabel('City').fill('Abeokuta');
+    await expect(review).toBeEnabled();
+    await state.selectOption({ label: 'Select a state' });
+    await expect(review).toBeDisabled();
+  });
 });

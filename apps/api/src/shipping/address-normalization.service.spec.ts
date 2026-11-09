@@ -102,85 +102,69 @@ describe('AddressNormalizationService', () => {
       lgaId: 'lga-ikeja',
     };
 
-    it('drops the saved state code and LGA when the edited state is unknown', async () => {
+    // TTW-087 replaces the TTW-185 tests that expected an unknown state to be
+    // saved with its codes dropped: the edit is now refused outright.
+    const expectUnknownState = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toMatchObject({
+        response: expect.objectContaining({
+          statusCode: 400,
+          code: 'ADDRESS_STATE_UNKNOWN',
+        }),
+      });
+
+    it('refuses an edit to an unknown state instead of keeping the saved state code and LGA', async () => {
       (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.normalizeForUpdate(savedLagosIkeja, {
-        state: 'Federal Capital Territory',
-      });
-
-      expect(result).toMatchObject({
-        state: 'Federal Capital Territory',
-        administrativeAreaLevel1: 'Federal Capital Territory',
-        administrativeAreaLevel2: null,
-        stateCode: null,
-        lgaId: null,
-      });
-      expect(result.normalizationMetadata).toMatchObject({
-        resolvedStateCode: null,
-        resolvedLgaId: null,
-      });
-      // The old state code must not be used to look up an LGA either.
-      expect(prisma.geoLga.findFirst).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ stateCode: 'LA' }),
+      await expectUnknownState(
+        service.normalizeForUpdate(savedLagosIkeja, {
+          state: 'Federal Capital Territory',
         }),
       );
     });
 
-    it('drops the saved state code when an explicit stateCode is unknown', async () => {
+    it('refuses an edit whose explicit stateCode is unknown', async () => {
       (prisma.geoState.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.normalizeForUpdate(savedLagosIkeja, {
-        stateCode: 'ZZ',
-      });
-
+      await expectUnknownState(
+        service.normalizeForUpdate(savedLagosIkeja, { stateCode: 'ZZ' }),
+      );
       expect(prisma.geoState.findUnique).toHaveBeenCalledWith({
         where: { code: 'ZZ' },
       });
-      expect(result).toMatchObject({
-        stateCode: null,
-        lgaId: null,
-        administrativeAreaLevel2: null,
-      });
     });
 
-    it('ignores an explicit lgaId when the edited state is unknown', async () => {
+    it('refuses an explicit lgaId sent with an unknown state', async () => {
       (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue({
         id: 'lga-ikeja',
         name: 'Ikeja',
       });
 
-      const result = await service.normalizeForUpdate(savedLagosIkeja, {
-        state: 'Federal Capital Territory',
-        lgaId: 'lga-ikeja',
-      });
-
-      expect(result).toMatchObject({ stateCode: null, lgaId: null });
+      await expectUnknownState(
+        service.normalizeForUpdate(savedLagosIkeja, {
+          state: 'Federal Capital Territory',
+          lgaId: 'lga-ikeja',
+        }),
+      );
     });
 
-    it('drops a saved LGA that had no state code when the edit names another unknown state', async () => {
+    it('refuses a saved LGA with no state code when the edit names another unknown state', async () => {
       (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.normalizeForUpdate(
-        {
-          ...savedLagosIkeja,
-          state: 'Lagos Stat',
-          administrativeAreaLevel1: 'Lagos Stat',
-          stateCode: null,
-        },
-        { state: 'Atlantis' },
+      await expectUnknownState(
+        service.normalizeForUpdate(
+          {
+            ...savedLagosIkeja,
+            state: 'Lagos Stat',
+            administrativeAreaLevel1: 'Lagos Stat',
+            stateCode: null,
+          },
+          { state: 'Atlantis' },
+        ),
       );
-
-      expect(result).toMatchObject({
-        stateCode: null,
-        lgaId: null,
-        administrativeAreaLevel2: null,
-      });
     });
 
     it('clears the saved LGA when the edit moves to another known state without an LGA', async () => {
@@ -365,6 +349,109 @@ describe('AddressNormalizationService', () => {
       });
 
       expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
+    });
+  });
+
+  // TTW-087: a Nigerian address must carry a state the platform knows.
+  describe('unknown Nigerian state (TTW-087)', () => {
+    const savedUnknown = {
+      addressLine1: '1 Old Road',
+      city: 'Somewhere',
+      state: 'Atlantis',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Atlantis',
+      stateCode: null,
+      lgaId: null,
+    };
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+    });
+
+    it('refuses a typed state that matches no known state on create', async () => {
+      await expect(
+        service.normalizeForCreate({
+          addressLine1: '12 Broad Street',
+          city: 'Lagos',
+          state: 'Lagoss',
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          statusCode: 400,
+          code: 'ADDRESS_STATE_UNKNOWN',
+        }),
+      });
+    });
+
+    it('refuses an unknown explicit stateCode on create', async () => {
+      await expect(
+        service.normalizeForCreate({
+          addressLine1: '12 Broad Street',
+          city: 'Lagos',
+          state: 'Lagos',
+          stateCode: 'ZZ',
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'ADDRESS_STATE_UNKNOWN' }),
+      });
+    });
+
+    it('refuses an edit that changes the state to an unknown one', async () => {
+      await expect(
+        service.normalizeForUpdate(
+          {
+            ...savedUnknown,
+            state: 'Lagos',
+            administrativeAreaLevel1: 'Lagos',
+            stateCode: 'LA',
+          },
+          { state: 'Atlantis' },
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'ADDRESS_STATE_UNKNOWN' }),
+      });
+    });
+
+    it('lets an edit that leaves an already-saved unknown state untouched go through', async () => {
+      const result = await service.normalizeForUpdate(savedUnknown, {
+        phone: '08012345678',
+        state: 'Atlantis',
+      });
+      expect(result).toMatchObject({ state: 'Atlantis', stateCode: null });
+    });
+
+    it('refuses an edit that moves a non-Nigerian address to Nigeria without a known state', async () => {
+      await expect(
+        service.normalizeForUpdate(
+          {
+            addressLine1: '1 Main St',
+            city: 'Accra',
+            state: 'Greater Accra',
+            country: 'Ghana',
+            countryCode: 'GH',
+            provider: AddressProvider.MANUAL,
+          },
+          { country: 'Nigeria', countryCode: 'NG' },
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'ADDRESS_STATE_UNKNOWN' }),
+      });
+    });
+
+    it('does not refuse a state outside Nigeria', async () => {
+      await expect(
+        service.normalizeForCreate({
+          addressLine1: '1 Main St',
+          city: 'Accra',
+          state: 'Greater Accra',
+          countryCode: 'GH',
+          country: 'Ghana',
+        }),
+      ).resolves.toMatchObject({ countryCode: 'GH' });
     });
   });
 });

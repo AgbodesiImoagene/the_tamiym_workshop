@@ -19,3 +19,20 @@ export function shippingAddressNotCovered(
     message,
   });
 }
+
+/**
+ * TTW-087: a Nigerian address names a state the platform does not know. It is
+ * refused when saved, so a misspelled state never reaches a shipping quote.
+ */
+export const ADDRESS_STATE_UNKNOWN = 'ADDRESS_STATE_UNKNOWN';
+
+export const ADDRESS_STATE_UNKNOWN_MESSAGE =
+  'Choose a state from the list. We could not match the state you entered.';
+
+export function addressStateUnknown(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: ADDRESS_STATE_UNKNOWN,
+    message: ADDRESS_STATE_UNKNOWN_MESSAGE,
+  });
+}

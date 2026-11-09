@@ -70,7 +70,9 @@ test.describe('Checkout shipping coverage @app @journey', () => {
       await page.getByLabel('Phone').fill('+2348012345678');
       await page.getByLabel('Street Address').fill('1 Coverage Street');
       await page.getByLabel('City').fill('Abuja');
-      await page.getByLabel('State').fill('Abuja Federal Capital Territory');
+      // TTW-087: the state is chosen from our list, so it cannot be misspelled.
+      await expect(page.getByLabel('State')).not.toHaveJSProperty('tagName', 'INPUT');
+      await page.getByLabel('State').selectOption({ label: 'Abuja Federal Capital Territory' });
       await page.getByRole('button', { name: 'Review quote' }).click();
 
       await expect(refusal).toBeVisible();
@@ -83,7 +85,8 @@ test.describe('Checkout shipping coverage @app @journey', () => {
 
       await openCheckout();
       await page.getByLabel('City').fill('Ikeja');
-      await page.getByLabel('State').fill('Lagos');
+      await page.getByLabel('State').selectOption({ label: 'Lagos' });
+      await page.getByLabel('LGA').selectOption({ label: 'Ikeja' });
       await page.getByRole('button', { name: 'Review quote' }).click();
 
       await expect(page.getByRole('button', { name: 'Place order and pay' })).toBeEnabled();

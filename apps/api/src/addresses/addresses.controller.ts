@@ -75,7 +75,11 @@ export class AddressesController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(
     @CurrentUser() user: RequestUser,
@@ -231,7 +235,11 @@ export class AddressesController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Address not found' })

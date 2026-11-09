@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import DashboardCheckoutPage from '@/app/dashboard/checkout/page';
 import { addCartItem, getCart, setCartPendingOrder, type CartItem } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder } from '@/lib/checkout';
+import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import { getUserAddresses, upsertPrimaryAddress } from '@/lib/profile';
 
 const push = jest.fn();
@@ -33,6 +34,11 @@ jest.mock('@/lib/checkout', () => ({
   quoteOrder: jest.fn(),
 }));
 
+jest.mock('@/lib/geo', () => ({
+  getGeoStates: jest.fn(),
+  getGeoLgas: jest.fn(),
+}));
+
 jest.mock('@/lib/profile', () => ({
   getUserAddresses: jest.fn(),
   upsertPrimaryAddress: jest.fn(),
@@ -49,6 +55,19 @@ const savedAddress = {
   postalCode: null,
   country: 'Nigeria',
   isDefault: true,
+};
+
+const geoStates = [
+  { code: 'LA', name: 'Lagos' },
+  { code: 'OG', name: 'Ogun' },
+];
+
+const lgasByState: Record<string, Array<{ id: string; name: string }>> = {
+  LA: [
+    { id: 'lga-ikeja', name: 'Ikeja' },
+    { id: 'lga-eti-osa', name: 'Eti-Osa' },
+  ],
+  OG: [{ id: 'lga-abeokuta', name: 'Abeokuta North' }],
 };
 
 const quote = {
@@ -107,7 +126,11 @@ beforeEach(() => {
   (createOrder as jest.Mock).mockReset();
   (initiateOrderPayment as jest.Mock).mockReset();
   (quoteOrder as jest.Mock).mockReset();
+  (getGeoStates as jest.Mock).mockReset();
+  (getGeoLgas as jest.Mock).mockReset();
   window.localStorage.clear();
+  (getGeoStates as jest.Mock).mockResolvedValue(geoStates);
+  (getGeoLgas as jest.Mock).mockImplementation(async (code: string) => lgasByState[code] ?? []);
   (getUserAddresses as jest.Mock).mockResolvedValue([savedAddress]);
   (upsertPrimaryAddress as jest.Mock).mockResolvedValue(savedAddress);
   (quoteOrder as jest.Mock).mockResolvedValue(quote);
@@ -451,7 +474,8 @@ describe('DashboardCheckoutPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
       await screen.findByRole('alert');
 
-      fireEvent.change(screen.getByLabelText('State'), { target: { value: 'Lagos State' } });
+      // TTW-087: the state is a list now, so the correction picks another state.
+      fireEvent.change(screen.getByLabelText('State'), { target: { value: 'OG' } });
       await reviewQuote();
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -472,6 +496,118 @@ describe('DashboardCheckoutPage', () => {
       expect(push).not.toHaveBeenCalled();
       expect(getCart()?.lines).toHaveLength(1);
       expect(getCart()?.pendingOrderId ?? null).toBeNull();
+    });
+  });
+
+  // TTW-087: the state is chosen from our list, never typed.
+  describe('state and LGA lists (TTW-087)', () => {
+    it('offers the states as a list instead of a text field', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+
+      const state = await screen.findByRole('combobox', { name: 'State' });
+      await waitFor(() => expect(screen.getByRole('option', { name: 'Ogun' })).toBeInTheDocument());
+      expect(state.tagName).toBe('SELECT');
+      expect(screen.queryByPlaceholderText('Enter state')).not.toBeInTheDocument();
+    });
+
+    it('selects the saved state by name when the saved address has no state code', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+
+      const state = await screen.findByRole('combobox', { name: 'State' });
+      await waitFor(() => expect(state).toHaveValue('LA'));
+      await waitFor(() => expect(getGeoLgas).toHaveBeenCalledWith('LA'));
+    });
+
+    it('loads the LGAs of the chosen state and clears the LGA when the state changes', async () => {
+      addCartItem(cartLine());
+      (getUserAddresses as jest.Mock).mockResolvedValue([
+        { ...savedAddress, stateCode: 'LA', lgaId: 'lga-ikeja' },
+      ]);
+      renderCheckout();
+
+      const lga = await screen.findByRole('combobox', { name: 'LGA' });
+      await waitFor(() => expect(lga).toHaveValue('lga-ikeja'));
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'State' }), {
+        target: { value: 'OG' },
+      });
+      await waitFor(() => expect(getGeoLgas).toHaveBeenCalledWith('OG'));
+      await waitFor(() =>
+        expect(screen.getByRole('option', { name: 'Abeokuta North' })).toBeInTheDocument()
+      );
+      expect(screen.getByRole('combobox', { name: 'LGA' })).toHaveValue('');
+      expect(screen.queryByRole('option', { name: 'Ikeja' })).not.toBeInTheDocument();
+    });
+
+    it('saves the chosen state name, state code and LGA', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await reviewQuote();
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'State' }), {
+        target: { value: 'OG' },
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('option', { name: 'Abeokuta North' })).toBeInTheDocument()
+      );
+      fireEvent.change(screen.getByRole('combobox', { name: 'LGA' }), {
+        target: { value: 'lga-abeokuta' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      await waitFor(() =>
+        expect(upsertPrimaryAddress).toHaveBeenLastCalledWith(
+          expect.objectContaining({ state: 'Ogun', stateCode: 'OG', lgaId: 'lga-abeokuta' })
+        )
+      );
+    });
+
+    it('asks for a correction when the saved state is not in the list', async () => {
+      addCartItem(cartLine());
+      (getUserAddresses as jest.Mock).mockResolvedValue([{ ...savedAddress, state: 'Lagoss' }]);
+      renderCheckout();
+
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      expect(await screen.findByText('Choose a state from the list.')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'State' })).toHaveValue('');
+      expect(screen.getByRole('button', { name: 'Review quote' })).toBeDisabled();
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'State' }), {
+        target: { value: 'LA' },
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Review quote' })).toBeEnabled()
+      );
+      expect(screen.queryByText('Choose a state from the list.')).not.toBeInTheDocument();
+    });
+
+    it('shows an error with a retry when the states cannot be loaded', async () => {
+      addCartItem(cartLine());
+      (getGeoStates as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+      renderCheckout();
+
+      expect(await screen.findByText('We could not load the states.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Review quote' })).toBeDisabled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await waitFor(() =>
+        expect(screen.getByRole('option', { name: 'Lagos' })).toBeInTheDocument()
+      );
+      expect(screen.queryByText('We could not load the states.')).not.toBeInTheDocument();
+    });
+
+    it('shows an error with a retry when the LGAs cannot be loaded', async () => {
+      addCartItem(cartLine());
+      (getGeoLgas as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+      renderCheckout();
+
+      expect(await screen.findByText('We could not load the LGAs.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await waitFor(() =>
+        expect(screen.getByRole('option', { name: 'Ikeja' })).toBeInTheDocument()
+      );
     });
   });
 });
