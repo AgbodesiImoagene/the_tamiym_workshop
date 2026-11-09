@@ -117,13 +117,14 @@ test.describe('Fundraiser checkout cart @comprehensive @web', () => {
     await lga.selectOption({ label: 'Ikeja' });
     await expect(lga).toHaveValue(/.+/);
 
-    await state.selectOption({ label: 'Ogun' });
+    // seed:e2e (the only geo data in CI) has Lagos and Abuja only.
+    await state.selectOption({ label: 'Abuja Federal Capital Territory' });
     await expect(lga).toHaveValue('');
     await expect(lga.locator('option', { hasText: 'Ikeja' })).toHaveCount(0);
 
     // The quote button needs a state from the list.
     await customerPage.getByLabel('Address line 1').fill('1 Test Street');
-    await customerPage.getByLabel('City').fill('Abeokuta');
+    await customerPage.getByLabel('City').fill('Abuja');
     await expect(review).toBeEnabled();
     await state.selectOption({ label: 'Select a state' });
     await expect(review).toBeDisabled();

@@ -1,10 +1,36 @@
 import { INestApplication } from '@nestjs/common';
+import Redis from 'ioredis';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
+import { AUTH_RATE_LIMIT_KEY_PREFIX } from '../src/auth/auth-rate-limit';
 import { AUTH_RATE_LIMIT_BUCKETS } from '../src/constants';
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
+
+/**
+ * The IP counter is shared by every suite that logs in within the same minute, and the
+ * suites run back to back from the same address. Without this reset the 41st login of
+ * the minute, made by other suites, is throttled before this test starts its own count
+ * (CI failure on main after TTW-087 added suites that log in).
+ */
+async function resetCustomerAuthIpCounters() {
+  const redis = new Redis({
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: Number(process.env.REDIS_PORT || 6379),
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: Number(process.env.REDIS_DB || 0),
+    maxRetriesPerRequest: 1,
+  });
+  try {
+    const keys = await redis.keys(
+      `${AUTH_RATE_LIMIT_KEY_PREFIX}:ip:customer_auth:*`,
+    );
+    if (keys.length > 0) await redis.del(...keys);
+  } finally {
+    redis.disconnect();
+  }
+}
 
 /**
  * Redis-backed identity+IP auth throttles (TTW-023 slice 4).
@@ -15,6 +41,7 @@ describe('Auth rate limits (e2e)', () => {
 
   beforeAll(async () => {
     app = await createE2eApp();
+    await resetCustomerAuthIpCounters();
   });
 
   afterAll(async () => {

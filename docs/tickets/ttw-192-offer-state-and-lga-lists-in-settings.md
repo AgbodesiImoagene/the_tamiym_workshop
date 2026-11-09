@@ -110,6 +110,12 @@ After the review fixes: 3 more tests written first and seen failing (3 failed, 8
 - `pnpm lint`: 6 tasks successful, 0 errors (existing warnings only: admin 21, api 14). `pnpm format:check`: all files formatted.
 - Playwright `settings.comprehensive.spec.ts`, `--project=setup --project=chromium-app --workers=2`: 12 passed (4 tests x desktop-1440, tablet-834, mobile-393 plus 3 setup).
 
+**CI failure after the push of `main` (8508add), fixed in a follow-up commit.**
+
+- Playwright Comprehensive: CI seeds only `seed:e2e` (Lagos with the LGA Ikeja, and Abuja with no LGA), while the local database had all 37 states. The settings test (this ticket) and the fundraiser list test (TTW-087) selected Ogun, which is absent in CI. Both now use Lagos and Abuja. Rerun on a database seeded with `seed:e2e` only: 16 passed (settings on 3 viewports, fundraiser spec, setup).
+- API Integration: `auth-rate-limit.e2e-spec.ts` got 429 instead of 401. All suites share the customer-auth IP counter (40 per minute) and run about 2 s each; the suites added by TTW-087 pushed the count over the limit before this test. Reproduced by pre-filling the counter (failed with the CI message), then fixed by clearing the customer-auth IP counters at the start of that suite (assertions unchanged). Full API e2e on a dedicated database and Redis db 15: 30 suites, 171 tests passed.
+- Lesson: run Playwright against a database seeded like CI (`seed:e2e` only, no `prisma db seed`) before pushing.
+
 Not verified: the new Playwright test was not seen failing on the old form (the old form has no State list, so `selectOption` could not have worked; the unit tests are the failing-first proof). Root-level `pnpm lint`, `pnpm typecheck`, `pnpm test` for api and web were not rerun: only `apps/app` and the e2e spec changed. The saved-unknown-state case is covered by the unit test only (the real API now refuses to store such a state, so Playwright cannot create one). Firefox and WebKit projects. A visual check of the new selects (they use the form's input tokens).
 
 ## Completion summary
