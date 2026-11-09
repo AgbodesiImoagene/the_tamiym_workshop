@@ -157,7 +157,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-085](ttw-085-validate-production-mail-settings.md)             | P0       | Standard | Complete | Validate production mail settings at startup                             | 10.5             |
 | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)       | P0       | High     | Complete | Reject addresses outside every shipping zone                             | 5.6              |
 | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)             | P0       | High     | Scoped   | Offer Nigerian states and LGAs as lists at checkout                      | 4.9              |
-| [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | P0       | Critical | Scoped   | Refund payments captured after an order was cancelled                    | 4.6              |
+| [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | P0       | Critical | Complete | Refund payments captured after an order was cancelled                    | 4.6              |
 | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | P0       | Critical | Complete | Record a second payment captured for the same order                      | Found in TTW-088 |
 | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | P1       | High     | Complete | Make extra payment captures visible to reconciliation and alerts         | Found in TTW-189 |
 | [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | P2       | Critical | Deferred | Refund extra payment captures automatically (deferred to v2)             | Found in TTW-189 |

@@ -1,7 +1,7 @@
 # TTW-088 — Refund payments captured after an order was cancelled
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, local commit only (not merged)\
+**Status:** Complete\
 **Risk:** Critical\
 **Blocked by:** TTW-081; client answer Q16 (default in Proposal)\
 **Blocks:** None
@@ -137,4 +137,4 @@ Left for later:
 - Several captured payments on one order (and a second capture on a `PAID` order, which is silently ignored today, pre-existing) need their own ticket or a client rule.
 - Q16 is still open with the client; this implements the default. If the client prefers card-only payment, this ticket stays valid but is needed less.
 - Frontends: no admin UI lists refund reasons today, so nothing changed there.
-- Not merged, not pushed, no PR (by request).
+- Merged into local `main` on 2026-11-09 (`859783a`). Not pushed, no PR (by request); CI has not run on it yet.
