@@ -44,7 +44,7 @@ The working order for this review lives in [ROADMAP.md](ROADMAP.md).
 | [TTW-181](ttw-181-seed-the-real-vat-rate-in-e2e-data.md)           | P2       | Low      | Scoped   | Seed the real 7.5% VAT rate in the e2e data instead of 7%                                | Not in review |
 | [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | P2       | Low      | Scoped   | Stop the customer app unit tests failing at random under parallel load                   | Not in review |
 | [TTW-183](ttw-183-move-admin-site-settings-form-to-zod.md)         | P2       | Standard | Scoped   | Move the admin site settings form to Zod and React Hook Form                             | Not in review |
-| [TTW-184](ttw-184-ignore-cancelled-prefetches-in-firefox.md)       | P1       | Low      | Scoped   | Stop the page guard flagging prefetches that Firefox cancels (flaky nightly matrix)      | Not in review |
+| [TTW-188](ttw-188-ignore-cancelled-prefetches-in-firefox.md)       | P1       | Low      | Scoped   | Stop the page guard flagging prefetches that Firefox cancels (flaky nightly matrix)      | Not in review |
 
 ## Epic 1 — Financial and inventory integrity
 

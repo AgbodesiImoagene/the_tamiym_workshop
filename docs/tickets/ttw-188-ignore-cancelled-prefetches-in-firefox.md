@@ -1,4 +1,4 @@
-# TTW-184 — Stop the strict page guard flagging prefetches that Firefox cancels
+# TTW-188 — Stop the strict page guard flagging prefetches that Firefox cancels
 
 **Epic:** 0 — Trustworthy delivery system  
 **Status:** Not started  

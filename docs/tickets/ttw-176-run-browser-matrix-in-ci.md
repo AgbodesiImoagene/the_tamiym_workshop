@@ -167,7 +167,7 @@ Failure detection and final changes (2026-11-08):
 
 - Timeouts sized from the measured runs (`339b4b6`): job 75 → 30 min, matrix step 55 → 20 min, baseline step 15 → 10 min. `docs/11-development-setup.md:92` now lists every matrix project and the workflow.
 - Throwaway branch `codex/ttw-176-broken-spec-proof` (`c402ac9`, never merged) adds `tests/e2e/web/ttw-176-broken-proof.spec.ts`, which waits for a heading that does not exist. Matrix run 42483902366 on it: **failure**, as intended. `Running 327 tests` → `5 failed`, `1 flaky`, `3 skipped`, `318 passed`. The 5 failures are exactly the broken spec in `chromium-web`, `firefox-web`, `webkit-web`, `mobile-chromium-web` and `mobile-webkit-web`. The `playwright-matrix-report` artefact (75.7 MB, HTML report and traces) was uploaded.
-- The same run found a real flake: `[firefox-web] fundraiser-checkout.comprehensive.spec.ts:87` failed once, then passed on retry. Cause: the strict page guard (`tests/e2e/fixtures/test.ts:45`) ignores Chromium's `net::ERR_ABORTED` but not Firefox's `NS_BINDING_ABORTED`, so Next.js prefetches cancelled at the end of a test count as failures. Ticketed as TTW-184, not fixed here (out of scope: one ticket per failure). Until TTW-184 lands, a nightly run can go red on it at random, and `--fail-on-flaky-tests` makes that visible on purpose.
+- The same run found a real flake: `[firefox-web] fundraiser-checkout.comprehensive.spec.ts:87` failed once, then passed on retry. Cause: the strict page guard (`tests/e2e/fixtures/test.ts:45`) ignores Chromium's `net::ERR_ABORTED` but not Firefox's `NS_BINDING_ABORTED`, so Next.js prefetches cancelled at the end of a test count as failures. Ticketed as TTW-188, not fixed here (out of scope: one ticket per failure). Until TTW-188 lands, a nightly run can go red on it at random, and `--fail-on-flaky-tests` makes that visible on purpose.
 - Matrix run 42483905699 on the ticket branch at `339b4b6` (new timeouts): **success**, `Running 322 tests` → `319 passed (4.3m)`, `3 skipped`, job 7 min (13:13:15 → 13:20:13 UTC).
 - Local gates at `339b4b6` plus the closing docs: `pnpm format:check` → `All matched files use Prettier code style!`; `pnpm docs:validate` → passed; `pnpm playwright:validate` → passed; `pnpm workflows:validate` → passed; `pnpm workflows:validate:test` → 6 pass, 0 fail; `pnpm lint` → 6/6 tasks successful; `pnpm typecheck` → 6/6 tasks successful; `CI=1 pnpm test:e2e:matrix --list` → `Total: 322 tests in 35 files`.
 
@@ -181,10 +181,10 @@ Failure detection and final changes (2026-11-08):
 - Strategy, interim policy, `docs/12-testing-strategy.md` and `docs/11-development-setup.md` describe what runs, with run ids.
 - Proven in CI: manual runs green (42431599230, 42483905699), first nightly run green (42469100727), a broken spec turns it red in all five web projects (42483902366).
 
-Merged into `main` in steps (`c135789`, `c4171ce`, `0425227`, `1ee04e9`); the last changes (timeouts, `docs/11`, closing docs, TTW-184) are on the ticket branch, to merge when the owner asks.
+Merged into `main` in steps (`c135789`, `c4171ce`, `0425227`, `1ee04e9`); the last changes (timeouts, `docs/11`, closing docs, TTW-188) are on the ticket branch, to merge when the owner asks.
 
 **Deviations from plan:** no local matrix run (no Docker or PostgreSQL on the machine, port 3001 taken); the baselines come from a workflow input instead of a local generation; the visual specs needed a wait for lazily loaded images before their baselines could be trusted.
 
-**Follow-up tickets:** TTW-177 (brand fonts never loaded), TTW-178 (footer payment logos: Visa invisible, PayPal shown), TTW-184 (Firefox flake from cancelled prefetches).
+**Follow-up tickets:** TTW-177 (brand fonts never loaded), TTW-178 (footer payment logos: Visa invisible, PayPal shown), TTW-188 (Firefox flake from cancelled prefetches).
 
 **Cleanup:** the throwaway branch `codex/ttw-176-broken-spec-proof` exists locally and on GitHub; delete it when the owner asks.
