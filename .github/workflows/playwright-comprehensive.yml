@@ -52,7 +52,6 @@ jobs:
       JWT_REFRESH_SECRET: test-refresh-secret-ttw003-not-for-prod
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      MFA_TOTP_ENCRYPTION_KEY: zghUm6jv4icb3WT8MzKea1lMrsgir7rONaShtv10zdQ=
       PAYSTACK_SECRET_KEY: sk_test_mock
       PAYSTACK_PUBLIC_KEY: pk_test_mock
       REDIS_HOST: localhost
@@ -78,6 +77,14 @@ jobs:
       PORT: '3001'
     steps:
       - uses: actions/checkout@v4
+      - name: Generate ephemeral MFA encryption key
+        shell: bash
+        run: |
+          # TTW-195: random per job, never committed. The API and the e2e seed
+          # both read MFA_TOTP_ENCRYPTION_KEY from the job environment.
+          key="$(openssl rand -base64 32)"
+          echo "::add-mask::${key}"
+          echo "MFA_TOTP_ENCRYPTION_KEY=${key}" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

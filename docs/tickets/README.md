@@ -247,6 +247,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)         | P1       | Standard | Scoped   | Offer the state and LGA lists in the customer settings address form      | Not in review    |
 | [TTW-193](ttw-193-let-customers-clear-a-saved-lga.md)               | P1       | High     | Scoped   | Let a customer clear the LGA saved on an address                         | Not in review    |
 | [TTW-194](ttw-194-refuse-a-deactivated-state-on-addresses.md)       | P1       | High     | Scoped   | Refuse a deactivated state when an address is saved                      | Not in review    |
+| [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                        | P1       | Standard | Scoped   | Generate the MFA test key at run time in CI workflows                    | Not in review    |
 
 ## Explicitly deferred post-v1 backlog
 
