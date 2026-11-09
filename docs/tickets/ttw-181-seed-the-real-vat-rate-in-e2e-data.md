@@ -1,7 +1,7 @@
 # TTW-181 — Seed the real 7.5% VAT rate in the e2e data
 
 **Epic:** 0 — Trustworthy delivery system  
-**Status:** Done (local commit on `codex/ttw-181-seed-real-vat-rate`, not pushed)  
+**Status:** Complete  
 **Risk:** Low  
 **Blocked by:** None  
 **Blocks:** None
@@ -51,7 +51,7 @@ To confirm at design review:
 ## Acceptance criteria
 
 - [x] After `pnpm --filter api seed:e2e`, the `default` settings row has VAT `0.0750`, shown by a command or test output.
-- [ ] Playwright specs that depend on the seed still pass. Not run locally (see evidence); to read on the CI Playwright jobs after the push to `main`.
+- [x] Playwright specs that depend on the seed still pass. Not run locally (see evidence); CI on `main` at the merge `102fd9e` ran `seed:e2e` and passed: run 42532976181 (CI, Playwright smoke included) and run 42532976039 (Playwright Comprehensive).
 - [x] Required quality gates pass with evidence recorded below.
 
 ## Out of scope
@@ -100,4 +100,5 @@ Local database `tamiym_workshop_ttw181_test`, Redis DB 13, Node 24.22.1.
 - Fix: `apps/api/scripts/seed-e2e-site-settings.ts` writes `vatRate: '0.0750'`; `seed-e2e-dummy-data.ts` calls `seedE2eSiteSettings(prisma)` instead of the inline upsert.
 - Regression guard: `apps/api/test/seed-e2e-site-settings.e2e-spec.ts` (real Postgres, create + overwrite twice).
 - Deviations from plan: step 3 (make the admin settings Playwright spec expect `7.5` again) not done, because TTW-183 is editing that file in parallel. It can expect `7.5` once both tickets are on `main`.
-- Left: merge into `main` and push when the user asks, then read the CI Playwright jobs and move TTW-181 to Complete in `docs/tickets/README.md` and `ROADMAP.md` (closing commit). `docs/tickets/ttw-038-fix-invalid-pricing-quote-query.md:137` still records the bug as noticed; it is a past record and was left unchanged.
+- State: Verified. Merged into `main` (`102fd9e`, merge of `39ba893`) and pushed; CI green on `102fd9e` (runs 42532976181 and 42532976039). TTW-183 has since landed on `main` too (`d4cce67`), so the admin settings Playwright spec could expect `7.5` again; left as is, since it passes with either rate.
+- `docs/tickets/ttw-038-fix-invalid-pricing-quote-query.md:137` still records the bug as noticed; it is a past record and was left unchanged.
