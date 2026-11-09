@@ -100,25 +100,34 @@ export class AddressNormalizationService {
       existing?.administrativeAreaLevel1 ?? null,
       existing?.state ?? null,
     );
-    const admin2Input = this.firstDefined(
-      this.clean(input.administrativeAreaLevel2),
-      existing?.administrativeAreaLevel2 ?? null,
-    );
-
     const resolvedState = await this.resolveState(
       countryCode,
       input,
       admin1Input,
     );
-    const resolvedLga = await this.resolveLga(
-      countryCode,
-      input,
-      resolvedState?.code ?? existing?.stateCode ?? null,
-      admin2Input,
-    );
 
-    const stateCode = resolvedState?.code ?? existing?.stateCode ?? null;
-    const lgaId = resolvedLga?.id ?? existing?.lgaId ?? null;
+    // TTW-185: an edit that changes the state must not keep the saved state
+    // code, nor an LGA from another state. Resending the same state text (the
+    // checkout sends the whole address on every save) is not a change.
+    const stateChanged =
+      existing !== null && this.isStateChange(input, existing);
+    const stateCode = stateChanged
+      ? (resolvedState?.code ?? null)
+      : (resolvedState?.code ?? existing?.stateCode ?? null);
+    const keepSavedLga =
+      !stateChanged || (!!stateCode && stateCode === existing?.stateCode);
+
+    const admin2Input = this.firstDefined(
+      this.clean(input.administrativeAreaLevel2),
+      keepSavedLga ? (existing?.administrativeAreaLevel2 ?? null) : null,
+    );
+    // An LGA cannot be checked against a state we do not know.
+    const resolvedLga =
+      stateChanged && !stateCode
+        ? null
+        : await this.resolveLga(countryCode, input, stateCode, admin2Input);
+    const lgaId =
+      resolvedLga?.id ?? (keepSavedLga ? (existing?.lgaId ?? null) : null);
     const administrativeAreaLevel1 = resolvedState?.name ?? admin1Input ?? null;
     const administrativeAreaLevel2 = resolvedLga?.name ?? admin2Input ?? null;
     const city = this.firstDefined(
@@ -229,6 +238,36 @@ export class AddressNormalizationService {
     return (
       this.firstDefined(this.clean(input.country), existing?.country ?? null) ??
       (countryCode === 'NG' ? 'Nigeria' : countryCode)
+    );
+  }
+
+  /**
+   * True when the request names a state that differs from the saved one: an
+   * explicit `stateCode` other than the saved code, or a state text that
+   * matches neither the saved `administrativeAreaLevel1` nor the saved `state`
+   * (trimmed, case-insensitive).
+   */
+  private isStateChange(
+    input: AddressNormalizationInput,
+    existing: ExistingAddressShape,
+  ) {
+    const sameText = (a: string | null | undefined, b: string | null) =>
+      !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+    const explicitCode = this.clean(input.stateCode);
+    if (explicitCode) {
+      return !sameText(this.clean(existing.stateCode), explicitCode);
+    }
+    const sentText = this.firstDefined(
+      this.clean(input.administrativeAreaLevel1),
+      this.clean(input.state),
+    );
+    if (!sentText) {
+      return false;
+    }
+    return (
+      !sameText(this.clean(existing.administrativeAreaLevel1), sentText) &&
+      !sameText(this.clean(existing.state), sentText)
     );
   }
 
