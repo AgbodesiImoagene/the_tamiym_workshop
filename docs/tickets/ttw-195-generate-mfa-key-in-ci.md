@@ -1,7 +1,7 @@
 # TTW-195 — Generate the MFA test key at run time in CI workflows
 
 **Epic:** 8 — Client review delivery  
-**Status:** Complete (local commit only, not pushed)  
+**Status:** Complete (merged and pushed to `main`, CI green)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -69,7 +69,7 @@ Rejected:
 - [x] No MFA encryption key literal remains under `.github/` (`grep` returns nothing).
 - [x] The four jobs generate the key at run time, mask it, and export it through `$GITHUB_ENV`.
 - [x] `pnpm workflows:validate`, `pnpm docs:validate` and the formatter pass.
-- [ ] A CI run on `main` is green with the generated key. **Not verified: needs a push.**
+- [x] A CI run on `main` is green with the generated key (see Post-merge CI evidence).
 
 ## Out of scope
 
@@ -108,7 +108,7 @@ Run in the ticket worktree:
 - `pnpm format:check`: "All matched files use Prettier code style!"
 - Local replay of the step: one line written to a temporary `GITHUB_ENV`, decodes to 32 bytes, base64 round-trips; the `::add-mask::` line was emitted.
 
-Not verified: a CI run on `main` with the generated key (nothing pushed); the e2e suites were not run locally.
+Post-merge CI evidence (2026-11-09, `main` at `6a8d4bf`): CI run 42720263522 success (5m1s); Playwright Comprehensive run 42720264168 success (2m59s); Playwright Matrix run 42721140578 success (7m27s, started by hand with `gh workflow run`, since it only runs nightly or on dispatch). Not verified: the e2e suites were not run locally.
 
 ## Completion summary
 
@@ -116,4 +116,4 @@ The four CI jobs no longer carry the MFA test key. Each generates a random key a
 
 Deviations: none. The seed needed no change because it already reads the same variable.
 
-Left to do: push and read the CI result on `main` (the user's decision). After a green run the owner can resolve the GitGuardian alert for `playwright-matrix.yml`; hits on `env-validation.ts` or the example files can be marked as test credentials.
+Left to do: the repository belongs to the client's GitHub account, and so does the GitGuardian alert. The client (not the project team) must mark the alert for `playwright-matrix.yml` as resolved; hits on `env-validation.ts`, the specs or the example files can be marked as test credentials.

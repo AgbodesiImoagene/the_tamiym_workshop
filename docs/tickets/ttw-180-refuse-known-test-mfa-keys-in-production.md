@@ -1,7 +1,7 @@
 # TTW-180 — Refuse known public MFA encryption keys in production
 
 **Epic:** 8 — Client review delivery  
-**Status:** Implemented and reviewed (PASS), local commit only, not pushed  
+**Status:** Complete (merged and pushed to `main`, CI green)  
 **Risk:** High  
 **Blocked by:** None  
 **Blocks:** None
@@ -124,7 +124,7 @@ Run in the ticket worktree:
 - `pnpm --filter api test`: 148 suites, 1388 tests passed.
 - `pnpm --filter api test:coverage` then `pnpm coverage:diff`: 5/5 changed lines covered (floor 80%). `pnpm coverage:ratchet`: passed.
 
-Not verified: CI on `main` (nothing pushed); the e2e suites (`validateEnv` is skipped under `NODE_ENV=test`).
+Post-merge CI (2026-11-09, `main` at `6a8d4bf`, with TTW-195): CI run 42720263522 and Playwright Comprehensive run 42720264168 success. Not verified: e2e for this check (`validateEnv` is skipped under `NODE_ENV=test`).
 
 ## Completion summary
 
@@ -132,4 +132,4 @@ In production, `validateEnv` now refuses `MFA_TOTP_ENCRYPTION_KEY` when it equal
 
 Deviations from the plan: the existing production fixture in `env-validation.spec.ts` used the test key, so it now uses a random key (no test weakened). The CI option is left out (see Design review).
 
-Left to do: CI option as a separate ticket if wanted; owner can mark the GitGuardian alert as a test credential once this is merged.
+Left to do: nothing here. The CI option was done in TTW-195. The GitGuardian alert is in the client's account: the client must mark it resolved (workflow file) or as a test credential (example files, specs).

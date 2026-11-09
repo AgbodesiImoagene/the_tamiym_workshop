@@ -240,14 +240,14 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-177](ttw-177-ship-brand-fonts.md)                              | P2       | Standard | Scoped   | Ship the brand fonts (Mundial, Neuffila Grotesk)                         | Not in review    |
 | [TTW-178](ttw-178-fix-footer-payment-logos.md)                      | P2       | Low      | Scoped   | Show only accepted, legible payment logos in the footer                  | Not in review    |
 | [TTW-179](ttw-179-close-google-account-prehijacking.md)             | P0       | High     | Complete | Secure unconfirmed accounts on Google linking                            | Not in review    |
-| [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | P1       | High     | Scoped   | Refuse known public MFA encryption keys in production                    | Not in review    |
+| [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | P1       | High     | Complete | Refuse known public MFA encryption keys in production                    | Not in review    |
 | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)              | P1       | High     | Complete | Keep raw reset and verification links out of retained Redis jobs         | Not in review    |
 | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | P0       | High     | Complete | Drop the old state and LGA when an edited address names an unknown state | Not in review    |
 | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | P0       | High     | Scoped   | Refuse an LGA that contradicts the address's state                       | Not in review    |
 | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)         | P1       | Standard | Scoped   | Offer the state and LGA lists in the customer settings address form      | Not in review    |
 | [TTW-193](ttw-193-let-customers-clear-a-saved-lga.md)               | P1       | High     | Scoped   | Let a customer clear the LGA saved on an address                         | Not in review    |
 | [TTW-194](ttw-194-refuse-a-deactivated-state-on-addresses.md)       | P1       | High     | Scoped   | Refuse a deactivated state when an address is saved                      | Not in review    |
-| [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                        | P1       | Standard | Scoped   | Generate the MFA test key at run time in CI workflows                    | Not in review    |
+| [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                        | P1       | Standard | Complete | Generate the MFA test key at run time in CI workflows                    | Not in review    |
 
 ## Explicitly deferred post-v1 backlog
 
