@@ -33,7 +33,7 @@ import {
 } from './paystack-refund.client';
 import {
   evaluateRefundEligibility,
-  type RefundReasonCode,
+  RefundReasonCode,
 } from './resolution-policy';
 import { assertResolutionAllowed } from './resolution-policy.assert';
 
@@ -197,9 +197,24 @@ export class RefundsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // TTW-088: only a CANCELLED order can be refunded without being paid, and
+    // only when a provider payment was actually captured.
+    const hasCapturedPayment =
+      order.status === OrderStatus.CANCELLED
+        ? (await db.payment.findFirst({
+            where: {
+              orderId,
+              status: PaymentStatus.SUCCEEDED,
+              providerRef: { not: null },
+            },
+            select: { id: true },
+          })) != null
+        : undefined;
+
     assertResolutionAllowed(
       evaluateRefundEligibility({
         orderStatus: order.status,
+        hasCapturedPayment,
         hasCustomizedLine: order.items.some((item) => item.designId != null),
         activeOutboundShipmentStatus: shipment?.status ?? null,
         deliveredAt: shipment?.deliveredAt ?? null,
@@ -374,7 +389,12 @@ export class RefundsService {
       if (!order) {
         throw new NotFoundException('Order not found');
       }
-      if (!REFUNDABLE_ORDER_STATUSES.has(order.status)) {
+      const isLatePayment =
+        reasonCode === RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION;
+      if (
+        !REFUNDABLE_ORDER_STATUSES.has(order.status) &&
+        !(isLatePayment && order.status === OrderStatus.CANCELLED)
+      ) {
         throw new BadRequestException(
           `Order status ${order.status} is not refundable`,
         );
@@ -394,10 +414,33 @@ export class RefundsService {
         );
       }
 
+      // TTW-088: one refund covers one captured payment. If several attempts
+      // were captured, refuse loudly rather than strand the others.
+      if (isLatePayment) {
+        const capturedCount = await tx.payment.count({
+          where: {
+            orderId,
+            status: PaymentStatus.SUCCEEDED,
+            providerRef: { not: null },
+          },
+        });
+        if (capturedCount > 1) {
+          throw new BadRequestException(
+            'Several captured payments exist for this order; a late payment cannot be refunded automatically',
+          );
+        }
+      }
+
       const captured = money(payment.amount);
       if (amount > captured) {
         throw new BadRequestException(
           `Refund amount must be between 0 and ${captured}`,
+        );
+      }
+      // TTW-088: a late payment is refunded in full, in one refund.
+      if (isLatePayment && Math.abs(amount - captured) > 1e-9) {
+        throw new BadRequestException(
+          `A late payment must be refunded in full (${captured})`,
         );
       }
 
@@ -950,7 +993,10 @@ export class RefundsService {
           data: { status: nextOrderStatus },
         });
 
-        if (order.campaignId) {
+        // TTW-088: a late payment on a CANCELLED order never reached the
+        // campaign (no currentAmount increment, no PAYMENT_SETTLED entry), so
+        // there is nothing to reverse.
+        if (order.campaignId && lockedOrder.status !== OrderStatus.CANCELLED) {
           await tx.campaign.update({
             where: { id: order.campaignId },
             data: { currentAmount: { decrement: amount } },

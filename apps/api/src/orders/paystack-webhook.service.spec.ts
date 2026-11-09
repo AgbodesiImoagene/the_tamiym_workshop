@@ -286,6 +286,109 @@ describe('PaystackWebhookService', () => {
       );
     });
 
+    describe('late payment captured after cancellation (TTW-088)', () => {
+      const cancelledOrder = {
+        id: 'order-1',
+        status: OrderStatus.CANCELLED,
+        totalAmount: 100,
+        currency: 'NGN',
+        campaignId: 'camp-1',
+        items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
+      };
+
+      beforeEach(() => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-1',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          order: cancelledOrder,
+        });
+      });
+
+      it('records the capture exactly once without paying the order or touching stock and campaign', async () => {
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
+        });
+
+        expect(mockTx.chargeSettlementClaim.create).toHaveBeenCalledTimes(1);
+        expect(mockTx.payment.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'pay-1' },
+            data: expect.objectContaining({
+              status: PaymentStatus.SUCCEEDED,
+            }),
+          }),
+        );
+        expect(mockTx.order.updateMany).not.toHaveBeenCalled();
+        expect(mockTx.order.update).not.toHaveBeenCalled();
+        expect(mockTx.campaign.update).not.toHaveBeenCalled();
+        expect(mockTx.campaignBalanceLedgerEntry.create).not.toHaveBeenCalled();
+      });
+
+      it('does not record anything when the amount differs from the order total', async () => {
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 5000, currency: 'NGN' },
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(mockTx.payment.update).not.toHaveBeenCalled();
+      });
+
+      it('does not record anything when the currency differs', async () => {
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 10000, currency: 'USD' },
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(mockTx.payment.update).not.toHaveBeenCalled();
+      });
+
+      it('treats a lost claim race as a duplicate and does not throw', async () => {
+        mockTx.chargeSettlementClaim.create.mockRejectedValueOnce(
+          new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+            code: 'P2002',
+            clientVersion: 'test',
+          }),
+        );
+
+        await expect(
+          service.processChargeSuccess({
+            event: 'charge.success',
+            data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(mockTx.payment.update).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'duplicate',
+        );
+      });
+
+      it('ignores a redelivery once the claim exists', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-1',
+          providerRef: 'ref-123',
+          status: PaymentStatus.SUCCEEDED,
+          settlementClaim: { id: 'claim-1' },
+          order: cancelledOrder,
+        });
+
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'duplicate',
+        );
+      });
+    });
+
     it('should reject expired orders', async () => {
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
         id: 'pay-1',

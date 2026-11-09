@@ -40,27 +40,41 @@ This matrix is the working source of truth for cancel, refund and return **eligi
 
 ## Refund reason codes (admin initiate)
 
-| Code                         | Meaning                                     | Eligible order statuses (slice 1)              | Customized lines (`designId` set)                     |
-| ---------------------------- | ------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
-| `CHANGE_OF_MIND`             | Customer / goodwill change of mind          | `PAID`, `PROCESSING` only                      | Denied once production/fulfilment started (`PAID` ok) |
-| `DEFECT_OR_NOT_AS_DESCRIBED` | Quality / description remedy                | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
-| `PRODUCTION_FAILURE`         | Platform production fault                   | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
-| `CARRIER_LOSS_OR_DAMAGE`     | Carrier lost/damaged (ops-confirmed)        | `FULFILLED`, `DELIVERED`, `PARTIALLY_REFUNDED` | Allowed                                               |
-| `ADDRESS_FAILURE_PLATFORM`   | Address/delivery failure attributed to us   | `FULFILLED`, `DELIVERED`, `PARTIALLY_REFUNDED` | Allowed                                               |
-| `DUPLICATE_OR_PRICING_ERROR` | Duplicate charge / pricing error            | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
-| `ADMIN_GOODWILL`             | Explicit admin goodwill (audited free text) | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
+| Code                              | Meaning                                                | Eligible order statuses (slice 1)              | Customized lines (`designId` set)                     |
+| --------------------------------- | ------------------------------------------------------ | ---------------------------------------------- | ----------------------------------------------------- |
+| `CHANGE_OF_MIND`                  | Customer / goodwill change of mind                     | `PAID`, `PROCESSING` only                      | Denied once production/fulfilment started (`PAID` ok) |
+| `DEFECT_OR_NOT_AS_DESCRIBED`      | Quality / description remedy                           | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
+| `PRODUCTION_FAILURE`              | Platform production fault                              | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
+| `CARRIER_LOSS_OR_DAMAGE`          | Carrier lost/damaged (ops-confirmed)                   | `FULFILLED`, `DELIVERED`, `PARTIALLY_REFUNDED` | Allowed                                               |
+| `ADDRESS_FAILURE_PLATFORM`        | Address/delivery failure attributed to us              | `FULFILLED`, `DELIVERED`, `PARTIALLY_REFUNDED` | Allowed                                               |
+| `DUPLICATE_OR_PRICING_ERROR`      | Duplicate charge / pricing error                       | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
+| `ADMIN_GOODWILL`                  | Explicit admin goodwill (audited free text)            | `PAID`…`DELIVERED`, `PARTIALLY_REFUNDED`       | Allowed                                               |
+| `LATE_PAYMENT_AFTER_CANCELLATION` | Money captured after the order was cancelled (TTW-088) | `CANCELLED` with a captured payment only       | Not applicable (full refund of the captured amount)   |
+
+### Late payment on a cancelled order (TTW-088)
+
+Interim rule, pending the client's answer to Q16: the 30 minute payment window is unchanged. Bank transfers and USSD can settle after it.
+
+- When `charge.success` arrives for an order that is already `CANCELLED` (or expired and cancelled on the spot) and Paystack's amount and currency match the order total, the capture is **recorded**: one `ChargeSettlementClaim` and `Payment.status = SUCCEEDED`, in one transaction. The order stays `CANCELLED`.
+- Nothing else is applied: no stock consumption, no campaign `currentAmount`, no ledger entry. A redelivery is a duplicate.
+- A capture whose amount or currency does not match, or that lacks them, is **not** recorded and stays a manual case (admin is notified).
+- An admin may then refund it with reason `LATE_PAYMENT_AFTER_CANCELLATION`, for the **full captured amount only**, once. This is not a general opening of refunds on cancelled orders: any other reason on a `CANCELLED` order stays `REFUND_NOT_ALLOWED_TERMINAL`, and a `CANCELLED` order without a captured payment stays non-refundable.
+- Settlement of this refund skips the campaign decrement and `REFUND_APPLIED` ledger entry, because the matching credit never existed. The order ends `REFUNDED`.
+- There is no automatic refund and no re-confirmation of the order.
+- Limit: if several captured payments exist on the same order, the late-payment refund is refused (manual handling), so no captured payment is left behind by refunding another.
 
 ### Refund status gates
 
-| Condition                                         | Code                                       |
-| ------------------------------------------------- | ------------------------------------------ |
-| `PENDING_PAYMENT` / unpaid                        | `REFUND_NOT_ALLOWED_UNPAID`                |
-| `CANCELLED` / `REFUNDED`                          | `REFUND_NOT_ALLOWED_TERMINAL`              |
-| Reason not in vocabulary                          | `REFUND_NOT_ALLOWED_UNKNOWN_REASON`        |
-| Reason × status illegal                           | `REFUND_NOT_ALLOWED_REASON_FOR_STATUS`     |
-| Customized + `CHANGE_OF_MIND` after `PROCESSING`+ | `REFUND_NOT_ALLOWED_CUSTOM_CHANGE_OF_MIND` |
-| Amount / cumulative cap                           | Existing TTW-013 validation (unchanged)    |
-| Allowed                                           | `REFUND_ALLOWED`                           |
+| Condition                                            | Code                                       |
+| ---------------------------------------------------- | ------------------------------------------ |
+| `PENDING_PAYMENT` / unpaid                           | `REFUND_NOT_ALLOWED_UNPAID`                |
+| `CANCELLED` / `REFUNDED`                             | `REFUND_NOT_ALLOWED_TERMINAL`              |
+| `CANCELLED` + captured payment + late-payment reason | `REFUND_ALLOWED_LATE_PAYMENT` (allowed)    |
+| Reason not in vocabulary                             | `REFUND_NOT_ALLOWED_UNKNOWN_REASON`        |
+| Reason × status illegal                              | `REFUND_NOT_ALLOWED_REASON_FOR_STATUS`     |
+| Customized + `CHANGE_OF_MIND` after `PROCESSING`+    | `REFUND_NOT_ALLOWED_CUSTOM_CHANGE_OF_MIND` |
+| Amount / cumulative cap                              | Existing TTW-013 validation (unchanged)    |
+| Allowed                                              | `REFUND_ALLOWED`                           |
 
 Shipping / Paystack fee allocation, organiser proceeds clawback and partial component math are **deferred** (still capped by captured value only).
 

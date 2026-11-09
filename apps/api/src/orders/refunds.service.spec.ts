@@ -543,6 +543,148 @@ describe('RefundsService', () => {
       );
     });
 
+    describe('late payment on a cancelled order (TTW-088)', () => {
+      const initiated = {
+        id: 'refund-late',
+        orderId: 'order-1',
+        status: RefundStatus.INITIATED,
+        amount: 10000,
+        providerRef: null,
+        transactionReference: 'txn_123',
+        payment: mockPayment,
+      };
+
+      function mockCancelledReserve(txPayment: unknown, capturedCount = 1) {
+        const txOrder = {
+          ...mockOrder,
+          status: OrderStatus.CANCELLED,
+          items: [{ designId: null }],
+        };
+        let calls = 0;
+        prisma.$transaction.mockImplementation(
+          async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
+            calls += 1;
+            if (calls === 1) {
+              return cb({
+                $executeRaw: jest.fn().mockResolvedValue(undefined),
+                order: { findUnique: jest.fn().mockResolvedValue(txOrder) },
+                shipment: { findFirst: jest.fn().mockResolvedValue(null) },
+                payment: {
+                  findFirst: jest.fn().mockResolvedValue(txPayment),
+                  count: jest.fn().mockResolvedValue(capturedCount),
+                },
+                refund: {
+                  findMany: jest.fn().mockResolvedValue([]),
+                  create: jest.fn().mockResolvedValue(initiated),
+                  findUnique: jest.fn(),
+                },
+              });
+            }
+            const row = {
+              ...initiated,
+              updatedAt: new Date(),
+              providerRef: null,
+            };
+            return cb({
+              $executeRaw: jest.fn().mockResolvedValue(undefined),
+              refund: {
+                findUniqueOrThrow: jest.fn().mockResolvedValue(row),
+                update: jest.fn().mockResolvedValue({
+                  ...row,
+                  providerRef: 'driving:refund-late',
+                }),
+              },
+            });
+          },
+        );
+      }
+
+      beforeEach(() => {
+        prisma.order.findUnique.mockResolvedValue({
+          status: OrderStatus.CANCELLED,
+          items: [{ designId: null }],
+        });
+        prisma.payment.findFirst.mockResolvedValue(mockPayment);
+      });
+
+      it('refunds the full captured amount and calls Paystack once', async () => {
+        mockCancelledReserve(mockPayment);
+        prisma.refund.findUniqueOrThrow.mockResolvedValue({
+          ...initiated,
+          status: RefundStatus.PROCESSING,
+          providerRef: '991',
+        });
+
+        const result = await service.initiateRefund(
+          'order-1',
+          10000,
+          RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+          'paid by transfer after the 30 min window',
+          'admin-1',
+        );
+
+        expect(paystackRefundClient.createRefund).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe(RefundStatus.PROCESSING);
+        expect(campaignLedger.createRefundApplied).not.toHaveBeenCalled();
+      });
+
+      it('refuses when several captured payments exist, and never calls Paystack', async () => {
+        mockCancelledReserve(mockPayment, 2);
+
+        await expect(
+          service.initiateRefund(
+            'order-1',
+            10000,
+            RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(paystackRefundClient.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('refuses a partial amount and never calls Paystack', async () => {
+        mockCancelledReserve(mockPayment);
+
+        await expect(
+          service.initiateRefund(
+            'order-1',
+            4000,
+            RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(paystackRefundClient.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('refuses a cancelled order that has no captured payment', async () => {
+        prisma.payment.findFirst.mockResolvedValue(null);
+        mockCancelledReserve(null);
+
+        await expect(
+          service.initiateRefund(
+            'order-1',
+            10000,
+            RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'REFUND_NOT_ALLOWED_TERMINAL' },
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(paystackRefundClient.createRefund).not.toHaveBeenCalled();
+      });
+
+      it('keeps other reasons refused on a cancelled order', async () => {
+        await expect(
+          service.initiateRefund(
+            'order-1',
+            10000,
+            RefundReasonCode.ADMIN_GOODWILL,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'REFUND_NOT_ALLOWED_TERMINAL' },
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
     it('rejects amount <= 0', async () => {
       await expect(
         service.initiateRefund('order-1', 0, RefundReasonCode.ADMIN_GOODWILL),
@@ -853,6 +995,62 @@ describe('RefundsService', () => {
       expect(observability.recordRefundSettlement).toHaveBeenCalledWith(
         'settled',
       );
+    });
+
+    it('settles a late-payment refund without touching campaign totals or ledger (TTW-088)', async () => {
+      const cancelledOrder = {
+        ...mockOrder,
+        status: OrderStatus.CANCELLED,
+        campaignId: 'camp-1',
+      };
+      prisma.refund.findFirst.mockResolvedValue({
+        ...baseRefund,
+        amount: 10000,
+        order: cancelledOrder,
+      });
+      const campaignUpdate = jest.fn().mockResolvedValue({});
+      const orderUpdate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
+          await cb({
+            $executeRaw: jest.fn().mockResolvedValue(undefined),
+            refundSettlementClaim: { create: jest.fn().mockResolvedValue({}) },
+            refund: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findMany: jest.fn().mockResolvedValue([{ amount: 10000 }]),
+              findUnique: jest.fn(),
+            },
+            order: {
+              update: orderUpdate,
+              findUniqueOrThrow: jest.fn().mockResolvedValue(cancelledOrder),
+            },
+            campaign: { update: campaignUpdate },
+            notificationOutbox: {
+              create: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+            },
+          });
+          return undefined;
+        },
+      );
+
+      const ok = await service.applyRefundWebhookEvent({
+        event: 'refund.processed',
+        data: {
+          id: 991,
+          status: 'processed',
+          amount: 1_000_000,
+          currency: 'NGN',
+          transaction_reference: 'txn_123',
+        },
+      });
+
+      expect(ok).toBe(true);
+      expect(campaignUpdate).not.toHaveBeenCalled();
+      expect(campaignLedger.createRefundApplied).not.toHaveBeenCalled();
+      expect(orderUpdate).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: { status: OrderStatus.REFUNDED },
+      });
     });
 
     it('rejects provider/local amount mismatch without settling', async () => {

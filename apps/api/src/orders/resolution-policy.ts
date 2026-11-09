@@ -63,6 +63,8 @@ export const RefundReasonCode = {
   ADDRESS_FAILURE_PLATFORM: 'ADDRESS_FAILURE_PLATFORM',
   DUPLICATE_OR_PRICING_ERROR: 'DUPLICATE_OR_PRICING_ERROR',
   ADMIN_GOODWILL: 'ADMIN_GOODWILL',
+  /** TTW-088: money captured after the order was cancelled (late transfer/USSD). */
+  LATE_PAYMENT_AFTER_CANCELLATION: 'LATE_PAYMENT_AFTER_CANCELLATION',
 } as const;
 
 export type RefundReasonCode =
@@ -88,6 +90,8 @@ export const ResolutionCode = {
   CANCEL_NOT_ALLOWED_TERMINAL: 'CANCEL_NOT_ALLOWED_TERMINAL',
 
   REFUND_ALLOWED: 'REFUND_ALLOWED',
+  /** TTW-088: captured payment on a cancelled order, refundable in full. */
+  REFUND_ALLOWED_LATE_PAYMENT: 'REFUND_ALLOWED_LATE_PAYMENT',
   REFUND_NOT_ALLOWED_UNPAID: 'REFUND_NOT_ALLOWED_UNPAID',
   REFUND_NOT_ALLOWED_TERMINAL: 'REFUND_NOT_ALLOWED_TERMINAL',
   REFUND_NOT_ALLOWED_UNKNOWN_REASON: 'REFUND_NOT_ALLOWED_UNKNOWN_REASON',
@@ -118,6 +122,11 @@ export type ResolutionPolicyInput = {
   activeOutboundShipmentStatus?: ShipmentStatus | null;
   /** Shipment deliveredAt when known (return window). */
   deliveredAt?: Date | string | null;
+  /**
+   * True when a SUCCEEDED provider payment exists for the order. Only read for
+   * CANCELLED orders (TTW-088): a normal cancelled order never has one.
+   */
+  hasCapturedPayment?: boolean;
   now?: Date;
 };
 
@@ -256,6 +265,18 @@ export function evaluateRefundEligibility(
 ): EligibilityDecision {
   const { orderStatus, hasCustomizedLine, reasonCode } = input;
 
+  if (
+    orderStatus === OrderStatus.CANCELLED &&
+    reasonCode === RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION &&
+    input.hasCapturedPayment === true
+  ) {
+    return decision(
+      true,
+      ResolutionCode.REFUND_ALLOWED_LATE_PAYMENT,
+      'A payment captured after cancellation may be refunded in full.',
+    );
+  }
+
   if (orderStatus === OrderStatus.PENDING_PAYMENT) {
     return decision(
       false,
@@ -296,6 +317,14 @@ export function evaluateRefundEligibility(
       false,
       ResolutionCode.REFUND_NOT_ALLOWED_UNKNOWN_REASON,
       'Refund reasonCode is not in the interim policy vocabulary.',
+    );
+  }
+
+  if (reasonCode === RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION) {
+    return decision(
+      false,
+      ResolutionCode.REFUND_NOT_ALLOWED_REASON_FOR_STATUS,
+      'Late-payment refunds only apply to a cancelled order with a captured payment.',
     );
   }
 
