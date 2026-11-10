@@ -138,11 +138,19 @@ export class AddressNormalizationService {
         ? null
         : await this.resolveLga(countryCode, input, stateCode, admin2Input);
     // TTW-186: an edit that changes the LGA never keeps the saved id unless
-    // the new LGA resolves to that same row.
+    // the new LGA resolves to that same row. A saved id is also kept only
+    // while the address still has the same known state code it was saved
+    // with, so an id never sits beside a null or newly resolved state.
     const lgaChanged = existing !== null && this.isLgaChange(input, existing);
     const lgaId =
       resolvedLga?.id ??
-      (keepSavedLga && !lgaChanged ? (existing?.lgaId ?? null) : null);
+      (keepSavedLga &&
+      !lgaChanged &&
+      !!stateCode &&
+      stateCode === existing?.stateCode
+        ? existing.lgaId
+        : null) ??
+      null;
     const administrativeAreaLevel1 = resolvedState?.name ?? admin1Input ?? null;
     const administrativeAreaLevel2 = resolvedLga?.name ?? admin2Input ?? null;
     const city = this.firstDefined(
@@ -342,14 +350,15 @@ export class AddressNormalizationService {
     if (countryCode !== 'NG') {
       return null;
     }
-    if (input.lgaId) {
+    const lgaId = this.clean(input.lgaId);
+    if (lgaId) {
       // TTW-186: an LGA cannot be checked against a state we do not know, and
       // the state is never derived from the LGA row.
       if (!stateCode) {
         return null;
       }
       return this.prisma.geoLga.findFirst({
-        where: { id: input.lgaId, stateCode },
+        where: { id: lgaId, stateCode },
       });
     }
     if (!admin2 || !stateCode) {

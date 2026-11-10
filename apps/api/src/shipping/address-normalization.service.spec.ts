@@ -479,6 +479,74 @@ describe('AddressNormalizationService', () => {
       expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
     });
 
+    it('drops a saved LGA from a legacy address with no state code on an unrelated edit', async () => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.normalizeForUpdate(
+        { ...savedLegacyUnknown, lgaId: 'lga-ikeja' },
+        { phone: '+2348012345678' },
+      );
+
+      expect(result).toMatchObject({ stateCode: null, lgaId: null });
+    });
+
+    it('drops a saved LGA that was never checked against a state the text now resolves to', async () => {
+      const result = await service.normalizeForUpdate(
+        {
+          ...savedLegacyUnknown,
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+          lgaId: 'lga-ikeja',
+        },
+        { phone: '+2348012345678' },
+      );
+
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: null });
+    });
+
+    it('lets the explicit lgaId win over a different LGA text', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        lgaId: 'lga-surulere',
+        administrativeAreaLevel2: 'Ikeja',
+      });
+
+      expect(result).toMatchObject({
+        lgaId: 'lga-surulere',
+        administrativeAreaLevel2: 'Surulere',
+      });
+    });
+
+    it('treats a whitespace-only lgaId as not sent and keeps the saved LGA', async () => {
+      const result = await service.normalizeForUpdate(saved, { lgaId: '  ' });
+
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
+    });
+
+    it('never stores an lgaId on a non-Nigerian address', async () => {
+      const result = await service.normalizeForUpdate(
+        {
+          ...saved,
+          country: 'Ghana',
+          countryCode: 'GH',
+          stateCode: null,
+          lgaId: null,
+          administrativeAreaLevel2: null,
+        },
+        { lgaId: 'lga-ikeja' },
+      );
+
+      expect(result).toMatchObject({ lgaId: null });
+    });
+
+    it('moves a saved LGA with no LGA text to the one the text resolves to', async () => {
+      const result = await service.normalizeForUpdate(
+        { ...saved, administrativeAreaLevel2: null },
+        { administrativeAreaLevel2: 'Ikeja' },
+      );
+
+      expect(result).toMatchObject({ lgaId: 'lga-ikeja' });
+    });
+
     it('keeps the saved LGA when the edit does not touch the LGA', async () => {
       const result = await service.normalizeForUpdate(saved, {
         phone: '+2348012345678',

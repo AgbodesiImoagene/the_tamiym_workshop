@@ -87,17 +87,20 @@ Recorded 2026-11-10, before implementation (High risk), against `main` at `3d69f
 
 2026-11-10, independent reviewer (read-only, one comprehensive review): **PASS**, no blocking or major finding. The reviewer read the diff, the service, the unit tests and the e2e, and re-ran `pnpm --filter api test -- src/shipping` (33 passed). It did not re-run the e2e, nor play the checkout in a browser; it read that the checkouts and the settings form resend `stateCode` and `lgaId`, so a valid LGA is not lost.
 
-Minor findings, not fixed in this ticket:
+Minor findings, both fixed in this ticket after the review (second commit on the same branch):
 
-- A legacy address with `stateCode: null` and an `lgaId` already stored keeps that `lgaId` on an edit that does not touch the LGA (for example a phone change). If its state text now resolves, it gains a `stateCode` while keeping an `lgaId` never checked against it. This only concerns rows saved before TTW-087 and is not a new write path; a follow-up should drop the saved `lgaId` when the resulting `stateCode` is `null` or differs from `existing.stateCode`.
-- No unit test yet for `lgaId` and LGA text sent together, a whitespace-only `lgaId`, a non-Nigerian address with an `lgaId`, or a saved `lgaId` with a `null` `administrativeAreaLevel2`. Current behaviour is correct (fail-closed).
+- A legacy address with `stateCode: null` and a stored `lgaId` kept that `lgaId` on an edit that did not touch the LGA, and could gain a `stateCode` it was never checked against. The saved `lgaId` is now kept only while the resulting `stateCode` is known and equal to the saved one. Two unit tests cover it (they failed first).
+- Missing unit tests added: `lgaId` and LGA text sent together (the `lgaId` wins), whitespace-only `lgaId`, non-Nigerian address with an `lgaId`, saved `lgaId` with a null LGA text. `resolveLga` now trims `lgaId` like `isLgaChange` does, so a whitespace-only `lgaId` counts as not sent (the saved LGA is kept) instead of being looked up as an id.
+
+The reviewer saw the code before these two changes; they have had no second independent review.
 
 ## Verification evidence
 
 Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-lga-that-contradicts-state`.
 
-- Tests first: 3 of the 7 new unit tests failed on the old code (unknown-state `lgaId`, unknown LGA text, other-state `lgaId`); the other 4 are guards that already held. The new e2e failed without the fix (`Expected - 1 / Received + 1`: the address stored the Ikeja `lgaId`) and passed with it.
-- `pnpm --filter api test -- src/shipping`: 4 suites, 33 tests passed.
+- Tests first: 3 of the 7 first unit tests failed on the old code (unknown-state `lgaId`, unknown LGA text, other-state `lgaId`); the other 4 are guards that already held. The new e2e failed without the fix (`Expected - 1 / Received + 1`: the address stored the Ikeja `lgaId`) and passed with it.
+- After the review fixes: 2 of the 6 added unit tests failed on the previous code (legacy `lgaId` kept) and passed after the fix; the whitespace test was reworded for the new trimming rule.
+- `pnpm --filter api test -- src/shipping`: 4 suites, 39 tests passed. Full api run with coverage: 148 suites, 1401 tests passed; diff coverage 14/14 lines; ratchet, typecheck, format and docs validation passed; the 3 related e2e suites (8 tests) passed.
 - `pnpm --filter api test:e2e` on `address-lga-state`, `address-edit-state`, `shipping-zone-coverage`: 3 suites, 8 tests passed.
 - `pnpm --filter api test` with coverage: 148 suites, 1395 tests passed.
 - `pnpm --filter api typecheck`: clean. `pnpm --filter api lint`: 0 errors (14 existing warnings, none in the touched files). `pnpm format:check`: passed.
