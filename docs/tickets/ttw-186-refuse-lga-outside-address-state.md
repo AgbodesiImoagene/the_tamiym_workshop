@@ -106,8 +106,9 @@ Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-
 - `pnpm --filter api typecheck`: clean. `pnpm --filter api lint`: 0 errors (14 existing warnings, none in the touched files). `pnpm format:check`: passed.
 - `pnpm docs:validate`, `pnpm openapi:check`: passed.
 - `pnpm coverage:diff`: 12/12 changed lines covered (floor 80%). `pnpm coverage:ratchet`: passed.
-- Not run: the full e2e suite, Playwright, `pnpm build`.
+- Full gates run afterwards on the final branch (2026-11-10): `pnpm --filter api test:e2e` 32 suites, 174 tests passed; `pnpm test` web 51, app 63, api 1401 passed; `pnpm build` 5 tasks successful.
+- Not run: Playwright, a browser check of the checkout.
 
 ## Completion summary
 
-An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. Not run: the full e2e suite, Playwright, `pnpm build`, a browser check of the checkout; CI has not run on this branch.
+An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. The full api e2e suite, `pnpm test` and `pnpm build` passed locally. Not run: Playwright, a browser check of the checkout; CI has not run on this branch.
