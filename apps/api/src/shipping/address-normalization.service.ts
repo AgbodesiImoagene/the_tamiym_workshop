@@ -137,8 +137,20 @@ export class AddressNormalizationService {
       stateChanged && !stateCode
         ? null
         : await this.resolveLga(countryCode, input, stateCode, admin2Input);
+    // TTW-186: an edit that changes the LGA never keeps the saved id unless
+    // the new LGA resolves to that same row. A saved id is also kept only
+    // while the address still has the same known state code it was saved
+    // with, so an id never sits beside a null or newly resolved state.
+    const lgaChanged = existing !== null && this.isLgaChange(input, existing);
     const lgaId =
-      resolvedLga?.id ?? (keepSavedLga ? (existing?.lgaId ?? null) : null);
+      resolvedLga?.id ??
+      (keepSavedLga &&
+      !lgaChanged &&
+      !!stateCode &&
+      stateCode === existing?.stateCode
+        ? existing.lgaId
+        : null) ??
+      null;
     const administrativeAreaLevel1 = resolvedState?.name ?? admin1Input ?? null;
     const administrativeAreaLevel2 = resolvedLga?.name ?? admin2Input ?? null;
     const city = this.firstDefined(
@@ -282,6 +294,27 @@ export class AddressNormalizationService {
     );
   }
 
+  /**
+   * True when the request names an LGA that differs from the saved one: an
+   * explicit `lgaId` other than the saved id, or an LGA text that differs from
+   * the saved `administrativeAreaLevel2` (trimmed, case-insensitive).
+   */
+  private isLgaChange(
+    input: AddressNormalizationInput,
+    existing: ExistingAddressShape,
+  ) {
+    const explicitId = this.clean(input.lgaId);
+    if (explicitId) {
+      return explicitId !== (existing.lgaId ?? null);
+    }
+    const sentText = this.clean(input.administrativeAreaLevel2);
+    if (!sentText) {
+      return false;
+    }
+    const savedText = this.clean(existing.administrativeAreaLevel2);
+    return !savedText || savedText.toLowerCase() !== sentText.toLowerCase();
+  }
+
   private async resolveState(
     countryCode: string,
     input: AddressNormalizationInput,
@@ -317,12 +350,15 @@ export class AddressNormalizationService {
     if (countryCode !== 'NG') {
       return null;
     }
-    if (input.lgaId) {
+    const lgaId = this.clean(input.lgaId);
+    if (lgaId) {
+      // TTW-186: an LGA cannot be checked against a state we do not know, and
+      // the state is never derived from the LGA row.
+      if (!stateCode) {
+        return null;
+      }
       return this.prisma.geoLga.findFirst({
-        where: {
-          id: input.lgaId,
-          ...(stateCode ? { stateCode } : {}),
-        },
+        where: { id: lgaId, stateCode },
       });
     }
     if (!admin2 || !stateCode) {

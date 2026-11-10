@@ -1,7 +1,7 @@
 # TTW-186 — Refuse an LGA that contradicts the address's state
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-185\
 **Blocks:** None
@@ -61,11 +61,11 @@ Both cases live in `AddressNormalizationService` (`apps/api/src/shipping/address
 
 ## Acceptance criteria
 
-- [ ] An address with an unknown state never stores an `lgaId`, on create or update.
-- [ ] An LGA-only edit to an unknown LGA clears the saved `lgaId`.
-- [ ] Resending the same LGA keeps the saved `lgaId`.
-- [ ] Required quality gates pass, with evidence recorded below.
-- [ ] `docs/runbooks/shipping-zone-coverage.md` updated if the address rules it lists change.
+- [x] An address with an unknown state never stores an `lgaId` (on update; create is already refused by TTW-087).
+- [x] An LGA-only edit to an unknown LGA clears the saved `lgaId`.
+- [x] Resending the same LGA keeps the saved `lgaId`.
+- [x] Required quality gates pass, with evidence recorded below.
+- [x] `docs/runbooks/shipping-zone-coverage.md` updated if the address rules it lists change.
 
 ## Out of scope
 
@@ -74,16 +74,43 @@ Both cases live in `AddressNormalizationService` (`apps/api/src/shipping/address
 
 ## Design review
 
-Pending.
+Recorded 2026-11-10, before implementation (High risk), against `main` at `3d69fa4`.
+
+- **Deviation: case 1 on create is no longer reachable.** Since TTW-087 a Nigerian address cannot be created with a state the platform does not know (400 `ADDRESS_STATE_UNKNOWN`), so `{ state: 'Atlantis', lgaId }` on create is refused before any LGA lookup. What remains is an edit of an address saved before TTW-087 with `stateCode: null`. The create unit test and the "on create" half of the first acceptance criterion are replaced by the edit case.
+- **TTW-087 already touched the same file and is Complete**, so there is no overlap to wait for. TTW-185 is Complete.
+- **Rule adopted (as proposed).** `resolveLga` returns `null` for an explicit `lgaId` when `stateCode` is `null`; the state is never derived from the LGA row. A new `isLgaChange` is true when the request sends an `lgaId` other than the saved one, or an `administrativeAreaLevel2` that differs from the saved text (trimmed, case-insensitive). A changed LGA that does not resolve within the address's state stores `lgaId: null`; the typed text is kept. Resending the same LGA is not a change.
+- **Security / data:** no new input, no new log, no PII. The change can only clear an `lgaId`, never set one the request did not resolve in the address's own state, so it cannot widen which rate applies.
+- **Concurrency / retry:** none; pure merge rule inside the existing update.
+- **Scope:** one service file, unit tests, one integration spec, one runbook sentence. No schema, DTO or OpenAPI change.
 
 ## Implementation reviews
 
-Pending.
+2026-11-10, independent reviewer (read-only, one comprehensive review): **PASS**, no blocking or major finding. The reviewer read the diff, the service, the unit tests and the e2e, and re-ran `pnpm --filter api test -- src/shipping` (33 passed). It did not re-run the e2e, nor play the checkout in a browser; it read that the checkouts and the settings form resend `stateCode` and `lgaId`, so a valid LGA is not lost.
+
+Minor findings, both fixed in this ticket after the review (second commit on the same branch):
+
+- A legacy address with `stateCode: null` and a stored `lgaId` kept that `lgaId` on an edit that did not touch the LGA, and could gain a `stateCode` it was never checked against. The saved `lgaId` is now kept only while the resulting `stateCode` is known and equal to the saved one. Two unit tests cover it (they failed first).
+- Missing unit tests added: `lgaId` and LGA text sent together (the `lgaId` wins), whitespace-only `lgaId`, non-Nigerian address with an `lgaId`, saved `lgaId` with a null LGA text. `resolveLga` now trims `lgaId` like `isLgaChange` does, so a whitespace-only `lgaId` counts as not sent (the saved LGA is kept) instead of being looked up as an id.
+
+2026-11-10, second independent review of the fix commit (`8e1378e`): **PASS**, no blocking or major finding. It re-ran `pnpm --filter api test -- src/shipping` (39 passed) and checked the legitimate cases by reading the code: a full resend by the checkout or settings form, a Google Places address with a valid `stateCode` and unresolved state text, a non-Nigerian address, a TTW-185 state change, and create. It did not run the e2e or Playwright, nor play the checkout in a browser. Its two minor findings were about this ticket's text and are fixed here: an inaccurate "reworded" remark about the whitespace test, and a status that contradicted the summary.
 
 ## Verification evidence
 
-Pending implementation.
+Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-lga-that-contradicts-state`.
+
+- Tests first: 3 of the 7 first unit tests failed on the old code (unknown-state `lgaId`, unknown LGA text, other-state `lgaId`); the other 4 are guards that already held. The new e2e failed without the fix (`Expected - 1 / Received + 1`: the address stored the Ikeja `lgaId`) and passed with it.
+- After the review fixes: 2 of the 6 added unit tests failed on the previous code (legacy `lgaId` kept) and passed after the fix; the whitespace-only `lgaId` test is a guard that already passed.
+- `pnpm --filter api test -- src/shipping`: 4 suites, 39 tests passed. Full api run with coverage: 148 suites, 1401 tests passed; diff coverage 14/14 lines; ratchet, typecheck, format and docs validation passed; the 3 related e2e suites (8 tests) passed.
+- `pnpm --filter api test:e2e` on `address-lga-state`, `address-edit-state`, `shipping-zone-coverage`: 3 suites, 8 tests passed.
+- `pnpm --filter api test` with coverage: 148 suites, 1395 tests passed.
+- `pnpm --filter api typecheck`: clean. `pnpm --filter api lint`: 0 errors (14 existing warnings, none in the touched files). `pnpm format:check`: passed.
+- `pnpm docs:validate`, `pnpm openapi:check`: passed.
+- `pnpm coverage:diff`: 12/12 changed lines covered (floor 80%). `pnpm coverage:ratchet`: passed.
+- Full gates run afterwards on the final branch (2026-11-10): `pnpm --filter api test:e2e` 32 suites, 174 tests passed; `pnpm test` web 51, app 63, api 1401 passed; `pnpm build` 5 tasks successful.
+- Playwright, on a fresh database `tamiym_workshop_e2e_ttw186` (the shared test database could not be re-seeded: `seed:e2e` failed on a foreign key from older test orders): `pnpm test:e2e:smoke` 39 passed; the checkout, settings and fundraiser-checkout specs (`checkout-shipping-coverage`, `checkout-idempotency`, `settings.comprehensive`, `fundraiser-checkout.comprehensive`) 18 passed; `pnpm playwright:validate` passed.
+- Browser check on the built app (:3002) and API (:3001) against that database, as the seeded customer: the checkout prefilled the saved Lagos/Ikeja address; "Review quote" resent it, the quote succeeded ("Place order and pay" enabled, no alert) and the saved `stateCode` (LA) and `lgaId` were unchanged. Through the PATCH route: resending `ikeja` kept the `lgaId`; `Surelere` (no row) set the text and cleared the `lgaId` (`stateCode` stayed LA); `Ikeja` again restored the `lgaId`. The pane was hidden, so the form was driven by DOM calls and not by clicks; no screenshot. The seed has only one LGA (Ikeja), so a switch between two LGAs was not played in the UI.
+- Not run: CI on this branch.
 
 ## Completion summary
 
-Pending implementation.
+An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. The full api e2e suite, `pnpm test` and `pnpm build` passed locally. Playwright and a browser check of the checkout passed locally (details above). CI has not run on this branch.
