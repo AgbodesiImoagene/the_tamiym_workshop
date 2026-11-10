@@ -1,7 +1,7 @@
 # TTW-193 — Let a customer clear the LGA saved on an address
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented (local commit, not pushed)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-186 (same code and the same "LGA changed" rule)\
 **Blocks:** None
@@ -98,8 +98,8 @@ Follow-up checks (second pass):
 
 Seen, not fixed (out of scope): the seeded customer's phone `08000000004` is refused by the API ("phone must be a valid phone number") when the web checkout saves the address.
 
-Not verified: CI run (not pushed when this was written; see below if updated).
+CI on `main` (commit 2757f22): CI run 42741230079 and Playwright Comprehensive run 42741230060 both succeeded.
 
 ## Completion summary
 
-An address LGA can now be removed with `lgaId: null` from settings and both checkouts; an absent `lgaId` still keeps it. Contracts regenerated. Not pushed, no PR.
+An address LGA can now be removed with `lgaId: null` from settings and both checkouts; an absent `lgaId` still keeps it. Contracts regenerated. Merged into `main` and pushed; CI green.
