@@ -1,7 +1,7 @@
 # TTW-186 — Refuse an LGA that contradicts the address's state
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented, independent review passed\
 **Risk:** High\
 **Blocked by:** TTW-185\
 **Blocks:** None
@@ -61,7 +61,7 @@ Both cases live in `AddressNormalizationService` (`apps/api/src/shipping/address
 
 ## Acceptance criteria
 
-- [ ] An address with an unknown state never stores an `lgaId`, on create or update.
+- [ ] An address with an unknown state never stores an `lgaId` (on update; create is already refused by TTW-087).
 - [ ] An LGA-only edit to an unknown LGA clears the saved `lgaId`.
 - [ ] Resending the same LGA keeps the saved `lgaId`.
 - [ ] Required quality gates pass, with evidence recorded below.
@@ -74,16 +74,37 @@ Both cases live in `AddressNormalizationService` (`apps/api/src/shipping/address
 
 ## Design review
 
-Pending.
+Recorded 2026-11-10, before implementation (High risk), against `main` at `3d69fa4`.
+
+- **Deviation: case 1 on create is no longer reachable.** Since TTW-087 a Nigerian address cannot be created with a state the platform does not know (400 `ADDRESS_STATE_UNKNOWN`), so `{ state: 'Atlantis', lgaId }` on create is refused before any LGA lookup. What remains is an edit of an address saved before TTW-087 with `stateCode: null`. The create unit test and the "on create" half of the first acceptance criterion are replaced by the edit case.
+- **TTW-087 already touched the same file and is Complete**, so there is no overlap to wait for. TTW-185 is Complete.
+- **Rule adopted (as proposed).** `resolveLga` returns `null` for an explicit `lgaId` when `stateCode` is `null`; the state is never derived from the LGA row. A new `isLgaChange` is true when the request sends an `lgaId` other than the saved one, or an `administrativeAreaLevel2` that differs from the saved text (trimmed, case-insensitive). A changed LGA that does not resolve within the address's state stores `lgaId: null`; the typed text is kept. Resending the same LGA is not a change.
+- **Security / data:** no new input, no new log, no PII. The change can only clear an `lgaId`, never set one the request did not resolve in the address's own state, so it cannot widen which rate applies.
+- **Concurrency / retry:** none; pure merge rule inside the existing update.
+- **Scope:** one service file, unit tests, one integration spec, one runbook sentence. No schema, DTO or OpenAPI change.
 
 ## Implementation reviews
 
-Pending.
+2026-11-10, independent reviewer (read-only, one comprehensive review): **PASS**, no blocking or major finding. The reviewer read the diff, the service, the unit tests and the e2e, and re-ran `pnpm --filter api test -- src/shipping` (33 passed). It did not re-run the e2e, nor play the checkout in a browser; it read that the checkouts and the settings form resend `stateCode` and `lgaId`, so a valid LGA is not lost.
+
+Minor findings, not fixed in this ticket:
+
+- A legacy address with `stateCode: null` and an `lgaId` already stored keeps that `lgaId` on an edit that does not touch the LGA (for example a phone change). If its state text now resolves, it gains a `stateCode` while keeping an `lgaId` never checked against it. This only concerns rows saved before TTW-087 and is not a new write path; a follow-up should drop the saved `lgaId` when the resulting `stateCode` is `null` or differs from `existing.stateCode`.
+- No unit test yet for `lgaId` and LGA text sent together, a whitespace-only `lgaId`, a non-Nigerian address with an `lgaId`, or a saved `lgaId` with a `null` `administrativeAreaLevel2`. Current behaviour is correct (fail-closed).
 
 ## Verification evidence
 
-Pending implementation.
+Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-lga-that-contradicts-state`.
+
+- Tests first: 3 of the 7 new unit tests failed on the old code (unknown-state `lgaId`, unknown LGA text, other-state `lgaId`); the other 4 are guards that already held. The new e2e failed without the fix (`Expected - 1 / Received + 1`: the address stored the Ikeja `lgaId`) and passed with it.
+- `pnpm --filter api test -- src/shipping`: 4 suites, 33 tests passed.
+- `pnpm --filter api test:e2e` on `address-lga-state`, `address-edit-state`, `shipping-zone-coverage`: 3 suites, 8 tests passed.
+- `pnpm --filter api test` with coverage: 148 suites, 1395 tests passed.
+- `pnpm --filter api typecheck`: clean. `pnpm --filter api lint`: 0 errors (14 existing warnings, none in the touched files). `pnpm format:check`: passed.
+- `pnpm docs:validate`, `pnpm openapi:check`: passed.
+- `pnpm coverage:diff`: 12/12 changed lines covered (floor 80%). `pnpm coverage:ratchet`: passed.
+- Not run: the full e2e suite, Playwright, `pnpm build`.
 
 ## Completion summary
 
-Pending implementation.
+Implemented; not Complete until the independent review passes. An address no longer keeps an `lgaId` the edit contradicts. Nothing pushed, no PR.

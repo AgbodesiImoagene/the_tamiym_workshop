@@ -352,6 +352,142 @@ describe('AddressNormalizationService', () => {
     });
   });
 
+  // TTW-186: an address never carries an LGA that its state does not contain.
+  describe('LGA consistency with the state (TTW-186)', () => {
+    const saved = {
+      addressLine1: '12 Broad Street',
+      city: 'Ikeja',
+      state: 'Lagos',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      locality: 'Ikeja',
+      administrativeAreaLevel1: 'Lagos',
+      administrativeAreaLevel2: 'Ikeja',
+      stateCode: 'LA',
+      lgaId: 'lga-ikeja',
+    };
+    // Saved before TTW-087: a state we do not know, so no state code.
+    const savedLegacyUnknown = {
+      ...saved,
+      state: 'Atlantis',
+      administrativeAreaLevel1: 'Atlantis',
+      administrativeAreaLevel2: null,
+      stateCode: null,
+      lgaId: null,
+    };
+
+    type LgaWhere = {
+      id?: string;
+      stateCode?: string;
+      name?: { equals: string };
+    };
+    // Behaves like the database: LGA rows by (state, name) and by id.
+    const rows = [
+      { id: 'lga-ikeja', name: 'Ikeja', stateCode: 'LA' },
+      { id: 'lga-surulere', name: 'Surulere', stateCode: 'LA' },
+    ];
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
+        code: 'LA',
+        name: 'Lagos',
+      });
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue({
+        code: 'LA',
+        name: 'Lagos',
+      });
+      (prisma.geoLga.findFirst as jest.Mock).mockImplementation(
+        ({ where }: { where: LgaWhere }) =>
+          Promise.resolve(
+            rows.find(
+              (row) =>
+                (where.id === undefined || row.id === where.id) &&
+                (where.stateCode === undefined ||
+                  row.stateCode === where.stateCode) &&
+                (where.name === undefined ||
+                  row.name.toLowerCase() === where.name.equals.toLowerCase()),
+            ) ?? null,
+          ),
+      );
+    });
+
+    it('ignores an explicit lgaId when the saved state is unknown', async () => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.normalizeForUpdate(savedLegacyUnknown, {
+        lgaId: 'lga-ikeja',
+      });
+
+      expect(result).toMatchObject({ stateCode: null, lgaId: null });
+    });
+
+    it('clears the saved LGA when an LGA-only edit names an unknown LGA', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        administrativeAreaLevel2: 'Surelere',
+      });
+
+      expect(result).toMatchObject({
+        stateCode: 'LA',
+        lgaId: null,
+        administrativeAreaLevel2: 'Surelere',
+      });
+    });
+
+    it('keeps the saved LGA when the same LGA text is resent', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        administrativeAreaLevel2: ' ikeja ',
+      });
+
+      expect(result).toMatchObject({
+        stateCode: 'LA',
+        lgaId: 'lga-ikeja',
+        administrativeAreaLevel2: 'Ikeja',
+      });
+    });
+
+    it('moves to the new LGA when an LGA-only edit names another LGA of the state', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        administrativeAreaLevel2: 'Surulere',
+      });
+
+      expect(result).toMatchObject({
+        stateCode: 'LA',
+        lgaId: 'lga-surulere',
+        administrativeAreaLevel2: 'Surulere',
+      });
+    });
+
+    it('clears the saved LGA when an explicit lgaId belongs to another state', async () => {
+      rows.push({ id: 'lga-abeokuta', name: 'Abeokuta', stateCode: 'OG' });
+      try {
+        const result = await service.normalizeForUpdate(saved, {
+          lgaId: 'lga-abeokuta',
+        });
+
+        expect(result).toMatchObject({ stateCode: 'LA', lgaId: null });
+      } finally {
+        rows.pop();
+      }
+    });
+
+    it('keeps the saved LGA when the same lgaId is resent', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        lgaId: 'lga-ikeja',
+      });
+
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
+    });
+
+    it('keeps the saved LGA when the edit does not touch the LGA', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        phone: '+2348012345678',
+      });
+
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
+    });
+  });
+
   // TTW-087: a Nigerian address must carry a state the platform knows.
   describe('unknown Nigerian state (TTW-087)', () => {
     const savedUnknown = {
