@@ -35,6 +35,7 @@ jest.mock('@/lib/checkout', () => ({
 }));
 
 jest.mock('@/lib/geo', () => ({
+  ...jest.requireActual('@/lib/geo'),
   getGeoStates: jest.fn(),
   getGeoLgas: jest.fn(),
 }));
@@ -562,6 +563,35 @@ describe('DashboardCheckoutPage', () => {
           expect.objectContaining({ state: 'Ogun', stateCode: 'OG', lgaId: 'lga-abeokuta' })
         )
       );
+    });
+
+    // TTW-193: emptying the LGA select removes the LGA saved on the address.
+    it('sends lgaId null when the customer empties the LGA of a saved address', async () => {
+      addCartItem(cartLine());
+      (getUserAddresses as jest.Mock).mockResolvedValue([
+        { ...savedAddress, stateCode: 'LA', lgaId: 'lga-ikeja' },
+      ]);
+      renderCheckout();
+
+      const lga = await screen.findByRole('combobox', { name: 'LGA' });
+      await waitFor(() => expect(lga).toHaveValue('lga-ikeja'));
+      fireEvent.change(lga, { target: { value: '' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      await waitFor(() =>
+        expect(upsertPrimaryAddress).toHaveBeenLastCalledWith(
+          expect.objectContaining({ stateCode: 'LA', lgaId: null })
+        )
+      );
+    });
+
+    it('sends no lgaId when the saved address had none and the LGA stays empty', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await reviewQuote();
+
+      const payload = (upsertPrimaryAddress as jest.Mock).mock.calls.at(-1)?.[0];
+      expect(payload).not.toHaveProperty('lgaId');
     });
 
     it('asks for a correction when the saved state is not in the list', async () => {

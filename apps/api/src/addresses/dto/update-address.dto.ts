@@ -107,11 +107,18 @@ export class UpdateAddressDto {
   @IsNotEmpty()
   stateCode?: string;
 
-  @ApiProperty({ example: 'cme4abcd1234', required: false })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'cme4abcd1234',
+    required: false,
+    description:
+      'LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).',
+  })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  lgaId?: string;
+  lgaId?: string | null;
 
   @ApiProperty({ enum: AddressProvider, required: false })
   @IsOptional()

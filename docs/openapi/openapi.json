@@ -3627,7 +3627,9 @@
             "type": "number"
           },
           "lgaId": {
+            "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).",
             "example": "cme4abcd1234",
+            "nullable": true,
             "type": "string"
           },
           "locality": {
@@ -19395,7 +19397,9 @@
                     "type": "number"
                   },
                   "lgaId": {
+                    "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).",
                     "example": "cme4abcd1234",
+                    "nullable": true,
                     "type": "string"
                   },
                   "locality": {

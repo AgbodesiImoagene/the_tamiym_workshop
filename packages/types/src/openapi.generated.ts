@@ -4737,8 +4737,11 @@ export interface components {
             landmark?: string;
             /** @example 6.5244 */
             latitude?: number;
-            /** @example cme4abcd1234 */
-            lgaId?: string;
+            /**
+             * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).
+             * @example cme4abcd1234
+             */
+            lgaId?: string | null;
             /** @example Lagos */
             locality?: string;
             /** @example 3.3792 */
@@ -14466,8 +14469,11 @@ export interface operations {
                     landmark?: string;
                     /** @example 6.5244 */
                     latitude?: number;
-                    /** @example cme4abcd1234 */
-                    lgaId?: string;
+                    /**
+                     * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).
+                     * @example cme4abcd1234
+                     */
+                    lgaId?: string | null;
                     /** @example Lagos */
                     locality?: string;
                     /** @example 3.3792 */

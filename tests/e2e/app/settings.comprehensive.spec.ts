@@ -74,6 +74,35 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     expect(sent.lgaId).toEqual(expect.any(String));
     const body = (await response.json()) as { state: string; stateCode: string; lgaId: string };
     expect(body).toMatchObject({ state: 'Lagos', stateCode: 'LA', lgaId: sent.lgaId });
+
+    // TTW-193: emptying the LGA removes it from the saved address.
+    await expect(lga).toHaveValue(String(sent.lgaId));
+    await lga.selectOption({ value: '' });
+    const clearedResponse = customerPage.waitForResponse(
+      (res) =>
+        res.request().method() === 'PATCH' && /\/v1\/users\/addresses\/[^/]+$/.test(res.url())
+    );
+    await addressForm.getByRole('button', { name: 'Save' }).click();
+    const cleared = await clearedResponse;
+    expect(cleared.status()).toBeLessThan(300);
+    expect(cleared.request().postDataJSON()).toMatchObject({ stateCode: 'LA', lgaId: null });
+    expect(await cleared.json()).toMatchObject({
+      stateCode: 'LA',
+      lgaId: null,
+      administrativeAreaLevel2: null,
+    });
+
+    // The address is shared with other specs: put the LGA back.
+    await expect(lga).toHaveValue('');
+    await lga.selectOption({ label: 'Ikeja' });
+    const restoredResponse = customerPage.waitForResponse(
+      (res) =>
+        res.request().method() === 'PATCH' && /\/v1\/users\/addresses\/[^/]+$/.test(res.url())
+    );
+    await addressForm.getByRole('button', { name: 'Save' }).click();
+    expect(((await restoredResponse).request().postDataJSON() as { lgaId: string }).lgaId).toEqual(
+      expect.any(String)
+    );
   });
 
   test('profile page reuses settings form controls', async ({ customerPage }) => {

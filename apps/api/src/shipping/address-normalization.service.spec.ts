@@ -554,6 +554,83 @@ describe('AddressNormalizationService', () => {
 
       expect(result).toMatchObject({ stateCode: 'LA', lgaId: 'lga-ikeja' });
     });
+
+    // TTW-193: an explicit null is the only way to remove a saved LGA.
+    describe('explicit clear (TTW-193)', () => {
+      it('clears the LGA id and the LGA text when lgaId is null', async () => {
+        const result = await service.normalizeForUpdate(saved, {
+          lgaId: null,
+        });
+
+        expect(result).toMatchObject({
+          lgaId: null,
+          administrativeAreaLevel2: null,
+        });
+      });
+
+      it('never touches the state or the state code on a clear', async () => {
+        const result = await service.normalizeForUpdate(saved, {
+          state: 'Lagos',
+          stateCode: 'LA',
+          lgaId: null,
+        });
+
+        expect(result).toMatchObject({
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+          stateCode: 'LA',
+          lgaId: null,
+          administrativeAreaLevel2: null,
+        });
+      });
+
+      it('still keeps the saved LGA when lgaId is absent', async () => {
+        const result = await service.normalizeForUpdate(saved, {
+          state: 'Lagos',
+          stateCode: 'LA',
+        });
+
+        expect(result).toMatchObject({
+          lgaId: 'lga-ikeja',
+          administrativeAreaLevel2: 'Ikeja',
+        });
+      });
+
+      it('lets a named LGA text decide when lgaId is null', async () => {
+        const result = await service.normalizeForUpdate(saved, {
+          lgaId: null,
+          administrativeAreaLevel2: 'Surulere',
+        });
+
+        expect(result).toMatchObject({
+          lgaId: 'lga-surulere',
+          administrativeAreaLevel2: 'Surulere',
+        });
+      });
+
+      it('treats an empty LGA text next to a null lgaId as a clear', async () => {
+        const result = await service.normalizeForUpdate(saved, {
+          lgaId: null,
+          administrativeAreaLevel2: '  ',
+        });
+
+        expect(result).toMatchObject({
+          lgaId: null,
+          administrativeAreaLevel2: null,
+        });
+      });
+
+      it('has no effect on create', async () => {
+        const result = await service.normalizeForCreate({
+          addressLine1: '12 Broad Street',
+          city: 'Ikeja',
+          state: 'Lagos',
+          lgaId: null,
+        });
+
+        expect(result).toMatchObject({ stateCode: 'LA', lgaId: null });
+      });
+    });
   });
 
   // TTW-087: a Nigerian address must carry a state the platform knows.

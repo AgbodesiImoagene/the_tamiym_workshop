@@ -421,7 +421,11 @@ export function CustomerSettingsForm({
                 stateCode: values.stateCode,
                 ...(lgasQuery.isSuccess && lgas.some((item) => item.id === values.lgaId)
                   ? { lgaId: values.lgaId }
-                  : {}),
+                  : // TTW-193: an emptied select on an address that had an LGA means "remove it".
+                    // A saved LGA the list cannot show is left alone (the value is not empty).
+                    values.lgaId === '' && primaryAddress?.lgaId
+                    ? { lgaId: null }
+                    : {}),
                 city: values.city,
                 addressLine1: values.addressLine1,
               });

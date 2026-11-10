@@ -2,7 +2,7 @@
  * TTW-087: the fundraiser checkout offers states and LGAs as lists. These pure
  * helpers decide which state is selected and what a state change resets.
  */
-import { findSelectedState, stateFormPatch, type GeoState } from '@/lib/geo';
+import { findSelectedState, lgaIdPayload, stateFormPatch, type GeoState } from '@/lib/geo';
 
 const states: GeoState[] = [
   { code: 'LA', name: 'Lagos' },
@@ -42,5 +42,22 @@ describe('stateFormPatch', () => {
 
   it('clears everything when no state is chosen', () => {
     expect(stateFormPatch(states, '')).toEqual({ state: '', stateCode: '', lgaId: '' });
+  });
+});
+
+// TTW-193: an emptied LGA select on an address that had an LGA is an explicit "remove it".
+describe('lgaIdPayload', () => {
+  it('sends the chosen LGA', () => {
+    expect(lgaIdPayload('lga-ikeja', 'lga-ikeja')).toEqual({ lgaId: 'lga-ikeja' });
+    expect(lgaIdPayload('lga-ikeja', null)).toEqual({ lgaId: 'lga-ikeja' });
+  });
+
+  it('sends null when the select is emptied and the saved address had an LGA', () => {
+    expect(lgaIdPayload('', 'lga-ikeja')).toEqual({ lgaId: null });
+  });
+
+  it('sends nothing when the select is empty and the saved address had no LGA', () => {
+    expect(lgaIdPayload('', null)).toEqual({});
+    expect(lgaIdPayload('', undefined)).toEqual({});
   });
 });

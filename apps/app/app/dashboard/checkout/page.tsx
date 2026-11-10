@@ -13,7 +13,7 @@ import {
 } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
-import { getGeoLgas, getGeoStates } from '@/lib/geo';
+import { getGeoLgas, getGeoStates, lgaIdPayload } from '@/lib/geo';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -72,6 +72,8 @@ export default function DashboardCheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
+  // LGA currently saved on the account address (TTW-193): emptying it must be sent as null.
+  const [savedLgaId, setSavedLgaId] = useState<string | null>(null);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
   // Address last saved to the account. Orders are always placed with the saved address,
   // so after a reload it is still the address of any earlier attempt. The API returns
@@ -117,6 +119,7 @@ export default function DashboardCheckoutPage() {
       (addressesQuery.data ?? []).find((item) => item.isDefault) ?? addressesQuery.data?.[0];
     if (address) {
       setSavedAddressId(address.id);
+      setSavedLgaId(address.lgaId ?? null);
       setForm(addressToForm(address));
       setSavedAddressJson(JSON.stringify(addressToForm(address)));
     }
@@ -174,11 +177,12 @@ export default function DashboardCheckoutPage() {
       city: form.city,
       state: selectedState?.name ?? form.state,
       ...(selectedState ? { stateCode: selectedState.code } : {}),
-      ...(form.lgaId ? { lgaId: form.lgaId } : {}),
+      ...lgaIdPayload(form.lgaId, savedLgaId),
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
     });
     setSavedAddressId(address.id);
+    setSavedLgaId(address.lgaId ?? null);
     setSavedAddressJson(JSON.stringify(form));
     return address.id;
   }

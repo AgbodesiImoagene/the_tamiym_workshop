@@ -24,6 +24,7 @@ import {
   findSelectedState,
   getGeoLgas,
   getGeoStates,
+  lgaIdPayload,
   stateFormPatch,
   type GeoLga,
   type GeoState,
@@ -84,6 +85,8 @@ export default function FundraiserCheckoutPage() {
   const [isQuoting, setIsQuoting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
+  // LGA currently saved on the account address (TTW-193): emptying it must be sent as null.
+  const [savedLgaId, setSavedLgaId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +157,7 @@ export default function FundraiserCheckoutPage() {
         if (cancelled) return;
         const address = addresses.find((item) => item.isDefault) ?? addresses[0];
         if (address) {
+          setSavedLgaId(address.lgaId ?? null);
           setForm(addressToForm(address));
         }
       } catch {
@@ -242,10 +246,11 @@ export default function FundraiserCheckoutPage() {
       city: form.city,
       state: selectedState?.name ?? form.state,
       ...(selectedState ? { stateCode: selectedState.code } : {}),
-      ...(form.lgaId ? { lgaId: form.lgaId } : {}),
+      ...lgaIdPayload(form.lgaId, savedLgaId),
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
     });
+    setSavedLgaId(address.lgaId ?? null);
     return address.id;
   }
 

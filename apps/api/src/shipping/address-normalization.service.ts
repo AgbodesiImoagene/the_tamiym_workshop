@@ -128,9 +128,18 @@ export class AddressNormalizationService {
     const keepSavedLga =
       !stateChanged || (!!stateCode && stateCode === existing?.stateCode);
 
+    // TTW-193: an explicit `lgaId: null` on an update removes the saved LGA. An
+    // absent `lgaId` still keeps it. If the request also names an LGA by text,
+    // that text decides. The state is never touched by a clear.
+    const lgaCleared =
+      existing !== null &&
+      input.lgaId === null &&
+      !this.clean(input.administrativeAreaLevel2);
     const admin2Input = this.firstDefined(
       this.clean(input.administrativeAreaLevel2),
-      keepSavedLga ? (existing?.administrativeAreaLevel2 ?? null) : null,
+      keepSavedLga && !lgaCleared
+        ? (existing?.administrativeAreaLevel2 ?? null)
+        : null,
     );
     // An LGA cannot be checked against a state we do not know.
     const resolvedLga =
@@ -145,6 +154,7 @@ export class AddressNormalizationService {
     const lgaId =
       resolvedLga?.id ??
       (keepSavedLga &&
+      !lgaCleared &&
       !lgaChanged &&
       !!stateCode &&
       stateCode === existing?.stateCode

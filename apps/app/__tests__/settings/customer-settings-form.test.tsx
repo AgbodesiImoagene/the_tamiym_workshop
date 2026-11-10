@@ -145,6 +145,28 @@ describe('CustomerSettingsForm shipping address', () => {
     ]);
   });
 
+  // TTW-193: emptying the LGA select is an explicit request to remove the LGA.
+  it('sends lgaId null when the customer empties the LGA of a saved address', async () => {
+    renderForm();
+    await loaded();
+    await waitFor(() => expect(screen.getByLabelText('LGA')).toHaveValue('lga-ikeja'));
+
+    fireEvent.change(screen.getByLabelText('LGA'), { target: { value: '' } });
+    save();
+
+    await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
+    expect(sentPayloads()).toEqual([
+      {
+        country: 'Nigeria',
+        state: 'Lagos',
+        stateCode: 'LA',
+        lgaId: null,
+        city: 'Ikeja',
+        addressLine1: '1 Allen Avenue',
+      },
+    ]);
+  });
+
   it('matches a saved state that has only its text, by name', async () => {
     (getUserAddresses as jest.Mock).mockResolvedValue([
       { ...savedAddress, state: 'lagos', stateCode: null, lgaId: null },

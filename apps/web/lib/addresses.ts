@@ -25,7 +25,8 @@ export interface UpsertAddressInput {
   city: string;
   state: string;
   stateCode?: string;
-  lgaId?: string;
+  // undefined keeps the saved LGA; null removes it (TTW-193).
+  lgaId?: string | null;
   country?: string;
   postalCode?: string;
   landmark?: string;
@@ -49,5 +50,10 @@ export async function upsertPrimaryAddress(input: UpsertAddressInput) {
     return apiClient.patch<ShippingAddress>(`/users/addresses/${existing.id}`, payload);
   }
 
-  return apiClient.post<ShippingAddress>('/users/addresses', payload);
+  // A new address has no LGA to remove: null means nothing on create.
+  const { lgaId, ...createPayload } = payload;
+  return apiClient.post<ShippingAddress>('/users/addresses', {
+    ...createPayload,
+    ...(lgaId ? { lgaId } : {}),
+  });
 }

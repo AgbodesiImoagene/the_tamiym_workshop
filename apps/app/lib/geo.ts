@@ -31,3 +31,13 @@ export function matchSavedState(
   const typed = (saved.state ?? '').trim().toLowerCase();
   return typed ? states.find((item) => item.name.toLowerCase() === typed) : undefined;
 }
+
+/**
+ * TTW-193: the `lgaId` part of an address save. An LGA left empty on an address that had
+ * one is an explicit "remove it" (null); on an address without one there is nothing to
+ * send. The API keeps the saved LGA when `lgaId` is absent.
+ */
+export function lgaIdPayload(formLgaId: string, savedLgaId: string | null | undefined) {
+  if (formLgaId) return { lgaId: formLgaId };
+  return savedLgaId ? { lgaId: null } : {};
+}

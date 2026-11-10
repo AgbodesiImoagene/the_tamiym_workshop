@@ -1,7 +1,7 @@
 # TTW-193 — Let a customer clear the LGA saved on an address
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented (local commit, not pushed)\
 **Risk:** High\
 **Blocked by:** TTW-186 (same code and the same "LGA changed" rule)\
 **Blocks:** None
@@ -54,10 +54,10 @@ An address can also carry an LGA that is no longer in the list (deactivated): th
 
 ## Acceptance criteria
 
-- [ ] A customer can remove the LGA of a saved address from the checkouts and from settings.
-- [ ] A request without `lgaId` still keeps the saved LGA.
-- [ ] Swagger, shared contracts and docs are updated.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] A customer can remove the LGA of a saved address from the checkouts and from settings.
+- [x] A request without `lgaId` still keeps the saved LGA.
+- [x] Swagger, shared contracts and docs are updated.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -66,16 +66,35 @@ An address can also carry an LGA that is no longer in the list (deactivated): th
 
 ## Design review
 
-Pending.
+Done by the implementer before coding (High risk).
+
+- `lgaId: null` passes the DTO: `@IsOptional()` skips validation for `null`. Swagger now says `nullable: true`.
+- Clear = update with `lgaId === null` and no LGA text. It empties both the saved id and the saved text; state and state code are computed before and never touched.
+- `lgaId: null` plus a non-empty LGA text: the text decides (the request names an LGA).
+- `null` on create has no effect. The two `upsertPrimaryAddress` helpers also strip `null` on POST.
+- Frontends send `null` only when the select is empty AND the saved address had an LGA. A saved LGA the list cannot show (list failed, LGA deactivated) is not sent and not cleared.
 
 ## Implementation reviews
 
-Pending.
+Independent reviewer (general-purpose subagent, read-only): **PASS**, no blocking finding.
+
+- Low: in the settings form, re-picking a state after an unmatched saved state resets the LGA select, so `lgaId: null` is sent with the same state code. Accepted: the customer changed the state, which already resets the LGA select.
+- Info: no unit test for the web checkout wiring (only `lgaIdPayload`). Not added.
+- Info: `lgaId: null` with an empty-string LGA text was untested. Test added.
 
 ## Verification evidence
 
-Pending implementation.
+- API unit: 148 suites, 1406 tests passed (the empty-text test was added after, spec file re-run: 39 passed).
+- Written first and failing: 2 API unit tests (LGA stayed Ikeja), 1 settings form test, 1 app checkout test, 3 web `lgaIdPayload` tests.
+- Integration on real Postgres: `pnpm --filter api test:e2e -- test/address-clear-lga.e2e-spec.ts` passed (quote 3500 with LGA rule, 2500 after clear).
+- App 66 tests, web 54 tests passed. `pnpm typecheck` 6/6, `pnpm lint` 0 errors (14 existing API warnings), `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm build` passed.
+- Playwright: a temporary copy of the clear flow (choose Ikeja, save, empty, save, restore) passed on chromium-app, then was deleted.
+
+Not verified:
+
+- The Playwright test added to `settings.comprehensive.spec.ts` fails locally before the new lines (state "Abuja" missing from the local test DB because `seed:e2e` fails with a foreign-key error). CI seeds it; not run in CI yet.
+- No browser run of the two checkouts.
 
 ## Completion summary
 
-Pending implementation.
+An address LGA can now be removed with `lgaId: null` from settings and both checkouts; an absent `lgaId` still keeps it. Contracts regenerated. Not pushed, no PR.
