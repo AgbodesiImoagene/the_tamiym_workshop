@@ -1,7 +1,7 @@
 # TTW-186 — Refuse an LGA that contradicts the address's state
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, independent review passed\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-185\
 **Blocks:** None
@@ -61,11 +61,11 @@ Both cases live in `AddressNormalizationService` (`apps/api/src/shipping/address
 
 ## Acceptance criteria
 
-- [ ] An address with an unknown state never stores an `lgaId` (on update; create is already refused by TTW-087).
-- [ ] An LGA-only edit to an unknown LGA clears the saved `lgaId`.
-- [ ] Resending the same LGA keeps the saved `lgaId`.
-- [ ] Required quality gates pass, with evidence recorded below.
-- [ ] `docs/runbooks/shipping-zone-coverage.md` updated if the address rules it lists change.
+- [x] An address with an unknown state never stores an `lgaId` (on update; create is already refused by TTW-087).
+- [x] An LGA-only edit to an unknown LGA clears the saved `lgaId`.
+- [x] Resending the same LGA keeps the saved `lgaId`.
+- [x] Required quality gates pass, with evidence recorded below.
+- [x] `docs/runbooks/shipping-zone-coverage.md` updated if the address rules it lists change.
 
 ## Out of scope
 
@@ -92,14 +92,14 @@ Minor findings, both fixed in this ticket after the review (second commit on the
 - A legacy address with `stateCode: null` and a stored `lgaId` kept that `lgaId` on an edit that did not touch the LGA, and could gain a `stateCode` it was never checked against. The saved `lgaId` is now kept only while the resulting `stateCode` is known and equal to the saved one. Two unit tests cover it (they failed first).
 - Missing unit tests added: `lgaId` and LGA text sent together (the `lgaId` wins), whitespace-only `lgaId`, non-Nigerian address with an `lgaId`, saved `lgaId` with a null LGA text. `resolveLga` now trims `lgaId` like `isLgaChange` does, so a whitespace-only `lgaId` counts as not sent (the saved LGA is kept) instead of being looked up as an id.
 
-The reviewer saw the code before these two changes; they have had no second independent review.
+2026-11-10, second independent review of the fix commit (`8e1378e`): **PASS**, no blocking or major finding. It re-ran `pnpm --filter api test -- src/shipping` (39 passed) and checked the legitimate cases by reading the code: a full resend by the checkout or settings form, a Google Places address with a valid `stateCode` and unresolved state text, a non-Nigerian address, a TTW-185 state change, and create. It did not run the e2e or Playwright, nor play the checkout in a browser. Its two minor findings were about this ticket's text and are fixed here: an inaccurate "reworded" remark about the whitespace test, and a status that contradicted the summary.
 
 ## Verification evidence
 
 Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-lga-that-contradicts-state`.
 
 - Tests first: 3 of the 7 first unit tests failed on the old code (unknown-state `lgaId`, unknown LGA text, other-state `lgaId`); the other 4 are guards that already held. The new e2e failed without the fix (`Expected - 1 / Received + 1`: the address stored the Ikeja `lgaId`) and passed with it.
-- After the review fixes: 2 of the 6 added unit tests failed on the previous code (legacy `lgaId` kept) and passed after the fix; the whitespace test was reworded for the new trimming rule.
+- After the review fixes: 2 of the 6 added unit tests failed on the previous code (legacy `lgaId` kept) and passed after the fix; the whitespace-only `lgaId` test is a guard that already passed.
 - `pnpm --filter api test -- src/shipping`: 4 suites, 39 tests passed. Full api run with coverage: 148 suites, 1401 tests passed; diff coverage 14/14 lines; ratchet, typecheck, format and docs validation passed; the 3 related e2e suites (8 tests) passed.
 - `pnpm --filter api test:e2e` on `address-lga-state`, `address-edit-state`, `shipping-zone-coverage`: 3 suites, 8 tests passed.
 - `pnpm --filter api test` with coverage: 148 suites, 1395 tests passed.
@@ -110,4 +110,4 @@ Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-
 
 ## Completion summary
 
-Implemented; not Complete until the independent review passes. An address no longer keeps an `lgaId` the edit contradicts. Nothing pushed, no PR.
+An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. Not run: the full e2e suite, Playwright, `pnpm build`, a browser check of the checkout; CI has not run on this branch.
