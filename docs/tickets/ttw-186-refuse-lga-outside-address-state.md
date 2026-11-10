@@ -107,8 +107,10 @@ Run in the worktree `.claude/worktrees/ttw-186` on branch `codex/ttw-186-refuse-
 - `pnpm docs:validate`, `pnpm openapi:check`: passed.
 - `pnpm coverage:diff`: 12/12 changed lines covered (floor 80%). `pnpm coverage:ratchet`: passed.
 - Full gates run afterwards on the final branch (2026-11-10): `pnpm --filter api test:e2e` 32 suites, 174 tests passed; `pnpm test` web 51, app 63, api 1401 passed; `pnpm build` 5 tasks successful.
-- Not run: Playwright, a browser check of the checkout.
+- Playwright, on a fresh database `tamiym_workshop_e2e_ttw186` (the shared test database could not be re-seeded: `seed:e2e` failed on a foreign key from older test orders): `pnpm test:e2e:smoke` 39 passed; the checkout, settings and fundraiser-checkout specs (`checkout-shipping-coverage`, `checkout-idempotency`, `settings.comprehensive`, `fundraiser-checkout.comprehensive`) 18 passed; `pnpm playwright:validate` passed.
+- Browser check on the built app (:3002) and API (:3001) against that database, as the seeded customer: the checkout prefilled the saved Lagos/Ikeja address; "Review quote" resent it, the quote succeeded ("Place order and pay" enabled, no alert) and the saved `stateCode` (LA) and `lgaId` were unchanged. Through the PATCH route: resending `ikeja` kept the `lgaId`; `Surelere` (no row) set the text and cleared the `lgaId` (`stateCode` stayed LA); `Ikeja` again restored the `lgaId`. The pane was hidden, so the form was driven by DOM calls and not by clicks; no screenshot. The seed has only one LGA (Ikeja), so a switch between two LGAs was not played in the UI.
+- Not run: CI on this branch.
 
 ## Completion summary
 
-An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. The full api e2e suite, `pnpm test` and `pnpm build` passed locally. Not run: Playwright, a browser check of the checkout; CI has not run on this branch.
+An address no longer keeps an `lgaId` the edit contradicts or that was never checked against its state. Two commits on `codex/ttw-186-refuse-lga-that-contradicts-state`, both reviewed (PASS). Nothing pushed, no PR, not merged into `main`. The full api e2e suite, `pnpm test` and `pnpm build` passed locally. Playwright and a browser check of the checkout passed locally (details above). CI has not run on this branch.
