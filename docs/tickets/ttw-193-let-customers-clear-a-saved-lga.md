@@ -90,10 +90,15 @@ Independent reviewer (general-purpose subagent, read-only): **PASS**, no blockin
 - App 66 tests, web 54 tests passed. `pnpm typecheck` 6/6, `pnpm lint` 0 errors (14 existing API warnings), `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm build` passed.
 - Playwright: a temporary copy of the clear flow (choose Ikeja, save, empty, save, restore) passed on chromium-app, then was deleted.
 
-Not verified:
+Follow-up checks (second pass):
 
-- The Playwright test added to `settings.comprehensive.spec.ts` fails locally before the new lines (state "Abuja" missing from the local test DB because `seed:e2e` fails with a foreign-key error). CI seeds it; not run in CI yet.
-- No browser run of the two checkouts.
+- Local test DB repaired so `seed:e2e` runs: the order, product and category tables of `tamiym_workshop_test` (test DB only) were truncated, then `seed:e2e` succeeded.
+- New Playwright spec `tests/e2e/app/settings-clear-lga.spec.ts`: registers its own customer (so it never touches the address shared by other specs), picks Lagos/Ikeja, saves, reloads, empties the LGA, saves, checks the request (`lgaId: null`), the response (`lgaId` and LGA text null) and the reloaded form. 8 consecutive runs passed. `settings.comprehensive.spec.ts` is back to its original content and passes (13 passed with the new spec).
+- Both checkouts were played in a browser with a temporary spec (deleted): app checkout (`/dashboard/checkout`) sent `lgaId: null` after the LGA was emptied and got `lgaId: null` back; web fundraiser checkout sent `lgaId: null` and got 200 with `lgaId` and LGA text null.
+
+Seen, not fixed (out of scope): the seeded customer's phone `08000000004` is refused by the API ("phone must be a valid phone number") when the web checkout saves the address.
+
+Not verified: CI run (not pushed when this was written; see below if updated).
 
 ## Completion summary
 
