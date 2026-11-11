@@ -1,7 +1,7 @@
 # TTW-196 — Use valid phone numbers in the e2e seed
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented (uncommitted)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -63,8 +63,8 @@ Not required for a Low-risk seed/test change; no independent review run.
 - After: seed phones changed (13 values `0800000000N` → `+234800000000N`), `pnpm --filter api seed:e2e`, same command: 4 passed.
 - `pnpm --filter api typecheck` OK; `pnpm --filter api lint` 0 errors (14 existing warnings); `pnpm format:check`, `pnpm docs:validate`, `pnpm playwright:validate` OK.
 - Local test DB: `orders`, `products` and `categories` of `tamiym_workshop_test` were truncated so the seed could run (leftovers from earlier test runs break its cleanup). Not a change to the repo.
-- Not run: the CI (nothing pushed).
+- CI on `main` (commit 67c0cbe): CI run 43079269554 and Playwright Comprehensive run 43079269653 both succeeded.
 
 ## Completion summary
 
-The e2e seed now uses international phone numbers, so the seeded customer address saves through checkout; the workaround in the idempotency spec is gone. No production code changed. Not committed, not pushed.
+The e2e seed now uses international phone numbers, so the seeded customer address saves through checkout; the workaround in the idempotency spec is gone. No production code changed. Merged into `main` and pushed; CI green.
