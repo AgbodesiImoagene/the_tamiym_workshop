@@ -53,9 +53,6 @@ test.describe('Customer checkout retry @app @journey', () => {
 
     await customerPage.goto('/dashboard/checkout');
     await expect(customerPage.getByLabel('City')).toHaveValue('Ikeja');
-    // The seeded address phone (08000000004) fails the API's @IsPhoneNumber() check on
-    // save; enter an international number like the DTO example.
-    await customerPage.getByLabel('Phone').fill('+2348012345678');
     await customerPage.getByRole('button', { name: 'Review quote' }).click();
     const placeOrder = customerPage.getByRole('button', { name: 'Place order and pay' });
     await expect(placeOrder).toBeEnabled();
