@@ -249,6 +249,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-194](ttw-194-refuse-a-deactivated-state-on-addresses.md)       | P1       | High     | Scoped   | Refuse a deactivated state when an address is saved                      | Not in review    |
 | [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                        | P1       | Standard | Complete | Generate the MFA test key at run time in CI workflows                    | Not in review    |
 | [TTW-196](ttw-196-valid-phones-in-e2e-seed.md)                      | P2       | Low      | Complete | Use valid phone numbers in the e2e seed                                  | Not in review    |
+| [TTW-199](ttw-199-show-deactivated-states-in-admin-shipping.md)     | P2       | Standard | Complete | Show deactivated states in the admin shipping lists                      | Not in review    |
 | [TTW-200](ttw-200-refuse-deactivated-state-in-shipping-rules.md)    | P1       | Standard | Scoped   | Refuse a deactivated state when a shipping rule is created               | Not in review    |
 
 ## Explicitly deferred post-v1 backlog
