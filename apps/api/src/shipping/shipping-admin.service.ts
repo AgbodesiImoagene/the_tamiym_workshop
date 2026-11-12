@@ -41,10 +41,14 @@ type ShippingRateInput = {
 export class ShippingAdminService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * TTW-199: deactivated states stay in the admin list (the rows carry
+   * `isActive`) so an admin can see them. The customer list (`GeoService`)
+   * stays active-only.
+   */
   async listStates() {
     return this.prisma.geoState.findMany({
       orderBy: { name: 'asc' },
-      where: { isActive: true },
     });
   }
 
@@ -57,7 +61,7 @@ export class ShippingAdminService {
       return [];
     }
     return this.prisma.geoLga.findMany({
-      where: { stateCode: code, isActive: true },
+      where: { stateCode: code },
       orderBy: { name: 'asc' },
     });
   }
