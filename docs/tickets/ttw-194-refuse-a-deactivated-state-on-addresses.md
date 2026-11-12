@@ -1,7 +1,7 @@
 # TTW-194 — Refuse a deactivated state when an address is saved
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented — local commit, not pushed\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -48,10 +48,10 @@ When an admin deactivates a state, the checkouts stop offering it, yet a direct 
 
 ## Acceptance criteria
 
-- [ ] The API refuses an address that names a deactivated state, by name or by code.
-- [ ] A saved address with a later-deactivated state still loads and can be edited on other fields.
-- [ ] Required quality gates pass, with evidence recorded below.
-- [ ] Contracts and docs are updated where applicable.
+- [x] The API refuses an address that names a deactivated state, by name or by code.
+- [x] A saved address with a later-deactivated state still loads and can be edited on other fields.
+- [x] Required quality gates pass, with evidence recorded below.
+- [x] Contracts and docs are updated where applicable.
 
 ## Out of scope
 
@@ -60,16 +60,32 @@ When an admin deactivates a state, the checkouts stop offering it, yet a direct 
 
 ## Design review
 
-Pending.
+Confirmed against `main` 09239e1: `resolveState` matched any `GeoState` row; `GeoService` lists active states only.
+
+- `resolveState` returns an active state only: text path filters `isActive: true` in the query; explicit-code path reads by code and treats `isActive === false` as unknown. A deactivated state is then "unknown", so the existing TTW-087 rule refuses it with `ADDRESS_STATE_UNKNOWN` (400) on create and on an edit that changes the state. No new branch.
+- Saved address whose state is deactivated later: an edit that does not change the state (field absent, or same text or code resent) is not a state change (`isStateChange`), so it passes and keeps its `stateCode` and LGA, as for any saved unknown state.
+- Other readers: `GeoService` already filters active; `resolveLga` inherits the resolved state code; the destination resolver reads `geoLga` by id only. No change.
+- Choice: the explicit-code path keeps `findUnique` plus a post-check so the existing unit assertion on that call is not rewritten.
+- No schema change, no migration, no OpenAPI change (same 400 code).
+
+**Found, not fixed (out of scope):** `ShippingAdminService.listStates` already filters `isActive: true`, which contradicts the invariant "admin screens keep showing deactivated states". Admin shipping-rule creation (`shipping-admin.service.ts` ~342 and ~364) also accepts a deactivated state. Proposed as a separate ticket.
 
 ## Implementation reviews
 
-Pending.
+`/code-review high` on the working tree: 4 findings. Fixed: ticket not updated (this section); e2e now checks refused POSTs create no row, covers a move by `stateCode`, and deletes its `ZT` state row. Kept as is, on purpose: the mixed filter in `resolveState` (see Design review, "Choice").
 
 ## Verification evidence
 
-Pending implementation.
+Run in the worktree `.claude/worktrees/ttw-194`:
+
+- Tests first: 3 new unit tests failed (state accepted instead of refused); the e2e failed with `expected 400, got 201`.
+- `pnpm --filter api test -- src/shipping/address-normalization.service.spec.ts`: 45 passed, existing tests untouched.
+- `pnpm --filter api test -- --coverage`: 148 suites, 1413 tests passed.
+- `pnpm --filter api test:e2e` on `address-deactivated-state`, `address-edit-state`, `address-lga-state`, `address-clear-lga`, `geo-reference`: all passed.
+- `pnpm --filter api typecheck`: OK. `pnpm --filter api lint`: 0 errors (14 pre-existing warnings, none in touched files). `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`: OK.
+- `pnpm coverage:diff`: 2/2 changed lines covered (floor 80%).
+- Not run: browser journey (no UI change), `pnpm build`, full e2e suite.
 
 ## Completion summary
 
-Pending implementation.
+The API now refuses a deactivated state on create and on a state-changing edit, by name and by code, while a saved address keeps loading and stays editable on other fields. One local commit on `codex/ttw-194-refuse-a-deactivated-state-on-addresses`; nothing pushed, no PR.
