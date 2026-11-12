@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 /**
  * Order create idempotency (TTW-037): a key replays an order only for the same
  * request content. The fingerprint covers the lines, the delivery address as
- * stored when the request is made, and the campaign.
+ * stored when the request is made, the campaign and the order note.
  */
 export const IDEMPOTENCY_KEY_REUSED = 'IDEMPOTENCY_KEY_REUSED';
 export const IDEMPOTENCY_KEY_PAYLOAD_MISMATCH =
@@ -33,6 +33,8 @@ export interface FingerprintInput {
     designId?: string | null;
     quantity: number;
   }>;
+  /** Order note (TTW-197), already trimmed; null, undefined or blank means none. */
+  customerNote?: string | null;
 }
 
 export function computeOrderRequestFingerprint(
@@ -59,7 +61,14 @@ export function computeOrderRequestFingerprint(
         a.instructions ?? null,
       ]
     : null;
-  const canonical = JSON.stringify([input.campaignId, address, lines]);
+  // The note is appended only when there is one, so the digest of a request without
+  // a note is the one computed before the note existed and stored fingerprints of
+  // older orders stay valid (TTW-197).
+  const base: unknown[] = [input.campaignId, address, lines];
+  if (input.customerNote) {
+    base.push(input.customerNote);
+  }
+  const canonical = JSON.stringify(base);
   const digest = createHash('sha256').update(canonical).digest('hex');
   return `${FINGERPRINT_VERSION}:${digest}`;
 }

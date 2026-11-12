@@ -444,6 +444,127 @@ describe('DashboardCheckoutPage', () => {
     expect(getCart()?.lines ?? []).toHaveLength(0);
   });
 
+  describe('order note (TTW-197)', () => {
+    const noteField = () => screen.getByLabelText(/Order note/);
+
+    it('offers an optional note limited to 500 characters with a counter', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+
+      expect(noteField()).toHaveAttribute('maxlength', '500');
+      expect(screen.getByText('0 / 500')).toBeInTheDocument();
+      fireEvent.change(noteField(), { target: { value: 'Pack apart' } });
+      expect(screen.getByText('10 / 500')).toBeInTheDocument();
+    });
+
+    it('sends the trimmed note with the order', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+      (initiateOrderPayment as jest.Mock).mockResolvedValue({
+        authorizationUrl: 'https://checkout.paystack.test/abc',
+      });
+      renderCheckout();
+      await reviewQuote();
+      fireEvent.change(noteField(), { target: { value: '  Logo slightly smaller \n' } });
+      await placeOrder();
+
+      expect((createOrder as jest.Mock).mock.calls[0][0].customerNote).toBe(
+        'Logo slightly smaller'
+      );
+    });
+
+    it('sends no note when the field is empty or blank', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+      (initiateOrderPayment as jest.Mock).mockResolvedValue({
+        authorizationUrl: 'https://checkout.paystack.test/abc',
+      });
+      renderCheckout();
+      await reviewQuote();
+      fireEvent.change(noteField(), { target: { value: '   ' } });
+      await placeOrder();
+
+      expect((createOrder as jest.Mock).mock.calls[0][0].customerNote).toBeUndefined();
+    });
+
+    it('keeps the key when the same note is sent again', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+      (initiateOrderPayment as jest.Mock)
+        .mockRejectedValueOnce({ message: 'Paystack is unavailable' })
+        .mockResolvedValueOnce({ authorizationUrl: 'https://checkout.paystack.test/abc' });
+      renderCheckout();
+      await reviewQuote();
+      fireEvent.change(noteField(), { target: { value: 'Same note' } });
+      await placeOrder();
+      await screen.findByText('Paystack is unavailable');
+      fireEvent.click(screen.getByRole('button', { name: 'Place order and pay' }));
+      await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
+
+      const keys = sentKeys();
+      expect(keys[1]).toBe(keys[0]);
+    });
+
+    it('uses a new key when the note changes after an order was created', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+      (initiateOrderPayment as jest.Mock)
+        .mockRejectedValueOnce({ message: 'Paystack is unavailable' })
+        .mockResolvedValueOnce({ authorizationUrl: 'https://checkout.paystack.test/abc' });
+      renderCheckout();
+      await reviewQuote();
+      fireEvent.change(noteField(), { target: { value: 'First note' } });
+      await placeOrder();
+      await screen.findByText('Paystack is unavailable');
+
+      fireEvent.change(noteField(), { target: { value: 'Edited note' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Place order and pay' }));
+      await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
+
+      const calls = (createOrder as jest.Mock).mock.calls;
+      expect(calls[1][0].customerNote).toBe('Edited note');
+      expect(calls[1][0].idempotencyKey).not.toBe(calls[0][0].idempotencyKey);
+    });
+
+    it('warns that changing the note after an order was created starts a new order', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+      (initiateOrderPayment as jest.Mock).mockRejectedValue({ message: 'Paystack is unavailable' });
+      renderCheckout();
+      await reviewQuote();
+      fireEvent.change(noteField(), { target: { value: 'First note' } });
+      await placeOrder();
+      await screen.findByText('Paystack is unavailable');
+
+      const warning = /Changing the note will create a new order/;
+      expect(screen.queryByText(warning)).not.toBeInTheDocument();
+      fireEvent.change(noteField(), { target: { value: 'Edited note' } });
+      expect(screen.getByText(warning)).toBeInTheDocument();
+      fireEvent.change(noteField(), { target: { value: 'First note' } });
+      expect(screen.queryByText(warning)).not.toBeInTheDocument();
+    });
+
+    it('shows no warning before any order exists', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.change(noteField(), { target: { value: 'A note' } });
+      expect(
+        screen.queryByText(/Changing the note will create a new order/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not store the note in the cart or in local storage', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.change(noteField(), { target: { value: 'PRIVATE-NOTE-TEXT' } });
+
+      expect(JSON.stringify({ ...window.localStorage })).not.toContain('PRIVATE-NOTE-TEXT');
+    });
+  });
+
   describe('address outside every shipping zone (TTW-086)', () => {
     const notCovered = {
       statusCode: 400,

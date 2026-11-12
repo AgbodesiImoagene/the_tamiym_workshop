@@ -664,6 +664,12 @@
       },
       "CreateOrderDto": {
         "properties": {
+          "customerNote": {
+            "example": "Please pack the two hoodies separately",
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          },
           "idempotencyKey": {
             "type": "string"
           },
@@ -1391,6 +1397,12 @@
             "enum": [
               "NGN"
             ],
+            "type": "string"
+          },
+          "customerNote": {
+            "description": "Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML.",
+            "maxLength": 500,
+            "nullable": true,
             "type": "string"
           },
           "discountAmount": {
@@ -14970,6 +14982,12 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "customerNote": {
+                    "example": "Please pack the two hoodies separately",
+                    "maxLength": 500,
+                    "nullable": true,
+                    "type": "string"
+                  },
                   "idempotencyKey": {
                     "type": "string"
                   },
@@ -15035,7 +15053,7 @@
             "description": "Campaign not found"
           },
           "409": {
-            "description": "IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a standard order or another campaign. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same request on this campaign returns that order (201)."
+            "description": "IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a standard order or another campaign. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address, order note); use a new key. A key already used for the same request on this campaign returns that order (201)."
           },
           "503": {
             "description": "Pricing unavailable: site settings are not configured (TTW-084)"
@@ -16515,6 +16533,12 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "customerNote": {
+                    "example": "Please pack the two hoodies separately",
+                    "maxLength": 500,
+                    "nullable": true,
+                    "type": "string"
+                  },
                   "idempotencyKey": {
                     "type": "string"
                   },
@@ -16577,7 +16601,7 @@
             "description": "Forbidden — EMAIL_NOT_VERIFIED when the account must verify before ordering"
           },
           "409": {
-            "description": "IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests."
+            "description": "IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address, order note); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests."
           },
           "503": {
             "description": "Pricing unavailable: site settings are not configured (TTW-084)"
@@ -16744,6 +16768,12 @@
                       "enum": [
                         "NGN"
                       ],
+                      "type": "string"
+                    },
+                    "customerNote": {
+                      "description": "Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML.",
+                      "maxLength": 500,
+                      "nullable": true,
                       "type": "string"
                     },
                     "discountAmount": {

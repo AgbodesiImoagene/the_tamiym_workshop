@@ -191,6 +191,15 @@ export default function DashboardOrderDetailPage() {
                 </p>
               </div>
 
+              {order.customerNote ? (
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-black/90">Order note</h2>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-black/75">
+                    {order.customerNote}
+                  </p>
+                </div>
+              ) : null}
+
               {order.campaign ? (
                 <div className="rounded-2xl bg-[#f8fbff] p-4 text-sm">
                   <p className="font-semibold text-black">Campaign</p>

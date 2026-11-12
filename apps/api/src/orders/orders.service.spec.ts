@@ -824,6 +824,117 @@ describe('OrdersService', () => {
       expect(messages.some((m) => m.includes('idem-1'))).toBe(false);
     });
 
+    describe('customer note (TTW-197)', () => {
+      const body = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+        idempotencyKey: 'idem-1',
+      };
+
+      it('stores the note on a standard order', async () => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+        await service.create('user-1', { ...body, customerNote: 'Pack apart' });
+        expect(orderCreateMock.mock.calls[0][0].data.customerNote).toBe(
+          'Pack apart',
+        );
+      });
+
+      it('stores the note on a campaign order', async () => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+        await service.createCampaignOrder('camp-1', 'user-1', {
+          ...body,
+          customerNote: 'Logo smaller',
+        });
+        expect(orderCreateMock.mock.calls[0][0].data.customerNote).toBe(
+          'Logo smaller',
+        );
+      });
+
+      it('stores null when there is no note', async () => {
+        await service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+        });
+        expect(orderCreateMock.mock.calls[0][0].data.customerNote).toBeNull();
+      });
+
+      it('puts the note in the stored fingerprint', async () => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+        await service.create('user-1', { ...body, customerNote: 'Pack apart' });
+        expect(
+          orderCreateMock.mock.calls[0][0].data.idempotencyFingerprint,
+        ).toBe(
+          computeOrderRequestFingerprint({
+            campaignId: null,
+            address: mockAddress,
+            items: [{ variantId: 'var-1', quantity: 2 }],
+            customerNote: 'Pack apart',
+          }),
+        );
+      });
+
+      it('replays a known key with the same note', async () => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+          ...existingStandardOrder,
+          idempotencyFingerprint: computeOrderRequestFingerprint({
+            campaignId: null,
+            address: mockAddress,
+            items: [{ variantId: 'var-1', quantity: 2 }],
+            customerNote: 'Pack apart',
+          }),
+        });
+        const result = await service.create('user-1', {
+          ...body,
+          customerNote: 'Pack apart',
+        });
+        expect(result.id).toBe('order-existing');
+        expect(orderCreateMock).not.toHaveBeenCalled();
+      });
+
+      it('rejects a known key sent with another note, or a note added', async () => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+          ...existingStandardOrder,
+          idempotencyFingerprint: computeOrderRequestFingerprint({
+            campaignId: null,
+            address: mockAddress,
+            items: [{ variantId: 'var-1', quantity: 2 }],
+            customerNote: 'Pack apart',
+          }),
+        });
+        const other = await service
+          .create('user-1', { ...body, customerNote: 'Something else' })
+          .catch((e: unknown) => e);
+        expectPayloadMismatch(other);
+
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue(
+          existingStandardOrder,
+        );
+        const added = await service
+          .create('user-1', { ...body, customerNote: 'New note' })
+          .catch((e: unknown) => e);
+        expectPayloadMismatch(added);
+        expect(orderCreateMock).not.toHaveBeenCalled();
+      });
+
+      it('writes the note to no log line', async () => {
+        const spies = (
+          ['log', 'warn', 'error', 'debug', 'verbose'] as const
+        ).map((level) =>
+          jest
+            .spyOn(Logger.prototype, level)
+            .mockImplementation(() => undefined),
+        );
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+        await service.create('user-1', {
+          ...body,
+          customerNote: 'PRIVATE-NOTE-TEXT',
+        });
+        const printed = JSON.stringify(spies.flatMap((s) => s.mock.calls));
+        spies.forEach((s) => s.mockRestore());
+        expect(printed).not.toContain('PRIVATE-NOTE-TEXT');
+      });
+    });
+
     it('rethrows a unique violation that is not an idempotency replay', async () => {
       (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
       orderCreateMock.mockRejectedValueOnce(uniqueViolation());
@@ -1089,6 +1200,32 @@ describe('OrdersService', () => {
       expect(result.payments[0]).not.toHaveProperty('idempotencyKey');
       expect(result.payments[0]).not.toHaveProperty('authorizationUrl');
       expect(result.refunds[0]).not.toHaveProperty('idempotencyKey');
+    });
+
+    it('reads the customer note and returns it as text (TTW-197)', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...ownedDetailRow,
+        customerNote: '<b>Pack apart</b>',
+      });
+
+      const result = await service.findOne('user-1', 'order-1');
+
+      expect(result.customerNote).toBe('<b>Pack apart</b>');
+      expect(prisma.order.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ customerNote: true }),
+        }),
+      );
+    });
+
+    it('returns a null note when the order has none (TTW-197)', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...ownedDetailRow,
+        customerNote: null,
+      });
+      expect(
+        (await service.findOne('user-1', 'order-1')).customerNote,
+      ).toBeNull();
     });
 
     it('should throw NotFoundException when order not found', async () => {

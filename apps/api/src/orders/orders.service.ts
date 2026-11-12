@@ -185,6 +185,7 @@ export class OrdersService {
               shipCountry: address.country ?? 'Nigeria',
               shipLandmark: address.landmark,
               shipInstructions: address.instructions,
+              customerNote: dto.customerNote ?? null,
               shippingBreakdown: quote.shippingBreakdown as object,
               expiresAt,
               idempotencyKey: dto.idempotencyKey ?? null,
@@ -358,6 +359,7 @@ export class OrdersService {
               shipCountry: address.country ?? 'Nigeria',
               shipLandmark: address.landmark,
               shipInstructions: address.instructions,
+              customerNote: dto.customerNote ?? null,
               shippingBreakdown: quote.shippingBreakdown as object,
               expiresAt,
               idempotencyKey: dto.idempotencyKey ?? null,
@@ -471,6 +473,7 @@ export class OrdersService {
       campaignId,
       address: address && address.userId === userId ? address : null,
       items: dto.items,
+      customerNote: dto.customerNote,
     });
   }
 
@@ -798,6 +801,7 @@ export class OrdersService {
         shipPostalCode: true,
         shipCountry: true,
         shipLandmark: true,
+        customerNote: true,
         campaignId: true,
         campaign: {
           select: { id: true, title: true, slug: true },
@@ -930,6 +934,7 @@ export class OrdersService {
         country: order.shipCountry,
         landmark: order.shipLandmark,
       },
+      customerNote: order.customerNote,
       payments: order.payments.map((payment) => ({
         id: payment.id,
         status: payment.status,

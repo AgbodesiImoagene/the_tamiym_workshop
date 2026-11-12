@@ -15,14 +15,14 @@ This matrix is the working source of truth for customer-owned order detail, line
 
 ## Response contract (`CustomerOrderDetailDto`)
 
-| Included                                                                    | Never included                                                                         |
-| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Order status, payment status, money totals, timestamps                      | Mutable `Address` relation                                                             |
-| `ship*` destination snapshot                                                | Provider `rawEvent`, `authorizationUrl`, `accessCode`, payment/refund idempotency keys |
-| Line display snapshots + money                                              | Organizer economics (`organizerCostBasis`, discount internals)                         |
-| Safe payment/refund summaries + `refundedAmountConfirmed` (SUCCEEDED sum)   | Internal audit notes, user PII beyond shipping snapshot                                |
-| Campaign attribution `{ id, title, slug }` when present                     | Catalogue live product/variant names (use snapshots)                                   |
-| `paymentRetryEligible`, `shipment` / `shipmentPlaceholder`, `policyVersion` | Invented shipment progress                                                             |
+| Included                                                                    | Never included                                                                                                          |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Order status, payment status, money totals, timestamps                      | Mutable `Address` relation                                                                                              |
+| `ship*` destination snapshot                                                | Provider `rawEvent`, `authorizationUrl`, `accessCode`, payment/refund idempotency keys                                  |
+| Line display snapshots + money                                              | Organizer economics (`organizerCostBasis`, discount internals)                                                          |
+| Safe payment/refund summaries + `refundedAmountConfirmed` (SUCCEEDED sum)   | Internal audit notes, user PII beyond the shipping snapshot and the customer's own order note (`customerNote`, TTW-197) |
+| Campaign attribution `{ id, title, slug }` when present                     | Catalogue live product/variant names (use snapshots)                                                                    |
+| `paymentRetryEligible`, `shipment` / `shipmentPlaceholder`, `policyVersion` | Invented shipment progress                                                                                              |
 
 ## Line display snapshots
 
