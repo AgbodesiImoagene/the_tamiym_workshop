@@ -8,6 +8,7 @@ import {
   IsEnum,
   IsNumber,
   Length,
+  MaxLength,
 } from 'class-validator';
 import { AddressProvider } from '../../generated/prisma/enums';
 
@@ -68,11 +69,20 @@ export class CreateAddressDto {
   @IsNotEmpty()
   landmark?: string;
 
-  @ApiProperty({ example: 'Leave at gate', required: false })
+  @ApiProperty({
+    type: String,
+    example: 'Leave at gate',
+    required: false,
+    nullable: true,
+    maxLength: 500,
+    description:
+      'Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.',
+  })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  instructions?: string;
+  @MaxLength(500)
+  instructions?: string | null;
 
   @ApiProperty({ example: 'Lagos', required: false })
   @IsOptional()

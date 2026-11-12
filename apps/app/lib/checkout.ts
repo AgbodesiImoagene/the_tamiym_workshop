@@ -51,6 +51,7 @@ export interface CustomerOrderShippingSnapshot {
   postalCode?: string | null;
   country: string;
   landmark?: string | null;
+  instructions?: string | null;
 }
 
 export interface CustomerOrderPaymentSummary {

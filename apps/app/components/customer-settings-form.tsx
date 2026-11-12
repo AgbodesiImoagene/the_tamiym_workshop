@@ -22,6 +22,7 @@ import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
   changePassword,
@@ -62,6 +63,8 @@ const addressSchema = z.object({
   lgaId: z.string(),
   city: z.string(),
   addressLine1: z.string(),
+  // TTW-198: optional, plain text. Same limit as the API.
+  instructions: z.string().max(DELIVERY_INSTRUCTIONS_MAX_LENGTH, 'Use at most 500 characters.'),
 });
 
 type AddressFormValues = z.infer<typeof addressSchema>;
@@ -130,6 +133,7 @@ export function CustomerSettingsForm({
       lgaId: '',
       city: '',
       addressLine1: '',
+      instructions: '',
     },
   });
 
@@ -179,6 +183,7 @@ export function CustomerSettingsForm({
       lgaId: '',
       city: primaryAddress.city ?? '',
       addressLine1: primaryAddress.addressLine1 ?? '',
+      instructions: primaryAddress.instructions ?? '',
     });
   }, [addressForm, primaryAddress]);
 
@@ -428,6 +433,7 @@ export function CustomerSettingsForm({
                     : {}),
                 city: values.city,
                 addressLine1: values.addressLine1,
+                ...instructionsPayload(values.instructions, primaryAddress?.instructions),
               });
             })}
           >
@@ -552,6 +558,24 @@ export function CustomerSettingsForm({
                   <FormLabel className={labelClassName}>Street Address</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Enter address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={addressForm.control}
+              name="instructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>Delivery instructions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Optional, for example: ring twice, or leave with the guard"
+                      maxLength={DELIVERY_INSTRUCTIONS_MAX_LENGTH}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -3397,8 +3397,11 @@ export interface components {
             formattedAddress?: string;
             /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
             googlePlaceId?: string;
-            /** @example Leave at gate */
-            instructions?: string;
+            /**
+             * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+             * @example Leave at gate
+             */
+            instructions?: string | null;
             /**
              * @default false
              * @example false
@@ -4044,6 +4047,8 @@ export interface components {
                 city: string;
                 /** @example Nigeria */
                 country: string;
+                /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+                instructions?: string | null;
                 landmark?: Record<string, never> | null;
                 line1: string;
                 line2?: Record<string, never> | null;
@@ -4145,6 +4150,8 @@ export interface components {
             city: string;
             /** @example Nigeria */
             country: string;
+            /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+            instructions?: string | null;
             landmark?: Record<string, never> | null;
             line1: string;
             line2?: Record<string, never> | null;
@@ -4729,8 +4736,11 @@ export interface components {
             formattedAddress?: string;
             /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
             googlePlaceId?: string;
-            /** @example Leave at gate */
-            instructions?: string;
+            /**
+             * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+             * @example Leave at gate
+             */
+            instructions?: string | null;
             /** @example false */
             isDefault?: boolean;
             /** @example Near the roundabout */
@@ -7337,7 +7347,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Order */
+            /** @description Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -13190,6 +13200,8 @@ export interface operations {
                             city: string;
                             /** @example Nigeria */
                             country: string;
+                            /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+                            instructions?: string | null;
                             landmark?: Record<string, never> | null;
                             line1: string;
                             line2?: Record<string, never> | null;
@@ -14221,8 +14233,11 @@ export interface operations {
                     formattedAddress?: string;
                     /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
                     googlePlaceId?: string;
-                    /** @example Leave at gate */
-                    instructions?: string;
+                    /**
+                     * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+                     * @example Leave at gate
+                     */
+                    instructions?: string | null;
                     /**
                      * @default false
                      * @example false
@@ -14461,8 +14476,11 @@ export interface operations {
                     formattedAddress?: string;
                     /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
                     googlePlaceId?: string;
-                    /** @example Leave at gate */
-                    instructions?: string;
+                    /**
+                     * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+                     * @example Leave at gate
+                     */
+                    instructions?: string | null;
                     /** @example false */
                     isDefault?: boolean;
                     /** @example Near the roundabout */

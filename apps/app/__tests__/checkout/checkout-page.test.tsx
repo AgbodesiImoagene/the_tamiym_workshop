@@ -641,3 +641,84 @@ describe('DashboardCheckoutPage', () => {
     });
   });
 });
+
+// TTW-198: optional delivery instructions, plain text, 500 characters at most.
+describe('delivery instructions (TTW-198)', () => {
+  it('prefills the saved instructions and limits the field to 500 characters', async () => {
+    addCartItem(cartLine());
+    (getUserAddresses as jest.Mock).mockResolvedValue([
+      { ...savedAddress, instructions: 'Ring twice' },
+    ]);
+    renderCheckout();
+
+    const field = await screen.findByLabelText('Delivery instructions');
+    await waitFor(() => expect(field).toHaveValue('Ring twice'));
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field).toHaveAttribute('maxLength', '500');
+    expect(field).not.toBeRequired();
+  });
+
+  it('saves the trimmed instructions with the address', async () => {
+    addCartItem(cartLine());
+    renderCheckout();
+    await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+
+    fireEvent.change(screen.getByLabelText('Delivery instructions'), {
+      target: { value: '  Leave with the guard  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+    await waitFor(() =>
+      expect(upsertPrimaryAddress).toHaveBeenLastCalledWith(
+        expect.objectContaining({ instructions: 'Leave with the guard' })
+      )
+    );
+  });
+
+  it('sends no instructions when the address has none and the field stays empty', async () => {
+    addCartItem(cartLine());
+    renderCheckout();
+    await reviewQuote();
+
+    const payload = (upsertPrimaryAddress as jest.Mock).mock.calls.at(-1)?.[0];
+    expect(payload).not.toHaveProperty('instructions');
+  });
+
+  it('sends instructions null when the customer empties saved instructions', async () => {
+    addCartItem(cartLine());
+    (getUserAddresses as jest.Mock).mockResolvedValue([
+      { ...savedAddress, instructions: 'Ring twice' },
+    ]);
+    renderCheckout();
+
+    const field = await screen.findByLabelText('Delivery instructions');
+    await waitFor(() => expect(field).toHaveValue('Ring twice'));
+    fireEvent.change(field, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+    await waitFor(() =>
+      expect(upsertPrimaryAddress).toHaveBeenLastCalledWith(
+        expect.objectContaining({ instructions: null })
+      )
+    );
+  });
+
+  it('uses a new key when only the instructions change after a quote', async () => {
+    addCartItem(cartLine());
+    (createOrder as jest.Mock).mockResolvedValue(pendingOrder());
+    (initiateOrderPayment as jest.Mock).mockRejectedValue(new Error('gateway down'));
+    renderCheckout();
+    await reviewQuote();
+    await placeOrder();
+
+    fireEvent.change(screen.getByLabelText('Delivery instructions'), {
+      target: { value: 'Call on arrival' },
+    });
+    await reviewQuote();
+    await placeOrder();
+
+    const keys = sentKeys();
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+});

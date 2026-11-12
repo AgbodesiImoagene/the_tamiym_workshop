@@ -1091,6 +1091,36 @@ describe('OrdersService', () => {
       expect(result.refunds[0]).not.toHaveProperty('idempotencyKey');
     });
 
+    // TTW-198: the customer sees the instructions saved on the order, not the live address.
+    it('returns the delivery instructions from the order snapshot', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...ownedDetailRow,
+        shipInstructions: 'Ring twice\nLeave with the guard',
+      });
+
+      const result = await service.findOne('user-1', 'order-1');
+
+      expect(result.shipping.instructions).toBe(
+        'Ring twice\nLeave with the guard',
+      );
+      expect(prisma.order.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ shipInstructions: true }),
+        }),
+      );
+    });
+
+    it('returns null instructions when the order has none (older orders)', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        ...ownedDetailRow,
+        shipInstructions: null,
+      });
+
+      const result = await service.findOne('user-1', 'order-1');
+
+      expect(result.shipping.instructions).toBeNull();
+    });
+
     it('should throw NotFoundException when order not found', async () => {
       (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
 

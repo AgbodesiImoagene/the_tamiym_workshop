@@ -318,3 +318,68 @@ describe('CustomerSettingsForm shipping address', () => {
     expect(screen.getByLabelText('City')).toHaveValue('Epe');
   });
 });
+
+// TTW-198: optional delivery instructions, plain text, 500 characters at most.
+describe('CustomerSettingsForm delivery instructions', () => {
+  it('prefills the saved instructions', async () => {
+    (getUserAddresses as jest.Mock).mockResolvedValue([
+      { ...savedAddress, instructions: 'Ring twice' },
+    ]);
+    renderForm();
+    await loaded();
+
+    expect(screen.getByLabelText('Delivery instructions')).toHaveValue('Ring twice');
+  });
+
+  it('limits the field to 500 characters and says it is optional', async () => {
+    renderForm();
+    await loaded();
+
+    const field = screen.getByLabelText('Delivery instructions');
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field).toHaveAttribute('maxLength', '500');
+    expect(field).not.toBeRequired();
+  });
+
+  it('sends the trimmed instructions', async () => {
+    renderForm();
+    await loaded();
+    await waitFor(() => expect(screen.getByLabelText('LGA')).toHaveValue('lga-ikeja'));
+
+    fireEvent.change(screen.getByLabelText('Delivery instructions'), {
+      target: { value: '  Leave with the guard\nGate code 4321  ' },
+    });
+    save();
+
+    await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
+    expect(sentPayloads()[0]).toEqual(
+      expect.objectContaining({ instructions: 'Leave with the guard\nGate code 4321' })
+    );
+  });
+
+  it('sends no instructions for an address that never had any', async () => {
+    renderForm();
+    await loaded();
+    await waitFor(() => expect(screen.getByLabelText('LGA')).toHaveValue('lga-ikeja'));
+
+    save();
+
+    await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
+    expect(sentPayloads()[0]).not.toHaveProperty('instructions');
+  });
+
+  it('sends instructions null when the customer empties saved instructions', async () => {
+    (getUserAddresses as jest.Mock).mockResolvedValue([
+      { ...savedAddress, instructions: 'Ring twice' },
+    ]);
+    renderForm();
+    await loaded();
+    await waitFor(() => expect(screen.getByLabelText('LGA')).toHaveValue('lga-ikeja'));
+
+    fireEvent.change(screen.getByLabelText('Delivery instructions'), { target: { value: '   ' } });
+    save();
+
+    await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
+    expect(sentPayloads()[0]).toEqual(expect.objectContaining({ instructions: null }));
+  });
+});

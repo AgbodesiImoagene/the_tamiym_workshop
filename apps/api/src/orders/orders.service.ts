@@ -798,6 +798,7 @@ export class OrdersService {
         shipPostalCode: true,
         shipCountry: true,
         shipLandmark: true,
+        shipInstructions: true,
         campaignId: true,
         campaign: {
           select: { id: true, title: true, slug: true },
@@ -929,6 +930,7 @@ export class OrdersService {
         postalCode: order.shipPostalCode,
         country: order.shipCountry,
         landmark: order.shipLandmark,
+        instructions: order.shipInstructions,
       },
       payments: order.payments.map((payment) => ({
         id: payment.id,
