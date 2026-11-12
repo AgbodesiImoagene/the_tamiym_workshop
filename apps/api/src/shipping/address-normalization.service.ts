@@ -366,25 +366,30 @@ export class AddressNormalizationService {
       return null;
     }
     const lgaId = this.clean(input.lgaId);
+    let lga;
     if (lgaId) {
       // TTW-186: an LGA cannot be checked against a state we do not know, and
       // the state is never derived from the LGA row.
       if (!stateCode) {
         return null;
       }
-      return this.prisma.geoLga.findFirst({
+      lga = await this.prisma.geoLga.findFirst({
         where: { id: lgaId, stateCode },
       });
+    } else {
+      if (!admin2 || !stateCode) {
+        return null;
+      }
+      lga = await this.prisma.geoLga.findFirst({
+        where: {
+          stateCode,
+          name: { equals: admin2, mode: 'insensitive' },
+        },
+      });
     }
-    if (!admin2 || !stateCode) {
-      return null;
-    }
-    return this.prisma.geoLga.findFirst({
-      where: {
-        stateCode,
-        name: { equals: admin2, mode: 'insensitive' },
-      },
-    });
+    // TTW-202: a deactivated LGA is as unknown as one that does not exist, so
+    // it is never linked. A saved address keeps the id it already has.
+    return lga?.isActive === false ? null : lga;
   }
 
   private clean(value: string | undefined | null) {

@@ -251,6 +251,7 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-196](ttw-196-valid-phones-in-e2e-seed.md)                      | P2       | Low      | Complete | Use valid phone numbers in the e2e seed                                  | Not in review    |
 | [TTW-199](ttw-199-show-deactivated-states-in-admin-shipping.md)     | P2       | Standard | Complete | Show deactivated states in the admin shipping lists                      | Not in review    |
 | [TTW-200](ttw-200-refuse-deactivated-state-in-shipping-rules.md)    | P1       | Standard | Scoped   | Refuse a deactivated state when a shipping rule is created               | Not in review    |
+| [TTW-202](ttw-202-refuse-deactivated-lga-in-shipping-rules.md)      | P2       | Standard | Complete | Refuse a deactivated LGA in shipping rules, areas and address linking    | Not in review    |
 
 ## Explicitly deferred post-v1 backlog
 

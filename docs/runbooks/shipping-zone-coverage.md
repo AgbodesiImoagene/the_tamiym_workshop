@@ -39,6 +39,7 @@ Quote refused: address not covered by any shipping rate (reason=NO_ZONE|NO_RATE,
 
 - `NO_ZONE`: no active zone rule matches the address. Add or fix a zone rule for that state or LGA.
   Since TTW-200 the admin API refuses a new rule or area (`POST .../rules`, `POST .../areas`, or a rule edit that changes its state) for a state that is deactivated, with 400 `State <code> is deactivated`, because no address can name that state any more (TTW-194). Reactivate the state first. Rules created earlier for a state deactivated later are kept and stay editable.
+  Since TTW-202 the same applies to an LGA: a new ADMIN2 rule or LGA area (or a rule edit that moves it to another LGA) for a deactivated LGA is refused with 400 `LGA <name> is deactivated`, because customers are only offered active LGAs. Reactivate the LGA first. Existing rules for an LGA deactivated later are kept and stay editable. Likewise, a customer address is no longer linked to a deactivated LGA (its `lgaId` stays empty); an address saved earlier keeps its LGA. Deactivating an LGA does not deactivate its shipping rules: customers can still be shipped there at the rule's rate. To stop shipping to an LGA, also deactivate its rule.
 - `NO_RATE`: a zone matches, but it has no active rate today. Add a rate or fix its dates.
 
 The log carries no street, city, name or user id. Repeated warnings for the same state usually mean that a zone is missing.
