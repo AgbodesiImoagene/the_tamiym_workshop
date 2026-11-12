@@ -335,7 +335,11 @@ export class AddressNormalizationService {
     }
     const explicitCode = this.clean(input.stateCode)?.toUpperCase();
     if (explicitCode) {
-      return this.prisma.geoState.findUnique({ where: { code: explicitCode } });
+      const state = await this.prisma.geoState.findUnique({
+        where: { code: explicitCode },
+      });
+      // TTW-194: a deactivated state is as unknown as one that does not exist.
+      return state?.isActive === false ? null : state;
     }
     if (!admin1) {
       return null;
@@ -343,6 +347,7 @@ export class AddressNormalizationService {
     const codeCandidate = admin1.toUpperCase();
     return this.prisma.geoState.findFirst({
       where: {
+        isActive: true,
         OR: [
           { code: codeCandidate },
           { name: { equals: admin1, mode: 'insensitive' } },

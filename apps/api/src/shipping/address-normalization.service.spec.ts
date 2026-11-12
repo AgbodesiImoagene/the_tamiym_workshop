@@ -735,4 +735,137 @@ describe('AddressNormalizationService', () => {
       ).resolves.toMatchObject({ countryCode: 'GH' });
     });
   });
+
+  describe('deactivated Nigerian state (TTW-194)', () => {
+    type Row = { code: string; name: string; isActive: boolean };
+    const rows: Row[] = [
+      { code: 'LA', name: 'Lagos', isActive: true },
+      { code: 'AB', name: 'Abia', isActive: false },
+    ];
+    type Where = {
+      code?: string;
+      isActive?: boolean;
+      OR?: Array<{ code?: string; name?: { equals: string } }>;
+    };
+    // Fake table that honours the filters the service sends, so the tests
+    // check behaviour (what is returned) and not the exact query shape.
+    const match = (where: Where) =>
+      rows.find(
+        (r) =>
+          (where.code === undefined || r.code === where.code) &&
+          (where.isActive === undefined || r.isActive === where.isActive) &&
+          (where.OR === undefined ||
+            where.OR.some(
+              (c) =>
+                (c.code !== undefined && r.code === c.code) ||
+                (c.name !== undefined &&
+                  r.name.toLowerCase() === c.name.equals.toLowerCase()),
+            )),
+      ) ?? null;
+
+    const savedAbia = {
+      addressLine1: '1 Old Road',
+      city: 'Umuahia',
+      state: 'Abia',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Abia',
+      stateCode: 'AB',
+      lgaId: null,
+    };
+
+    const expectUnknown = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toMatchObject({
+        response: expect.objectContaining({
+          statusCode: 400,
+          code: 'ADDRESS_STATE_UNKNOWN',
+        }),
+      });
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockImplementation(
+        ({ where }: { where: Where }) => Promise.resolve(match(where)),
+      );
+      (prisma.geoState.findUnique as jest.Mock).mockImplementation(
+        ({ where }: { where: Where }) => Promise.resolve(match(where)),
+      );
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+    });
+
+    it('refuses a deactivated state named by text on create', async () => {
+      await expectUnknown(
+        service.normalizeForCreate({
+          addressLine1: '1 Main St',
+          city: 'Umuahia',
+          state: 'Abia',
+        }),
+      );
+    });
+
+    it('refuses a deactivated state named by code on create', async () => {
+      await expectUnknown(
+        service.normalizeForCreate({
+          addressLine1: '1 Main St',
+          city: 'Umuahia',
+          state: 'Abia',
+          stateCode: 'AB',
+        }),
+      );
+    });
+
+    it('still accepts an active state on create', async () => {
+      await expect(
+        service.normalizeForCreate({
+          addressLine1: '1 Main St',
+          city: 'Ikeja',
+          state: 'Lagos',
+        }),
+      ).resolves.toMatchObject({ stateCode: 'LA' });
+    });
+
+    it('refuses an edit that moves a saved address to a deactivated state', async () => {
+      await expectUnknown(
+        service.normalizeForUpdate(
+          {
+            ...savedAbia,
+            state: 'Lagos',
+            administrativeAreaLevel1: 'Lagos',
+            stateCode: 'LA',
+          },
+          { state: 'Abia' },
+        ),
+      );
+      await expectUnknown(
+        service.normalizeForUpdate(
+          {
+            ...savedAbia,
+            state: 'Lagos',
+            administrativeAreaLevel1: 'Lagos',
+            stateCode: 'LA',
+          },
+          { stateCode: 'AB' },
+        ),
+      );
+    });
+
+    it('lets an edit of another field keep a saved state deactivated later', async () => {
+      const result = await service.normalizeForUpdate(savedAbia, {
+        phone: '+2348012345678',
+      });
+      expect(result).toMatchObject({ state: 'Abia', stateCode: 'AB' });
+    });
+
+    it('lets the checkout resend the same deactivated state text or code', async () => {
+      await expect(
+        service.normalizeForUpdate(savedAbia, {
+          state: 'Abia',
+          phone: '+2348012345678',
+        }),
+      ).resolves.toMatchObject({ stateCode: 'AB' });
+      await expect(
+        service.normalizeForUpdate(savedAbia, { stateCode: 'AB' }),
+      ).resolves.toMatchObject({ stateCode: 'AB' });
+    });
+  });
 });
