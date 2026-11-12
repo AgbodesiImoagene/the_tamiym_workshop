@@ -21,6 +21,7 @@ Texte à donner à un agent, en remplaçant le chemin. Le reste des règles est 
 ```text
 Travaille sur le ticket docs/tickets/ttw-XXX-....md, dans ton propre worktree, sur une branche créée depuis main.
 Arrête-toi à un commit local : ne pousse rien et n'ouvre pas de PR.
+Je vais ouvrir une session pour ttw-yyy en parallele, ça ne va pas te deranger?
 ```
 
 ## L'ordre en bref
