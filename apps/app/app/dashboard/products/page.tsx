@@ -3,8 +3,7 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { addCartItem } from '@/lib/cart-store';
-import { getDashboardProductDetail, getDashboardProducts } from '@/lib/products';
+import { getDashboardProducts } from '@/lib/products';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -59,8 +58,6 @@ export default function DashboardProductsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<(typeof categoryTabs)[number]>('All');
-  const [addingProductId, setAddingProductId] = useState<string | null>(null);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -144,7 +141,6 @@ export default function DashboardProductsPage() {
               </TabsList>
             </Tabs>
           </div>
-          {cartMessage ? <p className="text-sm text-[#004385]">{cartMessage}</p> : null}
         </div>
 
         {productsQuery.isLoading ? (
@@ -200,64 +196,12 @@ export default function DashboardProductsPage() {
                       <p className="text-sm text-black/70">{product.description || 'No Minimum'}</p>
                     </div>
                     <div className="flex items-center gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setCartMessage(null);
-                          setAddingProductId(product.id);
-                          try {
-                            const detail = await getDashboardProductDetail(product.id);
-                            const variant = detail.variants.find(
-                              (entry) => entry.isAvailable && entry.inStock
-                            );
-
-                            if (!variant) {
-                              setCartMessage(
-                                'This product does not have an available variant yet.'
-                              );
-                              return;
-                            }
-
-                            addCartItem({
-                              productId: detail.id,
-                              productName: detail.name,
-                              variantId: variant.id,
-                              variantName: variant.name,
-                              optionSummary:
-                                variant.optionValues
-                                  .map(
-                                    (entry) =>
-                                      `${entry.option.name}: ${entry.optionValue.displayName}`
-                                  )
-                                  .join(' • ') || 'Default option',
-                              quantity: 1,
-                              unitPrice:
-                                variant.resolvedPrice ??
-                                detail.resolvedBasePrice ??
-                                price?.amount ??
-                                0,
-                              currency:
-                                variant.resolvedCurrency ??
-                                detail.resolvedCurrency ??
-                                price?.currency ??
-                                'NGN',
-                              imageUrl,
-                            });
-                            setCartMessage(`${detail.name} was added to your cart.`);
-                          } catch (err) {
-                            const apiError = err as ApiError;
-                            setCartMessage(
-                              apiError.message || 'We could not add this product to your cart.'
-                            );
-                          } finally {
-                            setAddingProductId(null);
-                          }
-                        }}
-                        disabled={addingProductId === product.id}
-                        className="rounded-full bg-[#004385] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                      <Link
+                        href={`/dashboard/products/${product.id}`}
+                        className="rounded-full bg-[#004385] px-4 py-2 text-xs font-semibold text-white"
                       >
-                        {addingProductId === product.id ? 'Adding...' : 'Add to cart'}
-                      </button>
+                        View product
+                      </Link>
                       <Link href="/dashboard/cart" className="text-xs font-semibold text-[#004385]">
                         Go to cart
                       </Link>

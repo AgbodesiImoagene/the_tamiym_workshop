@@ -141,6 +141,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                  | 2A  | Retirer la fausse photo de profil et son bouton               | 1.2      | Faible   | 1      | —                |
 | [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)     | 2B  | Message « e-mail non vérifié » et renvoi du lien              | 1.4      | Élevé    | 3–5    | TTW-089          |
 | [ ]  | 16  | [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)   | 2B  | Vraies catégories et pagination du catalogue                  | 2.3      | Standard | 4–8    | TTW-092          |
+| [ ]  | —   | [TTW-197](ttw-197-add-an-order-note-at-checkout.md)                | 2B  | Note de commande saisie au paiement et visible par l'admin    | 2.2      | Élevé    | 6–10   | TTW-092          |
 | [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md) | 2B  | Tarif de livraison selon le poids ou la quantité              | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086 |
 | [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md) | 2C  | Palier de prix calculé sur le total du produit                | 8.5      | Élevé    | 4–8    | TTW-094, Q38     |
 | [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)            | 2D  | Faire fonctionner les remises produit et commande             | 8.1      | Élevé    | 10–16  | TTW-095          |

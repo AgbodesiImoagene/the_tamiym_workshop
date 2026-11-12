@@ -26,6 +26,13 @@ export interface DashboardProduct {
 export interface DashboardProductDetail extends DashboardProduct {
   resolvedBasePrice?: number | null;
   resolvedCurrency?: string;
+  /** Display images; `variantId` ties an image to one variant (and so to a colour). */
+  images: Array<{
+    id: string;
+    variantId?: string | null;
+    url?: string | null;
+    altText?: string | null;
+  }>;
   variants: Array<{
     id: string;
     name: string;
