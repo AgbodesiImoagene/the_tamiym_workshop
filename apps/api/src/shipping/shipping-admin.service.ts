@@ -140,6 +140,7 @@ export class ShippingAdminService {
     if (!state) {
       throw new BadRequestException(`State ${dto.stateCode} not found`);
     }
+    this.assertStateActive(state);
 
     let lgaId: string | null = null;
     if (dto.lgaId) {
@@ -229,17 +230,20 @@ export class ShippingAdminService {
     if (!existing) {
       throw new NotFoundException('Shipping rule not found');
     }
-    const normalized = await this.normalizeRuleInput({
-      countryCode: dto.countryCode ?? existing.countryCode,
-      matchType: dto.matchType ?? existing.matchType,
-      matchValue: dto.matchValue ?? existing.matchValue,
-      matchContext:
-        dto.matchContext !== undefined
-          ? dto.matchContext
-          : existing.matchContext,
-      priority: dto.priority ?? existing.priority,
-      isActive: dto.isActive ?? existing.isActive,
-    });
+    const normalized = await this.normalizeRuleInput(
+      {
+        countryCode: dto.countryCode ?? existing.countryCode,
+        matchType: dto.matchType ?? existing.matchType,
+        matchValue: dto.matchValue ?? existing.matchValue,
+        matchContext:
+          dto.matchContext !== undefined
+            ? dto.matchContext
+            : existing.matchContext,
+        priority: dto.priority ?? existing.priority,
+        isActive: dto.isActive ?? existing.isActive,
+      },
+      existing,
+    );
     return this.prisma.shippingZoneRule.update({
       where: { id },
       data: normalized,
@@ -318,7 +322,19 @@ export class ShippingAdminService {
     await this.prisma.shippingRate.delete({ where: { id } });
   }
 
-  private async normalizeRuleInput(dto: ShippingRuleInput) {
+  /**
+   * `existing` is the rule being edited, if any. A rule keeps its deactivated
+   * state (TTW-200): only a rule that newly names one is refused.
+   */
+  private async normalizeRuleInput(
+    dto: ShippingRuleInput,
+    existing?: {
+      countryCode: string;
+      matchType: ShippingRuleMatchType;
+      matchValue: string;
+      matchContext: string | null;
+    },
+  ) {
     const countryCode = dto.countryCode?.trim().toUpperCase();
     const matchType = dto.matchType;
     const matchValue = dto.matchValue?.trim();
@@ -350,6 +366,15 @@ export class ShippingAdminService {
       if (!state) {
         throw new BadRequestException(`State ${matchValue} not found`);
       }
+      if (
+        !(
+          existing?.countryCode === countryCode &&
+          existing.matchType === matchType &&
+          existing.matchValue === state.code
+        )
+      ) {
+        this.assertStateActive(state);
+      }
       normalizedMatchValue = state.code;
       normalizedMatchContext = null;
     }
@@ -380,6 +405,16 @@ export class ShippingAdminService {
         throw new BadRequestException(
           `LGA ${matchValue} not found for state ${state.code}`,
         );
+      }
+      if (
+        !(
+          existing?.countryCode === countryCode &&
+          existing.matchType === matchType &&
+          existing.matchValue === lga.id &&
+          existing.matchContext === state.code
+        )
+      ) {
+        this.assertStateActive(state);
       }
       normalizedMatchValue = lga.id;
       normalizedMatchContext = state.code;
@@ -430,6 +465,14 @@ export class ShippingAdminService {
       minDeliveryDays: dto.minDeliveryDays ?? null,
       maxDeliveryDays: dto.maxDeliveryDays ?? null,
     };
+  }
+
+  // No address can name a deactivated state (TTW-194), so a new rule or area
+  // for it could never match.
+  private assertStateActive(state: { code: string; isActive: boolean }) {
+    if (!state.isActive) {
+      throw new BadRequestException(`State ${state.code} is deactivated`);
+    }
   }
 
   private async assertZoneExists(zoneId: string) {
