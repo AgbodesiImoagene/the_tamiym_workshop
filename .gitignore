@@ -85,3 +85,6 @@ infra/**/terraform.tfvars
 !infra/**/terraform.tfvars.example
 *.auto.tfvars
 *.auto.tfvars.json
+
+# Written by `next dev` in each Next.js app
+apps/*/AGENTS.md
