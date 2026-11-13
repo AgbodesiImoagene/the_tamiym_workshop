@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { addClassicTeeToCart } from '../fixtures/cart';
 import { test } from '../fixtures/test';
 
 /**
@@ -43,13 +44,7 @@ test.describe('Customer checkout retry @app @journey', () => {
       route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Paystack test</h1>' })
     );
 
-    await customerPage.goto('/dashboard/products');
-    await customerPage
-      .locator('article')
-      .filter({ has: customerPage.getByText('Classic Tee', { exact: true }) })
-      .getByRole('button', { name: 'Add to cart' })
-      .click();
-    await expect(customerPage.getByText('Classic Tee was added to your cart.')).toBeVisible();
+    await addClassicTeeToCart(customerPage);
 
     await customerPage.goto('/dashboard/checkout');
     await expect(customerPage.getByLabel('City')).toHaveValue('Ikeja');
