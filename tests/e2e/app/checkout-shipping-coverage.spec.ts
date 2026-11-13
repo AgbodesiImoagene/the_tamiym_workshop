@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { addClassicTeeToCart } from '../fixtures/cart';
 import { authDir, expect, test, urls, attachStrictPageGuards } from '../fixtures/test';
 
 /**
@@ -57,13 +58,7 @@ test.describe('Checkout shipping coverage @app @journey', () => {
         }
       }
 
-      await page.goto('/dashboard/products');
-      await page
-        .locator('article')
-        .filter({ has: page.getByText('Classic Tee', { exact: true }) })
-        .getByRole('button', { name: 'Add to cart' })
-        .click();
-      await expect(page.getByText('Classic Tee was added to your cart.')).toBeVisible();
+      await addClassicTeeToCart(page);
 
       await openCheckout();
       await page.getByLabel('Recipient Name').fill('Coverage Tester');
