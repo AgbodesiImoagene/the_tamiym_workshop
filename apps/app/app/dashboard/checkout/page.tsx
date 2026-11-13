@@ -12,6 +12,7 @@ import {
   useCart,
 } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
+import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
 import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
 import { getGeoLgas, getGeoStates, lgaIdPayload } from '@/lib/geo';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
@@ -75,6 +76,11 @@ export default function DashboardCheckoutPage() {
   // LGA currently saved on the account address (TTW-193): emptying it must be sent as null.
   const [savedLgaId, setSavedLgaId] = useState<string | null>(null);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
+  // Optional note about the order (TTW-197). Kept in memory only: it can hold personal data.
+  const [customerNote, setCustomerNote] = useState('');
+  // Note sent with the order of the current cart revision. The API refuses a known key
+  // with another note, so a changed note needs a new key.
+  const [sentNote, setSentNote] = useState<{ key: string; note: string | undefined } | null>(null);
   // Address last saved to the account. Orders are always placed with the saved address,
   // so after a reload it is still the address of any earlier attempt. The API returns
   // the existing order for a known key whatever the payload, so quoting a different
@@ -124,6 +130,13 @@ export default function DashboardCheckoutPage() {
       setSavedAddressJson(JSON.stringify(addressToForm(address)));
     }
   }
+
+  // An order already exists for this cart revision with another note: placing the order
+  // again starts a new order (the API refuses one key with two notes). Warn before it happens.
+  const noteChangeStartsNewOrder =
+    sentNote !== null &&
+    sentNote.key === idempotencyKey &&
+    sentNote.note !== (customerNote.trim() || undefined);
 
   const orderItems = useMemo(() => toOrderItems(items), [items]);
 
@@ -225,19 +238,28 @@ export default function DashboardCheckoutPage() {
   }
 
   async function handlePlaceOrder() {
-    const cart = getCart();
+    let cart = getCart();
     if (!cart) return;
+    const note = customerNote.trim() || undefined;
+    const previous = sentNote;
+    if (previous && previous.key === cart.idempotencyKey && previous.note !== note) {
+      rotateCartIdempotencyKey();
+      cart = getCart();
+      if (!cart) return;
+    }
     setError(null);
     setSubmitMessage(null);
     setIsSubmitting(true);
     try {
       const shippingAddressId = savedAddressId || (await ensureAddress());
-      // Same cart revision → same key → the API returns the order already created.
+      // Same cart revision and note → same key → the API returns the order already created.
       const order = await createOrder({
         shippingAddressId,
         items: toOrderItems(cart.lines),
         idempotencyKey: cart.idempotencyKey,
+        customerNote: note,
       });
+      setSentNote({ key: cart.idempotencyKey, note });
       // Only the revision this order was created for; another tab may have changed it.
       setCartPendingOrder(order.id, cart.idempotencyKey);
 
@@ -509,6 +531,30 @@ export default function DashboardCheckoutPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+
+              <div className="space-y-2 border-t border-black/10 pt-4">
+                <label htmlFor="checkout-order-note" className="text-sm font-semibold text-black">
+                  Order note (optional)
+                </label>
+                <textarea
+                  id="checkout-order-note"
+                  value={customerNote}
+                  onChange={(event) => setCustomerNote(event.target.value)}
+                  maxLength={ORDER_NOTE_MAX_LENGTH}
+                  rows={3}
+                  placeholder="Anything we should know about this order?"
+                  className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm text-black"
+                />
+                <p className="text-right text-xs text-black/55">
+                  {customerNote.length} / {ORDER_NOTE_MAX_LENGTH}
+                </p>
+                {noteChangeStartsNewOrder ? (
+                  <p role="status" className="text-xs text-amber-800">
+                    Changing the note will create a new order. The previous unpaid order will expire
+                    on its own.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-3 border-t border-black/10 pt-4 text-sm">

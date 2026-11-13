@@ -91,7 +91,7 @@ export class OrdersController {
   @ApiResponse({
     status: 409,
     description:
-      'IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests.',
+      'IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address, order note); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests.',
   })
   @ApiResponse({
     status: 503,

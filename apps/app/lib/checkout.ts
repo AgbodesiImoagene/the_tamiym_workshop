@@ -91,6 +91,8 @@ export interface CustomerOrderDetail {
   paymentReference?: string | null;
   items: CustomerOrderItemDetail[];
   shipping: CustomerOrderShippingSnapshot;
+  /** Plain text typed by the customer at checkout; show it as text, never as HTML. */
+  customerNote?: string | null;
   payments: CustomerOrderPaymentSummary[];
   refunds: CustomerOrderRefundSummary[];
   refundedAmountConfirmed: number;
@@ -130,6 +132,7 @@ export async function createOrder(input: {
   shippingAddressId: string;
   items: QuoteLineItem[];
   idempotencyKey?: string;
+  customerNote?: string;
 }) {
   // A known idempotency key returns the existing order, whatever its state (TTW-037).
   return apiClient.post<{

@@ -274,6 +274,14 @@ describe('PrivacyService', () => {
     );
     expect(prisma.userPayoutProfile.updateMany).toHaveBeenCalled();
     expect(result.id).toBe('req-1');
+    // TTW-197: the order note is erased with the shipping snapshot.
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1' },
+      data: expect.objectContaining({
+        shipInstructions: null,
+        customerNote: null,
+      }),
+    });
   });
 
   it('resumes a stuck IN_PROGRESS erasure request', async () => {
@@ -416,6 +424,12 @@ describe('PrivacyService', () => {
       'TestPassword1!',
     );
     expect(payload.data.user.id).toBe('u1');
+    // TTW-197: the order note is the customer's own data, so the export carries it.
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ customerNote: true }),
+      }),
+    );
     expect(payload.data.designs[0].hadShareLink).toBe(true);
     expect(payload.data.designs[0].activeShareLinkCount).toBe(1);
     expect(payload.checksum).toMatch(/^[a-f0-9]{64}$/);

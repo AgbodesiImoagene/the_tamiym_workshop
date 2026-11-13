@@ -73,4 +73,31 @@ describe('computeOrderRequestFingerprint', () => {
       computeOrderRequestFingerprint({ ...base, campaignId: 'camp-1' }),
     ).not.toBe(computeOrderRequestFingerprint(base));
   });
+
+  describe('customer note (TTW-197)', () => {
+    it('keeps the digest of a request without a note unchanged', () => {
+      const fp = computeOrderRequestFingerprint(base);
+      expect(
+        computeOrderRequestFingerprint({ ...base, customerNote: null }),
+      ).toBe(fp);
+      expect(
+        computeOrderRequestFingerprint({ ...base, customerNote: undefined }),
+      ).toBe(fp);
+      // Golden digest computed before the note existed: stored fingerprints stay valid.
+      expect(fp).toBe(
+        'v1:db3d1aeac06d85421cf8af201eb7d3a91b65541c33c28d6b22379b6db13f2a3a',
+      );
+    });
+
+    it('changes when a note is added, removed or edited', () => {
+      const none = computeOrderRequestFingerprint(base);
+      const a = computeOrderRequestFingerprint({ ...base, customerNote: 'A' });
+      const b = computeOrderRequestFingerprint({ ...base, customerNote: 'B' });
+      expect(a).not.toBe(none);
+      expect(a).not.toBe(b);
+      expect(
+        computeOrderRequestFingerprint({ ...base, customerNote: 'A' }),
+      ).toBe(a);
+    });
+  });
 });

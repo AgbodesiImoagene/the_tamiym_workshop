@@ -58,6 +58,8 @@ export interface AdminOrder {
 }
 
 export interface AdminOrderDetail extends AdminOrder {
+  /** Plain text typed by the customer at checkout (TTW-197); show it as text, never as HTML. */
+  customerNote?: string | null;
   subtotalAmount: number;
   shippingFee: number;
   discountAmount: number;

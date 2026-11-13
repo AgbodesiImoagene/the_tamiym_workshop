@@ -141,6 +141,7 @@
       "automation": "automated",
       "tests": [
         "tests/e2e/app/checkout-idempotency.spec.ts",
+        "tests/e2e/app/checkout-order-note.spec.ts",
         "tests/e2e/app/checkout-shipping-coverage.spec.ts"
       ],
       "browser_tiers": ["matrix", "journey"],

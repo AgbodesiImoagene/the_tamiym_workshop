@@ -1722,6 +1722,8 @@ model Order {
   shipCountry       String  @default("Nigeria")
   shipLandmark      String?
   shipInstructions  String?
+  /// Optional free-text note typed by the customer at checkout (TTW-197): trimmed, at most 500 characters, plain text. Personal data: erased with the shipping snapshot.
+  customerNote      String?
 
   // Paystack reference for the order-level payment attempt (still track Payment rows below)
   paymentReference String? @unique

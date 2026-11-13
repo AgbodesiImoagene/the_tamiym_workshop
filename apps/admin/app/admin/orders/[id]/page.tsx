@@ -166,6 +166,22 @@ export default function AdminOrderDetailPage() {
               </CardContent>
             </Card>
 
+            {order.customerNote ? (
+              <Card className="rounded-[1.75rem] border-black/8 shadow-none">
+                <CardHeader>
+                  <CardTitle>Customer note</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p
+                    data-testid="admin-order-customer-note"
+                    className="whitespace-pre-wrap break-words text-sm text-black/75"
+                  >
+                    {order.customerNote}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card className="rounded-[1.75rem] border-black/8 shadow-none">
               <CardHeader>
                 <CardTitle>Items</CardTitle>
