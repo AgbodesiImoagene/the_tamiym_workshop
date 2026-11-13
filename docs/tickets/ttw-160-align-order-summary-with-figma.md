@@ -12,6 +12,8 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 - **Row 4.4, Order summary and confirmation lighter than Figma** (Low, P2, 4–8 h, status "To do"): No thumbnails in the summary, no related products on "Purchase Successful".
 
+Seen running on 2026-11-12 (`/dashboard/checkout` on the customer app): the order summary lists the product name and quantity only. Figma's "Order Total" has a photo, a quantity stepper and a trash button per line, and a Discount line (the discount itself is TTW-096). The main button reads "Place order and pay" and looks washed out in blue-grey while the quote is missing; Figma has a green "Place Order". The card, "Pay on delivery" and PayPal parts of the Figma payment box stay out: the client accepted the Paystack redirect (Q8) and refused cash on delivery (Q11).
+
 ## Proposal
 
 - Add thumbnails to the summary, and related products on "Purchase Successful".

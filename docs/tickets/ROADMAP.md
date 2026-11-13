@@ -30,14 +30,14 @@ Je vais ouvrir une session pour ttw-yyy en parallele, ça ne va pas te deranger?
 | ----- | ---------------------------------------- | ------- | -------------------------- |
 | 0     | Fiabiliser la base et la CI              | 7       | hors Excel                 |
 | 1     | Fermer les failles sécurité et argent    | 7       | 20–35 h                    |
-| 2     | Comptes et achat d'un produit            | 10      | 73–122 h                   |
+| 2     | Comptes et achat d'un produit            | 11      | 73–122 h, plus TTW-204     |
 | 3     | Commander son design et l'imprimer       | 8       | 108–171 h                  |
 | 4     | Produire, expédier, facturer             | 5       | 36–58 h                    |
 | 5     | Outils d'administration                  | 12      | 41–65 h                    |
-| 6     | Données personnelles, légal, site public | 11      | 47–79 h                    |
-| 7     | Fundraising                              | 21      | 174–277 h                  |
+| 6     | Données personnelles, légal, site public | 12      | 47–79 h, plus TTW-207      |
+| 7     | Fundraising                              | 22      | 174–277 h, plus TTW-206    |
 | 8     | Recette et mise en ligne                 | 5       | 10–20 h, plus le catalogue |
-| 9     | Après le lancement                       | 16      | 89–144 h                   |
+| 9     | Après le lancement                       | 18      | 89–144 h, plus TTW-203/205 |
 
 Pourquoi cet ordre :
 
@@ -76,6 +76,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q39      | Délai de l'option express                                                                                                                                           | TTW-153          | Attendre la réponse                                                                               |
 | Nouvelle | Fichiers et licence web des polices Mundial et Neuffila Grotesk                                                                                                     | TTW-177          | Attendre la réponse ; sans licence, lui demander une police de remplacement validée               |
 | Nouvelle | Logos de paiement du pied de page (PayPal non accepté)                                                                                                              | TTW-178          | Retirer PayPal, garder les cartes acceptées par Paystack en version lisible sur fond bleu         |
+| Nouvelle | Texte de la page Fundraiser : le Figma promet « no upfront costs, no inventory, no stress » et « risk-free », le site actuel ne le dit pas                          | —                | Garder le texte actuel tant que le client n'a pas confirmé que la promesse est vraie              |
 
 ### Déjà répondues : rien à attendre
 
@@ -135,18 +136,19 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 2 : Comptes et achat d'un produit
 
-| Fait | N°  | Ticket                                                             | Lot | Travail                                                       | Excel    | Risque   | Heures | Attend           |
-| ---- | --- | ------------------------------------------------------------------ | --- | ------------------------------------------------------------- | -------- | -------- | ------ | ---------------- |
-| [ ]  | 10  | [TTW-092](ttw-092-build-product-detail-page.md)                    | 2A  | Fiche produit : galerie, taille, couleur, quantité par taille | 2.2, 2.1 | Standard | 25–40  | —                |
-| [ ]  | 11  | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)          | 2A  | Pages « mot de passe oublié » et réinitialisation             | 1.1      | Élevé    | 6–10   | TTW-083          |
-| [ ]  | 12  | [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)   | 2A  | Saisir les suppléments de taille et de face imprimée          | 2.7      | Élevé    | 8–14   | —                |
-| [ ]  | 13  | [TTW-097](ttw-097-complete-shipping-zone-administration.md)        | 2A  | Corriger et supprimer tarifs et zones de livraison            | 8.2      | Élevé    | 6–10   | —                |
-| [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                  | 2A  | Retirer la fausse photo de profil et son bouton               | 1.2      | Faible   | 1      | —                |
-| [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)     | 2B  | Message « e-mail non vérifié » et renvoi du lien              | 1.4      | Élevé    | 3–5    | TTW-089          |
-| [ ]  | 16  | [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)   | 2B  | Vraies catégories et pagination du catalogue                  | 2.3      | Standard | 4–8    | TTW-092          |
-| [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md) | 2B  | Tarif de livraison selon le poids ou la quantité              | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086 |
-| [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md) | 2C  | Palier de prix calculé sur le total du produit                | 8.5      | Élevé    | 4–8    | TTW-094, Q38     |
-| [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)            | 2D  | Faire fonctionner les remises produit et commande             | 8.1      | Élevé    | 10–16  | TTW-095          |
+| Fait | N°  | Ticket                                                             | Lot | Travail                                                         | Excel    | Risque   | Heures | Attend           |
+| ---- | --- | ------------------------------------------------------------------ | --- | --------------------------------------------------------------- | -------- | -------- | ------ | ---------------- |
+| [ ]  | 10  | [TTW-092](ttw-092-build-product-detail-page.md)                    | 2A  | Fiche produit : galerie, taille, couleur, quantité par taille   | 2.2, 2.1 | Standard | 25–40  | —                |
+| [ ]  | 11  | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)          | 2A  | Pages « mot de passe oublié » et réinitialisation               | 1.1      | Élevé    | 6–10   | TTW-083          |
+| [ ]  | 12  | [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)   | 2A  | Saisir les suppléments de taille et de face imprimée            | 2.7      | Élevé    | 8–14   | —                |
+| [ ]  | 13  | [TTW-097](ttw-097-complete-shipping-zone-administration.md)        | 2A  | Corriger et supprimer tarifs et zones de livraison              | 8.2      | Élevé    | 6–10   | —                |
+| [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                  | 2A  | Retirer la fausse photo de profil et son bouton                 | 1.2      | Faible   | 1      | —                |
+| [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)     | 2B  | Message « e-mail non vérifié » et renvoi du lien                | 1.4      | Élevé    | 3–5    | TTW-089          |
+| [ ]  | 16  | [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)   | 2B  | Vraies catégories et pagination du catalogue                    | 2.3      | Standard | 4–8    | TTW-092          |
+| [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md) | 2B  | Tarif de livraison selon le poids ou la quantité                | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086 |
+| [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md) | 2C  | Palier de prix calculé sur le total du produit                  | 8.5      | Élevé    | 4–8    | TTW-094, Q38     |
+| [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)            | 2D  | Faire fonctionner les remises produit et commande               | 8.1      | Élevé    | 10–16  | TTW-095          |
+| [ ]  | —   | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)   | 2C  | Liste produits : vraies couleurs, vrai prix, cartes comme Figma | Figma    | Standard | 6–10   | TTW-093          |
 
 ## Phase 3 : Commander son design et l'imprimer
 
@@ -191,21 +193,22 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 6 : Données personnelles, légal, site public
 
-| Fait | N°  | Ticket                                                      | Lot | Travail                                            | Excel | Risque   | Heures | Attend           |
-| ---- | --- | ----------------------------------------------------------- | --- | -------------------------------------------------- | ----- | -------- | ------ | ---------------- |
-| [ ]  | 44  | [TTW-119](ttw-119-build-data-rights-screens.md)             | 6A  | Écrans export, suppression de compte, préférences  | 11.1  | Élevé    | 12–18  | —                |
-| [ ]  | 45  | [TTW-120](ttw-120-erase-files-of-deleted-accounts.md)       | 6A  | Effacer vraiment les fichiers d'un compte supprimé | 11.2  | Élevé    | 6–10   | TTW-099          |
-| [ ]  | 46  | [TTW-123](ttw-123-add-public-catalogue-and-site-menu.md)    | 6A  | Catalogue public et menu cohérent                  | 2.4   | Standard | 15–25  | TTW-092          |
-| [ ]  | 47  | [TTW-118](ttw-118-remove-unproven-about-page-figures.md)    | 6A  | Retirer les faux chiffres de la page About         | 12.6  | Faible   | 0      | —                |
-| [ ]  | 48  | [TTW-126](ttw-126-compress-homepage-photos.md)              | 6A  | Alléger les photos d'accueil                       | 12.5  | Faible   | 1–2    | —                |
-| [ ]  | 49  | [TTW-127](ttw-127-add-global-error-page.md)                 | 6A  | Page d'erreur globale du site public               | 12.7  | Faible   | 1–2    | —                |
-| [ ]  | 50  | [TTW-121](ttw-121-recalibrate-account-deletion-blockers.md) | 6B  | Revoir ce qui bloque la suppression d'un compte    | 11.6  | Élevé    | 3–5    | TTW-106, TTW-120 |
-| [ ]  | 51  | [TTW-122](ttw-122-add-unsubscribe-links.md)                 | 6B  | Lien de désinscription dans les e-mails            | 10.9  | Standard | 2–4    | TTW-119          |
-| [ ]  | 52  | [TTW-124](ttw-124-add-audience-measurement.md)              | 6B  | Mesure d'audience                                  | 12.4  | Standard | 4–8    | —                |
-| [ ]  | 53  | [TTW-117](ttw-117-draft-and-publish-legal-texts.md)         | 6C  | Rédiger et intégrer les textes légaux              | 11.4  | Standard | 2–4    | Q19              |
-| [ ]  | 54  | [TTW-125](ttw-125-replace-fake-social-links.md)             | 6C  | Vrais liens sociaux et contacts                    | 12.2  | Faible   | 1      | Q46              |
-| [ ]  | —   | [TTW-177](ttw-177-ship-brand-fonts.md)                      | 6C  | Charger les polices de la marque sur tout le site  | —     | Standard | —      | Polices (client) |
-| [ ]  | —   | [TTW-178](ttw-178-fix-footer-payment-logos.md)              | 6C  | Logos de paiement lisibles, sans PayPal            | —     | Faible   | 1–2    | Logos (client)   |
+| Fait | N°  | Ticket                                                      | Lot | Travail                                                                          | Excel | Risque   | Heures | Attend           |
+| ---- | --- | ----------------------------------------------------------- | --- | -------------------------------------------------------------------------------- | ----- | -------- | ------ | ---------------- |
+| [ ]  | 44  | [TTW-119](ttw-119-build-data-rights-screens.md)             | 6A  | Écrans export, suppression de compte, préférences                                | 11.1  | Élevé    | 12–18  | —                |
+| [ ]  | 45  | [TTW-120](ttw-120-erase-files-of-deleted-accounts.md)       | 6A  | Effacer vraiment les fichiers d'un compte supprimé                               | 11.2  | Élevé    | 6–10   | TTW-099          |
+| [ ]  | 46  | [TTW-123](ttw-123-add-public-catalogue-and-site-menu.md)    | 6A  | Catalogue public et menu cohérent                                                | 2.4   | Standard | 15–25  | TTW-092          |
+| [ ]  | 47  | [TTW-118](ttw-118-remove-unproven-about-page-figures.md)    | 6A  | Retirer les faux chiffres de la page About                                       | 12.6  | Faible   | 0      | —                |
+| [ ]  | 48  | [TTW-126](ttw-126-compress-homepage-photos.md)              | 6A  | Alléger les photos d'accueil                                                     | 12.5  | Faible   | 1–2    | —                |
+| [ ]  | 49  | [TTW-127](ttw-127-add-global-error-page.md)                 | 6A  | Page d'erreur globale du site public                                             | 12.7  | Faible   | 1–2    | —                |
+| [ ]  | 50  | [TTW-121](ttw-121-recalibrate-account-deletion-blockers.md) | 6B  | Revoir ce qui bloque la suppression d'un compte                                  | 11.6  | Élevé    | 3–5    | TTW-106, TTW-120 |
+| [ ]  | 51  | [TTW-122](ttw-122-add-unsubscribe-links.md)                 | 6B  | Lien de désinscription dans les e-mails                                          | 10.9  | Standard | 2–4    | TTW-119          |
+| [ ]  | 52  | [TTW-124](ttw-124-add-audience-measurement.md)              | 6B  | Mesure d'audience                                                                | 12.4  | Standard | 4–8    | —                |
+| [ ]  | 53  | [TTW-117](ttw-117-draft-and-publish-legal-texts.md)         | 6C  | Rédiger et intégrer les textes légaux                                            | 11.4  | Standard | 2–4    | Q19              |
+| [ ]  | 54  | [TTW-125](ttw-125-replace-fake-social-links.md)             | 6C  | Vrais liens sociaux et contacts                                                  | 12.2  | Faible   | 1      | Q46              |
+| [ ]  | —   | [TTW-177](ttw-177-ship-brand-fonts.md)                      | 6C  | Charger les polices de la marque sur tout le site                                | —     | Standard | —      | Polices (client) |
+| [ ]  | —   | [TTW-178](ttw-178-fix-footer-payment-logos.md)              | 6C  | Logos de paiement lisibles, sans PayPal                                          | —     | Faible   | 1–2    | Logos (client)   |
+| [ ]  | —   | [TTW-207](ttw-207-align-public-site-visuals-with-figma.md)  | 6C  | Site public : arcs, formes, bandeau d'appel, pied de page, mobile comme le Figma | Figma | Standard | 10–16  | TTW-162, TTW-178 |
 
 ## Phase 7 : Fundraising
 
@@ -232,6 +235,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 70  | [TTW-141](ttw-141-complete-campaign-end-handling.md)                      | 7D  | Fin de campagne et page archivée                            | 6.12           | Élevé    | 6–10   | TTW-131, Q17, Q35, Q23, Q25 |
 | [ ]  | 71  | [TTW-137](ttw-137-add-fundraiser-donations.md)                            | 7E  | Dons libres dans le paiement                                | 4.5            | Critique | 40–60  | TTW-136, Q23, Q25           |
 | [ ]  | 72  | [TTW-139](ttw-139-show-organisers-their-campaign-orders.md)               | 7E  | Écran des commandes de la campagne pour l'organisateur      | 5.9            | Élevé    | 6–10   | TTW-134, Q23, Q25           |
+| [ ]  | —   | [TTW-206](ttw-206-align-the-organiser-fundraiser-dashboard-with-figma.md) | 7E  | Tableau de bord Fundraiser de l'organisateur comme le Figma | Figma          | Standard | 6–10   | TTW-134, Q23, Q25           |
 | [ ]  | 73  | [TTW-138](ttw-138-add-campaign-delivery-options.md)                       | 7F  | Options de livraison d'une campagne                         | 5.4            | Élevé    | 15–25  | TTW-131, Q18, Q23, Q25      |
 | [ ]  | 74  | [TTW-145](ttw-145-add-campaign-headline-and-video.md)                     | 7G  | Titre et vidéo optionnelle de campagne                      | 6.8            | Standard | 4–6    | TTW-144, Q23, Q25           |
 
@@ -248,24 +252,26 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 Priorité P2 de l'Excel, sauf indication contraire : à classer selon les retours des vrais utilisateurs.
 
-| Fait | N°  | Ticket                                                          | Lot | Travail                                                      | Excel | Risque   | Heures | Attend  |
-| ---- | --- | --------------------------------------------------------------- | --- | ------------------------------------------------------------ | ----- | -------- | ------ | ------- |
-| [ ]  | 79  | [TTW-150](ttw-150-build-moderation-appeal-screens.md)           | 9A  | Écrans d'appel de modération                                 | 9.1   | Élevé    | 15–20  | —       |
-| [ ]  | 80  | [TTW-154](ttw-154-add-audit-log-screen.md)                      | 9A  | Consulter le journal d'audit                                 | 10.4  | Élevé    | 6–10   | —       |
-| [ ]  | 81  | [TTW-158](ttw-158-add-active-sessions-screen.md)                | 9A  | Écran « sessions actives »                                   | 1.5   | Élevé    | 4–8    | —       |
-| [ ]  | 82  | [TTW-151](ttw-151-complete-admin-analytics.md)                  | 9A  | Graphiques et filtres des statistiques                       | 10.3  | Standard | 8–14   | —       |
-| [ ]  | 83  | [TTW-152](ttw-152-add-workshop-earnings-metric.md)              | 9A  | Métrique de gain de l'atelier                                | 10.7  | Standard | 4–6    | TTW-131 |
-| [ ]  | 84  | [TTW-155](ttw-155-paginate-admin-orders.md)                     | 9A  | Pagination des commandes côté admin                          | 5.8   | Standard | 4–8    | —       |
-| [ ]  | 85  | [TTW-159](ttw-159-add-share-link-management.md)                 | 9A  | Écran de gestion des liens de partage                        | 3.6   | Standard | 3–5    | —       |
-| [ ]  | 86  | [TTW-161](ttw-161-allow-local-courier-tracking-links.md)        | 9A  | Liens de suivi pour les coursiers locaux                     | 5.10  | Standard | 1–2    | —       |
-| [ ]  | 87  | [TTW-156](ttw-156-add-search-to-admin-products.md)              | 9A  | Recherche et pagination des produits côté admin              | 2.8   | Faible   | 2–4    | —       |
-| [ ]  | 88  | [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)       | 9A  | Recherche, tri et filtre prix du catalogue                   | 2.6   | Faible   | 4–6    | —       |
-| [ ]  | 89  | [TTW-162](ttw-162-darken-green-button-colour.md)                | 9A  | Assombrir le vert des boutons                                | 12.8  | Faible   | 1–3    | —       |
-| [ ]  | 90  | [TTW-171](ttw-171-limit-bulk-tier-prices.md)                    | 9A  | Refuser les prix de palier que la base ne peut pas stocker   | —     | Faible   | —      | —       |
-| [ ]  | 91  | [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)       | 9B  | Refuser devise, produit et variante inconnus sur les paliers | —     | Faible   | —      | —       |
-| [ ]  | 92  | [TTW-160](ttw-160-align-order-summary-with-figma.md)            | 9B  | Récapitulatif plus proche de Figma                           | 4.4   | Faible   | 4–8    | —       |
-| [ ]  | 93  | [TTW-149](ttw-149-add-returns-and-claims.md)                    | 9C  | Retours et réclamations                                      | 5.3   | Critique | 30–45  | Q19     |
-| [ ]  | 94  | [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md) | 9C  | Délai estimé et option express                               | 8.7   | Élevé    | 3–5    | Q39     |
+| Fait | N°  | Ticket                                                                           | Lot | Travail                                                          | Excel | Risque   | Heures | Attend  |
+| ---- | --- | -------------------------------------------------------------------------------- | --- | ---------------------------------------------------------------- | ----- | -------- | ------ | ------- |
+| [ ]  | 79  | [TTW-150](ttw-150-build-moderation-appeal-screens.md)                            | 9A  | Écrans d'appel de modération                                     | 9.1   | Élevé    | 15–20  | —       |
+| [ ]  | 80  | [TTW-154](ttw-154-add-audit-log-screen.md)                                       | 9A  | Consulter le journal d'audit                                     | 10.4  | Élevé    | 6–10   | —       |
+| [ ]  | 81  | [TTW-158](ttw-158-add-active-sessions-screen.md)                                 | 9A  | Écran « sessions actives »                                       | 1.5   | Élevé    | 4–8    | —       |
+| [ ]  | 82  | [TTW-151](ttw-151-complete-admin-analytics.md)                                   | 9A  | Graphiques et filtres des statistiques                           | 10.3  | Standard | 8–14   | —       |
+| [ ]  | 83  | [TTW-152](ttw-152-add-workshop-earnings-metric.md)                               | 9A  | Métrique de gain de l'atelier                                    | 10.7  | Standard | 4–6    | TTW-131 |
+| [ ]  | 84  | [TTW-155](ttw-155-paginate-admin-orders.md)                                      | 9A  | Pagination des commandes côté admin                              | 5.8   | Standard | 4–8    | —       |
+| [ ]  | 85  | [TTW-159](ttw-159-add-share-link-management.md)                                  | 9A  | Écran de gestion des liens de partage                            | 3.6   | Standard | 3–5    | —       |
+| [ ]  | 86  | [TTW-161](ttw-161-allow-local-courier-tracking-links.md)                         | 9A  | Liens de suivi pour les coursiers locaux                         | 5.10  | Standard | 1–2    | —       |
+| [ ]  | 87  | [TTW-156](ttw-156-add-search-to-admin-products.md)                               | 9A  | Recherche et pagination des produits côté admin                  | 2.8   | Faible   | 2–4    | —       |
+| [ ]  | 88  | [TTW-157](ttw-157-expose-catalogue-search-and-filters.md)                        | 9A  | Recherche, tri et filtre prix du catalogue                       | 2.6   | Faible   | 4–6    | —       |
+| [ ]  | 89  | [TTW-162](ttw-162-darken-green-button-colour.md)                                 | 9A  | Assombrir le vert des boutons                                    | 12.8  | Faible   | 1–3    | —       |
+| [ ]  | 90  | [TTW-171](ttw-171-limit-bulk-tier-prices.md)                                     | 9A  | Refuser les prix de palier que la base ne peut pas stocker       | —     | Faible   | —      | —       |
+| [ ]  | 91  | [TTW-172](ttw-172-reject-unknown-bulk-tier-references.md)                        | 9B  | Refuser devise, produit et variante inconnus sur les paliers     | —     | Faible   | —      | —       |
+| [ ]  | 92  | [TTW-160](ttw-160-align-order-summary-with-figma.md)                             | 9B  | Récapitulatif plus proche de Figma                               | 4.4   | Faible   | 4–8    | —       |
+| [ ]  | —   | [TTW-203](ttw-203-add-tracking-timeline-contact-and-reorder-to-order-details.md) | 9B  | Détail de commande : suivi en 3 étapes, contact, recommander     | Figma | Standard | 8–12   | —       |
+| [ ]  | —   | [TTW-205](ttw-205-put-figma-colours-in-the-theme-and-drop-hard-coded-hex.md)     | 9B  | Couleurs du Figma dans le thème, fin des couleurs écrites en dur | Figma | Faible   | 4–8    | TTW-162 |
+| [ ]  | 93  | [TTW-149](ttw-149-add-returns-and-claims.md)                                     | 9C  | Retours et réclamations                                          | 5.3   | Critique | 30–45  | Q19     |
+| [ ]  | 94  | [TTW-153](ttw-153-show-delivery-estimate-and-express-option.md)                  | 9C  | Délai estimé et option express                                   | 8.7   | Élevé    | 3–5    | Q39     |
 
 **Options repoussées par le client** (50–90 h, sans ticket tant que le client ne les redemande pas) :
 
@@ -275,6 +281,43 @@ Priorité P2 de l'Excel, sauf indication contraire : à classer selon les retour
 - 5.5 Regrouper la production d'une campagne : 10–20 h (Q17, en attente du propriétaire).
 
 **Tickets reportés après la v1** : [TTW-044](ttw-044-integrate-carrier-labels-and-webhooks.md) (transporteurs), [TTW-045](ttw-045-support-partial-and-multi-package-shipments.md) (plusieurs colis), [TTW-046](ttw-046-handle-chargebacks-and-payment-disputes.md) (litiges de paiement), [TTW-047](ttw-047-automate-reverse-logistics.md) (étiquettes de retour), [TTW-048](ttw-048-productionize-notification-providers.md) (secours entre fournisseurs), [TTW-049](ttw-049-add-consented-marketing-segmentation.md) (segmentation marketing), [TTW-055](ttw-055-unify-standard-catalogue-cart-and-checkout.md) (panier unifié sur le site), [TTW-056](ttw-056-reconcile-bank-and-accounting-records.md) (banque et comptabilité), [TTW-057](ttw-057-support-international-money-and-payouts.md) (international).
+
+## Écarts avec le Figma (comparaison du 12 novembre 2026)
+
+Fichier comparé : « TTW Site (Copy) », lu par l'API Figma (55 écrans exportés, textes, couleurs, polices). Cinq écarts n'avaient aucun ticket : [TTW-203](ttw-203-add-tracking-timeline-contact-and-reorder-to-order-details.md), [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md), [TTW-205](ttw-205-put-figma-colours-in-the-theme-and-drop-hard-coded-hex.md) [TTW-206](ttw-206-align-the-organiser-fundraiser-dashboard-with-figma.md) et [TTW-207](ttw-207-align-public-site-visuals-with-figma.md). Tous les autres sont déjà suivis, ou refusés par le client :
+
+| Écart avec le Figma                                                        | Où c'est suivi                                                       |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Mise en page du Workshop : rail d'outils, face/dos/manche, photo en fond   | TTW-105                                                              |
+| Workshop : ajouter, retirer, dupliquer un produit                          | Option repoussée 3.5 (Q6)                                            |
+| Fiche produit : galerie, quantité par taille, produits liés                | TTW-092                                                              |
+| Fiche produit : avis clients et notes                                      | Refusé (Q7)                                                          |
+| Pastille « 2-Day Express Production »                                      | TTW-153                                                              |
+| Récapitulatif : miniatures, produits liés après achat                      | TTW-160                                                              |
+| Vert des boutons                                                           | TTW-162                                                              |
+| Polices (le Figma est en Inter et Urbanist, le guide de marque en Mundial) | TTW-177                                                              |
+| Logos de paiement du pied de page                                          | TTW-178                                                              |
+| Création de campagne en 3 étapes (Select & Design, Story, Settings)        | Refusé : page unique acceptée (Q9)                                   |
+| Campagne : date de fin, ventes, titre, vidéo                               | TTW-144, TTW-145, TTW-141                                            |
+| Campagne : options de livraison, don libre dans le paiement                | TTW-138, TTW-137                                                     |
+| Paiement : numéro de carte et CCV saisis sur le site                       | Refusé : redirection vers Paystack (Q8)                              |
+| Paiement à la livraison                                                    | Refusé (Q11)                                                         |
+| Facture téléchargeable                                                     | TTW-108                                                              |
+| Accueil, À propos, pied de page                                            | Textes conformes ; seule la page Fundraiser diffère (voir Décisions) |
+
+**Vu en vrai :** toutes les pages publiques (accueil, À propos, Fundraiser, page d'une campagne, connexion, inscription) et tout l'app client (accueil, produits, commandes, détail de commande, Design, Workshop, panier, paiement, profil, réglages, Fundraiser), en bureau (1440 px) et en mobile (375 px), à côté des frames Figma. Le profil, les réglages et l'accueil du tableau de bord sont conformes. Le panier n'existe pas dans le Figma : c'est un ajout, pas un écart. La page publique a donné TTW-207, le détail de commande TTW-203, la liste produits TTW-204, les couleurs TTW-205 et le tableau de bord Fundraiser TTW-206.
+
+**Ce qui n'est pas vérifié :**
+
+- Le Figma ne contient aucun écran d'administration : l'admin n'a pas de modèle à comparer.
+- La page d'une campagne : la base de test n'a aucun produit en vente, donc la partie produit, couleur, taille et « Buy/Donate » n'a pas pu être comparée. Le paiement d'un supporter demande un compte (le paiement sans compte est TTW-136) et n'a pas pu être vu.
+- La fiche produit et les pages par catégorie du Figma : la fiche produit n'existe pas encore (TTW-092), les catégories sont TTW-093.
+- Le Workshop avec une vraie photo de produit et les étapes Upload, Add Text et Product Colors : la base de test n'a pas de photo, seul l'écran vide a été vu.
+- Les icônes et logos du pied de page : ils se chargent à la demande et manquent sur les captures pleine page, donc rien n'est affirmé à leur sujet (TTW-125 et TTW-178 les couvrent).
+- Les écrans de création de campagne en 3 étapes (refusés, Q9) et la page « REF » du Figma (shop, panier, contact), qui sert de référence.
+- Les couleurs, tailles et espacements ont été jugés à l'œil, pas mesurés pixel par pixel.
+
+Les heures des cinq tickets sont des estimations à confirmer.
 
 ## Ce qu'on ne fait pas
 

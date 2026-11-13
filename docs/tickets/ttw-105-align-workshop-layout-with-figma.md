@@ -12,6 +12,8 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 - **Row 3.4, Design Workshop layout differs from Figma** (High, P1, 30–45 h, status "To do"): Left tool rail, front/back/sleeve thumbnails, dashboard sidebar, product photo as background.
 
+Seen running on 2026-11-12 (`/dashboard/design/new/<product>` on the customer app): a full-page editor with no dashboard sidebar, an empty white canvas with no product photo, and one right-hand column holding Size, Color, Add Text, Add Image and Save Design. Figma (frames under "Dashboard/Products/.../DesignWorkshop") has the sidebar, a left rail (Upload, Add Text, Product Colors, Front, Back, Sleeve), a colour grid with a size list, and the buttons Add Product, Remove Product, Duplicate Product, Save | Share and Get Price. The upload text also differs: Figma says "jpg, png, eps, ai and pdf (max 5 mb)", the app says "PNG, JPEG or WebP · max 10 MB". Vector formats are an option the client postponed (3.9, Q27), so the upload text must follow what the app really accepts, not Figma.
+
 ## Proposal
 
 - Rebuild the layout from the approved Figma: left tool rail, front, back and sleeve thumbnails, dashboard sidebar, product photo background.
