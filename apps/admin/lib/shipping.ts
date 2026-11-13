@@ -4,12 +4,14 @@ import { apiClient } from './api';
 export interface GeoState {
   code: string;
   name: string;
+  isActive: boolean;
 }
 
 export interface GeoLga {
   id: string;
   stateCode: string;
   name: string;
+  isActive: boolean;
 }
 
 export interface AdminShippingZoneArea {

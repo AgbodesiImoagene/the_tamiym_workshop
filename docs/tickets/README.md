@@ -251,6 +251,8 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 | [TTW-196](ttw-196-valid-phones-in-e2e-seed.md)                                   | P2       | Low      | Complete | Use valid phone numbers in the e2e seed                                                                    | Not in review             |
 | [TTW-199](ttw-199-show-deactivated-states-in-admin-shipping.md)                  | P2       | Standard | Complete | Show deactivated states in the admin shipping lists                                                        | Not in review             |
 | [TTW-200](ttw-200-refuse-deactivated-state-in-shipping-rules.md)                 | P1       | Standard | Scoped   | Refuse a deactivated state when a shipping rule is created                                                 | Not in review             |
+| [TTW-201](ttw-201-mark-deactivated-states-in-the-zone-area-picker.md)            | P2       | Low      | Complete | Mark deactivated states in the zone-area picker                                                            | Not in review             |
+| [TTW-202](ttw-202-refuse-deactivated-lga-in-shipping-rules.md)                   | P2       | Standard | Complete | Refuse a deactivated LGA in shipping rules, areas and address linking                                      | Not in review             |
 | [TTW-203](ttw-203-add-tracking-timeline-contact-and-reorder-to-order-details.md) | P2       | Standard | Scoped   | Add the tracking timeline, contact support and reorder to the order details page                           | Not in review (Figma gap) |
 | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)                 | P2       | Standard | Scoped   | Show real product data on the customer product list and match the Figma cards                              | Not in review (Figma gap) |
 | [TTW-205](ttw-205-put-figma-colours-in-the-theme-and-drop-hard-coded-hex.md)     | P2       | Low      | Scoped   | Put the Figma colours in the theme and replace hard-coded hex values                                       | Not in review (Figma gap) |
@@ -261,18 +263,17 @@ One ticket per piece of work from the client review, in the order of [ROADMAP.md
 
 These tickets are scoped so deferred work is owned and discoverable. They do not block the current v1 release unless an owner promotes them through design review and updates the dependency map.
 
-| Ticket                                                            | Risk     | State    | Outcome                                                                | Review                                                                |
-| ----------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------- |
-| [TTW-044](ttw-044-integrate-carrier-labels-and-webhooks.md)       | High     | Deferred | Integrate carrier rates, label purchasing and tracking webhooks        | Launch part: TTW-161                                                  |
-| [TTW-045](ttw-045-support-partial-and-multi-package-shipments.md) | High     | Deferred | Support partial fulfilment and multiple shipment packages              | Not in review                                                         |
-| [TTW-046](ttw-046-handle-chargebacks-and-payment-disputes.md)     | Critical | Deferred | Reconcile chargebacks, disputes and their accounting effects           | Not in review                                                         |
-| [TTW-047](ttw-047-automate-reverse-logistics.md)                  | High     | Deferred | Automate returns labels, receipts and reverse logistics                | Launch part: TTW-149                                                  |
-| [TTW-048](ttw-048-productionize-notification-providers.md)        | High     | Deferred | Select production providers and implement controlled delivery failover | Launch part: TTW-147                                                  |
-| [TTW-049](ttw-049-add-consented-marketing-segmentation.md)        | High     | Deferred | Add consented marketing segmentation and campaign delivery             | Not in review (10.9 is unsubscribe only)                              |
-| [TTW-055](ttw-055-unify-standard-catalogue-cart-and-checkout.md)  | High     | Deferred | Unify standard catalogue discovery, cart and checkout across surfaces  | Launch part: TTW-123                                                  |
-| [TTW-056](ttw-056-reconcile-bank-and-accounting-records.md)       | Critical | Deferred | Reconcile provider, bank and accounting-system records                 | Not in review (10.1 is Paystack screens only)                         |
-| [TTW-057](ttw-057-support-international-money-and-payouts.md)     | Critical | Deferred | Add international currencies, payouts and withholding controls         | Not in review                                                         |
-| [TTW-202](ttw-202-refuse-deactivated-lga-in-shipping-rules.md)    | P2       | Standard | Complete                                                               | Refuse a deactivated LGA in shipping rules, areas and address linking | Not in review |
+| Ticket                                                            | Risk     | State    | Outcome                                                                | Review                                        |
+| ----------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------------------------- | --------------------------------------------- |
+| [TTW-044](ttw-044-integrate-carrier-labels-and-webhooks.md)       | High     | Deferred | Integrate carrier rates, label purchasing and tracking webhooks        | Launch part: TTW-161                          |
+| [TTW-045](ttw-045-support-partial-and-multi-package-shipments.md) | High     | Deferred | Support partial fulfilment and multiple shipment packages              | Not in review                                 |
+| [TTW-046](ttw-046-handle-chargebacks-and-payment-disputes.md)     | Critical | Deferred | Reconcile chargebacks, disputes and their accounting effects           | Not in review                                 |
+| [TTW-047](ttw-047-automate-reverse-logistics.md)                  | High     | Deferred | Automate returns labels, receipts and reverse logistics                | Launch part: TTW-149                          |
+| [TTW-048](ttw-048-productionize-notification-providers.md)        | High     | Deferred | Select production providers and implement controlled delivery failover | Launch part: TTW-147                          |
+| [TTW-049](ttw-049-add-consented-marketing-segmentation.md)        | High     | Deferred | Add consented marketing segmentation and campaign delivery             | Not in review (10.9 is unsubscribe only)      |
+| [TTW-055](ttw-055-unify-standard-catalogue-cart-and-checkout.md)  | High     | Deferred | Unify standard catalogue discovery, cart and checkout across surfaces  | Launch part: TTW-123                          |
+| [TTW-056](ttw-056-reconcile-bank-and-accounting-records.md)       | Critical | Deferred | Reconcile provider, bank and accounting-system records                 | Not in review (10.1 is Paystack screens only) |
+| [TTW-057](ttw-057-support-international-money-and-payouts.md)     | Critical | Deferred | Add international currencies, payouts and withholding controls         | Not in review                                 |
 
 ## Recommended first sequence
 

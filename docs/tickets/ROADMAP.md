@@ -109,32 +109,33 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
-| Fait | N°  | Ticket                                                              | Lot | Travail                                                                     | Excel | Risque   | Heures | Attend           |
-| ---- | --- | ------------------------------------------------------------------- | --- | --------------------------------------------------------------------------- | ----- | -------- | ------ | ---------------- |
-| [x]  | —   | [TTW-085](ttw-085-validate-production-mail-settings.md)             | 1A  | Vérifier au démarrage les réglages e-mail de production                     | 10.5  | Standard | 1–2    | —                |
-| [x]  | —   | [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)       | 1A  | Google : ne relier un compte que si l'e-mail est confirmé                   | 1.8   | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-179](ttw-179-close-google-account-prehijacking.md)             | 1A  | Google : sécuriser un compte non confirmé qu'on relie                       | —     | Élevé    | 3–5    | —                |
-| [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                  | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)       | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —                |
-| [x]  | —   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)   | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —                |
-| [x]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)             | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
-| [x]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)   | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16     |
-| [x]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)      | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)              | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
-| [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)              | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
-| [x]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)              | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
-| [x]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)         | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
-| [x]  | —   | [TTW-193](ttw-193-let-customers-clear-a-saved-lga.md)               | 1C  | Permettre d'effacer la LGA enregistrée sur une adresse                      | —     | Élevé    | 2–3    | TTW-186          |
-| [ ]  | —   | [TTW-194](ttw-194-refuse-a-deactivated-state-on-addresses.md)       | 1C  | Refuser un État désactivé quand une adresse est enregistrée                 | —     | Élevé    | 1–2    | —                |
-| [x]  | —   | [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                        | 1B  | Générer la clé MFA de test à l'exécution dans la CI (alerte GitGuardian)    | —     | Standard | 1–2    | TTW-180          |
-| [x]  | —   | [TTW-196](ttw-196-valid-phones-in-e2e-seed.md)                      | 1B  | Mettre des numéros de téléphone valides dans les données de test            | —     | Faible   | 0–1    | —                |
-| [ ]  | —   | [TTW-208](ttw-208-reset-auth-rate-limits-between-e2e-suites.md)     | 1B  | Remettre à zéro les compteurs de connexion entre les suites de test API     | —     | Faible   | 1–2    | —                |
-| [x]  | —   | [TTW-199](ttw-199-show-deactivated-states-in-admin-shipping.md)     | 1C  | Afficher les États désactivés dans les listes admin de livraison            | —     | Standard | 1–2    | —                |
-| [ ]  | —   | [TTW-200](ttw-200-refuse-deactivated-state-in-shipping-rules.md)    | 1C  | Refuser un État désactivé quand une règle de livraison est créée            | —     | Standard | 1–2    | —                |
-| [x]  | —   | [TTW-202](ttw-202-refuse-deactivated-lga-in-shipping-rules.md)      | 1C  | Refuser une commune (LGA) désactivée : règles, zones et adresses            | —     | Standard | 1–2    | TTW-200          |
-| [x]  | —   | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)             | 1D  | Tracer et signaler un second encaissement pour une même commande            | —     | Critique | 6–10   | TTW-088          |
-| [x]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md) | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte   | —     | Élevé    | 4–8    | TTW-189          |
-| [ ]  | —   | [TTW-191](ttw-191-refund-extra-payment-captures.md)                 | 1D  | Rembourser automatiquement les encaissements en trop (v2, reporté)          | —     | Critique | 6–10   | TTW-190 (v2)     |
+| Fait | N°  | Ticket                                                                | Lot | Travail                                                                     | Excel | Risque   | Heures | Attend           |
+| ---- | --- | --------------------------------------------------------------------- | --- | --------------------------------------------------------------------------- | ----- | -------- | ------ | ---------------- |
+| [x]  | —   | [TTW-085](ttw-085-validate-production-mail-settings.md)               | 1A  | Vérifier au démarrage les réglages e-mail de production                     | 10.5  | Standard | 1–2    | —                |
+| [x]  | —   | [TTW-082](ttw-082-link-google-sign-in-to-confirmed-emails.md)         | 1A  | Google : ne relier un compte que si l'e-mail est confirmé                   | 1.8   | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-179](ttw-179-close-google-account-prehijacking.md)               | 1A  | Google : sécuriser un compte non confirmé qu'on relie                       | —     | Élevé    | 3–5    | —                |
+| [x]  | —   | [TTW-084](ttw-084-create-default-site-settings.md)                    | 1A  | Créer les réglages du site par défaut, pour que la TVA ne soit jamais à 0 % | 8.6   | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-086](ttw-086-reject-addresses-outside-shipping-zones.md)         | 1B  | Refuser une adresse hors zone de livraison                                  | 5.6   | Élevé    | 3–5    | —                |
+| [x]  | —   | [TTW-083](ttw-083-hash-password-reset-and-verification-tokens.md)     | 1B  | Stocker les jetons de réinitialisation et de vérification hachés            | 1.7   | Élevé    | 2–4    | —                |
+| [x]  | 8   | [TTW-087](ttw-087-offer-states-and-lgas-at-checkout.md)               | 1C  | Proposer États et LGA en liste au paiement                                  | 4.9   | Élevé    | 4–6    | TTW-086, TTW-185 |
+| [x]  | 9   | [TTW-088](ttw-088-refund-payments-captured-after-cancellation.md)     | 1D  | Rembourser un paiement arrivé après annulation                              | 4.6   | Critique | 8–14   | TTW-081, Q16     |
+| [x]  | —   | [TTW-180](ttw-180-refuse-known-test-mfa-keys-in-production.md)        | 1B  | Refuser en production les clés MFA de test publiques (alerte GitGuardian)   | —     | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-184](ttw-184-keep-raw-auth-links-out-of-redis.md)                | 1B  | Ne pas garder dans Redis les liens de réinitialisation et de vérification   | —     | Élevé    | 2–3    | TTW-083          |
+| [x]  | —   | [TTW-185](ttw-185-drop-stale-state-on-address-edit.md)                | 1C  | Ne pas garder l'ancien État quand une adresse modifiée cite un État inconnu | —     | Élevé    | 1–2    | TTW-086          |
+| [x]  | —   | [TTW-186](ttw-186-refuse-lga-outside-address-state.md)                | 1C  | Refuser une LGA qui ne correspond pas à l'État de l'adresse                 | —     | Élevé    | 1–2    | TTW-185          |
+| [x]  | —   | [TTW-192](ttw-192-offer-state-and-lga-lists-in-settings.md)           | 1C  | Proposer États et LGA en liste dans les réglages du compte                  | —     | Standard | 2–4    | TTW-087          |
+| [x]  | —   | [TTW-193](ttw-193-let-customers-clear-a-saved-lga.md)                 | 1C  | Permettre d'effacer la LGA enregistrée sur une adresse                      | —     | Élevé    | 2–3    | TTW-186          |
+| [ ]  | —   | [TTW-194](ttw-194-refuse-a-deactivated-state-on-addresses.md)         | 1C  | Refuser un État désactivé quand une adresse est enregistrée                 | —     | Élevé    | 1–2    | —                |
+| [x]  | —   | [TTW-195](ttw-195-generate-mfa-key-in-ci.md)                          | 1B  | Générer la clé MFA de test à l'exécution dans la CI (alerte GitGuardian)    | —     | Standard | 1–2    | TTW-180          |
+| [x]  | —   | [TTW-196](ttw-196-valid-phones-in-e2e-seed.md)                        | 1B  | Mettre des numéros de téléphone valides dans les données de test            | —     | Faible   | 0–1    | —                |
+| [ ]  | —   | [TTW-208](ttw-208-reset-auth-rate-limits-between-e2e-suites.md)       | 1B  | Remettre à zéro les compteurs de connexion entre les suites de test API     | —     | Faible   | 1–2    | —                |
+| [x]  | —   | [TTW-199](ttw-199-show-deactivated-states-in-admin-shipping.md)       | 1C  | Afficher les États désactivés dans les listes admin de livraison            | —     | Standard | 1–2    | —                |
+| [ ]  | —   | [TTW-200](ttw-200-refuse-deactivated-state-in-shipping-rules.md)      | 1C  | Refuser un État désactivé quand une règle de livraison est créée            | —     | Standard | 1–2    | —                |
+| [x]  | —   | [TTW-201](ttw-201-mark-deactivated-states-in-the-zone-area-picker.md) | 1C  | Marquer les États désactivés dans le sélecteur de zone de livraison         | —     | Faible   | 1      | —                |
+| [x]  | —   | [TTW-202](ttw-202-refuse-deactivated-lga-in-shipping-rules.md)        | 1C  | Refuser une commune (LGA) désactivée : règles, zones et adresses            | —     | Standard | 1–2    | TTW-200          |
+| [x]  | —   | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)               | 1D  | Tracer et signaler un second encaissement pour une même commande            | —     | Critique | 6–10   | TTW-088          |
+| [x]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md)   | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte   | —     | Élevé    | 4–8    | TTW-189          |
+| [ ]  | —   | [TTW-191](ttw-191-refund-extra-payment-captures.md)                   | 1D  | Rembourser automatiquement les encaissements en trop (v2, reporté)          | —     | Critique | 6–10   | TTW-190 (v2)     |
 
 ## Phase 2 : Comptes et achat d'un produit
 

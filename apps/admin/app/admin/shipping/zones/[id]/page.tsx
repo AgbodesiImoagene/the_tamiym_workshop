@@ -322,8 +322,8 @@ export default function AdminShippingZoneDetailPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {(statesQuery.data ?? []).map((state) => (
-                        <SelectItem key={state.code} value={state.code}>
-                          {state.name}
+                        <SelectItem key={state.code} value={state.code} disabled={!state.isActive}>
+                          {state.isActive ? state.name : `${state.name} (deactivated)`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -337,8 +337,8 @@ export default function AdminShippingZoneDetailPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {(lgasQuery.data ?? []).map((lga) => (
-                        <SelectItem key={lga.id} value={lga.id}>
-                          {lga.name}
+                        <SelectItem key={lga.id} value={lga.id} disabled={!lga.isActive}>
+                          {lga.isActive ? lga.name : `${lga.name} (deactivated)`}
                         </SelectItem>
                       ))}
                     </SelectContent>
