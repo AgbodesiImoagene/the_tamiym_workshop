@@ -868,4 +868,100 @@ describe('AddressNormalizationService', () => {
       ).resolves.toMatchObject({ stateCode: 'AB' });
     });
   });
+
+  describe('deactivated Nigerian LGA (TTW-202)', () => {
+    const OFF_LGA = {
+      id: 'lga-off',
+      name: 'Ikeja',
+      stateCode: 'LA',
+      isActive: false,
+    };
+    const ON_LGA = {
+      ...OFF_LGA,
+      id: 'lga-on',
+      name: 'Surulere',
+      isActive: true,
+    };
+    const savedWithOffLga = {
+      addressLine1: '1 Old Road',
+      city: 'Ikeja',
+      state: 'Lagos',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Lagos',
+      administrativeAreaLevel2: 'Ikeja',
+      stateCode: 'LA',
+      lgaId: OFF_LGA.id,
+    };
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
+        code: 'LA',
+        name: 'Lagos',
+        isActive: true,
+      });
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue({
+        code: 'LA',
+        name: 'Lagos',
+        isActive: true,
+      });
+    });
+
+    it('does not link a new address to a deactivated LGA named by id', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(OFF_LGA);
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Main St',
+        city: 'Ikeja',
+        state: 'Lagos',
+        lgaId: OFF_LGA.id,
+      });
+      expect(result.lgaId).toBeNull();
+      expect(result.stateCode).toBe('LA');
+    });
+
+    it('does not link a new address to a deactivated LGA named by text', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(OFF_LGA);
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Main St',
+        city: 'Ikeja',
+        state: 'Lagos',
+        administrativeAreaLevel2: 'Ikeja',
+      });
+      expect(result.lgaId).toBeNull();
+    });
+
+    it('still links a new address to an active LGA', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(ON_LGA);
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Main St',
+        city: 'Surulere',
+        state: 'Lagos',
+        lgaId: ON_LGA.id,
+      });
+      expect(result.lgaId).toBe(ON_LGA.id);
+    });
+
+    it('does not move a saved address to a deactivated LGA', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(OFF_LGA);
+      const result = await service.normalizeForUpdate(
+        {
+          ...savedWithOffLga,
+          lgaId: ON_LGA.id,
+          administrativeAreaLevel2: 'Surulere',
+        },
+        { lgaId: OFF_LGA.id },
+      );
+      expect(result.lgaId).toBeNull();
+    });
+
+    it('keeps the saved deactivated LGA when an edit does not touch the LGA', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(OFF_LGA);
+      const result = await service.normalizeForUpdate(savedWithOffLga, {
+        addressLine1: '2 New Road',
+      });
+      expect(result.lgaId).toBe(OFF_LGA.id);
+      expect(result.addressLine1).toBe('2 New Road');
+    });
+  });
 });

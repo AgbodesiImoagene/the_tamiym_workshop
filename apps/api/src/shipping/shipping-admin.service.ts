@@ -156,6 +156,7 @@ export class ShippingAdminService {
           'LGA not found or does not belong to state',
         );
       }
+      this.assertLgaActive(lga);
       lgaId = lga.id;
     }
 
@@ -419,6 +420,7 @@ export class ShippingAdminService {
         )
       ) {
         this.assertStateActive(state);
+        this.assertLgaActive(lga);
       }
       normalizedMatchValue = lga.id;
       normalizedMatchContext = state.code;
@@ -476,6 +478,14 @@ export class ShippingAdminService {
   private assertStateActive(state: { code: string; isActive: boolean }) {
     if (!state.isActive) {
       throw new BadRequestException(`State ${state.code} is deactivated`);
+    }
+  }
+
+  // Customers are only offered active LGAs, so a new rule or area for a
+  // deactivated one could never match (TTW-202).
+  private assertLgaActive(lga: { name: string; isActive: boolean }) {
+    if (!lga.isActive) {
+      throw new BadRequestException(`LGA ${lga.name} is deactivated`);
     }
   }
 
