@@ -63,16 +63,18 @@ export interface AdminOrderDetail extends AdminOrder {
   subtotalAmount: number;
   shippingFee: number;
   discountAmount: number;
-  shippingAddress?: {
-    id: string;
-    addressLine1: string;
-    addressLine2?: string | null;
-    city: string;
-    state: string;
-    country?: string | null;
-    phone?: string | null;
-    recipientName?: string | null;
-  } | null;
+  // Shipping snapshot saved when the order was placed (TTW-198). It does not follow later
+  // edits of the customer's address, unlike the linked address row.
+  shipRecipientName?: string | null;
+  shipPhone?: string | null;
+  shipLine1: string;
+  shipLine2?: string | null;
+  shipCity: string;
+  shipState: string;
+  shipPostalCode?: string | null;
+  shipCountry: string;
+  shipLandmark?: string | null;
+  shipInstructions?: string | null;
   items: Array<{
     id: string;
     quantity: number;

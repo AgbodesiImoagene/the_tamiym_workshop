@@ -14,6 +14,7 @@ import {
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
 import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
+import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
 import { getGeoLgas, getGeoStates, lgaIdPayload } from '@/lib/geo';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +33,7 @@ interface CheckoutFormState {
   lgaId: string;
   postalCode: string;
   country: string;
+  instructions: string;
 }
 
 function addressToForm(address?: ShippingAddress | null): CheckoutFormState {
@@ -46,6 +48,7 @@ function addressToForm(address?: ShippingAddress | null): CheckoutFormState {
     lgaId: address?.lgaId || '',
     postalCode: address?.postalCode || '',
     country: address?.country || 'Nigeria',
+    instructions: address?.instructions || '',
   };
 }
 
@@ -75,6 +78,8 @@ export default function DashboardCheckoutPage() {
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
   // LGA currently saved on the account address (TTW-193): emptying it must be sent as null.
   const [savedLgaId, setSavedLgaId] = useState<string | null>(null);
+  // Instructions saved on the address: emptying them sends null (TTW-198).
+  const [savedInstructions, setSavedInstructions] = useState<string | null>(null);
   const [form, setForm] = useState<CheckoutFormState>(() => addressToForm());
   // Optional note about the order (TTW-197). Kept in memory only: it can hold personal data.
   const [customerNote, setCustomerNote] = useState('');
@@ -126,6 +131,7 @@ export default function DashboardCheckoutPage() {
     if (address) {
       setSavedAddressId(address.id);
       setSavedLgaId(address.lgaId ?? null);
+      setSavedInstructions(address.instructions ?? null);
       setForm(addressToForm(address));
       setSavedAddressJson(JSON.stringify(addressToForm(address)));
     }
@@ -193,9 +199,11 @@ export default function DashboardCheckoutPage() {
       ...lgaIdPayload(form.lgaId, savedLgaId),
       postalCode: form.postalCode || undefined,
       country: form.country || 'Nigeria',
+      ...instructionsPayload(form.instructions, savedInstructions),
     });
     setSavedAddressId(address.id);
     setSavedLgaId(address.lgaId ?? null);
+    setSavedInstructions(address.instructions ?? null);
     setSavedAddressJson(JSON.stringify(form));
     return address.id;
   }
@@ -486,6 +494,18 @@ export default function DashboardCheckoutPage() {
                     onChange={(event) => updateField('country', event.target.value)}
                     className="h-12 w-full rounded-xl border border-black/15 px-4 outline-none"
                     placeholder="Nigeria"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-foreground md:col-span-2">
+                  <span>Delivery instructions</span>
+                  <textarea
+                    value={form.instructions}
+                    onChange={(event) => updateField('instructions', event.target.value)}
+                    maxLength={DELIVERY_INSTRUCTIONS_MAX_LENGTH}
+                    rows={3}
+                    className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Optional, for example: ring twice, or leave with the guard"
                   />
                 </label>
               </div>

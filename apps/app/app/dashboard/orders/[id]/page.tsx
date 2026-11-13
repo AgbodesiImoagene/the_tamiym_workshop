@@ -189,6 +189,17 @@ export default function DashboardOrderDetailPage() {
                     </>
                   ) : null}
                 </p>
+                {order.shipping.instructions ? (
+                  <div className="pt-1">
+                    <h3 className="text-sm font-semibold text-foreground">Delivery instructions</h3>
+                    <p
+                      data-testid="order-delivery-instructions"
+                      className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground"
+                    >
+                      {order.shipping.instructions}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               {order.customerNote ? (

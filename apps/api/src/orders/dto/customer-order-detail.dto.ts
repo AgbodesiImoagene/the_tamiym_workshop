@@ -108,6 +108,14 @@ export class CustomerOrderShippingSnapshotDto {
 
   @ApiPropertyOptional({ nullable: true })
   landmark?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits.',
+  })
+  instructions?: string | null;
 }
 
 /** Safe payment attempt summary — no rawEvent, idempotencyKey, or provider URLs. */

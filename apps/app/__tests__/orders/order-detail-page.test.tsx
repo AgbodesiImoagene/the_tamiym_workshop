@@ -1,8 +1,10 @@
 /**
  * TTW-197: the customer's order shows the order note as plain text, and nothing
  * when there is none.
+ * TTW-198: the customer order shows the delivery instructions saved on the order,
+ * as plain text, and nothing when there are none.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import DashboardOrderDetailPage from '@/app/dashboard/orders/[id]/page';
@@ -33,7 +35,13 @@ jest.mock('@/lib/checkout', () => ({
   initiateOrderPayment: jest.fn(),
 }));
 
-function orderDetail(customerNote: string | null) {
+function orderDetail({
+  customerNote = null,
+  instructions,
+}: {
+  customerNote?: string | null;
+  instructions?: string | null;
+} = {}) {
   return {
     policyVersion: 'v1',
     id: 'order-1',
@@ -44,21 +52,27 @@ function orderDetail(customerNote: string | null) {
     shippingFee: 2000,
     discountAmount: 0,
     totalAmount: 7000,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
     items: [],
-    shipping: {
-      recipientName: 'Ada',
-      line1: '1 Allen Avenue',
-      city: 'Ikeja',
-      state: 'Lagos',
-      country: 'Nigeria',
-    },
     payments: [],
     refunds: [],
     refundedAmountConfirmed: 0,
     paymentRetryEligible: false,
+    shipment: null,
     customerNote,
+    shipping: {
+      recipientName: 'Ada',
+      phone: '+2348000000000',
+      line1: '1 Allen Avenue',
+      line2: null,
+      city: 'Ikeja',
+      state: 'Lagos',
+      postalCode: null,
+      country: 'Nigeria',
+      landmark: null,
+      ...(instructions === undefined ? {} : { instructions }),
+    },
   };
 }
 
@@ -71,10 +85,14 @@ function renderPage() {
   );
 }
 
+beforeEach(() => {
+  (getCustomerOrderDetail as jest.Mock).mockReset();
+});
+
 describe('DashboardOrderDetailPage order note (TTW-197)', () => {
   it('shows the note as text, never as markup', async () => {
     (getCustomerOrderDetail as jest.Mock).mockResolvedValue(
-      orderDetail('Pack apart <img src=x onerror=alert(1)>')
+      orderDetail({ customerNote: 'Pack apart <img src=x onerror=alert(1)>' })
     );
     const { container } = renderPage();
 
@@ -84,10 +102,38 @@ describe('DashboardOrderDetailPage order note (TTW-197)', () => {
   });
 
   it('shows no note section when the order has none', async () => {
-    (getCustomerOrderDetail as jest.Mock).mockResolvedValue(orderDetail(null));
+    (getCustomerOrderDetail as jest.Mock).mockResolvedValue(orderDetail({ customerNote: null }));
     renderPage();
 
     await screen.findByText('Shipping destination');
     expect(screen.queryByText('Order note')).not.toBeInTheDocument();
   });
+});
+
+describe('customer order delivery instructions (TTW-198)', () => {
+  it('shows the instructions as text, keeping the line breaks and not reading HTML', async () => {
+    (getCustomerOrderDetail as jest.Mock).mockResolvedValue(
+      orderDetail({ instructions: 'Ring twice\nLeave with the guard <b>please</b>' })
+    );
+    const { container } = renderPage();
+
+    await screen.findByText('Delivery instructions');
+    const text = container.querySelector('[data-testid="order-delivery-instructions"]');
+    expect(text?.textContent).toBe('Ring twice\nLeave with the guard <b>please</b>');
+    expect(text?.querySelector('b')).toBeNull();
+    expect(text).toHaveClass('whitespace-pre-wrap');
+  });
+
+  it.each([[null], [undefined], ['']])(
+    'shows nothing when the instructions are %p',
+    async (value) => {
+      (getCustomerOrderDetail as jest.Mock).mockResolvedValue(
+        orderDetail({ instructions: value })
+      );
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText('Shipping destination')).toBeInTheDocument());
+      expect(screen.queryByText('Delivery instructions')).not.toBeInTheDocument();
+    }
+  );
 });
