@@ -127,9 +127,7 @@ describe('customer order delivery instructions (TTW-198)', () => {
   it.each([[null], [undefined], ['']])(
     'shows nothing when the instructions are %p',
     async (value) => {
-      (getCustomerOrderDetail as jest.Mock).mockResolvedValue(
-        orderDetail({ instructions: value })
-      );
+      (getCustomerOrderDetail as jest.Mock).mockResolvedValue(orderDetail({ instructions: value }));
       renderPage();
 
       await waitFor(() => expect(screen.getByText('Shipping destination')).toBeInTheDocument());
