@@ -53,7 +53,8 @@ export interface UpsertAddressInput {
   country?: string;
   postalCode?: string;
   landmark?: string;
-  instructions?: string;
+  // Plain text, 500 characters at most. null removes the saved instructions (TTW-198).
+  instructions?: string | null;
 }
 
 export async function getUserProfile() {

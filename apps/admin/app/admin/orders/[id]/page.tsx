@@ -145,26 +145,52 @@ export default function AdminOrderDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45">
                     Shipping address
                   </p>
-                  {order.shippingAddress ? (
-                    <div className="mt-2 space-y-1 text-sm text-black/65">
-                      <p className="font-semibold text-black">
-                        {order.shippingAddress.recipientName || 'No recipient name'}
-                      </p>
-                      <p>{order.shippingAddress.addressLine1}</p>
-                      {order.shippingAddress.addressLine2 ? (
-                        <p>{order.shippingAddress.addressLine2}</p>
-                      ) : null}
-                      <p>
-                        {order.shippingAddress.city}, {order.shippingAddress.state}
-                      </p>
-                      {order.shippingAddress.phone ? <p>{order.shippingAddress.phone}</p> : null}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-black/55">No shipping address recorded.</p>
-                  )}
+                  <div className="mt-2 space-y-1 text-sm text-black/65">
+                    <p className="font-semibold text-black">
+                      {order.shipRecipientName || 'No recipient name'}
+                    </p>
+                    <p>{order.shipLine1}</p>
+                    {order.shipLine2 ? <p>{order.shipLine2}</p> : null}
+                    <p>
+                      {order.shipCity}, {order.shipState}
+                    </p>
+                    {order.shipPostalCode ? <p>{order.shipPostalCode}</p> : null}
+                    <p>{order.shipCountry}</p>
+                    {order.shipPhone ? <p>{order.shipPhone}</p> : null}
+                    {order.shipLandmark ? <p>Landmark: {order.shipLandmark}</p> : null}
+                    {order.shipInstructions ? (
+                      <div className="pt-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Delivery instructions
+                        </p>
+                        <p
+                          data-testid="order-delivery-instructions"
+                          className="mt-1 whitespace-pre-wrap break-words text-foreground"
+                        >
+                          {order.shipInstructions}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            {order.customerNote ? (
+              <Card className="rounded-[1.75rem] border-black/8 shadow-none">
+                <CardHeader>
+                  <CardTitle>Customer note</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p
+                    data-testid="admin-order-customer-note"
+                    className="whitespace-pre-wrap break-words text-sm text-black/75"
+                  >
+                    {order.customerNote}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card className="rounded-[1.75rem] border-black/8 shadow-none">
               <CardHeader>

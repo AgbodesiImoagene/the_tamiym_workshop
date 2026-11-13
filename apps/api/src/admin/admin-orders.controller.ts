@@ -62,7 +62,11 @@ export class AdminOrdersController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Order ID' })
-  @ApiResponse({ status: 200, description: 'Order' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later.',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Order not found' })

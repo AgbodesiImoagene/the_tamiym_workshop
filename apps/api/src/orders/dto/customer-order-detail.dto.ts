@@ -6,6 +6,7 @@ import {
   PaymentStatus,
   RefundStatus,
 } from '../../generated/prisma/enums';
+import { ORDER_NOTE_MAX_LENGTH } from './create-order.dto';
 import { CUSTOMER_ORDER_DETAIL_POLICY_VERSION } from '../order-item-snapshot';
 import { CustomerShipmentSummaryDto } from '../../shipments/dto/customer-shipment-summary.dto';
 import { CUSTOMER_SHIPMENT_ABSENT_MESSAGE } from '../../shipments/shipments.constants';
@@ -107,6 +108,14 @@ export class CustomerOrderShippingSnapshotDto {
 
   @ApiPropertyOptional({ nullable: true })
   landmark?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits.',
+  })
+  instructions?: string | null;
 }
 
 /** Safe payment attempt summary — no rawEvent, idempotencyKey, or provider URLs. */
@@ -230,6 +239,15 @@ export class CustomerOrderDetailDto {
 
   @ApiProperty({ type: CustomerOrderShippingSnapshotDto })
   shipping!: CustomerOrderShippingSnapshotDto;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    maxLength: ORDER_NOTE_MAX_LENGTH,
+    description:
+      'Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML.',
+  })
+  customerNote?: string | null;
 
   @ApiProperty({ type: [CustomerOrderPaymentSummaryDto] })
   payments!: CustomerOrderPaymentSummaryDto[];

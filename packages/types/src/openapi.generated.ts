@@ -3397,8 +3397,11 @@ export interface components {
             formattedAddress?: string;
             /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
             googlePlaceId?: string;
-            /** @example Leave at gate */
-            instructions?: string;
+            /**
+             * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+             * @example Leave at gate
+             */
+            instructions?: string | null;
             /**
              * @default false
              * @example false
@@ -3592,6 +3595,8 @@ export interface components {
             valueCode: string;
         };
         CreateOrderDto: {
+            /** @example Please pack the two hoodies separately */
+            customerNote?: string | null;
             idempotencyKey?: string;
             items: {
                 /** @example campaign-1 */
@@ -3919,6 +3924,8 @@ export interface components {
             createdAt: string;
             /** @enum {string} */
             currency: "NGN";
+            /** @description Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML. */
+            customerNote?: string | null;
             /** @example 0 */
             discountAmount: number;
             expiresAt?: Record<string, never> | null;
@@ -4044,6 +4051,8 @@ export interface components {
                 city: string;
                 /** @example Nigeria */
                 country: string;
+                /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+                instructions?: string | null;
                 landmark?: Record<string, never> | null;
                 line1: string;
                 line2?: Record<string, never> | null;
@@ -4145,6 +4154,8 @@ export interface components {
             city: string;
             /** @example Nigeria */
             country: string;
+            /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+            instructions?: string | null;
             landmark?: Record<string, never> | null;
             line1: string;
             line2?: Record<string, never> | null;
@@ -4729,8 +4740,11 @@ export interface components {
             formattedAddress?: string;
             /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
             googlePlaceId?: string;
-            /** @example Leave at gate */
-            instructions?: string;
+            /**
+             * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+             * @example Leave at gate
+             */
+            instructions?: string | null;
             /** @example false */
             isDefault?: boolean;
             /** @example Near the roundabout */
@@ -7337,7 +7351,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Order */
+            /** @description Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -11673,6 +11687,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @example Please pack the two hoodies separately */
+                    customerNote?: string | null;
                     idempotencyKey?: string;
                     items: {
                         /** @example campaign-1 */
@@ -11725,7 +11741,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a standard order or another campaign. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same request on this campaign returns that order (201). */
+            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a standard order or another campaign. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address, order note); use a new key. A key already used for the same request on this campaign returns that order (201). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -12912,6 +12928,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @example Please pack the two hoodies separately */
+                    customerNote?: string | null;
                     idempotencyKey?: string;
                     items: {
                         /** @example campaign-1 */
@@ -12957,7 +12975,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests. */
+            /** @description IDEMPOTENCY_KEY_REUSED — the idempotency key already belongs to a campaign order. IDEMPOTENCY_KEY_PAYLOAD_MISMATCH — the key was already used with different content (lines, saved delivery address, order note); use a new key. A key already used for the same standard request returns that order (201), including under concurrent requests. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13065,6 +13083,8 @@ export interface operations {
                         createdAt: string;
                         /** @enum {string} */
                         currency: "NGN";
+                        /** @description Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML. */
+                        customerNote?: string | null;
                         /** @example 0 */
                         discountAmount: number;
                         expiresAt?: Record<string, never> | null;
@@ -13190,6 +13210,8 @@ export interface operations {
                             city: string;
                             /** @example Nigeria */
                             country: string;
+                            /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+                            instructions?: string | null;
                             landmark?: Record<string, never> | null;
                             line1: string;
                             line2?: Record<string, never> | null;
@@ -14221,8 +14243,11 @@ export interface operations {
                     formattedAddress?: string;
                     /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
                     googlePlaceId?: string;
-                    /** @example Leave at gate */
-                    instructions?: string;
+                    /**
+                     * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+                     * @example Leave at gate
+                     */
+                    instructions?: string | null;
                     /**
                      * @default false
                      * @example false
@@ -14461,8 +14486,11 @@ export interface operations {
                     formattedAddress?: string;
                     /** @example ChIJrTLr-GyuEmsRBfy61i59si0 */
                     googlePlaceId?: string;
-                    /** @example Leave at gate */
-                    instructions?: string;
+                    /**
+                     * @description Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.
+                     * @example Leave at gate
+                     */
+                    instructions?: string | null;
                     /** @example false */
                     isDefault?: boolean;
                     /** @example Near the roundabout */

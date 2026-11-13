@@ -136,19 +136,21 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 2 : Comptes et achat d'un produit
 
-| Fait | N°  | Ticket                                                             | Lot | Travail                                                         | Excel    | Risque   | Heures | Attend           |
-| ---- | --- | ------------------------------------------------------------------ | --- | --------------------------------------------------------------- | -------- | -------- | ------ | ---------------- |
-| [ ]  | 10  | [TTW-092](ttw-092-build-product-detail-page.md)                    | 2A  | Fiche produit : galerie, taille, couleur, quantité par taille   | 2.2, 2.1 | Standard | 25–40  | —                |
-| [ ]  | 11  | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)          | 2A  | Pages « mot de passe oublié » et réinitialisation               | 1.1      | Élevé    | 6–10   | TTW-083          |
-| [ ]  | 12  | [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)   | 2A  | Saisir les suppléments de taille et de face imprimée            | 2.7      | Élevé    | 8–14   | —                |
-| [ ]  | 13  | [TTW-097](ttw-097-complete-shipping-zone-administration.md)        | 2A  | Corriger et supprimer tarifs et zones de livraison              | 8.2      | Élevé    | 6–10   | —                |
-| [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                  | 2A  | Retirer la fausse photo de profil et son bouton                 | 1.2      | Faible   | 1      | —                |
-| [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)     | 2B  | Message « e-mail non vérifié » et renvoi du lien                | 1.4      | Élevé    | 3–5    | TTW-089          |
-| [ ]  | 16  | [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)   | 2B  | Vraies catégories et pagination du catalogue                    | 2.3      | Standard | 4–8    | TTW-092          |
-| [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md) | 2B  | Tarif de livraison selon le poids ou la quantité                | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086 |
-| [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md) | 2C  | Palier de prix calculé sur le total du produit                  | 8.5      | Élevé    | 4–8    | TTW-094, Q38     |
-| [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)            | 2D  | Faire fonctionner les remises produit et commande               | 8.1      | Élevé    | 10–16  | TTW-095          |
-| [ ]  | —   | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)   | 2C  | Liste produits : vraies couleurs, vrai prix, cartes comme Figma | Figma    | Standard | 6–10   | TTW-093          |
+| Fait | N°  | Ticket                                                                   | Lot | Travail                                                             | Excel    | Risque   | Heures | Attend           |
+| ---- | --- | ------------------------------------------------------------------------ | --- | ------------------------------------------------------------------- | -------- | -------- | ------ | ---------------- |
+| [ ]  | 10  | [TTW-092](ttw-092-build-product-detail-page.md)                          | 2A  | Fiche produit : galerie, taille, couleur, quantité par taille       | 2.2, 2.1 | Standard | 25–40  | —                |
+| [ ]  | 11  | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)                | 2A  | Pages « mot de passe oublié » et réinitialisation                   | 1.1      | Élevé    | 6–10   | TTW-083          |
+| [ ]  | 12  | [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)         | 2A  | Saisir les suppléments de taille et de face imprimée                | 2.7      | Élevé    | 8–14   | —                |
+| [ ]  | 13  | [TTW-097](ttw-097-complete-shipping-zone-administration.md)              | 2A  | Corriger et supprimer tarifs et zones de livraison                  | 8.2      | Élevé    | 6–10   | —                |
+| [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                        | 2A  | Retirer la fausse photo de profil et son bouton                     | 1.2      | Faible   | 1      | —                |
+| [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)           | 2B  | Message « e-mail non vérifié » et renvoi du lien                    | 1.4      | Élevé    | 3–5    | TTW-089          |
+| [ ]  | 16  | [TTW-093](ttw-093-use-real-categories-and-paginate-catalogue.md)         | 2B  | Vraies catégories et pagination du catalogue                        | 2.3      | Standard | 4–8    | TTW-092          |
+| [ ]  | —   | [TTW-197](ttw-197-add-an-order-note-at-checkout.md)                      | 2B  | Note de commande saisie au paiement et visible par l'admin          | 2.2      | Élevé    | 6–10   | TTW-092          |
+| [ ]  | —   | [TTW-198](ttw-198-show-delivery-instructions-on-addresses-and-orders.md) | 2B  | Saisir les instructions de livraison et les montrer sur la commande | —        | Standard | 3–5    | —                |
+| [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md)       | 2B  | Tarif de livraison selon le poids ou la quantité                    | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086 |
+| [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md)       | 2C  | Palier de prix calculé sur le total du produit                      | 8.5      | Élevé    | 4–8    | TTW-094, Q38     |
+| [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)                  | 2D  | Faire fonctionner les remises produit et commande                   | 8.1      | Élevé    | 10–16  | TTW-095          |
+| [ ]  | —   | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)         | 2C  | Liste produits : vraies couleurs, vrai prix, cartes comme Figma     | Figma    | Standard | 6–10   | TTW-093          |
 
 ## Phase 3 : Commander son design et l'imprimer
 

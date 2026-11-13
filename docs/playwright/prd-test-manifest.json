@@ -140,7 +140,9 @@
       "prd_ref": "Checkout & Orders",
       "automation": "automated",
       "tests": [
+        "tests/e2e/app/checkout-delivery-instructions.spec.ts",
         "tests/e2e/app/checkout-idempotency.spec.ts",
+        "tests/e2e/app/checkout-order-note.spec.ts",
         "tests/e2e/app/checkout-shipping-coverage.spec.ts"
       ],
       "browser_tiers": ["matrix", "journey"],

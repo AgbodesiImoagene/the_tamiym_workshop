@@ -437,6 +437,7 @@ export class PrivacyService {
           shipPostalCode: null,
           shipLandmark: null,
           shipInstructions: null,
+          customerNote: null,
         },
       });
       await this.recordActionTx(
@@ -601,6 +602,7 @@ export class PrivacyService {
         status: true,
         currency: true,
         totalAmount: true,
+        customerNote: true,
         createdAt: true,
       },
       take: 500,
