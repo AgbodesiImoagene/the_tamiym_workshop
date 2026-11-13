@@ -83,8 +83,26 @@ Run on 2026-11-13 in this worktree, on a dedicated database (`tamiym_ttw208_e2e`
 - `tsc --noEmit` (api), `eslint` on the two changed files and `prettier --check` on the changed files: clean.
 - Not verified: the GitHub `CI` run after the push (recorded under the completion summary once read).
 
+## Follow-up after the first push (CI on `main`)
+
+The push of the fix (`8dc0be9`) made `auth-role` pass but the "API Integration" job still failed, with `Unhandled error. ([Error: Connection is closed.])` from BullMQ (108 occurrences in the log, none in the 7 earlier runs):
+
+- Pass 1 failed in `products.e2e-spec.ts`, the re-run's pass 2 in `site-settings-default.e2e-spec.ts`. In both, the failing suite ran right after `e2e-app-auth-counters.e2e-spec.ts`, the suite added by this ticket.
+- Cause: that suite booted the application and closed it at once. The queues open their Redis connections in the background; closing before they are ready makes BullMQ raise "Connection is closed" a moment later, inside whichever suite runs next.
+- Reproduced locally: running `e2e-app-auth-counters` then `products` printed the error on 1 run out of 3.
+- Fix (test only, no change to the helper): before closing the app, the test waits for the three queues (`waitUntilReady()`). 5 runs of the same pair afterwards: no error.
+- The reset itself (`createE2eApp()`) is unchanged and did its job: `auth-role` no longer answers 429.
+
+Independent review of the follow-up by a fresh read-only subagent, 2026-11-13: **PASS**, no blocking finding. The assertions are unchanged and run before the waits, `closeE2eApp` still runs in the `finally`, the queue names and tokens match `src/constants.ts` and `src/media/media.constants.ts`, and `waitUntilReady()` is bounded by the Jest timeout.
+
+Verification evidence for the follow-up (2026-11-13, dedicated database `tamiym_ttw208b_e2e`, Redis db 9):
+
+- Full `pnpm --filter api test:e2e`, 4 runs: 3 runs with 39 suites and 192 tests passed, 0 "Connection is closed". One run failed on `address-edit-state` (403) and `auth-link-retention` (socket hang up) while the machine was heavily loaded (load average 32); not reproduced in the other 3 runs; those suites do not touch queue closing, so a link with this change is unlikely, but that is an inference, not a proof.
+- `tsc --noEmit` (api), `eslint` and `prettier --check` on the changed file: clean.
+- Not verified: the GitHub `CI` run after the second push.
+
 ## Completion summary
 
-Done: `createE2eApp()` now deletes the Redis keys `ttw:auth:rl:ip:*` before booting the application, so each suite starts with empty IP counters, and `test/e2e-app-auth-counters.e2e-spec.ts` proves it, including that identity counters are kept. No production code changed.
+Done: `createE2eApp()` deletes the Redis keys `ttw:auth:rl:ip:*` before booting the application, so each suite starts with empty IP counters, and `test/e2e-app-auth-counters.e2e-spec.ts` proves it, including that identity counters are kept. The first version of that test leaked a BullMQ error into the next suite; it now waits for the queues before closing the application. No production code changed.
 
-Left to do: read the `CI` run on `main` after the push.
+Left to do: read the `CI` run on `main` after the push, then tick the ROADMAP.

@@ -1,4 +1,8 @@
+import { getQueueToken } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import Redis from 'ioredis';
+import { MAIL_QUEUE_NAME, PAYOUT_QUEUE_NAME } from '../src/constants';
+import { MEDIA_QUEUE } from '../src/media/media.constants';
 import {
   authRateLimitIdentityKey,
   authRateLimitIpKey,
@@ -45,6 +49,14 @@ describe('createE2eApp auth counters (e2e)', () => {
     try {
       expect(await redis.exists(...ipKeys)).toBe(0);
       expect(await redis.get(identityKey)).toBe('3');
+      // The queues open their Redis connections in the background. Closing the app before
+      // they are ready makes BullMQ raise "Connection is closed" a moment later, inside
+      // whichever suite runs next (seen on CI: products, site-settings-default).
+      for (const name of [MAIL_QUEUE_NAME, PAYOUT_QUEUE_NAME, MEDIA_QUEUE]) {
+        await app
+          .get<Queue>(getQueueToken(name), { strict: false })
+          .waitUntilReady();
+      }
     } finally {
       await closeE2eApp(app);
     }
