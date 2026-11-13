@@ -1,7 +1,7 @@
 # TTW-197 — Add an order note at checkout
 
 **Epic:** 8 — Client review delivery\
-**Status:** Done (local commit, awaiting merge after TTW-092)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-092\
 **Blocks:** None

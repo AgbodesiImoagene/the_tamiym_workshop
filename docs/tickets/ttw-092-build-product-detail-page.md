@@ -1,7 +1,7 @@
 # TTW-092 — Build the product detail page
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, reviewed, journeys green; Figma comparison pending\
+**Status:** Complete (Figma comparison not done: the Figma canvas could not be read)\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-093, TTW-058, TTW-123

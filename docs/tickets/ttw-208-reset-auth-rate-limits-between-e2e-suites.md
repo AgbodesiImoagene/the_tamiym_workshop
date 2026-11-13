@@ -1,7 +1,7 @@
 # TTW-208 — Reset the auth IP counters between API e2e suites
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -51,9 +51,9 @@ The `CI` workflow on `main` fails in the "API Integration" job on `test/auth-rol
 
 ## Acceptance criteria
 
-- [ ] A new suite that logs in many times no longer makes `auth-role` fail with 429.
-- [ ] `CI` is green on `main`, including both API e2e passes.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] A new suite that logs in many times no longer makes `auth-role` fail with 429.
+- [x] `CI` is green on `main`, including both API e2e passes.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -99,10 +99,10 @@ Verification evidence for the follow-up (2026-11-13, dedicated database `tamiym_
 
 - Full `pnpm --filter api test:e2e`, 4 runs: 3 runs with 39 suites and 192 tests passed, 0 "Connection is closed". One run failed on `address-edit-state` (403) and `auth-link-retention` (socket hang up) while the machine was heavily loaded (load average 32); not reproduced in the other 3 runs; those suites do not touch queue closing, so a link with this change is unlikely, but that is an inference, not a proof.
 - `tsc --noEmit` (api), `eslint` and `prettier --check` on the changed file: clean.
-- Not verified: the GitHub `CI` run after the second push.
+- GitHub `CI` on `main` after the second push (`8efc7c9`, run `43448785916`): **success**, all jobs green including "API Integration" (both API e2e passes). `Playwright Comprehensive` on the next `main` commit: success.
 
 ## Completion summary
 
 Done: `createE2eApp()` deletes the Redis keys `ttw:auth:rl:ip:*` before booting the application, so each suite starts with empty IP counters, and `test/e2e-app-auth-counters.e2e-spec.ts` proves it, including that identity counters are kept. The first version of that test leaked a BullMQ error into the next suite; it now waits for the queues before closing the application. No production code changed.
 
-Left to do: read the `CI` run on `main` after the push, then tick the ROADMAP.
+Left to do: nothing.
