@@ -17,8 +17,9 @@ TTW-211 changed `apps/api/src/config/throttler-redis.factory.ts` (commits `f1f66
 
 Add an e2e spec, `apps/api/test/throttler-cold-start.e2e-spec.ts`, that builds a minimal Nest application with the production factory (`createThrottlerModuleOptions`) against the real Redis of the test environment, one controller guarded by `ThrottlerGuard`, and checks:
 
-1. After the storage's client is `ready`, the first throttled request is served (200), then the next one too. A lazily connecting client fails here (500, "Stream isn't writeable").
-2. After `app.close()` the client reaches `end`. A client built outside the storage is never closed by it and fails here.
+1. After the storage's client is `ready`, the first throttled request is served (200). A lazily connecting client never becomes `ready`, so the wait fails with a clear message ("Redis client is still 'wait'...").
+2. Two further requests are counted in Redis: the `totalHits` returned by the storage's `increment` rises by one between them.
+3. After `app.close()` the client reaches `end`. A client built outside the storage is never closed by it and fails here.
 
 ## Invariants
 
@@ -34,7 +35,7 @@ Add an e2e spec, `apps/api/test/throttler-cold-start.e2e-spec.ts`, that builds a
 ## Test and observability plan
 
 - The spec itself, run against the real Redis (`REDIS_*` of `.env.test`).
-- Proof that it fails for the right reason (recorded below): with `lazyConnect: true` restored (first assertion), and with a client built by the caller instead of options (second assertion).
+- Proof that it fails for the right reason (recorded below): with `lazyConnect: true` restored (readiness wait), and with a client built by the caller instead of options (close assertion). The counting assertion relies on the value returned by the real Lua script and was not mutation-tested.
 - Logs, metrics, traces, and alerts: nothing new.
 
 ## References
@@ -61,12 +62,13 @@ Low risk, test only. Blast radius: one new e2e file. It talks to the same Redis 
 
 ## Implementation reviews
 
-No independent review: test-only change of Low risk, proven in both directions against the code it guards (see Verification evidence).
+- `/code-review` (high), 2026-11-14: no blocking finding, 9 notes, 6 fixed in this ticket's follow-up: (1) the review was missing (this section); (2) the spec defaulted to Redis db 0 locally instead of the test db 15: now defaults to 15 and restores `REDIS_DB` afterwards; (3) the second test only asserted 200 although it was named "counted": it now spies on the storage's `increment` and checks `totalHits` rises by one; (4) `afterAll` crashed with a TypeError if `beforeAll` failed and the readiness wait timed out silently: both guarded, the wait now throws a message naming host, port and db; (5) the unmeasured claim about production boot time: reworded as not measured; (6) two duplicated polling loops: one `waitForStatus` helper. Not fixed here: the CI timeout margin of passes 1 and 2, see TTW-213.
 
 ## Verification evidence
 
 - Probe script (storage built with options, command sent right after creation): `increment immediately FAILED: Stream isn't writeable and enableOfflineQueue options is false`, `ready` about 26 ms later, then `increment later OK`.
-- With the current factory: `pnpm --filter api test:e2e -- test/throttler-cold-start.e2e-spec.ts` → 2 passed.
+- With the current factory: `pnpm --filter api test:e2e -- test/throttler-cold-start.e2e-spec.ts` → 2 passed (after the review fixes).
+- After the review fixes, with `lazyConnect: true` restored (temporary, reverted): 2 failed, `Redis client is still 'wait', expected 'ready' after 3000 ms (Redis at localhost:6379, db 15)`. With the storage given a client built outside (temporary, reverted, `--forceExit`): `Redis client is still 'ready', expected 'end' after 3000 ms`.
 - With `lazyConnect: true` restored (temporary, reverted): both requests answered 500 "Stream isn't writeable", 2 failed.
 - With the storage given `new Redis({...})` instead of options (temporary, reverted, run with `--forceExit` because the leaked client keeps Jest alive): `Expected: "end"`, `Received: "ready"`; the leak is also why this variant hangs without `--forceExit`.
 - CI on `main` (`f59b223`, run 43619535096): `CI` success, including the new spec. `pnpm --filter api test` 151 suites / 1474 tests pass; `--detectOpenHandles` on the new spec reports nothing.
