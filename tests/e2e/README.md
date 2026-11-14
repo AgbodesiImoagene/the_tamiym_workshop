@@ -51,7 +51,7 @@ Local tip: export the same env as API Integration (or use `apps/api/.env.test`) 
 
 ## Specs that write shared settings
 
-Site settings are one global row that checkout and payout specs read. Specs that really change it live in `tests/e2e/admin-settings-writes/` and run in the `chromium-admin-settings-writes` project (TTW-211), which starts only after the web, app, admin and journey projects have finished, takes its tests one at a time, and restores the row after each test. Do not put such a spec in the other projects.
+Site settings are one global row that checkout and payout specs read. Specs that really change it live in `tests/e2e/admin-settings-writes/` and run in the `chromium-admin-settings-writes` project (TTW-211), which starts only after the web, app, admin and journey projects have finished, takes its tests one at a time, and restores the row after each test. Do not put such a spec in the other projects. Keep a single spec file in it (`fullyParallel: false` only serialises the tests of one file). The matrix-only projects (Firefox, WebKit, mobile, a11y, visual) depend on `setup` alone and can overlap with it: none of them prices an order today, so add a dependency if one ever does.
 
 ## Running beside other checkouts or worktrees
 

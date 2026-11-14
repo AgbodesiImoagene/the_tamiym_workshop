@@ -22,7 +22,7 @@ import { openSiteSettings, SITE_SETTINGS_API } from '../admin/site-settings-help
  * - each test restores the row it found in `afterEach`, even when it fails.
  */
 let admin: APIRequestContext;
-let original: SiteSettingsValues;
+let original: SiteSettingsValues | undefined;
 
 test.beforeAll(async () => {
   admin = await createAdminApi();
@@ -34,9 +34,15 @@ test.afterAll(async () => {
 
 test.beforeEach(async () => {
   original = await readSiteSettings(admin);
+  // Refuse a corrupted starting row: it would be taken as the reference and
+  // "restored" as is, hiding the damage from the next test and from the readers.
+  expect(original.vatRate, 'the settings row starts with a VAT fraction').toBeGreaterThanOrEqual(0);
+  expect(original.vatRate, 'the settings row starts with a VAT fraction').toBeLessThanOrEqual(1);
 });
 
 test.afterEach(async () => {
+  // beforeAll/beforeEach failed: nothing was read, so nothing was changed.
+  if (!admin || !original) return;
   await restoreSiteSettings(admin, original);
   // The restore must have landed: other specs read this row.
   expect(await readSiteSettings(admin)).toEqual(original);
