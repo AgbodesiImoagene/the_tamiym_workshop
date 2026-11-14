@@ -230,6 +230,10 @@ jobs:
           pnpm --filter api test:e2e 2>&1 | tee apps/api/e2e-pass-2.log
       - name: Prove no open handles
         shell: bash
+        env:
+          # TTW-213: the suite takes ~95 s on a runner and the proof is cut at
+          # its budget, so 120 s was too tight (failed on a docs-only commit).
+          E2E_OPEN_HANDLE_TIMEOUT_MS: '240000'
         run: |
           set -o pipefail
           node scripts/quality/prove-e2e-open-handles.mjs 2>&1 | tee apps/api/e2e-open-handles.log
