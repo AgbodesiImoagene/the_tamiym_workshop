@@ -49,6 +49,10 @@ PRD-to-test traceability: `docs/playwright/prd-test-manifest.json` (validated in
 
 Local tip: export the same env as API Integration (or use `apps/api/.env.test`) before migrate/seed/start.
 
+## Specs that write shared settings
+
+Site settings are one global row that checkout and payout specs read. Specs that really change it live in `tests/e2e/admin-settings-writes/` and run in the `chromium-admin-settings-writes` project (TTW-211), which starts only after the web, app, admin and journey projects have finished, takes its tests one at a time, and restores the row after each test. Do not put such a spec in the other projects.
+
 ## Tags
 
 `@smoke` `@web` `@app` `@admin` `@journey` `@comprehensive` (plus `@critical` `@a11y` `@visual` for later tickets).

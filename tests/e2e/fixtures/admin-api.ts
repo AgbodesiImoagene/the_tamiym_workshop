@@ -74,3 +74,54 @@ export async function listZoneAreas(admin: APIRequestContext, zoneId: string): P
   }
   return (await res.json()) as unknown[];
 }
+
+/** The site settings the admin form edits (`GET`/`PATCH /admin/site-settings`). */
+export interface SiteSettingsValues {
+  vatRate: number;
+  pricesIncludeVat: boolean;
+  vatAppliesToShipping: boolean;
+  currency: string;
+  payoutMode: string;
+  payoutCadenceDays: number;
+  payoutSettlementHoldDays: number;
+  minimumPayoutAmount: number | null;
+  autoRetryFailedPayouts: boolean;
+}
+
+/** Reads the one global settings row through `GET /admin/site-settings`. */
+export async function readSiteSettings(admin: APIRequestContext): Promise<SiteSettingsValues> {
+  const res = await admin.get('admin/site-settings');
+  if (!res.ok()) {
+    throw new Error(`Reading site settings failed: ${res.status()} ${await res.text()}`);
+  }
+  const body = (await res.json()) as SiteSettingsValues;
+  if (body.vatRate === null || body.vatRate === undefined) {
+    throw new Error('Site settings have no VAT rate: run seed:e2e before the settings spec');
+  }
+  return {
+    vatRate: body.vatRate,
+    pricesIncludeVat: body.pricesIncludeVat,
+    vatAppliesToShipping: body.vatAppliesToShipping,
+    currency: body.currency,
+    payoutMode: body.payoutMode,
+    payoutCadenceDays: body.payoutCadenceDays,
+    payoutSettlementHoldDays: body.payoutSettlementHoldDays,
+    minimumPayoutAmount: body.minimumPayoutAmount,
+    autoRetryFailedPayouts: body.autoRetryFailedPayouts,
+  };
+}
+
+/**
+ * Writes the given values back through `PATCH /admin/site-settings`.
+ * A failure throws: a settings row left changed would shift the totals of the
+ * checkout and payout specs that read it.
+ */
+export async function restoreSiteSettings(
+  admin: APIRequestContext,
+  values: SiteSettingsValues
+): Promise<void> {
+  const res = await admin.patch('admin/site-settings', { data: values });
+  if (!res.ok()) {
+    throw new Error(`Restoring site settings failed: ${res.status()} ${await res.text()}`);
+  }
+}
