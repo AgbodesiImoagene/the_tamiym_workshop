@@ -11,6 +11,27 @@ export const FIXTURE_PREFIX = 'e2e-';
  * spec can call it. Only rows tied to `e2e-` fixtures are deleted.
  */
 export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
+  // TTW-210: a real checkout on a fixture user or variant writes orders whose
+  // ids are generated (not `e2e-`). Orders and addresses are Restrict
+  // parents of users and variants, so these orders go first; their items,
+  // payments and refunds go with them (cascade), movements are detached.
+  await prisma.order.deleteMany({
+    where: {
+      OR: [
+        { userId: { startsWith: FIXTURE_PREFIX } },
+        {
+          items: {
+            some: {
+              OR: [
+                { variantId: { startsWith: FIXTURE_PREFIX } },
+                { productId: { startsWith: FIXTURE_PREFIX } },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  });
   // Findings go with their run (cascade).
   await prisma.reconciliationRun.deleteMany({
     where: { id: { startsWith: FIXTURE_PREFIX } },

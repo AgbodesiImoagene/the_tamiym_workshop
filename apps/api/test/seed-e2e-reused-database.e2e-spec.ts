@@ -16,6 +16,9 @@ import {
  * `pnpm seed:e2e` does. It reads the same DATABASE_URL as this suite.
  */
 describe('seed:e2e on a reused database (e2e)', () => {
+  // Each test runs the real seed twice (ts-node start-up + ~100 inserts).
+  jest.setTimeout(400_000);
+
   const apiRoot = join(__dirname, '..');
   const fixtureEffectKey = 'ttw-210:fixture-movement';
   const controlEffectKey = 'ttw-210:control-movement';
@@ -24,19 +27,25 @@ describe('seed:e2e on a reused database (e2e)', () => {
     product: 'ttw210-control-product',
     variant: 'ttw210-control-variant',
   };
+  const checkoutOrderNumber = 'ttw210-checkout-order-ref';
   let context: PrismaScriptContext;
+  let previousSettings: Awaited<ReturnType<typeof readSettings>>;
+
+  function readSettings() {
+    return context.prisma.siteSettings.findUnique({ where: { id: 'default' } });
+  }
 
   function runSeed() {
     execFileSync(
-      'pnpm',
+      process.execPath,
       [
-        'exec',
-        'ts-node',
+        '-r',
+        'ts-node/register',
         '-r',
         'tsconfig-paths/register',
         'scripts/seed-e2e-dummy-data.ts',
       ],
-      { cwd: apiRoot, env: process.env, stdio: 'pipe', timeout: 120_000 },
+      { cwd: apiRoot, env: process.env, stdio: 'pipe', timeout: 150_000 },
     );
   }
 
@@ -48,6 +57,9 @@ describe('seed:e2e on a reused database (e2e)', () => {
 
   async function removeControlRows() {
     const { prisma } = context;
+    await prisma.order.deleteMany({
+      where: { paymentReference: checkoutOrderNumber },
+    });
     await prisma.inventoryMovement.deleteMany({
       where: { effectKey: { in: [fixtureEffectKey, controlEffectKey] } },
     });
@@ -60,11 +72,17 @@ describe('seed:e2e on a reused database (e2e)', () => {
 
   beforeAll(async () => {
     context = createPrismaScriptContext();
+    previousSettings = await readSettings();
     await removeControlRows();
   });
 
   afterAll(async () => {
     await removeControlRows();
+    // The seed rewrites the default settings row; other suites share it.
+    await context.prisma.siteSettings.deleteMany({ where: { id: 'default' } });
+    if (previousSettings) {
+      await context.prisma.siteSettings.create({ data: previousSettings });
+    }
     await closePrismaScriptContext(context);
   });
 
@@ -116,6 +134,48 @@ describe('seed:e2e on a reused database (e2e)', () => {
     ).toBe(1);
     expect(
       await prisma.productVariant.count({ where: { id: controlIds.variant } }),
+    ).toBe(1);
+  });
+
+  it('clears orders a real checkout left on fixture variants (ids are not e2e-)', async () => {
+    const { prisma } = context;
+    runSeed();
+
+    const fixtureVariant = await prisma.productVariant.findFirstOrThrow({
+      where: { id: { startsWith: 'e2e-' } },
+    });
+    const order = await prisma.order.create({
+      data: {
+        userId: 'e2e-user-customer',
+        shippingAddressId: 'e2e-address-customer-main',
+        subtotalAmount: '1000.00',
+        totalAmount: '1000.00',
+        shipLine1: '1 Test Street',
+        shipCity: 'Ikeja',
+        shipState: 'Lagos',
+        paymentReference: checkoutOrderNumber,
+        items: {
+          create: {
+            productId: fixtureVariant.productId,
+            variantId: fixtureVariant.id,
+            quantity: 1,
+            unitBasePrice: '1000.00',
+            unitFinalPrice: '1000.00',
+            productNameSnapshot: 'ttw-210',
+            variantDisplaySnapshot: 'ttw-210',
+            snapshotSource: 'PURCHASE',
+          },
+        },
+      },
+    });
+    await addMovement(fixtureVariant.id, fixtureEffectKey);
+
+    // Second run on the same database: neither the order nor its movement may block it.
+    runSeed();
+
+    expect(await prisma.order.count({ where: { id: order.id } })).toBe(0);
+    expect(
+      await prisma.productVariant.count({ where: { id: fixtureVariant.id } }),
     ).toBe(1);
   });
 });
