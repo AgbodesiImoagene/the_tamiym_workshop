@@ -144,7 +144,12 @@ function LoginPageContent() {
                 <FormItem>
                   <div className="flex items-center justify-between gap-3">
                     <FormLabel>Password</FormLabel>
-                    <span className="text-xs text-muted-foreground">Use your account password</span>
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-xs font-medium text-primary transition-colors hover:text-primary-700"
+                    >
+                      Forgot password?
+                    </Link>
                   </div>
                   <FormControl>
                     <div className="relative">
