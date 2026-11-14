@@ -51,16 +51,16 @@ Rejected: lightening the two seed specs. They prove real behaviour and TTW-212 w
 
 ## Out of scope
 
-- Making the e2e suite faster.
+- Making the e2e suite faster, or running the open-handle proof on a subset (the structural fix; passes 1 and 2 also sit near their 3-minute limit).
 - Changing the default of the proof script.
 
 ## Design review
 
-Low risk, CI configuration only. Blast radius: the one CI step. Edge: a genuinely hanging suite now needs up to 240 s to be reported instead of 120 s; accepted because the same budget logic is used for the two normal passes (180 s each).
+Low risk, CI configuration only. Blast radius: the one CI step. Edge: a genuinely hanging suite now needs up to 240 s to be reported instead of 120 s; accepted: the slow-runner proof took 157 s, so 240 s keeps about a third of headroom. The two normal passes have their own 3-minute step limit (`timeout-minutes: 3`), unchanged here.
 
 ## Implementation reviews
 
-Pending.
+- `/code-review` (high), 2026-11-14, on the merged change (`ci.yml`, the TTW-214 spec and both tickets): no blocking finding, 9 notes. For this ticket: (1) the ticket was Complete while its review said Pending: fixed by this section; (2) the `ci.yml` comment said "about 95 s" while the step took 157 s on a slow runner: comment rewritten with the measured range; (3) the design review compared the budget with the passes' "same logic": sentence corrected above; (4) altitude: a bigger timeout only moves the cliff, the root cause is running the whole e2e suite three times per job and passes 1 and 2 stay at about 75 % of their 3 minutes: not fixed here, see Out of scope.
 
 ## Verification evidence
 

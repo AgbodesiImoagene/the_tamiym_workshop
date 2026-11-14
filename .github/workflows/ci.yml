@@ -231,8 +231,10 @@ jobs:
       - name: Prove no open handles
         shell: bash
         env:
-          # TTW-213: the suite takes ~95 s on a runner and the proof is cut at
-          # its budget, so 120 s was too tight (failed on a docs-only commit).
+          # TTW-213: this step runs the whole suite once more with
+          # --detectOpenHandles. Measured on CI: 93 s on a fast runner, 157 s on
+          # a slow one (a normal pass takes 79-139 s). 120 s failed twice on a
+          # docs-only commit, so the budget is 240 s.
           E2E_OPEN_HANDLE_TIMEOUT_MS: '240000'
         run: |
           set -o pipefail
