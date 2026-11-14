@@ -1,7 +1,7 @@
 # TTW-194 — Refuse a deactivated state when an address is saved
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented — local commit, not pushed\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -72,7 +72,13 @@ Confirmed against `main` 09239e1: `resolveState` matched any `GeoState` row; `Ge
 
 ## Implementation reviews
 
-`/code-review high` on the working tree: 4 findings. Fixed: ticket not updated (this section); e2e now checks refused POSTs create no row, covers a move by `stateCode`, and deletes its `ZT` state row. Kept as is, on purpose: the mixed filter in `resolveState` (see Design review, "Choice").
+`/code-review high` on the working tree: 4 findings. Fixed: ticket not updated (this section); e2e now checks refused POSTs create no row, covers a move by `stateCode`, and deletes its `ZT` state row.
+
+**Independent security review (2026-11-14), High-risk gate:** read-only review by a fresh-context reviewer of the TTW-194 diff (`git diff 09239e1 e62668f`) and of the code around it. Result: **no finding at confidence 8/10 or more.** What it checked, with evidence in the code: ownership is enforced before normalisation (`addresses.service.ts`: 404 for a missing address, 403 when `address.userId !== userId`) and the change touches neither path; both `resolveState` branches refuse a deactivated state (explicit code returns null when `isActive === false`, text path filters `isActive: true`) and an explicit code takes priority over the text, so an active code cannot be paired with deactivated text; a non-NG address cannot move to NG carrying one (`existing.countryCode !== 'NG'` throws); accents and look-alike characters resolve to unknown because the comparison is an exact match ignoring case; `address.create` and `address.update` are called only in `addresses.service.ts` and both go through the normaliser (the only other writer is the privacy `updateMany` that writes `'REDACTED'`); the 400 is the existing generic `ADDRESS_STATE_UNKNOWN`, so it does not reveal that a state exists but is deactivated; an edit that leaves the state untouched is not a state change, so a saved address stays editable.
+
+Not verified by the reviewer: the Prisma schema, the DTO validators (for example the length and format of `stateCode`) and the database collation.
+
+LOW observations, not findings: (1) an edit that resends the saved deactivated `stateCode` with a different state text can store text that does not match the code; the same already happens for any saved state, only the owner can do it on their own address, and what downstream code trusts the text was not checked; (2) a saved address in a deactivated state still reaches shipping, because `shipping-destination-resolver.service.ts` filters on rule and zone `isActive`, not on `GeoState.isActive` (a business rule, not a security issue); (3) the check and the write are not atomic, so a state deactivated between them could still be saved (theoretical race, excluded). Kept as is, on purpose: the mixed filter in `resolveState` (see Design review, "Choice").
 
 ## Verification evidence
 
@@ -85,7 +91,8 @@ Run in the worktree `.claude/worktrees/ttw-194`:
 - `pnpm --filter api typecheck`: OK. `pnpm --filter api lint`: 0 errors (14 pre-existing warnings, none in touched files). `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`: OK.
 - `pnpm coverage:diff`: 2/2 changed lines covered (floor 80%).
 - Not run: browser journey (no UI change), `pnpm build`, full e2e suite.
+- Merged into `main` with TTW-199 and TTW-200 (merge `8e64509`) and pushed. CI on `main` after the push: `CI` and `Playwright Comprehensive` success on `c89d85b` (run 43449191615); the address e2e specs also pass in every later green run (for example `f59b223`, `3d05c6c`, `d9b8f58`).
 
 ## Completion summary
 
-The API now refuses a deactivated state on create and on a state-changing edit, by name and by code, while a saved address keeps loading and stays editable on other fields. One local commit on `codex/ttw-194-refuse-a-deactivated-state-on-addresses`; nothing pushed, no PR.
+The API now refuses a deactivated state on create and on a state-changing edit, by name and by code, while a saved address keeps loading and stays editable on other fields. Merged into `main` and pushed with TTW-199 and TTW-200; CI is green on `main`. The independent security review required for a High-risk ticket found nothing at confidence 8 or more (see Implementation reviews); three LOW observations are recorded there.
