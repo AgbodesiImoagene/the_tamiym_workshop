@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'codex/ttw-**', 'claude/ttw-**']
   pull_request:
     branches: [main, develop]
+
+# A new push to a ticket branch cancels the previous run of that branch.
+# Runs on main and develop are never cancelled: they are the final proof.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
 jobs:
   typecheck:
