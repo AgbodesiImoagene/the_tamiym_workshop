@@ -114,6 +114,27 @@ export default defineConfig({
         baseURL: APP_URL,
       },
     },
+    {
+      // TTW-211: specs that really write the global site settings row (VAT rate,
+      // payout mode). Checkout and payout specs read that row, so this project
+      // only starts once every project that reads it has finished, and it is not
+      // fully parallel: its tests take turns on the row.
+      name: 'chromium-admin-settings-writes',
+      dependencies: [
+        'setup',
+        'chromium-web',
+        'chromium-app',
+        'chromium-admin',
+        'chromium-journeys',
+      ],
+      testMatch: /admin-settings-writes\/.*\.spec\.ts/,
+      fullyParallel: false,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: ADMIN_URL,
+        storageState: path.join(authDir, 'admin.json'),
+      },
+    },
     // Full-matrix projects (test:e2e:matrix, run by playwright-matrix.yml; not on every push).
     {
       name: 'firefox-web',

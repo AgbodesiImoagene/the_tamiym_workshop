@@ -46,6 +46,10 @@ test.describe('Refund lifecycle @smoke', () => {
   test('admin refund API returns pending/processing without implying settled money', async ({
     page,
   }) => {
+    // Kept as a stub (TTW-209 audit): the real refund route calls
+    // https://api.paystack.co/refund (hard-coded in the API) on a paid order,
+    // and ordinary CI never calls live Paystack. The real route is covered by
+    // the API integration test paystack-refund-lifecycle.e2e-spec.ts.
     await page.goto('about:blank');
     let calls = 0;
     await page.route('**/admin/orders/*/refund', async (route) => {

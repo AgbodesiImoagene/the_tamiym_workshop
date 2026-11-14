@@ -48,6 +48,13 @@ import {
 
 const FIXTURE_PREFIX = 'e2e-';
 const FIXTURE_PASSWORD = 'TestPassword1!';
+
+/**
+ * Deactivated geo rows for the admin zone area picker spec (TTW-209). Keep in
+ * sync with `tests/e2e/fixtures/seed-data.ts`.
+ */
+const E2E_DORMANT_STATE = { code: 'ZZ', name: 'E2E Dormant State' };
+const E2E_DORMANT_LGA_NAME = 'E2E Dormant LGA';
 /** Deterministic admin TOTP secret for Playwright MFA challenge (TTW-023). */
 const E2E_ADMIN_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 /**
@@ -234,6 +241,10 @@ async function clearFixtureData() {
   const { prisma } = context;
 
   try {
+    // Findings go with their run (cascade).
+    await prisma.reconciliationRun.deleteMany({
+      where: { id: { startsWith: FIXTURE_PREFIX } },
+    });
     await prisma.authToken.deleteMany({
       where: { userId: { startsWith: FIXTURE_PREFIX } },
     });
@@ -410,6 +421,55 @@ async function main() {
         stateCode: 'LA',
         name: 'Ikeja',
         isActive: true,
+      },
+    });
+
+    // TTW-209: one deactivated state and one deactivated LGA for the admin zone
+    // area picker spec (TTW-201). Both are inactive, so the public geo lists
+    // (which only return active rows) never show them. No admin route
+    // deactivates a state, so the data has to come from here. Names are matched
+    // by that spec; changing them means updating it.
+    await prisma.geoState.upsert({
+      where: { code: E2E_DORMANT_STATE.code },
+      update: { name: E2E_DORMANT_STATE.name, isActive: false },
+      create: { ...E2E_DORMANT_STATE, isActive: false },
+    });
+    await prisma.geoLga.upsert({
+      where: {
+        stateCode_name: { stateCode: 'LA', name: E2E_DORMANT_LGA_NAME },
+      },
+      update: { isActive: false },
+      create: { stateCode: 'LA', name: E2E_DORMANT_LGA_NAME, isActive: false },
+    });
+
+    // TTW-209: one reconciliation finding for the admin findings contract spec.
+    // The run is INCOMPLETE and the finding RESOLVED on purpose: analytics reads
+    // the last COMPLETED run and the OPEN/ACKNOWLEDGED findings, so this row
+    // changes no dashboard figure. `evidence` is raw data the admin list must
+    // never return. Values are matched by tests/e2e/journeys/reconciliation.smoke.spec.ts.
+    await prisma.reconciliationRun.create({
+      data: {
+        id: 'e2e-reconciliation-run',
+        kind: 'TARGETED',
+        status: 'INCOMPLETE',
+        windowKey: 'targeted:e2e-contract',
+        cutoffAt: daysAgo(1),
+        findings: {
+          create: {
+            id: 'e2e-reconciliation-finding-campaign',
+            domain: 'CAMPAIGN',
+            outcome: 'MISMATCH',
+            severity: 'CRITICAL',
+            status: 'RESOLVED',
+            fingerprint: 'e2e:campaign:contract',
+            leftLabel: 'campaign.currentAmount',
+            leftValue: '100',
+            rightLabel: 'ledger',
+            rightValue: '50',
+            sourceIds: { campaignId: IDS.campaigns.active, note: 'not an id' },
+            evidence: { rawProviderPayload: 'e2e-secret-payload' },
+          },
+        },
       },
     });
 

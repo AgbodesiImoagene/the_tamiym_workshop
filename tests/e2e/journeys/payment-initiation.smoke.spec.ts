@@ -32,6 +32,10 @@ test.describe('Payment initiation retry @smoke', () => {
   });
 
   test('API initiate-payment retry returns the same session contract', async ({ page }) => {
+    // Kept as a stub (TTW-209 audit): the real route calls
+    // https://api.paystack.co/transaction/initialize (hard-coded in the API),
+    // which ordinary CI never reaches. Real order creation plus this simulated
+    // initiation is exercised by the app/checkout-*.spec.ts journeys.
     await page.goto('about:blank');
     let calls = 0;
     const session = {

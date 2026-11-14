@@ -2,28 +2,11 @@ import { expect, type Page } from '@playwright/test';
 import { test } from '../fixtures/test';
 import { assertVisibleControlsEnabled } from '../fixtures/interactions';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
+import { openSiteSettings, SITE_SETTINGS_API } from './site-settings-helpers';
 
-const SITE_SETTINGS_API = '**/v1/admin/site-settings';
 const VAT_RATE_ERROR =
   'Enter a VAT rate between 0 and 100, with at most 2 decimals, before saving.';
 const VAT_NOT_CONFIGURED = 'No VAT rate is set. Checkout is paused until you enter one and save.';
-
-/** Opens the site settings page and waits until the saved settings have loaded. */
-async function openSiteSettings(page: Page, { vatRateSet = true } = {}) {
-  await page.goto('/admin/settings/site');
-  const saveButton = page.getByRole('button', { name: /Save site settings/i });
-  const vatRate = page.getByLabel('VAT rate (%)');
-  // The Save button only renders once settings have loaded.
-  await expect(saveButton).toBeVisible();
-  // The form takes the loaded values in an effect after that render: wait for
-  // them before reading any field, or a test would capture the defaults.
-  if (vatRateSet) await expect(vatRate).not.toHaveValue('');
-  return {
-    saveButton,
-    resetButton: page.getByRole('button', { name: /Reset unsaved changes/i }),
-    vatRate,
-  };
-}
 
 /** Collects every site settings write the page sends (none may leave on a refused save). */
 function recordSettingsWrites(page: Page): string[] {
@@ -34,22 +17,6 @@ function recordSettingsWrites(page: Page): string[] {
     }
   });
   return writes;
-}
-
-/**
- * Answers the settings PATCH without touching the shared database (the three
- * viewports run in parallel against the same seed) and records each body.
- */
-async function mockSettingsSave(page: Page): Promise<Record<string, unknown>[]> {
-  const bodies: Record<string, unknown>[] = [];
-  await page.route(SITE_SETTINGS_API, async (route) => {
-    if (route.request().method() !== 'PATCH') return route.fallback();
-    const body = route.request().postDataJSON() as Record<string, unknown>;
-    bodies.push(body);
-    // The page sends every field, so the body is the full updated settings.
-    await route.fulfill({ json: { id: 'default', ...body } });
-  });
-  return bodies;
 }
 
 describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () => {
@@ -129,6 +96,8 @@ describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () =>
     adminPage,
   }) => {
     const writes = recordSettingsWrites(adminPage);
+    // Kept (TTW-209 audit): the seed always sets a VAT rate, and no admin route
+    // clears it, so the unset state is forced on the real GET response.
     await adminPage.route(SITE_SETTINGS_API, async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       const response = await route.fetch();
@@ -161,57 +130,10 @@ describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () =>
     expect(writes).toEqual([]);
   });
 
-  test('site settings save the VAT rate as a fraction with the other fields (TTW-183)', async ({
-    adminPage,
-  }) => {
-    const bodies = await mockSettingsSave(adminPage);
-    const { saveButton, resetButton, vatRate } = await openSiteSettings(adminPage);
-    await expect(saveButton).toBeDisabled();
-    await expect(resetButton).toBeDisabled();
-
-    // Every field reaches the request: a checkbox, a select, and a blank minimum.
-    const pricesIncludeVat = adminPage.getByRole('checkbox', { name: /Prices include VAT/i });
-    const pricesIncludedBefore = await pricesIncludeVat.isChecked();
-    await pricesIncludeVat.click();
-    const payoutMode = adminPage.locator('#payoutMode');
-    const nextMode = (await payoutMode.innerText()).includes('MANUAL') ? 'AUTO_EXECUTE' : 'MANUAL';
-    await payoutMode.click();
-    await adminPage.getByRole('option', { name: nextMode.replaceAll('_', ' ') }).click();
-    await adminPage.getByLabel('Minimum payout amount').fill('');
-    await adminPage.getByLabel('Payout cadence (days)').fill('14');
-    await vatRate.fill('7.55');
-    await saveButton.click();
-
-    await expect(adminPage.getByText('Site settings saved.')).toBeVisible();
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]).toEqual({
-      vatRate: 0.0755,
-      pricesIncludeVat: !pricesIncludedBefore,
-      vatAppliesToShipping: expect.any(Boolean),
-      currency: expect.any(String),
-      payoutMode: nextMode,
-      payoutCadenceDays: 14,
-      payoutSettlementHoldDays: expect.any(Number),
-      minimumPayoutAmount: null,
-      autoRetryFailedPayouts: expect.any(Boolean),
-    });
-
-    // Boundaries: 100 % and an explicitly typed 0 % are both accepted.
-    for (const [typed, sent] of [
-      ['100', 1],
-      ['0', 0],
-    ] as const) {
-      await expect(saveButton).toBeDisabled();
-      await vatRate.fill(typed);
-      await saveButton.click();
-      await expect.poll(() => bodies.at(-1)?.vatRate).toBe(sent);
-      await expect(adminPage.getByText('Site settings saved.')).toBeVisible();
-    }
-    expect(bodies).toHaveLength(3);
-  });
-
   // Uses the unguarded `page` (same admin session and viewport): the mocked 400
   // makes the browser log a console error, which the adminPage guard rejects.
+  // Kept (TTW-209 audit): a deliberate frontend error-state test. The real API
+  // refuses only what the page already blocks, so it cannot produce this 400.
   test('site settings show an API save error in the alert (TTW-183)', async ({ page }) => {
     await page.route(SITE_SETTINGS_API, async (route) => {
       if (route.request().method() !== 'PATCH') return route.fallback();
