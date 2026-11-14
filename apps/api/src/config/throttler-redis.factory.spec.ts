@@ -10,6 +10,7 @@ jest.mock('@nest-lab/throttler-storage-redis', () => ({
     .mockImplementation((client: unknown) => ({ client })),
 }));
 
+import Redis from 'ioredis';
 import {
   createThrottlerModuleOptions,
   redisConnectionOptions,
@@ -41,5 +42,20 @@ describe('throttler-redis.factory', () => {
       { name: 'default', ttl: 60_000, limit: 100 },
     ]);
     expect(options.storage).toEqual({ client: expect.anything() });
+  });
+
+  // With enableOfflineQueue off, a client that has not connected yet rejects
+  // every command ("Stream isn't writeable"). lazyConnect would leave the
+  // client unconnected until its first command, so the first request after a
+  // boot got a 500 (TTW-211 found it as a cold-start e2e failure).
+  it('connects at creation so the first request after boot is not rejected', () => {
+    (Redis as unknown as jest.Mock).mockClear();
+    createThrottlerModuleOptions(config);
+    const options = (Redis as unknown as jest.Mock).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(options.lazyConnect).not.toBe(true);
+    expect(options.enableOfflineQueue).toBe(false);
   });
 });

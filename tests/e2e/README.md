@@ -53,6 +53,14 @@ Local tip: export the same env as API Integration (or use `apps/api/.env.test`) 
 
 Site settings are one global row that checkout and payout specs read. Specs that really change it live in `tests/e2e/admin-settings-writes/` and run in the `chromium-admin-settings-writes` project (TTW-211), which starts only after the web, app, admin and journey projects have finished, takes its tests one at a time, and restores the row after each test. Do not put such a spec in the other projects.
 
+## Running beside other checkouts or worktrees
+
+The suites share three things that collide when two runs overlap on one machine:
+
+- **Ports.** `playwright.config.ts` starts web, app and admin on 3000, 3002 and 3003 (the API port comes from `PORT` / `PLAYWRIGHT_API_URL`). With `reuseExistingServer` a second run silently attaches to the first run's servers and fails when they stop. Run one suite at a time on a machine.
+- **Redis.** The API's login rate limits (`429 Too many requests`) live in Redis and survive between runs. Many reruns in a few minutes make the admin login in the `setup` project fail with a 429 and every test fail after it. Give each worktree its own Redis database (`REDIS_DB=<n>` in `apps/api/.env`, `.env.local` and `.env.test`) or wait for the window to pass.
+- **Database.** `seed:e2e` cannot run twice on one database (TTW-210): drop and re-create the test database before each full run.
+
 ## Tags
 
 `@smoke` `@web` `@app` `@admin` `@journey` `@comprehensive` (plus `@critical` `@a11y` `@visual` for later tickets).
