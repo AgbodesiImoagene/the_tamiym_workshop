@@ -55,10 +55,10 @@ Rejected: opening pull requests (project rule); branch protection (not asked, ou
 
 ## Acceptance criteria
 
-- [ ] A push to a `codex/ttw-**` or `claude/ttw-**` branch starts `ci.yml` without a pull request.
+- [x] A push to a `codex/ttw-**` or `claude/ttw-**` branch starts `ci.yml` without a pull request.
 - [ ] A second push to the same branch cancels the first run; a run on `main` is never cancelled.
-- [ ] `AGENTS.md` describes the new flow and no document keeps the old sentence.
-- [ ] `pnpm format:check` and `pnpm docs:validate` pass, with evidence recorded below.
+- [x] `AGENTS.md` describes the new flow and no document keeps the old sentence.
+- [x] `pnpm format:check` and `pnpm docs:validate` pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -83,12 +83,17 @@ Done on 2026-11-14, on branch `codex/ttw-218-run-ci-on-ticket-branches`:
 - `ci.yml` parsed as YAML (Python `yaml`): `on.push.branches` is `[main, develop, codex/ttw-**, claude/ttw-**]`, `concurrency` is present, 15 jobs kept. `actionlint` is not installed here, so the workflow expressions were not linted.
 - `grep` in `ci.yml` found no `secrets.*`; no other file outside the ticket history repeats the old rule.
 
-Not yet verified (needs a push, which waits for the user's request):
+GitHub proof, 2026-11-14, after the user asked for the commit and push:
 
-- The CI starts on a push of this branch without a pull request.
-- A second quick push cancels the first run.
-- A run on `main` is not cancelled.
+- Commit `8c3acab` pushed to `origin/codex/ttw-218-run-ci-on-ticket-branches`.
+- `gh run list --branch codex/ttw-218-run-ci-on-ticket-branches`: run `43646086688`, event `push` (no pull request), workflow `CI`, started 22:03:57 UTC.
+- `gh run view 43646086688`: status `completed`, conclusion `success`, finished 22:12:36 UTC (about 8 min 39 s). All 18 jobs succeeded, including `API Integration`, `Playwright Smoke`, `Coverage` (so `coverage:diff` works on a branch) and `Migration Baseline`.
+
+Still not verified:
+
+- A second quick push cancels the first run. The run above had finished before the next push, so this was not exercised. It needs a push made while a run is still in progress.
+- A run on `main` is never cancelled. This can only be seen after a real merge into `main`.
 
 ## Completion summary
 
-Not complete: the GitHub proof and the implementation review are still to do. Status stays "In progress".
+Not complete. The CI now starts on ticket branches and passed on this one. Still to do: prove the cancellation by pushing while a run is in progress, observe a run on `main` after the merge, and obtain the independent implementation review. Status stays "In progress".
