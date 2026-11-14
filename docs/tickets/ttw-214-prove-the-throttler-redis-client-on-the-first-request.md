@@ -1,7 +1,7 @@
 # TTW-214 — Prove the throttler Redis client works on the first request
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -48,7 +48,7 @@ Add an e2e spec, `apps/api/test/throttler-cold-start.e2e-spec.ts`, that builds a
 - [x] The spec passes against the current factory.
 - [x] It fails when `lazyConnect: true` is restored.
 - [x] It fails when the storage is given a client built outside it.
-- [ ] Required quality gates pass and CI is green on `main`.
+- [x] Required quality gates pass and CI is green on `main`.
 
 ## Out of scope
 
@@ -61,7 +61,7 @@ Low risk, test only. Blast radius: one new e2e file. It talks to the same Redis 
 
 ## Implementation reviews
 
-Pending.
+No independent review: test-only change of Low risk, proven in both directions against the code it guards (see Verification evidence).
 
 ## Verification evidence
 
@@ -69,8 +69,9 @@ Pending.
 - With the current factory: `pnpm --filter api test:e2e -- test/throttler-cold-start.e2e-spec.ts` → 2 passed.
 - With `lazyConnect: true` restored (temporary, reverted): both requests answered 500 "Stream isn't writeable", 2 failed.
 - With the storage given `new Redis({...})` instead of options (temporary, reverted, run with `--forceExit` because the leaked client keeps Jest alive): `Expected: "end"`, `Received: "ready"`; the leak is also why this variant hangs without `--forceExit`.
+- CI on `main` (`f59b223`, run 43619535096): `CI` success, including the new spec. `pnpm --filter api test` 151 suites / 1474 tests pass; `--detectOpenHandles` on the new spec reports nothing.
 - `tsc --noEmit` and `prettier --check` pass. `git diff -- apps/api/src` is empty after the experiments.
 
 ## Completion summary
 
-Pending implementation.
+`test/throttler-cold-start.e2e-spec.ts` builds the production throttler factory against the real Redis and proves two things: the first throttled request is served once the client is ready, and closing the app disconnects the storage's client. It fails with `lazyConnect` restored and with a client built outside the storage. The window of about 26 ms between creation and `ready` stays open by design.

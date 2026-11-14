@@ -1,7 +1,7 @@
 # TTW-213 — Give the CI open-handle proof room to finish
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -45,9 +45,9 @@ Rejected: lightening the two seed specs. They prove real behaviour and TTW-212 w
 
 ## Acceptance criteria
 
-- [ ] The step has a 240000 ms budget and the job still fits its 15-minute limit.
-- [ ] `pnpm e2e-open-handles:test` passes.
-- [ ] The next CI run on `main` shows the step green, with its duration recorded.
+- [x] The step has a 240000 ms budget and the job still fits its 15-minute limit.
+- [x] `pnpm e2e-open-handles:test` passes.
+- [x] The next CI run on `main` shows the step green, with its duration recorded.
 
 ## Out of scope
 
@@ -70,8 +70,8 @@ Pending.
 - The first re-run of the failed job failed the same way, at exactly 120 s (`16:47:02Z` to `16:49:02Z`), so it was not a one-off. In that run pass 1 took 2 min 18 s and pass 2 2 min 13 s (83 s and 79 s on the green run), Jest reported `Time: 134.965 s` for 43 suites, and only 24 of the 43 specs had finished when the proof was cut. The runner was about 1.6 times slower; the proof (about 1.1 times a normal pass because of `--detectOpenHandles`) would need about 150 s, which fits in 240 s and not in 120 s.
 - Remaining risk, not changed here: passes 1 and 2 have a 3-minute budget each and took 138 s and 133 s on the slow runner (about 75 %). A runner twice as slow would fail them.
 - `pnpm docs:validate` and `prettier --check` on the changed files: pass.
-- To record after the push: the duration of the step in the first green `CI` run on `main`.
+- First CI run after the change (`f59b223`, run 43619535096): `CI` success. "Prove no open handles" `17:14:36Z` to `17:17:13Z` = 157 s, which the old 120 s budget would have cut. Pass 1 139 s and pass 2 133 s on that runner (budget 180 s each).
 
 ## Completion summary
 
-Pending implementation.
+The open-handle proof has a 240 s budget in `ci.yml` (`E2E_OPEN_HANDLE_TIMEOUT_MS`). The first run with it passed in 157 s. Passes 1 and 2 are the next thin margin (about 75 % of their 3 minutes on a slow runner); not changed here.
