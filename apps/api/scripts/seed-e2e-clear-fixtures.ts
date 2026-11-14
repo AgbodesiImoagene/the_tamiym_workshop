@@ -32,6 +32,27 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
       ],
     },
   });
+  // TTW-212: rows with generated ids that keep a Restrict foreign key to a
+  // fixture user or product. Children of a deleted campaign (payouts, campaign
+  // products and prices) go with it by cascade.
+  await prisma.campaign.deleteMany({
+    where: { organizerId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.payout.deleteMany({
+    where: { recipientUserId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.campaignProduct.deleteMany({
+    where: { productId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.design.deleteMany({
+    where: { productId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.organizerApplication.deleteMany({
+    where: { userId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.privacyRequest.deleteMany({
+    where: { userId: { startsWith: FIXTURE_PREFIX } },
+  });
   // Findings go with their run (cascade).
   await prisma.reconciliationRun.deleteMany({
     where: { id: { startsWith: FIXTURE_PREFIX } },

@@ -86,7 +86,7 @@ Dedicated database `tamiym_workshop_test_210` (migrated with `prisma migrate dep
 
 - `clearFixtureData` moved to `apps/api/scripts/seed-e2e-clear-fixtures.ts` (takes a `PrismaClient`; `FIXTURE_PREFIX` exported from there). Reason: `seed-e2e-dummy-data.ts` runs `main()` on import, same pattern as `seed-e2e-site-settings.ts`. The new spec nevertheless runs the real script as a child process, as `pnpm seed:e2e` does.
 - `InventoryMovement` was the failing foreign key, but not the only possible one: a real checkout also leaves `orders` (generated ids) that block variants, products, users and addresses. `clearFixtureData` now also deletes orders whose user, item variant or item product is an `e2e-` fixture (items, payments and refunds cascade).
-- Known limit, not fixed and not tested: other Restrict links from non-`e2e-` rows to fixture users or products (`campaigns.organizerId`, `payouts.recipientUserId`, `organizer_applications.userId`, `privacy_requests.userId`, `campaign_products.productId`, `designs.productId`). They only appear if a test creates such rows on fixture users; if it happens, add them to `clearFixtureData` with a test.
+- Known limit, not fixed and not tested: other Restrict links from non-`e2e-` rows to fixture users or products (`campaigns.organizerId`, `payouts.recipientUserId`, `organizer_applications.userId`, `privacy_requests.userId`, `campaign_products.productId`, `designs.productId`). They only appear if a test creates such rows on fixture users; handled by TTW-212.
 
 ## Completion summary
 
