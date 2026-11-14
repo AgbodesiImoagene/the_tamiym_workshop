@@ -33,6 +33,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
+  original = undefined;
   original = await readSiteSettings(admin);
   // Refuse a corrupted starting row: it would be taken as the reference and
   // "restored" as is, hiding the damage from the next test and from the readers.
