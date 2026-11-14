@@ -107,7 +107,13 @@ A dedicated database `tamiym_workshop_test_209` (migrated and seeded with `seed:
 
 ## Implementation reviews
 
-Pending: an independent read-only review of the commit is still to be obtained before merge (`AGENTS.md`, step 7).
+Independent read-only review of commit `c404da1` by a fresh subagent, 2026-11-14: **PASS with reservations**, no blocking finding. It read the code and ticket only; it ran nothing.
+
+- Audit confirmed: `grep` gives 18 `route(` calls; 11 stay (3 checkout specs, 3 site-settings, refund, payment-initiation), 7 removed. Classification holds; the PATCH stub in `catalog-settings` is the only contestable one (follow-up TTW-211).
+- No test removed or skipped. Picker and reconciliation assertions kept or strengthened; the declared inventory deviation (admin half) confirmed.
+- Isolation confirmed: public geo lists filter `isActive: true`; analytics reads the last `COMPLETED` run and `OPEN`/`ACKNOWLEDGED` findings only; no count assertion elsewhere on states or LGAs; cleanup runs in `finally`; `clearFixtureData` order is safe (cascade).
+- To fix, handled: (1) this section was empty, now filled; (2) the "fails if the contract regresses" proof exists only for the picker. **Not proven for the reconciliation and inventory specs** (no forced failure was run for them); the acceptance criterion wording is limited to the picker spec, as written, and the other two are replacements of stubs that could not fail at all. (3) `createAdminApi` now disposes its bootstrap context in a `finally`.
+- Notes kept: the real site-settings PATCH is seen by no e2e test (TTW-211); the inventory spec assumes the seeded variant has an inventory row (true for the seed); `getByText(zone.name, { exact: true })` in the picker passed in the recorded runs.
 
 ## Verification evidence
 
