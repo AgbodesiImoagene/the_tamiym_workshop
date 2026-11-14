@@ -1,7 +1,7 @@
 # TTW-218 — Run CI on ticket branches before they merge into main
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -57,7 +57,7 @@ Rejected: opening pull requests (project rule); branch protection (not asked, ou
 
 - [x] A push to a `codex/ttw-**` or `claude/ttw-**` branch starts `ci.yml` without a pull request.
 - [x] A second push to the same branch cancels the first run.
-- [ ] A run that is executing on `main` is never cancelled (to observe after the merge).
+- [x] A run that is executing on `main` is not cancelled: expression false on `main` and `develop`, and the first run on `main` (`43649697832`) completed successfully. Not contested by a concurrent push (see the limit in the evidence).
 - [x] `AGENTS.md` describes the new flow and no document keeps the old sentence.
 - [x] `pnpm format:check` and `pnpm docs:validate` pass, with evidence recorded below.
 
@@ -108,10 +108,19 @@ Cancellation proof, same day, after the user asked for it:
 - Run `43646949476` (commit `3e8e953`) was `in_progress`. Commit `efb4d47` was then pushed to the same branch.
 - `gh run view 43646949476`: status `completed`, conclusion `cancelled`, updated 22:18:50 UTC. The new run `43647395370` (commit `efb4d47`, created 22:18:32 UTC) took its place. The `concurrency` group works on a ticket branch.
 
-Still not verified:
+Run on a ticket branch after the review fixes: run `43649009467` on `6b9b121`, `completed` / `success`, 18 jobs succeeded (22:36:48 to 22:43:34 UTC).
 
-- A run that is executing on `main` is never cancelled. This can only be seen after a real merge into `main`.
+Merge and run on `main`, 2026-11-14, after the user asked for the merge once the run was green:
+
+- `git merge --no-ff codex/ttw-218-run-ci-on-ticket-branches` gave `7a5a49f`; `git push origin main` moved `main` from `2684af6` to `7a5a49f`.
+- Run `43649697832` on `main` (event `push`, commit `7a5a49f`): `completed` / `success`, 18 jobs succeeded, 22:44:56 to 22:52:50 UTC. It was not cancelled.
+
+Limit of this evidence: no other push reached `main` while that run was executing, so the cancel path was not contested. That a running `main` run cannot be cancelled rests on the expression (false on `main` and `develop`, checked by the independent reviewer) plus this uncontested run.
 
 ## Completion summary
 
-Not complete. The CI now starts on ticket branches and passed on this one. Still to do: observe a run on `main` after the merge, and obtain the independent implementation review. Status stays "In progress".
+`ci.yml` now starts on `codex/ttw-**` and `claude/ttw-**` pushes and cancels the previous run of a ticket branch on a new push (proved with runs `43646949476` and `43647395370`). `AGENTS.md` step 8 describes the flow: push the branch, read the CI with `gh`, merge into `main` only when green. The independent review passed (see Review 1). Merged into `main` as `7a5a49f`, with a green run on `main`.
+
+Deviations from the plan: the review changed the wording "never cancelled" to "a run that is executing is never cancelled" (`ci.yml` comment, ticket); the second plan step found only `AGENTS.md` to update, so no other doc changed.
+
+No migration or operations note. Not done, deliberately: branch protection on `main`, and reducing the CI cost (TTW-215, deferred). Worktrees opened before this merge (`ttw-216`, `ttw-217`) keep the old `AGENTS.md` until they merge `main`.
