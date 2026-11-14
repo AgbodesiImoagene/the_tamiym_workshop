@@ -28,6 +28,14 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
   const fixtureCampaignSlug = `${marker}-fixture-campaign`;
   const fixturePayoutRef = `${marker}-fixture-payout`;
   const designName = `${marker}-design`;
+  const limits = {
+    user: `${marker}-limits-user`,
+    category: `${marker}-limits-category`,
+    product: `${marker}-limits-product`,
+    address: `${marker}-limits-address`,
+  };
+  const categoryProductSlug = `${marker}-product-in-fixture-category`;
+  const categoryMovementKey = `${marker}:category-movement`;
   let context: PrismaScriptContext;
   let previousSettings: Awaited<ReturnType<typeof readSettings>>;
 
@@ -51,6 +59,15 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
 
   async function removeTestRows() {
     const { prisma } = context;
+    await prisma.order.deleteMany({ where: { userId: limits.user } });
+    await prisma.campaignProduct.deleteMany({
+      where: { productId: limits.product },
+    });
+    await prisma.product.deleteMany({ where: { id: limits.product } });
+    await prisma.inventoryMovement.deleteMany({
+      where: { effectKey: categoryMovementKey },
+    });
+    await prisma.product.deleteMany({ where: { slug: categoryProductSlug } });
     await prisma.design.deleteMany({ where: { name: designName } });
     await prisma.campaignProduct.deleteMany({
       where: { campaign: { slug: { startsWith: marker } } },
@@ -65,7 +82,10 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
     await prisma.privacyRequest.deleteMany({
       where: { policyVersion: marker },
     });
-    await prisma.user.deleteMany({ where: { id: control.user } });
+    await prisma.category.deleteMany({ where: { id: limits.category } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [control.user, limits.user] } },
+    });
   }
 
   beforeAll(async () => {
@@ -198,5 +218,178 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
       controlPayout: 1,
       controlUser: 1,
     });
+  });
+
+  it('deletes a non-fixture product placed in a fixture category, with its variants and movements', async () => {
+    const { prisma } = context;
+    runSeed();
+
+    const fixtureProduct = await prisma.product.findFirstOrThrow({
+      where: { id: { startsWith: 'e2e-' } },
+    });
+    const product = await prisma.product.create({
+      data: {
+        categoryId: fixtureProduct.categoryId,
+        name: 'TTW-212 product in a fixture category',
+        slug: categoryProductSlug,
+        variants: {
+          create: {
+            name: 'TTW-212 variant',
+            sku: `${marker.toUpperCase()}-CATEGORY`,
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    await prisma.inventoryMovement.create({
+      data: {
+        kind: 'RESERVE',
+        effectKey: categoryMovementKey,
+        variantId: product.variants[0].id,
+        quantity: 1,
+      },
+    });
+
+    // Second run on the same database: the category delete must not be blocked.
+    runSeed();
+
+    expect(await prisma.product.count({ where: { id: product.id } })).toBe(0);
+    expect(
+      await prisma.inventoryMovement.count({
+        where: { effectKey: categoryMovementKey },
+      }),
+    ).toBe(0);
+  });
+
+  it('deletes orders, campaign products and product images that point at a fixture address, design or media asset, and keeps an unrelated order', async () => {
+    const { prisma } = context;
+    runSeed();
+
+    const fixtureDesign = await prisma.design.findFirstOrThrow({
+      where: { id: { startsWith: 'e2e-' } },
+    });
+    const fixtureMedia = await prisma.mediaAsset.findFirstOrThrow({
+      where: { id: { startsWith: 'e2e-' } },
+    });
+    await prisma.user.create({
+      data: {
+        id: limits.user,
+        email: `${marker}-limits@example.test`,
+        firstName: 'Limits',
+        lastName: 'User',
+      },
+    });
+    await prisma.address.create({
+      data: {
+        id: limits.address,
+        userId: limits.user,
+        addressLine1: '1 Test Street',
+        city: 'Ikeja',
+        state: 'Lagos',
+      },
+    });
+    await prisma.category.create({
+      data: {
+        id: limits.category,
+        name: 'TTW-212 limits',
+        slug: limits.category,
+      },
+    });
+    const product = await prisma.product.create({
+      data: {
+        id: limits.product,
+        categoryId: limits.category,
+        name: 'TTW-212 limits product',
+        slug: limits.product,
+        variants: {
+          create: {
+            name: 'TTW-212 limits',
+            sku: `${marker.toUpperCase()}-LIMITS`,
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    const variantId = product.variants[0].id;
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizerId: limits.user,
+        title: 'TTW-212 limits',
+        slug: `${marker}-limits-campaign`,
+      },
+    });
+    const orderData = (
+      shippingAddressId: string,
+      reference: string,
+      designId?: string,
+    ) => ({
+      userId: limits.user,
+      shippingAddressId,
+      subtotalAmount: '1000.00',
+      totalAmount: '1000.00',
+      shipLine1: '1 Test Street',
+      shipCity: 'Ikeja',
+      shipState: 'Lagos',
+      paymentReference: reference,
+      items: {
+        create: {
+          productId: product.id,
+          variantId,
+          designId,
+          quantity: 1,
+          unitBasePrice: '1000.00',
+          unitFinalPrice: '1000.00',
+          productNameSnapshot: 'ttw-212',
+          variantDisplaySnapshot: 'ttw-212',
+          snapshotSource: 'PURCHASE' as const,
+        },
+      },
+    });
+    // Three orders of a non-fixture user: one ships to a fixture address, one
+    // holds a fixture design, one touches nothing of the seed.
+    const toFixtureAddress = await prisma.order.create({
+      data: orderData('e2e-address-customer-main', `${marker}-order-address`),
+    });
+    const withFixtureDesign = await prisma.order.create({
+      data: orderData(
+        limits.address,
+        `${marker}-order-design`,
+        fixtureDesign.id,
+      ),
+    });
+    const unrelated = await prisma.order.create({
+      data: orderData(limits.address, `${marker}-order-unrelated`),
+    });
+    await prisma.campaignProduct.create({
+      data: {
+        campaignId: campaign.id,
+        productId: product.id,
+        designId: fixtureDesign.id,
+      },
+    });
+    await prisma.productImage.create({
+      data: { productId: product.id, mediaAssetId: fixtureMedia.id },
+    });
+
+    // Second run on the same database: none of these rows may block it.
+    runSeed();
+
+    expect(
+      await prisma.order.findMany({
+        where: {
+          id: { in: [toFixtureAddress.id, withFixtureDesign.id, unrelated.id] },
+        },
+        select: { id: true },
+      }),
+    ).toEqual([{ id: unrelated.id }]);
+    expect(
+      await prisma.campaignProduct.count({
+        where: { productId: product.id },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.productImage.count({ where: { productId: product.id } }),
+    ).toBe(0);
+    expect(await prisma.product.count({ where: { id: product.id } })).toBe(1);
   });
 });

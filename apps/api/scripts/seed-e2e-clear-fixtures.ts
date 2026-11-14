@@ -19,12 +19,17 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
     where: {
       OR: [
         { userId: { startsWith: FIXTURE_PREFIX } },
+        // TTW-212: the order ships to a fixture address.
+        { shippingAddressId: { startsWith: FIXTURE_PREFIX } },
         {
           items: {
             some: {
               OR: [
                 { variantId: { startsWith: FIXTURE_PREFIX } },
                 { productId: { startsWith: FIXTURE_PREFIX } },
+                { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
+                // TTW-212: the item uses a fixture design.
+                { designId: { startsWith: FIXTURE_PREFIX } },
               ],
             },
           },
@@ -41,11 +46,34 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
   await prisma.payout.deleteMany({
     where: { recipientUserId: { startsWith: FIXTURE_PREFIX } },
   });
+  const onFixtureProduct = {
+    OR: [
+      { productId: { startsWith: FIXTURE_PREFIX } },
+      { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
+    ],
+  };
   await prisma.campaignProduct.deleteMany({
-    where: { productId: { startsWith: FIXTURE_PREFIX } },
+    where: {
+      OR: [
+        ...onFixtureProduct.OR,
+        { designId: { startsWith: FIXTURE_PREFIX } },
+      ],
+    },
   });
-  await prisma.design.deleteMany({
-    where: { productId: { startsWith: FIXTURE_PREFIX } },
+  // A product image on a fixture media asset blocks the asset delete (Restrict).
+  await prisma.productImage.deleteMany({
+    where: { mediaAssetId: { startsWith: FIXTURE_PREFIX } },
+  });
+  await prisma.design.deleteMany({ where: onFixtureProduct });
+  // A product of any id placed in a fixture category blocks the category
+  // delete: its movements, then the product (variants cascade) go first.
+  await prisma.inventoryMovement.deleteMany({
+    where: {
+      variant: { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
+    },
+  });
+  await prisma.product.deleteMany({
+    where: { categoryId: { startsWith: FIXTURE_PREFIX } },
   });
   await prisma.organizerApplication.deleteMany({
     where: { userId: { startsWith: FIXTURE_PREFIX } },
