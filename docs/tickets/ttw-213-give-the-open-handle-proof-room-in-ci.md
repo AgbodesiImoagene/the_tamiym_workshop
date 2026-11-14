@@ -67,6 +67,8 @@ Pending.
 - Timings of the last green `CI` run (`c047436`, job `API Integration`): job 16:20:10Z to 16:25:15Z (5 min 5 s of 15 min); pass 1 83 s and pass 2 79 s (each of 180 s); proof 93 s (of 120 s). The failing run was cut at exactly 120 s with every printed spec green.
 - With a 240 s budget the worst case for the job is about 5 min 5 s + 147 s, close to 7.5 min, inside the 15-minute limit.
 - `pnpm e2e-open-handles:test` → `tests 10, pass 10, fail 0` (includes "open handles reported by Jest fail the proof" and the timeout kill tests, which set their own timeouts and do not depend on the default).
+- The first re-run of the failed job failed the same way, at exactly 120 s (`16:47:02Z` to `16:49:02Z`), so it was not a one-off. In that run pass 1 took 2 min 18 s and pass 2 2 min 13 s (83 s and 79 s on the green run), Jest reported `Time: 134.965 s` for 43 suites, and only 24 of the 43 specs had finished when the proof was cut. The runner was about 1.6 times slower; the proof (about 1.1 times a normal pass because of `--detectOpenHandles`) would need about 150 s, which fits in 240 s and not in 120 s.
+- Remaining risk, not changed here: passes 1 and 2 have a 3-minute budget each and took 138 s and 133 s on the slow runner (about 75 %). A runner twice as slow would fail them.
 - `pnpm docs:validate` and `prettier --check` on the changed files: pass.
 - To record after the push: the duration of the step in the first green `CI` run on `main`.
 
