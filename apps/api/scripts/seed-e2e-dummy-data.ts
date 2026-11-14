@@ -37,6 +37,7 @@ import {
   closePrismaScriptContext,
   createPrismaScriptContext,
 } from './_prisma-script-client';
+import { clearFixtureData } from './seed-e2e-clear-fixtures';
 import { seedE2eSiteSettings } from './seed-e2e-site-settings';
 import {
   decodeMfaEncryptionKey,
@@ -46,7 +47,6 @@ import {
   MFA_TOTP_KEY_VERSION,
 } from '../src/auth/admin-mfa.crypto';
 
-const FIXTURE_PREFIX = 'e2e-';
 const FIXTURE_PASSWORD = 'TestPassword1!';
 
 /**
@@ -236,153 +236,6 @@ function placeholderImage(
   return `https://placehold.co/${size}/${bg}/${fg}.png?text=${encodeURIComponent(label)}`;
 }
 
-async function clearFixtureData() {
-  const context = createPrismaScriptContext();
-  const { prisma } = context;
-
-  try {
-    // Findings go with their run (cascade).
-    await prisma.reconciliationRun.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.authToken.deleteMany({
-      where: { userId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.refund.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.payment.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.orderItem.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.order.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.campaignBalanceLedgerEntry.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.payout.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.payoutRun.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.campaignProductPrice.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.campaignProduct.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.campaign.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.designView.deleteMany({
-      where: {
-        OR: [
-          { designId: { startsWith: FIXTURE_PREFIX } },
-          { productViewId: { startsWith: FIXTURE_PREFIX } },
-        ],
-      },
-    });
-    await prisma.designAsset.deleteMany({
-      where: {
-        OR: [
-          { id: { startsWith: FIXTURE_PREFIX } },
-          { mediaAssetId: { startsWith: FIXTURE_PREFIX } },
-          { ownerUserId: { startsWith: FIXTURE_PREFIX } },
-        ],
-      },
-    });
-    await prisma.mediaDerivative.deleteMany({
-      where: {
-        OR: [
-          { id: { startsWith: FIXTURE_PREFIX } },
-          { assetId: { startsWith: FIXTURE_PREFIX } },
-        ],
-      },
-    });
-    await prisma.design.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.mediaAsset.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.userPayoutProfile.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.inventoryItem.deleteMany({
-      where: { variantId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.variantOptionValue.deleteMany({
-      where: {
-        OR: [
-          { variantId: { startsWith: FIXTURE_PREFIX } },
-          { optionId: { startsWith: FIXTURE_PREFIX } },
-          { optionValueId: { startsWith: FIXTURE_PREFIX } },
-        ],
-      },
-    });
-    await prisma.variantPrice.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.productOptionValue.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.productOption.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.productPrice.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.productVariant.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.productView.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.product.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.category.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.address.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.userOAuthAccount.deleteMany({
-      where: { userId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.adminMfaRecoveryCode.deleteMany({
-      where: { userId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.adminMfaCredential.deleteMany({
-      where: { userId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.authSession.deleteMany({
-      where: { userId: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.user.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.shippingRate.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.shippingZoneRule.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.shippingZoneArea.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-    await prisma.shippingZone.deleteMany({
-      where: { id: { startsWith: FIXTURE_PREFIX } },
-    });
-  } finally {
-    await closePrismaScriptContext(context);
-  }
-}
-
 async function main() {
   const context = createPrismaScriptContext();
   const { prisma, databaseUrl } = context;
@@ -391,7 +244,7 @@ async function main() {
   assertTestDatabase(databaseUrl);
 
   try {
-    await clearFixtureData();
+    await clearFixtureData(prisma);
 
     await prisma.geoState.upsert({
       where: { code: 'LA' },
