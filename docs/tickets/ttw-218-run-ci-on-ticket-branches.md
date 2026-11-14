@@ -38,7 +38,7 @@ Rejected: opening pull requests (project rule); branch protection (not asked, ou
 1. Edit `ci.yml` (triggers and `concurrency`).
 2. Edit `AGENTS.md` step 8. A search found no other file that repeats the old rule (worktree copies under `.claude/worktrees/` are copies of `AGENTS.md`, not separate docs).
 3. Add the ticket to `ROADMAP.md`.
-4. Prove it on GitHub: push this branch (user request), read the run, push a second commit, and check the first run is cancelled.
+4. Prove it on GitHub: push this branch (user request), read the run, push a second commit while a run is in progress, and check that run is cancelled (see "Verification evidence").
 
 ## Test and observability plan
 
