@@ -1,7 +1,7 @@
 # TTW-209 — Replace first-party API mocks in Playwright tests with real data
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** In review\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
@@ -73,16 +73,73 @@ The rule targets _core acceptance journeys_ and allows provider simulators. A ro
 
 ## Design review
 
-Pending.
+Standard risk, recorded before implementation (2026-11-13). Test code and one seed script only; no production code, schema or contract change.
+
+### Audit of every `route(` in `tests/e2e`
+
+`grep -rn "route(" tests/e2e` finds 18 calls in 9 files (the three checkout specs have two each). The fixtures (`tests/e2e/fixtures/`) contain none. Strategy doc `docs/16-playwright-regression-strategy.md` allows stubs for "external providers and deliberate frontend error-state tests".
+
+| #   | File and call                                                                                      | What it fakes                                                                      | Class                                          | Decision                                                                                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1-4 | `admin/shipping-zone-area-picker.comprehensive.spec.ts` (zone, areas, geo states, geo LGAs)        | The whole zone page contract                                                       | First-party API, can run for real              | **Replace.** Real admin routes, one zone per test, deactivated rows from `seed:e2e`.                                                                                                                                                     |
+| 5   | `admin/catalog-settings.comprehensive.spec.ts` `mockSettingsSave` (PATCH)                          | Success answer of the site settings save                                           | First-party, needed to avoid a shared write    | **Keep, with comment.** Site settings are one global row (VAT rate, payout mode) that checkout and payout specs read in parallel; a real save of 0 % / 100 % VAT would change their totals. The real PATCH is covered by API unit tests. |
+| 6   | same file, GET with `vatRate: null` (uses `route.fetch`, so the rest is the real response)         | A state the seed never has and no admin route can create                           | Forced state                                   | **Keep, with comment.**                                                                                                                                                                                                                  |
+| 7   | same file, PATCH answered 400                                                                      | A server refusal the page itself already prevents                                  | Deliberate frontend error-state test           | **Keep, with comment.**                                                                                                                                                                                                                  |
+| 8-9 | `journeys/inventory-lifecycle.smoke.spec.ts` (`/v1/products/*/availability`, `/admin/inventory/*`) | The test fetches URLs that it mocks itself. Neither route exists in the real API   | First-party API, can run for real              | **Replace** with the real `GET /v1/inventory/variant/:id` and `GET /v1/products/:id`.                                                                                                                                                    |
+| 10  | `journeys/reconciliation.smoke.spec.ts` (`/admin/reconciliation/findings`)                         | Mocked answer is an array; the real route returns `{ items, nextCursor }`          | First-party API, can run for real              | **Replace** with the real route and one finding from `seed:e2e`.                                                                                                                                                                         |
+| 11  | `journeys/refund-lifecycle.smoke.spec.ts` (`/admin/orders/*/refund`)                               | Refund route, which calls `https://api.paystack.co/refund` (hard-coded in the API) | Provider boundary                              | **Keep, with comment.** Live Paystack is never called in CI. Real route covered by `apps/api/test/paystack-refund-lifecycle.e2e-spec.ts`.                                                                                                |
+| 12  | `journeys/payment-initiation.smoke.spec.ts` (`/v1/orders/*/initiate-payment`)                      | Route that calls `https://api.paystack.co/transaction/initialize`                  | Provider boundary                              | **Keep, with comment.**                                                                                                                                                                                                                  |
+| 13  | `app/checkout-order-note`, `checkout-delivery-instructions`, `checkout-idempotency` (3 specs)      | `initiate-payment` only; quote and order creation are real                         | Provider boundary (+ `checkout.paystack.test`) | **Keep.** Already documented in each spec header.                                                                                                                                                                                        |
+
+Findings worth knowing: (a) the inventory and reconciliation stubs had already drifted from the real API (wrong paths, wrong shape) and passed anyway, because they only tested the stub; (b) the refund and payment-initiation "API" tests also assert only the stub. They stay (no test is deleted or weakened) but they prove nothing about the real routes: the checkout journeys and API integration tests carry that.
+
+### Design of the picker conversion
+
+- **Zone:** created by `POST /admin/shipping-zones` in a fixture (`tests/e2e/fixtures/admin-api.ts`) named `TTW-209 picker zone w<parallelIndex>-<timestamp>`, removed by `DELETE /admin/shipping-zones/:id` in the fixture teardown (also on failure). The API client reuses the admin session saved by the setup project and sends the CSRF token returned by `auth/me`.
+- **Deactivated rows:** `seed:e2e` adds state `ZZ` "E2E Dormant State" (inactive) and LGA "E2E Dormant LGA" (inactive) under the seeded state Lagos. They are immutable reference rows (the test never writes them), so no per-worker names are needed. Public geo lists (`GeoService`) filter `isActive: true`, so these rows never appear in lists other specs count. The active choices are the seeded Lagos and Ikeja.
+- **"No area was created" assertion:** previously a mocked `/areas` route returned 500 and recorded calls. Now the page's requests to `/areas` are recorded AND the zone's areas are read back from the real API (stronger: it checks the database, not just the request).
+- **Seed change:** one reconciliation run (kind `TARGETED`, status `INCOMPLETE`) with one `RESOLVED` finding, so analytics (last `COMPLETED` run, `OPEN`/`ACKNOWLEDGED` findings) does not count it. Cleared by `clearFixtureData` (cascade).
+- **Inventory:** the customer product detail must report `availableQuantity = max(0, stockOnHand - reserved)` against the real stock row. The admin inventory route is write-only (`PATCH`), and writing would change stock other specs count (and inventory movements, see the foreign key note below), so the admin half of the old test cannot be kept as a read. Recorded as a deviation.
+
+### Test environment
+
+A dedicated database `tamiym_workshop_test_209` (migrated and seeded with `seed:e2e`), API on port 3101, the three Next apps built with `NEXT_PUBLIC_API_URL=http://localhost:3101/v1`. Reason: `seed:e2e` fails on the shared test database (see Verification evidence), and the API on 3001 belongs to another session.
 
 ## Implementation reviews
 
-Pending.
+Pending: an independent read-only review of the commit is still to be obtained before merge (`AGENTS.md`, step 7).
 
 ## Verification evidence
 
-Pending implementation.
+Environment: database `tamiym_workshop_test_209` (migrated, `seed:e2e` applied), API on port 3101, web/app/admin built with `NEXT_PUBLIC_API_URL=http://localhost:3101/v1`, `PLAYWRIGHT_API_URL=http://localhost:3101`.
+
+**Seed foreign key (out of scope, not fixed).** `pnpm --filter api seed:e2e` on the shared database `tamiym_workshop_test` fails: `Foreign key constraint violated on the constraint: inventory_movements_variantId_fkey` (P2003) in `clearFixtureData` (`prisma.productVariant.deleteMany()`), because movements remain from earlier runs. On a fresh database the seed passes. A separate ticket is proposed ("seed:e2e must clear inventory movements before deleting variants").
+
+**Fails for the right reason, then passes** (`pnpm exec playwright test shipping-zone-area-picker --project=setup --project=chromium-admin`):
+
+- API drift: `listStates` temporarily stripped `isActive` (reverted) → both picker tests fail (`getByRole('option', { name: 'Lagos', exact: true })` not found).
+- Screen regression: the admin picker temporarily stopped disabling/marking states (reverted, admin rebuilt) → the state test fails on `getByRole('option', { name: 'E2E Dormant State (deactivated)' })` not found.
+- Unchanged code → 5 passed (3 setup + 2 picker).
+
+**Isolation and repeat:** `--repeat-each=2`, run twice in a row → `7 passed` and `7 passed`; then `select count(*) from shipping_zones where name like 'TTW-209%'` → 0 (cleanup works).
+
+**Converted and kept specs together** (picker, reconciliation, inventory, refund, payment-initiation, catalog-settings; `--workers=3`): `46 passed`. A later run of picker + reconciliation + inventory with `--workers=1`: `7 passed (39.0s)`.
+
+**Not clean, said plainly.** A second full run was spoiled by the Mac going to sleep (`ERR_NETWORK_IO_SUSPENDED`, durations of hours), and several further attempts timed out starting the web servers (`Timed out waiting 180000ms from config.webServer`) or force-killed workers while the host load average was above 150. These are host problems, not test assertions; the runs above are the green ones. A final two-in-a-row of the full set was not obtained in one session.
+
+**Gates**
+
+- `pnpm playwright:validate` → `Playwright manifest validation passed.`
+- `pnpm docs:validate` → `Documentation validation passed.`
+- `pnpm --filter api typecheck` (`tsc --noEmit`) → no error.
+- `eslint` on `apps/api/scripts/seed-e2e-dummy-data.ts` → no output. Root ESLint ignores `tests/e2e`; Prettier check on `tests/e2e` and `apps/api/scripts` passes.
+- `tsc` on the new test files reports only missing Node type declarations (the same for untouched fixtures), no type error in the new code.
+- Web/app/admin typecheck and lint were not run: no app source changed (the temporary regression edit was reverted).
 
 ## Completion summary
 
-Pending implementation.
+- Audit: 18 `route(` calls in 9 files classified (design review). Replaced: the zone picker spec, the inventory contract spec, the reconciliation contract spec. Kept with a written reason: Paystack-boundary stubs (refund, payment initiation, checkout specs) and three site-settings stubs.
+- New: `tests/e2e/fixtures/admin-api.ts` (real admin API client, zone create/delete/list); seed rows for a deactivated state, a deactivated LGA and one resolved reconciliation finding.
+- Deviations: the old inventory test's admin half is dropped (no admin read route; writing would change shared stock). The refund and payment-initiation "API" tests only exercise their stub; they are kept unchanged, with a comment.
+- Follow-ups to open (numbers 210+ after checking `git ls-tree` on all branches): (1) `seed:e2e` fails on leftover `inventory_movements`; (2) site-settings writes cannot be tested for real in parallel because the row is global.
+- Status stays "In review" until the independent review is done.

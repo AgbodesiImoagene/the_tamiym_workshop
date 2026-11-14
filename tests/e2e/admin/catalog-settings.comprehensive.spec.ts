@@ -39,6 +39,12 @@ function recordSettingsWrites(page: Page): string[] {
 /**
  * Answers the settings PATCH without touching the shared database (the three
  * viewports run in parallel against the same seed) and records each body.
+ *
+ * Kept as a first-party stub (TTW-209 audit): site settings are one global row
+ * (VAT rate, payout mode) that checkout and payout specs read in parallel, so a
+ * real save of 0 % or 100 % VAT from this test would change their totals. The
+ * real GET still serves the page, and the refused-save tests above send nothing.
+ * The real PATCH is covered by the API tests (admin-site-settings.controller.spec.ts).
  */
 async function mockSettingsSave(page: Page): Promise<Record<string, unknown>[]> {
   const bodies: Record<string, unknown>[] = [];
@@ -129,6 +135,8 @@ describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () =>
     adminPage,
   }) => {
     const writes = recordSettingsWrites(adminPage);
+    // Kept (TTW-209 audit): the seed always sets a VAT rate, and no admin route
+    // clears it, so the unset state is forced on the real GET response.
     await adminPage.route(SITE_SETTINGS_API, async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       const response = await route.fetch();
@@ -212,6 +220,8 @@ describeViewportMatrix('Admin catalog and settings @comprehensive @admin', () =>
 
   // Uses the unguarded `page` (same admin session and viewport): the mocked 400
   // makes the browser log a console error, which the adminPage guard rejects.
+  // Kept (TTW-209 audit): a deliberate frontend error-state test. The real API
+  // refuses only what the page already blocks, so it cannot produce this 400.
   test('site settings show an API save error in the alert (TTW-183)', async ({ page }) => {
     await page.route(SITE_SETTINGS_API, async (route) => {
       if (route.request().method() !== 'PATCH') return route.fallback();
