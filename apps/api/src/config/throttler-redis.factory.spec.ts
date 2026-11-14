@@ -1,16 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({ status: 'ready' }));
-});
-
 jest.mock('@nest-lab/throttler-storage-redis', () => ({
   ThrottlerStorageRedisService: jest
     .fn()
     .mockImplementation((client: unknown) => ({ client })),
 }));
 
-import Redis from 'ioredis';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import {
   createThrottlerModuleOptions,
   redisConnectionOptions,
@@ -41,21 +37,24 @@ describe('throttler-redis.factory', () => {
     expect(options.throttlers).toEqual([
       { name: 'default', ttl: 60_000, limit: 100 },
     ]);
-    expect(options.storage).toEqual({ client: expect.anything() });
+    expect(options.storage).toEqual({
+      client: expect.objectContaining({ host: 'redis.internal' }),
+    });
   });
 
   // With enableOfflineQueue off, a client that has not connected yet rejects
   // every command ("Stream isn't writeable"). lazyConnect would leave the
   // client unconnected until its first command, so the first request after a
   // boot got a 500 (TTW-211 found it as a cold-start e2e failure).
-  it('connects at creation so the first request after boot is not rejected', () => {
-    (Redis as unknown as jest.Mock).mockClear();
+  // Passing options (not a client) also lets the storage own the client and
+  // disconnect it on shutdown.
+  it('lets the storage connect and own the client, failing fast without a queue', () => {
+    const storage = ThrottlerStorageRedisService as unknown as jest.Mock;
+    storage.mockClear();
     createThrottlerModuleOptions(config);
-    const options = (Redis as unknown as jest.Mock).mock.calls[0][0] as Record<
-      string,
-      unknown
-    >;
-    expect(options.lazyConnect).not.toBe(true);
-    expect(options.enableOfflineQueue).toBe(false);
+    const [arg] = storage.mock.calls[0] as [Record<string, unknown>];
+    expect(arg.lazyConnect).not.toBe(true);
+    expect(arg.enableOfflineQueue).toBe(false);
+    expect(arg.host).toBe('redis.internal');
   });
 });

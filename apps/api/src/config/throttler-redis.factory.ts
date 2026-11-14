@@ -1,6 +1,5 @@
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import Redis from 'ioredis';
 
 /** Shared Redis connection options for BullMQ / throttler / auth rate limits. */
 export function redisConnectionOptions(config: ConfigService): {
@@ -17,17 +16,22 @@ export function redisConnectionOptions(config: ConfigService): {
   };
 }
 
-/** Nest Throttler Redis storage (multi-replica IP limits for non-auth routes). */
+/**
+ * Nest Throttler Redis storage (multi-replica IP limits for non-auth routes).
+ *
+ * Passes connection options, not a client: the storage then creates the client
+ * itself, connects at creation and disconnects it when the module is destroyed.
+ * An already-built client would never be closed by the storage, and a lazy one
+ * (no offline queue) rejects every command until it has connected.
+ */
 export function createThrottlerRedisStorage(
   config: ConfigService,
 ): ThrottlerStorageRedisService {
-  return new ThrottlerStorageRedisService(
-    new Redis({
-      ...redisConnectionOptions(config),
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    }),
-  );
+  return new ThrottlerStorageRedisService({
+    ...redisConnectionOptions(config),
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+  });
 }
 
 export function createThrottlerModuleOptions(config: ConfigService) {

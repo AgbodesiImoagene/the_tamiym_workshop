@@ -47,6 +47,49 @@ describe('AdminSiteSettingsController AUTO_EXECUTE gate', () => {
   });
 });
 
+describe('AdminSiteSettingsController AUTO_EXECUTE when the env gate is on (TTW-211)', () => {
+  it('accepts AUTO_EXECUTE and stores it', async () => {
+    const prev = process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+    process.env.PAYOUT_AUTO_EXECUTE_ENABLED = 'true';
+    const prisma = {
+      siteSettings: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'default', vatRate: 0.075 }),
+        upsert: jest.fn().mockImplementation(({ update }) =>
+          Promise.resolve({
+            id: 'default',
+            vatRate: 0.075,
+            minimumPayoutAmount: null,
+            ...update,
+          }),
+        ),
+      },
+    };
+    const module = await Test.createTestingModule({
+      controllers: [AdminSiteSettingsController],
+      providers: [
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: { log: jest.fn() } },
+      ],
+    }).compile();
+    const controller = module.get(AdminSiteSettingsController);
+    try {
+      const saved = await controller.update(
+        { payoutMode: 'AUTO_EXECUTE' } as never,
+        { id: 'admin', role: 'ADMIN' } as never,
+      );
+      expect(prisma.siteSettings.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { payoutMode: 'AUTO_EXECUTE' } }),
+      );
+      expect(saved.payoutMode).toBe('AUTO_EXECUTE');
+    } finally {
+      if (prev === undefined) delete process.env.PAYOUT_AUTO_EXECUTE_ENABLED;
+      else process.env.PAYOUT_AUTO_EXECUTE_ENABLED = prev;
+    }
+  });
+});
+
 describe('AdminSiteSettingsController VAT on first save (TTW-084)', () => {
   async function build(existing: unknown) {
     const prisma = {
