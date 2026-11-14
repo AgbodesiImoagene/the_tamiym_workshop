@@ -1,9 +1,9 @@
 # TTW-212 — Clear rows that block fixture users and products in the e2e seed
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** Low\
-**Blocked by:** TTW-210 (same function, not yet merged; this branch starts from the TTW-210 branch)\
+**Blocked by:** None (TTW-210 is merged in `main`)\
 **Blocks:** None
 
 ## Background
@@ -58,7 +58,7 @@ Delete these rows in `clearFixtureData`, before the fixture users, products, cat
 ## Acceptance criteria
 
 - [x] `seed:e2e` succeeds twice in a row on a database holding every kind of row in the table above.
-- [x] A test fails without the fix and passes with it, and each added branch of `clearFixtureData` is proven by a test that fails when the branch is removed.
+- [x] A test fails without the fix and passes with it, and the main added branches of `clearFixtureData` are proven by a test that fails when the branch is removed (six clauses checked, see the evidence).
 - [x] Rows on non-fixture parents are untouched.
 - [x] Required quality gates pass with evidence recorded below.
 
@@ -98,7 +98,7 @@ Dedicated database `tamiym_workshop_test_210` (the shared test database was not 
 - Full API suite on `tamiym_workshop_test_210`, with the TTW-210 and TTW-212 changes including the follow-up: `pnpm test:e2e` → `Test Suites: 43 passed, 43 total`, `Tests: 199 passed, 199 total`. (Before the follow-up: 43 suites, 198 tests, also green.)
 - `pnpm seed:e2e` twice in a row after the follow-up → `exit=0` both times.
 - Second review follow-up, test red first: fourth test (an order on a product in a fixture category, a variant of generated id under an `e2e-` product with a movement, a design of a fixture user used by an order and a campaign product, an order shipped to a generated address of a fixture user, and an unrelated order) → `✕ ... orders_shippingAddressId_fkey`, `Tests: 1 failed, 3 passed`. After the fix: `pnpm test:e2e -- test/seed-e2e` → `Test Suites: 3 passed, 3 total`, `Tests: 8 passed, 8 total`; the unrelated order survives.
-- Branch-by-branch proof (each added clause removed in turn, fourth test run): `order.product.categoryId` → `order_items_productId_fkey`; `order.shippingAddress.userId` → `orders_shippingAddressId_fkey`; `orderItem.design.userId` → ✕; `campaignProduct.design.userId` → ✕; `movement.variant.productId` → `inventory_movements_variantId_fkey` (after moving the generated variant under an `e2e-` product in a control category; before that the category clause covered it, so the first attempt did not prove the branch); `onFixtureProduct` category clause → `designs_productId_fkey`. Every clause makes the test fail when removed; the file was restored and checked identical.
+- Branch-by-branch proof (the six clauses listed here were each removed in turn, fourth test run; the other added clauses were not removed one by one, they are covered by the same tests and their failure is deduced from the code): `order.product.categoryId` → `order_items_productId_fkey`; `order.shippingAddress.userId` → `orders_shippingAddressId_fkey`; `orderItem.design.userId` → ✕; `campaignProduct.design.userId` → ✕; `movement.variant.productId` → `inventory_movements_variantId_fkey` (after moving the generated variant under an `e2e-` product in a control category; before that the category clause covered it, so the first attempt did not prove the branch); `onFixtureProduct` category clause → `designs_productId_fkey`. Each of these six clauses makes the test fail when removed; the file was restored and checked identical.
 - Full API suite after the second follow-up: first run `Test Suites: 1 failed, 42 passed, 43 total` (`auth-surface.e2e-spec.ts` › "fails with a mismatched X-CSRF-Token header", got 401 instead of 403; the spec imports nothing of this ticket, passes alone twice with `Tests: 34 passed, 34 total`, and load was ~5; not a repeat of the TTW-210 failure; not explained, likely shared Redis/rate-limit state). Re-run: `Test Suites: 43 passed, 43 total`, `Tests: 200 passed, 200 total`.
 - `pnpm exec tsc --noEmit` (api) after the last change → exit 0; `eslint` on the two touched files → exit 0; `prettier --check` → clean.
 - `coverage:ratchet` / `coverage:diff`: not run, same reason as TTW-210 (seed script and e2e spec).

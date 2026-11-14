@@ -1,7 +1,7 @@
 # TTW-210 — Clear inventory movements before the e2e seed deletes variants
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, independent review done (PASS with reservations, addressed below)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
