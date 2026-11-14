@@ -34,6 +34,12 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
     product: `${marker}-limits-product`,
     address: `${marker}-limits-address`,
   };
+  const more = {
+    user: `${marker}-more-user`,
+    address: `${marker}-more-address`,
+    fixtureUserAddress: `${marker}-more-fixture-user-address`,
+    category: `${marker}-more-category`,
+  };
   const categoryProductSlug = `${marker}-product-in-fixture-category`;
   const categoryMovementKey = `${marker}:category-movement`;
   let context: PrismaScriptContext;
@@ -59,21 +65,30 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
 
   async function removeTestRows() {
     const { prisma } = context;
-    await prisma.order.deleteMany({ where: { userId: limits.user } });
-    await prisma.campaignProduct.deleteMany({
-      where: { productId: limits.product },
+    // Children first; every row of this spec carries the marker.
+    await prisma.order.deleteMany({
+      where: { userId: { in: [limits.user, more.user] } },
     });
-    await prisma.product.deleteMany({ where: { id: limits.product } });
+    await prisma.campaignProduct.deleteMany({
+      where: {
+        OR: [
+          { campaign: { slug: { startsWith: marker } } },
+          { product: { slug: { startsWith: marker } } },
+        ],
+      },
+    });
     await prisma.inventoryMovement.deleteMany({
-      where: { effectKey: categoryMovementKey },
+      where: { effectKey: { startsWith: `${marker}:` } },
     });
-    await prisma.product.deleteMany({ where: { slug: categoryProductSlug } });
-    await prisma.design.deleteMany({ where: { name: designName } });
-    await prisma.campaignProduct.deleteMany({
-      where: { campaign: { slug: { startsWith: marker } } },
+    await prisma.design.deleteMany({ where: { name: { startsWith: marker } } });
+    await prisma.productVariant.deleteMany({
+      where: { sku: { startsWith: marker.toUpperCase() } },
     });
     // Payouts go with their campaign (cascade).
     await prisma.campaign.deleteMany({
+      where: { slug: { startsWith: marker } },
+    });
+    await prisma.product.deleteMany({
       where: { slug: { startsWith: marker } },
     });
     await prisma.organizerApplication.deleteMany({
@@ -82,9 +97,14 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
     await prisma.privacyRequest.deleteMany({
       where: { policyVersion: marker },
     });
-    await prisma.category.deleteMany({ where: { id: limits.category } });
+    await prisma.address.deleteMany({
+      where: { id: { startsWith: `${marker}-` } },
+    });
+    await prisma.category.deleteMany({
+      where: { id: { startsWith: `${marker}-` } },
+    });
     await prisma.user.deleteMany({
-      where: { id: { in: [control.user, limits.user] } },
+      where: { id: { in: [control.user, limits.user, more.user] } },
     });
   }
 
@@ -110,6 +130,7 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
 
     const fixtureProduct = await prisma.product.findFirstOrThrow({
       where: { id: { startsWith: 'e2e-' } },
+      orderBy: { id: 'asc' },
     });
     await prisma.user.create({
       data: {
@@ -226,6 +247,7 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
 
     const fixtureProduct = await prisma.product.findFirstOrThrow({
       where: { id: { startsWith: 'e2e-' } },
+      orderBy: { id: 'asc' },
     });
     const product = await prisma.product.create({
       data: {
@@ -267,9 +289,11 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
 
     const fixtureDesign = await prisma.design.findFirstOrThrow({
       where: { id: { startsWith: 'e2e-' } },
+      orderBy: { id: 'asc' },
     });
     const fixtureMedia = await prisma.mediaAsset.findFirstOrThrow({
       where: { id: { startsWith: 'e2e-' } },
+      orderBy: { id: 'asc' },
     });
     await prisma.user.create({
       data: {
@@ -391,5 +415,207 @@ describe('seed:e2e rows tied to fixture users and products (e2e)', () => {
       await prisma.productImage.count({ where: { productId: product.id } }),
     ).toBe(0);
     expect(await prisma.product.count({ where: { id: product.id } })).toBe(1);
+  });
+
+  it('covers the last links: category orders, generated variants, designs and addresses of fixture users', async () => {
+    const { prisma } = context;
+    runSeed();
+
+    const fixtureProduct = await prisma.product.findFirstOrThrow({
+      where: { id: { startsWith: 'e2e-' } },
+      orderBy: { id: 'asc' },
+    });
+    await prisma.user.create({
+      data: {
+        id: more.user,
+        email: `${marker}-more@example.test`,
+        firstName: 'More',
+        lastName: 'User',
+      },
+    });
+    const addressData = (id: string, userId: string) => ({
+      id,
+      userId,
+      addressLine1: '1 Test Street',
+      city: 'Ikeja',
+      state: 'Lagos',
+    });
+    await prisma.address.create({ data: addressData(more.address, more.user) });
+    await prisma.address.create({
+      data: addressData(more.fixtureUserAddress, 'e2e-user-customer'),
+    });
+    await prisma.category.create({
+      data: { id: more.category, name: 'TTW-212 more', slug: more.category },
+    });
+    // P1 sits in a fixture category; P2 in a control category.
+    const inFixtureCategory = await prisma.product.create({
+      data: {
+        categoryId: fixtureProduct.categoryId,
+        name: 'TTW-212 more P1',
+        slug: `${marker}-more-p1`,
+        variants: {
+          create: {
+            name: 'TTW-212 more',
+            sku: `${marker.toUpperCase()}-MORE-1`,
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    const controlProduct = await prisma.product.create({
+      data: {
+        categoryId: more.category,
+        name: 'TTW-212 more P2',
+        slug: `${marker}-more-p2`,
+        variants: {
+          create: {
+            name: 'TTW-212 more',
+            sku: `${marker.toUpperCase()}-MORE-2`,
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizerId: more.user,
+        title: 'TTW-212 more',
+        slug: `${marker}-more-campaign`,
+      },
+    });
+    const orderFor = (
+      reference: string,
+      shippingAddressId: string,
+      product: { id: string; variants: { id: string }[] },
+      designId?: string,
+    ) => ({
+      userId: more.user,
+      shippingAddressId,
+      subtotalAmount: '1000.00',
+      totalAmount: '1000.00',
+      shipLine1: '1 Test Street',
+      shipCity: 'Ikeja',
+      shipState: 'Lagos',
+      paymentReference: `${marker}-more-${reference}`,
+      items: {
+        create: {
+          productId: product.id,
+          variantId: product.variants[0].id,
+          designId,
+          quantity: 1,
+          unitBasePrice: '1000.00',
+          unitFinalPrice: '1000.00',
+          productNameSnapshot: 'ttw-212',
+          variantDisplaySnapshot: 'ttw-212',
+          snapshotSource: 'PURCHASE' as const,
+        },
+      },
+    });
+    // 1. Order of a non-fixture user on a product in a fixture category.
+    const categoryOrder = await prisma.order.create({
+      data: orderFor('category', more.address, inFixtureCategory),
+    });
+    await prisma.campaignProduct.create({
+      data: { campaignId: campaign.id, productId: inFixtureCategory.id },
+    });
+    await prisma.design.create({
+      data: {
+        userId: more.user,
+        productId: inFixtureCategory.id,
+        name: `${marker}-more-design-category`,
+        designData: {},
+      },
+    });
+    // 2. A variant with a generated id under a fixture product (id `e2e-`, in a
+    // control category so the category rule cannot cover it), with a movement.
+    const fixtureIdProduct = await prisma.product.create({
+      data: {
+        id: `e2e-${marker}-more-product`,
+        categoryId: more.category,
+        name: 'TTW-212 more fixture-id product',
+        slug: `${marker}-more-fixture-id-product`,
+      },
+    });
+    const generatedVariant = await prisma.productVariant.create({
+      data: {
+        productId: fixtureIdProduct.id,
+        name: 'TTW-212 generated',
+        sku: `${marker.toUpperCase()}-GENERATED`,
+      },
+    });
+    await prisma.inventoryMovement.create({
+      data: {
+        kind: 'RESERVE',
+        effectKey: `${marker}:more-movement`,
+        variantId: generatedVariant.id,
+        quantity: 1,
+      },
+    });
+    // 3. A design of a fixture user on a control product, used by a third party.
+    const fixtureUserDesign = await prisma.design.create({
+      data: {
+        userId: 'e2e-user-customer',
+        productId: controlProduct.id,
+        name: `${marker}-more-design-fixture-user`,
+        designData: {},
+      },
+    });
+    const designOrder = await prisma.order.create({
+      data: orderFor(
+        'design',
+        more.address,
+        controlProduct,
+        fixtureUserDesign.id,
+      ),
+    });
+    await prisma.campaignProduct.create({
+      data: {
+        campaignId: campaign.id,
+        productId: controlProduct.id,
+        designId: fixtureUserDesign.id,
+      },
+    });
+    // 4. An order shipped to a generated address of a fixture user.
+    const addressOrder = await prisma.order.create({
+      data: orderFor('address', more.fixtureUserAddress, controlProduct),
+    });
+    const unrelated = await prisma.order.create({
+      data: orderFor('unrelated', more.address, controlProduct),
+    });
+
+    // Second run on the same database: none of these rows may block it.
+    runSeed();
+
+    expect(
+      await prisma.order.findMany({
+        where: {
+          id: {
+            in: [
+              categoryOrder.id,
+              designOrder.id,
+              addressOrder.id,
+              unrelated.id,
+            ],
+          },
+        },
+        select: { id: true },
+      }),
+    ).toEqual([{ id: unrelated.id }]);
+    expect(
+      await prisma.campaignProduct.count({
+        where: { campaignId: campaign.id },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.design.count({
+        where: { name: { startsWith: `${marker}-more-design` } },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.productVariant.count({ where: { id: generatedVariant.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.product.count({ where: { id: controlProduct.id } }),
+    ).toBe(1);
   });
 });

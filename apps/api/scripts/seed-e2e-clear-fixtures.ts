@@ -21,6 +21,8 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
         { userId: { startsWith: FIXTURE_PREFIX } },
         // TTW-212: the order ships to a fixture address.
         { shippingAddressId: { startsWith: FIXTURE_PREFIX } },
+        // ... or to an address (any id) owned by a fixture user.
+        { shippingAddress: { userId: { startsWith: FIXTURE_PREFIX } } },
         {
           items: {
             some: {
@@ -30,6 +32,8 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
                 { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
                 // TTW-212: the item uses a fixture design.
                 { designId: { startsWith: FIXTURE_PREFIX } },
+                // ... or a design (any id) owned by a fixture user.
+                { design: { userId: { startsWith: FIXTURE_PREFIX } } },
               ],
             },
           },
@@ -57,6 +61,7 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
       OR: [
         ...onFixtureProduct.OR,
         { designId: { startsWith: FIXTURE_PREFIX } },
+        { design: { userId: { startsWith: FIXTURE_PREFIX } } },
       ],
     },
   });
@@ -66,10 +71,16 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
   });
   await prisma.design.deleteMany({ where: onFixtureProduct });
   // A product of any id placed in a fixture category blocks the category
-  // delete: its movements, then the product (variants cascade) go first.
+  // delete: its movements, then the product (variants cascade) go first. The
+  // same goes for a variant of any id under a fixture product.
   await prisma.inventoryMovement.deleteMany({
     where: {
-      variant: { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
+      OR: [
+        { variant: { productId: { startsWith: FIXTURE_PREFIX } } },
+        {
+          variant: { product: { categoryId: { startsWith: FIXTURE_PREFIX } } },
+        },
+      ],
     },
   });
   await prisma.product.deleteMany({
