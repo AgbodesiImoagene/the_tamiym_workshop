@@ -3430,7 +3430,10 @@ export interface components {
             recipientName?: string;
             /** @example Lagos */
             state: string;
-            /** @example LA */
+            /**
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @example LA
+             */
             stateCode?: string;
         };
         CreateAdminNotificationRouteDto: {
@@ -4770,7 +4773,10 @@ export interface components {
             recipientName?: string;
             /** @example Lagos */
             state?: string;
-            /** @example LA */
+            /**
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @example LA
+             */
             stateCode?: string;
         };
         UpdateAdminNotificationRouteDto: {
@@ -14276,7 +14282,10 @@ export interface operations {
                     recipientName?: string;
                     /** @example Lagos */
                     state: string;
-                    /** @example LA */
+                    /**
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @example LA
+                     */
                     stateCode?: string;
                 };
             };
@@ -14321,7 +14330,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14516,7 +14525,10 @@ export interface operations {
                     recipientName?: string;
                     /** @example Lagos */
                     state?: string;
-                    /** @example LA */
+                    /**
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @example LA
+                     */
                     stateCode?: string;
                 };
             };
@@ -14561,7 +14573,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
             400: {
                 headers: {
                     [name: string]: unknown;

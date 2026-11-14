@@ -298,6 +298,7 @@
             "type": "string"
           },
           "stateCode": {
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
             "example": "LA",
             "type": "string"
           }
@@ -3693,6 +3694,7 @@
             "type": "string"
           },
           "stateCode": {
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
             "example": "LA",
             "type": "string"
           }
@@ -19039,6 +19041,7 @@
                     "type": "string"
                   },
                   "stateCode": {
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
                     "example": "LA",
                     "type": "string"
                   }
@@ -19167,7 +19170,7 @@
             "description": "Address created successfully"
           },
           "400": {
-            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
           },
           "401": {
             "description": "Unauthorized"
@@ -19492,6 +19495,7 @@
                     "type": "string"
                   },
                   "stateCode": {
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
                     "example": "LA",
                     "type": "string"
                   }
@@ -19615,7 +19619,7 @@
             "description": "Address updated successfully"
           },
           "400": {
-            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
           },
           "401": {
             "description": "Unauthorized"
