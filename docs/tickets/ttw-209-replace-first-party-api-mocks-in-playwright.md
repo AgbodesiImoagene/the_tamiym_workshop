@@ -1,7 +1,7 @@
 # TTW-209 — Replace first-party API mocks in Playwright tests with real data
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
@@ -60,10 +60,10 @@ The rule targets _core acceptance journeys_ and allows provider simulators. A ro
 
 ## Acceptance criteria
 
-- [ ] Every `route(...)` in `tests/e2e` is classified in the design review.
-- [ ] The TTW-201 picker spec runs against the real API with seeded data and still fails if the picker or the API contract regresses.
-- [ ] Other first-party mocks classified "replace" are replaced; the rest carry a comment justifying them.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] Every `route(...)` in `tests/e2e` is classified in the design review.
+- [x] The TTW-201 picker spec runs against the real API with seeded data and still fails if the picker or the API contract regresses.
+- [x] Other first-party mocks classified "replace" are replaced; the rest carry a comment justifying them.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -107,7 +107,13 @@ A dedicated database `tamiym_workshop_test_209` (migrated and seeded with `seed:
 
 ## Implementation reviews
 
-Pending: an independent read-only review of the commit is still to be obtained before merge (`AGENTS.md`, step 7).
+Independent read-only review of commit `c404da1` by a fresh subagent, 2026-11-14: **PASS with reservations**, no blocking finding. It read the code and ticket only; it ran nothing.
+
+- Audit confirmed: `grep` gives 18 `route(` calls; 11 stay (3 checkout specs, 3 site-settings, refund, payment-initiation), 7 removed. Classification holds; the PATCH stub in `catalog-settings` is the only contestable one (follow-up TTW-211).
+- No test removed or skipped. Picker and reconciliation assertions kept or strengthened; the declared inventory deviation (admin half) confirmed.
+- Isolation confirmed: public geo lists filter `isActive: true`; analytics reads the last `COMPLETED` run and `OPEN`/`ACKNOWLEDGED` findings only; no count assertion elsewhere on states or LGAs; cleanup runs in `finally`; `clearFixtureData` order is safe (cascade).
+- To fix, handled: (1) this section was empty, now filled; (2) the "fails if the contract regresses" proof existed only for the picker: it was then produced for the reconciliation and inventory specs too (see Verification evidence, "Forced failures"); (3) `createAdminApi` now disposes its bootstrap context in a `finally`.
+- Notes kept: the real site-settings PATCH is seen by no e2e test (TTW-211); the inventory spec assumes the seeded variant has an inventory row (true for the seed); `getByText(zone.name, { exact: true })` in the picker passed in the recorded runs.
 
 ## Verification evidence
 
@@ -121,11 +127,24 @@ Environment: database `tamiym_workshop_test_209` (migrated, `seed:e2e` applied),
 - Screen regression: the admin picker temporarily stopped disabling/marking states (reverted, admin rebuilt) → the state test fails on `getByRole('option', { name: 'E2E Dormant State (deactivated)' })` not found.
 - Unchanged code → 5 passed (3 setup + 2 picker).
 
+**Forced failures for the two other converted specs** (2026-11-14, API rebuilt with `pnpm --filter api build`, the API process on port 3101 restarted each time; command `pnpm exec playwright test journeys/reconciliation journeys/inventory --project=setup --project=chromium-journeys --workers=2`). Two temporary edits, both reverted with `git checkout apps/api/src` and the API rebuilt afterwards:
+
+- `products.service.ts`: `availableQuantity = inventory.stockOnHand` instead of `max(0, stockOnHand - reserved)` → the inventory spec fails: `Expected value: 50`, `Received array: [49, 49]`.
+- `admin-reconciliation.controller.ts`: `maskFinding` also returned `evidence` → the reconciliation spec fails: `Expected path: not "evidence"`, `Received value: {"rawProviderPayload": "e2e-secret-payload"}`.
+- Result of that run: `2 failed`, `3 passed` (setup).
+
 **Isolation and repeat:** `--repeat-each=2`, run twice in a row → `7 passed` and `7 passed`; then `select count(*) from shipping_zones where name like 'TTW-209%'` → 0 (cleanup works).
 
 **Converted and kept specs together** (picker, reconciliation, inventory, refund, payment-initiation, catalog-settings; `--workers=3`): `46 passed`. A later run of picker + reconciliation + inventory with `--workers=1`: `7 passed (39.0s)`.
 
-**Not clean, said plainly.** A second full run was spoiled by the Mac going to sleep (`ERR_NETWORK_IO_SUSPENDED`, durations of hours), and several further attempts timed out starting the web servers (`Timed out waiting 180000ms from config.webServer`) or force-killed workers while the host load average was above 150. These are host problems, not test assertions; the runs above are the green ones. A final two-in-a-row of the full set was not obtained in one session.
+**Final runs, 2026-11-14** (`pnpm exec playwright test shipping-zone-area-picker journeys/reconciliation journeys/inventory journeys/refund journeys/payment-initiation catalog-settings --project=setup --project=chromium-admin --project=chromium-journeys --workers=3`, API restarted on port 3101 with the committed code):
+
+- Run 1: **35 failed, 11 passed.** Every admin test failed on `toBeVisible`, including `catalog-settings` tests this ticket did not change beyond comments. It was the first run after the API was rebuilt and restarted, on a host with a load average above 400 (cold servers). Not investigated further; not counted as green.
+- Run 2: `46 passed (1.8m)`.
+- Run 3 (immediately after): `46 passed (1.8m)`.
+- After run 3: `select count(*) from shipping_zones where name like 'TTW-209%'` → 0.
+
+Runs 2 and 3 are two green runs in a row, with three parallel workers. Earlier in the session, other attempts were spoiled by the Mac sleeping (`ERR_NETWORK_IO_SUSPENDED`) or by web servers not starting within 180 s under the same host load; those are host problems, not assertion failures.
 
 **Gates**
 
@@ -142,4 +161,6 @@ Environment: database `tamiym_workshop_test_209` (migrated, `seed:e2e` applied),
 - New: `tests/e2e/fixtures/admin-api.ts` (real admin API client, zone create/delete/list); seed rows for a deactivated state, a deactivated LGA and one resolved reconciliation finding.
 - Deviations: the old inventory test's admin half is dropped (no admin read route; writing would change shared stock). The refund and payment-initiation "API" tests only exercise their stub; they are kept unchanged, with a comment.
 - Follow-ups to open (numbers 210+ after checking `git ls-tree` on all branches): (1) `seed:e2e` fails on leftover `inventory_movements`; (2) site-settings writes cannot be tested for real in parallel because the row is global.
-- Status stays "In review" until the independent review is done.
+- Reviews: first review (`c404da1`) PASS with reservations; second review (`f5fcb0f`) PASS with reservations (no blocking finding; the two wording points it raised are fixed in this file). Both reviews read the code and ran nothing.
+- Forced failures now exist for all three converted specs (picker, inventory, reconciliation). Final runs 2 and 3 above are green; run 1 failed on a cold start under host load.
+- Status: Complete.

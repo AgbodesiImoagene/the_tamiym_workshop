@@ -19,14 +19,19 @@ export async function createAdminApi(): Promise<APIRequestContext> {
     storageState: path.join(authDir, 'admin.json'),
     extraHTTPHeaders: { Accept: 'application/json', Origin: originForSurface('ADMIN') },
   });
-  const me = await bootstrap.get('auth/me');
-  if (!me.ok()) {
-    throw new Error(`Admin session is not valid: auth/me returned ${me.status()}`);
+  let csrfToken: string | undefined;
+  let state: Awaited<ReturnType<APIRequestContext['storageState']>>;
+  try {
+    const me = await bootstrap.get('auth/me');
+    if (!me.ok()) {
+      throw new Error(`Admin session is not valid: auth/me returned ${me.status()}`);
+    }
+    csrfToken = ((await me.json()) as { csrf_token?: string }).csrf_token;
+    if (!csrfToken) throw new Error('auth/me returned no csrf_token for the admin session');
+    state = await bootstrap.storageState();
+  } finally {
+    await bootstrap.dispose();
   }
-  const { csrf_token: csrfToken } = (await me.json()) as { csrf_token?: string };
-  if (!csrfToken) throw new Error('auth/me returned no csrf_token for the admin session');
-  const state = await bootstrap.storageState();
-  await bootstrap.dispose();
 
   return request.newContext({
     baseURL: `${urls.api}/v1/`,
