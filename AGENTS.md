@@ -64,7 +64,7 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 5. Implement only the ticket scope; update its plan when reality differs.
 6. Run the required quality gates and record exact evidence in the ticket.
 7. Obtain an independent implementation review. Fix and repeat the full review until PASS.
-8. Do not open pull requests. Once acceptance criteria and required gates pass, and only when the user asks, merge the ticket branch locally into `main`, push `main`, and read the CI result with `gh`. A push to a `codex/ttw-*` branch does not start `ci.yml`, so a CI failure lands on `main`: report it and fix it straight away. Delete the ticket branch only when the user asks.
+8. Do not open pull requests. Once acceptance criteria and required gates pass, and only when the user asks, push the ticket branch: `ci.yml` runs on every push to `codex/ttw-**` and `claude/ttw-**` branches. Read the result with `gh run list --branch <branch>` or `gh run watch`, and fix any failure on the branch. Only when the user asks and that run is green, merge the ticket branch locally into `main` and push `main`. The run on `main` is the final proof: if it fails, report it and fix it straight away. Delete the ticket branch only when the user asks.
 
 Independent tickets may use separate worktrees. Dependent or overlapping tickets remain sequential.
 
