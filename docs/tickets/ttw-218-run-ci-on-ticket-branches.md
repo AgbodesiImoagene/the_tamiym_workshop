@@ -22,7 +22,7 @@ Checked before the change:
 ## Proposal
 
 1. In `ci.yml`, add `'codex/ttw-**'` and `'claude/ttw-**'` to `on.push.branches`. Both prefixes are in use (`claude/ttw-216-…` exist next to `codex/ttw-216-…`). The `pull_request` trigger is unchanged.
-2. Add a `concurrency` group per ref. A new push to a ticket branch cancels that branch's previous run. Runs on `main` and `develop` are never cancelled.
+2. Add a `concurrency` group per ref. A new push to a ticket branch cancels that branch's previous run. A run that is executing on `main` or `develop` is never cancelled (GitHub keeps one queued run per group, so a run still waiting in the queue can be replaced by a newer one).
 3. In `AGENTS.md` step 8, replace the sentence that said a branch push does not start the CI with the new flow: push the branch (when the user asks), read the CI with `gh`, merge into `main` only when it is green (and the user asks). The run on `main` stays the final proof.
 
 Rejected: opening pull requests (project rule); branch protection (not asked, outside this ticket); reducing the CI cost (TTW-215, deferred).
@@ -30,7 +30,7 @@ Rejected: opening pull requests (project rule); branch protection (not asked, ou
 ## Invariants
 
 - No pull request is needed to get a CI run.
-- A run on `main` or `develop` is never cancelled by `concurrency`.
+- A run that is executing on `main` or `develop` is never cancelled by `concurrency`.
 - No git action (push, merge, delete) happens without the user's request.
 
 ## Implementation plan
@@ -57,7 +57,7 @@ Rejected: opening pull requests (project rule); branch protection (not asked, ou
 
 - [x] A push to a `codex/ttw-**` or `claude/ttw-**` branch starts `ci.yml` without a pull request.
 - [x] A second push to the same branch cancels the first run.
-- [ ] A run on `main` is never cancelled (to observe after the merge).
+- [ ] A run that is executing on `main` is never cancelled (to observe after the merge).
 - [x] `AGENTS.md` describes the new flow and no document keeps the old sentence.
 - [x] `pnpm format:check` and `pnpm docs:validate` pass, with evidence recorded below.
 
@@ -72,7 +72,20 @@ Not required for a low-risk ticket.
 
 ## Implementation reviews
 
-Not done yet. A low-risk ticket needs one independent implementation review before it is closed.
+### Review 1 — 2026-11-14, independent reviewer (fresh session, read-only, no access to the author's reasoning)
+
+Charter: workflow correctness, behaviour of each job on a branch push, doc consistency, honesty of the evidence, scope. The reviewer re-read the diff and checked the runs with `gh`.
+
+Findings, none blocking:
+
+1. (minor) The wording "never cancelled" was too strong: GitHub keeps one queued run per group, so a run still waiting in the queue on `main` can be replaced by a newer one. A run that is executing is not cancelled. **Fixed:** wording in `ci.yml`, in the Proposal, the Invariants and the acceptance criterion now says "a run that is executing".
+2. (minor, not caused by this ticket) `playwright-comprehensive.yml` has its own `concurrency` group with `cancel-in-progress: true`, also on `main`. It only runs on `main` and is not touched. **No change:** the invariant of this ticket concerns `ci.yml` only.
+3. (minor) The ticket must record this review before it is closed. **Done** in this section.
+4. (cosmetic) The ROADMAP row sits between TTW-214 and TTW-189, not in numeric order. **No change:** the table is ordered by lot, and 1B groups the CI tickets.
+
+Verified by the reviewer: glob `'codex/ttw-**'` matches `codex/ttw-218-…`; the `cancel-in-progress` expression is valid and false on `main` and `develop`; `pull_request` events use a separate group; no `workflow_run` or `workflow_call` links the other workflows to `ci.yml`; `ci.yml` has no `secrets.*`, no deploy or publish step, and artifacts stay in the run; the evidence in this ticket matches `gh run view` for runs `43646086688`, `43646949476` and `43647395370`.
+
+**Verdict: PASS.**
 
 ## Verification evidence
 
@@ -97,7 +110,7 @@ Cancellation proof, same day, after the user asked for it:
 
 Still not verified:
 
-- A run on `main` is never cancelled. This can only be seen after a real merge into `main`.
+- A run that is executing on `main` is never cancelled. This can only be seen after a real merge into `main`.
 
 ## Completion summary
 
