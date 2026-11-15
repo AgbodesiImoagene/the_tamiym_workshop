@@ -92,6 +92,7 @@
         "tests/e2e/app/customer.smoke.spec.ts",
         "tests/e2e/app/dashboard-navigation.comprehensive.spec.ts",
         "tests/e2e/app/products-cart.comprehensive.spec.ts",
+        "tests/e2e/app/settings-default-address-refused.spec.ts",
         "tests/e2e/app/settings.comprehensive.spec.ts"
       ],
       "browser_tiers": ["smoke", "matrix", "comprehensive"],
