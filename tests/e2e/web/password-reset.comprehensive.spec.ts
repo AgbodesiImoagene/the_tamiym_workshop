@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { test } from '../fixtures/test';
+import { apiLogin, createApiContext } from '../fixtures/api';
 import { assertVisibleControlsEnabled } from '../fixtures/interactions';
 import {
   E2E_EXPIRED_PASSWORD_RESET_TOKEN,
@@ -81,7 +82,9 @@ test.describe('Web password reset @comprehensive @web', () => {
     await expect(page).toHaveURL(/\/auth\/forgot-password/);
   });
 
-  test('request, open the link, set a password, sign in', async ({ page }, testInfo) => {
+  test('request, open the link, set a password, close sessions, sign in', async ({
+    page,
+  }, testInfo) => {
     test.skip(
       testInfo.project.name !== 'chromium-web',
       'The seeded reset token is single-use: only one browser project can spend it.'
@@ -97,15 +100,38 @@ test.describe('Web password reset @comprehensive @web', () => {
     await page.getByRole('button', { name: 'Send reset link' }).click();
     await expect(page.getByText(GENERIC_MESSAGE)).toBeVisible();
 
-    // The emailed link carries the token; the page takes it out of the address bar.
-    await page.goto(`/reset-password?token=${token}`);
-    await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
-    await expect(page).not.toHaveURL(/token=/);
+    // A session that exists before the reset (TTW-023: a reset closes all sessions). The
+    // password is the seeded one on the first attempt and the new one after a retry.
+    const api = await createApiContext('CUSTOMER');
+    try {
+      const signedIn = await apiLogin(
+        api,
+        e2eUsers.passwordReset.email,
+        e2eUsers.passwordReset.password
+      ).then(
+        () => true,
+        () => false
+      );
+      if (!signedIn) {
+        await apiLogin(api, e2eUsers.passwordReset.email, NEW_PASSWORD);
+      }
+      expect((await api.get('auth/me')).status()).toBe(200);
 
-    await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
-    await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
-    await page.getByRole('button', { name: 'Reset password' }).click();
-    await expect(page.getByText(/password has been reset/i)).toBeVisible();
+      // The emailed link carries the token; the page takes it out of the address bar.
+      await page.goto(`/reset-password?token=${token}`);
+      await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
+      await expect(page).not.toHaveURL(/token=/);
+
+      await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
+      await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: 'Reset password' }).click();
+      await expect(page.getByText(/password has been reset/i)).toBeVisible();
+
+      // The session that existed before the reset is closed.
+      expect((await api.get('auth/me')).status()).toBe(401);
+    } finally {
+      await api.dispose();
+    }
 
     // The same link cannot be used twice.
     await page.goto(`/reset-password?token=${token}`);
