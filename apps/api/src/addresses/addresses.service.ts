@@ -23,39 +23,42 @@ export class AddressesService {
    * @returns Created address
    */
   async create(userId: string, createAddressDto: CreateAddressDto) {
-    // If setting as default, unset other default addresses
-    if (createAddressDto.isDefault) {
-      await this.prisma.address.updateMany({
-        where: { userId, isDefault: true },
-        data: { isDefault: false },
-      });
-    }
-
-    // If no default address exists, make this one default
-    const existingDefault = await this.prisma.address.findFirst({
-      where: { userId, isDefault: true },
-    });
-
-    const isDefault = createAddressDto.isDefault ?? !existingDefault;
+    // TTW-219: normalise and validate first. It only reads reference data and
+    // may refuse the request, so a refusal changes nothing.
     const normalizedAddress =
       await this.addressNormalization.normalizeForCreate(createAddressDto);
-    const data: Prisma.AddressUncheckedCreateInput = {
-      ...normalizedAddress,
-      addressLine1:
-        normalizedAddress.addressLine1 ?? createAddressDto.addressLine1,
-      city: normalizedAddress.city ?? createAddressDto.city,
-      state: normalizedAddress.state ?? createAddressDto.state,
-      country: normalizedAddress.country ?? 'Nigeria',
-      countryCode: normalizedAddress.countryCode ?? 'NG',
-      isDefault,
-      userId,
-    };
 
-    const address = await this.prisma.address.create({
-      data,
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockUserAddresses(tx, userId);
+
+      // If setting as default, unset other default addresses
+      if (createAddressDto.isDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      // If no default address exists, make this one default
+      const existingDefault = await tx.address.findFirst({
+        where: { userId, isDefault: true },
+      });
+
+      const isDefault = createAddressDto.isDefault ?? !existingDefault;
+      const data: Prisma.AddressUncheckedCreateInput = {
+        ...normalizedAddress,
+        addressLine1:
+          normalizedAddress.addressLine1 ?? createAddressDto.addressLine1,
+        city: normalizedAddress.city ?? createAddressDto.city,
+        state: normalizedAddress.state ?? createAddressDto.state,
+        country: normalizedAddress.country ?? 'Nigeria',
+        countryCode: normalizedAddress.countryCode ?? 'NG',
+        isDefault,
+        userId,
+      };
+
+      return tx.address.create({ data });
     });
-
-    return address;
   }
 
   /**
@@ -106,14 +109,7 @@ export class AddressesService {
   ) {
     const address = await this.findUnique(userId, addressId);
 
-    // If setting as default, unset other default addresses
-    if (updateAddressDto.isDefault === true) {
-      await this.prisma.address.updateMany({
-        where: { userId, isDefault: true, id: { not: addressId } },
-        data: { isDefault: false },
-      });
-    }
-
+    // TTW-219: normalise and validate first (see `create`).
     const normalizedAddress =
       await this.addressNormalization.normalizeForUpdate(
         address,
@@ -126,12 +122,22 @@ export class AddressesService {
         : {}),
     };
 
-    const updatedAddress = await this.prisma.address.update({
-      where: { id: addressId },
-      data,
-    });
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockUserAddresses(tx, userId);
 
-    return updatedAddress;
+      // If setting as default, unset other default addresses
+      if (updateAddressDto.isDefault === true) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true, id: { not: addressId } },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.address.update({
+        where: { id: addressId },
+        data,
+      });
+    });
   }
 
   /**
@@ -160,5 +166,19 @@ export class AddressesService {
         });
       }
     }
+  }
+
+  /**
+   * TTW-219: serialise the default-address writes of one user. Two quick saves
+   * with `isDefault: true` would otherwise both clear and both set, leaving two
+   * defaults. The lock is held until the surrounding transaction ends.
+   */
+  private async lockUserAddresses(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    await tx.$executeRaw`
+      SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE
+    `;
   }
 }

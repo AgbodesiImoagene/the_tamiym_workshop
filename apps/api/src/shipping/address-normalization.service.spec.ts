@@ -29,6 +29,52 @@ describe('AddressNormalizationService', () => {
     prisma = module.get(PrismaService);
   });
 
+  describe('TTW-219: country code', () => {
+    const input = {
+      addressLine1: '12 Broad Street',
+      city: 'Lagos',
+      state: 'Nowhereland',
+    };
+
+    it.each(['\uFF2E\uFF27', 'ng', 'Ng'])(
+      'reads %j as NG, so an unknown state is still refused',
+      async (countryCode) => {
+        (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.geoState.findUnique as jest.Mock).mockResolvedValue(null);
+        await expect(
+          service.normalizeForCreate({ ...input, countryCode }),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_STATE_UNKNOWN' },
+        });
+      },
+    );
+
+    it.each(['XX', 'N1', 'NGA', '\u0131t'])(
+      'refuses %j with ADDRESS_COUNTRY_CODE_INVALID on create and update',
+      async (countryCode) => {
+        await expect(
+          service.normalizeForCreate({ ...input, countryCode }),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_COUNTRY_CODE_INVALID' },
+        });
+        await expect(
+          service.normalizeForUpdate(
+            { countryCode: 'NG', country: 'Nigeria' } as never,
+            { countryCode },
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_COUNTRY_CODE_INVALID' },
+        });
+      },
+    );
+
+    it('keeps a valid non-Nigerian code working', async () => {
+      await expect(
+        service.normalizeForCreate({ ...input, countryCode: 'gh' }),
+      ).resolves.toMatchObject({ countryCode: 'GH' });
+    });
+  });
+
   it('normalizes Nigeria admin levels into stateCode and lgaId', async () => {
     (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
       code: 'LA',

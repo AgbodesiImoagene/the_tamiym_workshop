@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { AddressProvider } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
-import { addressStateMismatch, addressStateUnknown } from './shipping.errors';
+import { canonicalCountryCode } from './country-code';
+import {
+  addressCountryCodeInvalid,
+  addressStateMismatch,
+  addressStateUnknown,
+} from './shipping.errors';
 
 type AddressNormalizationInput = {
   addressLine1?: string;
@@ -268,7 +273,12 @@ export class AddressNormalizationService {
   ) {
     const raw = this.clean(input.countryCode);
     if (raw) {
-      return raw.toUpperCase();
+      // TTW-219: one rule for the code, so "ＮＧ" or "ng" cannot skip the NG checks.
+      const code = canonicalCountryCode(raw);
+      if (!code) {
+        throw addressCountryCodeInvalid();
+      }
+      return code;
     }
     const country = this.firstDefined(
       this.clean(input.country),

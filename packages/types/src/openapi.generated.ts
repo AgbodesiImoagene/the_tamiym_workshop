@@ -3387,6 +3387,7 @@ export interface components {
              */
             country: string;
             /**
+             * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.
              * @default NG
              * @example NG
              */
@@ -4735,7 +4736,10 @@ export interface components {
             city?: string;
             /** @example Nigeria */
             country?: string;
-            /** @example NG */
+            /**
+             * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.
+             * @example NG
+             */
             countryCode?: string;
             /** @example Victoria Island */
             dependentLocality?: string;
@@ -14239,6 +14243,7 @@ export interface operations {
                      */
                     country?: string;
                     /**
+                     * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.
                      * @default NG
                      * @example NG
                      */
@@ -14487,7 +14492,10 @@ export interface operations {
                     city?: string;
                     /** @example Nigeria */
                     country?: string;
-                    /** @example NG */
+                    /**
+                     * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.
+                     * @example NG
+                     */
                     countryCode?: string;
                     /** @example Victoria Island */
                     dependentLocality?: string;

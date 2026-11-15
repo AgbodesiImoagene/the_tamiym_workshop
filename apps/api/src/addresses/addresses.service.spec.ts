@@ -50,7 +50,13 @@ describe('AddressesService', () => {
         updateMany: jest.fn(),
         delete: jest.fn(),
       },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
     };
+    // TTW-219: writes run in a transaction; the callback gets the same mock.
+    mockPrisma.$transaction.mockImplementation(
+      (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma),
+    );
     const mockAddressNormalization = {
       normalizeForCreate: jest.fn().mockResolvedValue({
         addressLine1: '123 Main St',
@@ -124,6 +130,91 @@ describe('AddressesService', () => {
         where: { userId: 'user-1', isDefault: true },
         data: { isDefault: false },
       });
+    });
+  });
+
+  describe('TTW-219: a refused save changes nothing', () => {
+    it('create: no write and no transaction when normalisation refuses', async () => {
+      const normalization = (service as any).addressNormalization;
+      normalization.normalizeForCreate.mockRejectedValueOnce(
+        new Error('refused'),
+      );
+
+      await expect(
+        service.create('user-1', {
+          addressLine1: 'x',
+          city: 'x',
+          state: 'Nowhere',
+          isDefault: true,
+        } as any),
+      ).rejects.toThrow('refused');
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.address.updateMany).not.toHaveBeenCalled();
+      expect(prisma.address.create).not.toHaveBeenCalled();
+    });
+
+    it('update: no write and no transaction when normalisation refuses', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      const normalization = (service as any).addressNormalization;
+      normalization.normalizeForUpdate.mockRejectedValueOnce(
+        new Error('refused'),
+      );
+
+      await expect(
+        service.update('user-1', 'addr-1', {
+          isDefault: true,
+          state: 'Nowhere',
+        } as any),
+      ).rejects.toThrow('refused');
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.address.updateMany).not.toHaveBeenCalled();
+      expect(prisma.address.update).not.toHaveBeenCalled();
+    });
+
+    it('create: the user lock is taken before the default is cleared', async () => {
+      const order: string[] = [];
+      (prisma.$executeRaw as unknown as jest.Mock).mockImplementation(() => {
+        order.push('lock');
+        return Promise.resolve(1);
+      });
+      (prisma.address.updateMany as jest.Mock).mockImplementation(() => {
+        order.push('clear');
+        return Promise.resolve({});
+      });
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.address.create as jest.Mock).mockImplementation(() => {
+        order.push('write');
+        return Promise.resolve(mockAddress);
+      });
+
+      await service.create('user-1', {
+        addressLine1: 'x',
+        city: 'Lagos',
+        state: 'Lagos',
+        isDefault: true,
+      } as any);
+
+      expect(order).toEqual(['lock', 'clear', 'write']);
+    });
+
+    it('create: a failed write rejects (the transaction rolls the clear back)', async () => {
+      (prisma.address.updateMany as jest.Mock).mockResolvedValue({});
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.address.create as jest.Mock).mockRejectedValue(
+        new Error('db down'),
+      );
+
+      await expect(
+        service.create('user-1', {
+          addressLine1: 'x',
+          city: 'Lagos',
+          state: 'Lagos',
+          isDefault: true,
+        } as any),
+      ).rejects.toThrow('db down');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 
