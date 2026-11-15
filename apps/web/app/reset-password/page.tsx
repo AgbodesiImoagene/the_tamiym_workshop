@@ -147,7 +147,6 @@ function ResetPasswordContent() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((current: boolean) => !current)}
-                      aria-pressed={showPassword}
                       aria-label={showPassword ? 'Hide passwords' : 'Show passwords'}
                       className="absolute top-1/2 right-3 -translate-y-1/2 text-xs font-medium text-muted-foreground transition hover:text-foreground"
                     >

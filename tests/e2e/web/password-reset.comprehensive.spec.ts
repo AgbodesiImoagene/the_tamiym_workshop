@@ -27,13 +27,17 @@ test.describe('Web password reset @comprehensive @web', () => {
 
   test('forgot-password validates the email and gives the same answer for any account', async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto('/auth/forgot-password');
     await page.getByRole('button', { name: 'Send reset link' }).click();
     await expect(page.getByText('Enter a valid email address')).toBeVisible();
 
-    // An address with no account and a seeded one must look identical.
-    for (const email of ['nobody.here@tamiym.test', e2eUsers.customer.email]) {
+    // An address with no account and a seeded one must look identical. The rate limit
+    // counts requests per email across every browser project of the matrix, so the
+    // unknown address is unique to the project and the seeded one is used in one only.
+    const emails = [`nobody.${testInfo.project.name}@tamiym.test`];
+    if (testInfo.project.name === 'chromium-web') emails.push(e2eUsers.customer.email);
+    for (const email of emails) {
       await page.goto('/auth/forgot-password');
       await page.getByLabel('Email address').fill(email);
       await page.getByRole('button', { name: 'Send reset link' }).click();
@@ -63,7 +67,11 @@ test.describe('Web password reset @comprehensive @web', () => {
     await assertVisibleControlsEnabled(page.locator('form'));
   });
 
-  test('an expired link shows the expired state and a way to ask again', async ({ page }) => {
+  test('an expired link shows the expired state and a way to ask again', async ({
+    page,
+  }, testInfo) => {
+    // The reset endpoint allows 5 attempts a minute per token, shared by all projects.
+    test.skip(testInfo.project.name !== 'chromium-web', 'One browser project spends the token.');
     await page.goto(`/reset-password?token=${E2E_EXPIRED_PASSWORD_RESET_TOKEN}`);
     await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
     await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);

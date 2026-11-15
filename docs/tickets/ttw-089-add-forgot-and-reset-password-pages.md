@@ -93,7 +93,7 @@ Written before implementation, 2026-11-14.
 - L6 (already on `main`): `forgotPassword` only writes and queues when the account exists, so response time could reveal it.
 - The register page has the same symbol-regex mismatch (already on `main`).
 
-A second review round after these fixes has not been run.
+**Review 2 (independent subagent, 2026-11-15): PASS on the code.** B1, B2, H1 and M1 confirmed fixed. New findings: M-A (the CI plan above was wrong; corrected), M-B (the matrix shares rate limits across browser projects: the unknown address is now unique per project, and the seeded-customer request and the expired-link test run in `chromium-web` only), L-1 (`/reset-password` added to the crawler disallow list next to `/verify-email`), nit (`aria-pressed` removed, `aria-label` kept). Left open: L-2 (`classifyResetError` tells a bad token from a refused password by the word "token" in the API message; a stable error `code` from the API would remove that dependence) and L-3 (the spec never checks that the reset link reaches the reset user, nor that sessions are closed after a reset).
 
 ## Verification evidence
 
@@ -106,7 +106,7 @@ Run in the worktree `.claude/worktrees/ttw-089-forgot-reset-password` (Node 24):
 - After the review fixes: `pnpm --filter web test` 12 suites, 72 tests passed; `pnpm --filter web typecheck` and `pnpm --filter web lint` clean; `pnpm format:check`, `pnpm docs:validate`, `pnpm playwright:validate` passed.
 - Browser, web dev server on port 3100 with the API deliberately down: login shows "Forgot password?" linking to `/auth/forgot-password`; empty submit shows "Enter a valid email address"; a valid email with the API down shows "Something went wrong. Please try again."; `/reset-password` without token shows the invalid-link state with no form; with `?token=…` the form shows, the token is removed from the address bar, `meta referrer` is `no-referrer` and robots is `noindex`; short and mismatching passwords show both validation messages. The "New password" field had no accessible name until the label was moved onto the input (fixed).
 
-**Not verified:** the Playwright spec `tests/e2e/web/password-reset.comprehensive.spec.ts` has never run. The machine has no Docker or Postgres, so the API and the e2e seed could not start. The real request, reset, single-use and sign-in journey, the session closure after reset, and the "Forgot password?" link in `apps/app` are therefore unplayed. CI runs the comprehensive tier on push; that run is the first real proof.
+**Not verified:** the Playwright spec `tests/e2e/web/password-reset.comprehensive.spec.ts` has never run. The machine has no Docker or Postgres, so the API and the e2e seed could not start. The real request, reset, single-use and sign-in journey, the session closure after reset, and the "Forgot password?" link in `apps/app` are therefore unplayed. The comprehensive tier does not run on a ticket-branch push: `playwright-comprehensive.yml` runs on `main`, nightly or by `workflow_dispatch`. To prove the spec before merging: bring `main` into the branch (it carries the TTW-218 trigger for `codex/ttw-**` pushes), push when the user asks, then run `gh workflow run playwright-comprehensive.yml --ref codex/ttw-089-add-forgot-and-reset-password-pages` and wait for green.
 
 ## Completion summary
 
