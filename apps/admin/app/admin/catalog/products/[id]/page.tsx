@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminShell } from '@/components/admin-shell';
 import { ProductMerchandisingPanels } from '@/components/admin-product-merchandising';
 import { ProductSettingsPanel } from '@/components/admin-product-settings-panels';
+import { ProductSurchargesPanel } from '@/components/admin-product-surcharges-panel';
 import {
   getAdminProductDetail,
   updateAdminTemplateLayer,
@@ -488,6 +489,7 @@ export default function AdminCatalogProductDetailPage({
         <div className="space-y-8">
           <ProductSettingsPanel product={product} onUpdated={refresh} />
           <ProductMerchandisingPanels product={product} onChanged={refresh} />
+          <ProductSurchargesPanel product={product} />
 
           {product.views.length === 0 ? (
             <CreateProductViewForm
