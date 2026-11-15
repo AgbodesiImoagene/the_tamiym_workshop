@@ -93,7 +93,19 @@ Written before implementation, 2026-11-14.
 - L6 (already on `main`): `forgotPassword` only writes and queues when the account exists, so response time could reveal it.
 - The register page has the same symbol-regex mismatch (already on `main`).
 
-**Review 2 (independent subagent, 2026-11-15): PASS on the code.** B1, B2, H1 and M1 confirmed fixed. New findings: M-A (the CI plan above was wrong; corrected), M-B (the matrix shares rate limits across browser projects: the unknown address is now unique per project, and the seeded-customer request and the expired-link test run in `chromium-web` only), L-1 (`/reset-password` added to the crawler disallow list next to `/verify-email`), nit (`aria-pressed` removed, `aria-label` kept). Left open: L-2 (`classifyResetError` tells a bad token from a refused password by the word "token" in the API message; a stable error `code` from the API would remove that dependence) and L-3 (the spec never checks that the reset link reaches the reset user, nor that sessions are closed after a reset).
+**Review 2 (independent subagent, 2026-11-15): PASS on the code.** B1, B2, H1 and M1 confirmed fixed. New findings: M-A (the CI plan above was wrong; corrected), M-B (the matrix shares rate limits across browser projects: the unknown address is now unique per project, and the seeded-customer request and the expired-link test run in `chromium-web` only), L-1 (`/reset-password` added to the crawler disallow list next to `/verify-email`), nit (`aria-pressed` removed, `aria-label` kept).
+
+**Follow-ups handled after review 2 (user asked to fix the open points):**
+
+- L-2 fixed: the API now answers a bad, expired or used reset token with the stable code `INVALID_RESET_TOKEN` (`invalidResetTokenError` in `apps/api/src/auth/auth.service.ts`, Swagger and `openapi.json` regenerated). `classifyResetError` decides on that code only, never on the wording. Tests first: 1 API test and 2 web tests failed, then passed.
+- M2 fixed: reset and verification links are now built from `WEB_APP_URL`, falling back to `FRONTEND_URL`, so existing environments are unchanged. Two API tests pin it. `.env.example` and `docs/10-deployment-and-environments.md` say so. The Google-linked "settings" link (`/dashboard/settings`) still uses `FRONTEND_URL`, as intended (it is a customer-app route).
+- L1 documented: `NEXT_PUBLIC_WEB_URL` is listed in `docs/10-deployment-and-environments.md` as required in deployed environments.
+
+**Still open:**
+
+- L-3: the spec does not check that sessions are closed after a reset, nor that the link reaches the user whose password changes (the request step uses another user, because a request wipes the seeded tokens). Unrun e2e assertions were not added blind.
+- The "Forgot password?" link in `apps/app` has no Playwright test.
+- Already on `main`, not touched: response time of `forgotPassword` depends on whether the account exists; the register page's symbol regex differs from the API's.
 
 ## Verification evidence
 

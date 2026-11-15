@@ -42,6 +42,9 @@ export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export const FORGOT_PASSWORD_SUCCESS_MESSAGE =
   'If an account exists with this email, a password reset link is on its way. It stays valid for one hour.';
 
+/** Stable code of the API for an unknown, expired or used reset token. */
+export const INVALID_RESET_TOKEN_CODE = 'INVALID_RESET_TOKEN';
+
 export type ResetErrorKind = 'invalid-link' | 'password-rejected' | 'rate-limited' | 'unexpected';
 
 /** How an API failure is shown. The raw message is never displayed or logged. */
@@ -52,11 +55,12 @@ export function classifyResetError(error: unknown): ResetErrorKind {
       : undefined;
   if (statusCode === 400) {
     // The API answers 400 both for a bad token and for a password it refuses.
-    const message =
-      typeof error === 'object' && error !== null && 'message' in error
-        ? String((error as { message?: unknown }).message)
-        : '';
-    return /token/i.test(message) ? 'invalid-link' : 'password-rejected';
+    // Only the stable code marks the first; the wording is not relied on.
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    return code === INVALID_RESET_TOKEN_CODE ? 'invalid-link' : 'password-rejected';
   }
   if (statusCode === 429) return 'rate-limited';
   return 'unexpected';

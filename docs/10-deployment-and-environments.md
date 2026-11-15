@@ -26,9 +26,14 @@ Startup validation in `apps/api/src/app.module.ts` rejects missing values and kn
 - `LOG_LEVEL`
 - `CORS_ORIGIN`
 - `FRONTEND_URL`
+- `WEB_APP_URL` (public web site origin; password-reset and email-verification links in emails use it, then fall back to `FRONTEND_URL`)
 - `ADMIN_APP_URL`
 - `JWT_ACCESS_EXPIRES_IN`
 - `JWT_REFRESH_EXPIRES_IN`
+
+### Frontend variables
+
+- `NEXT_PUBLIC_WEB_URL`: public web site origin. The customer app (`apps/app`) uses it for its "Forgot password?" link, since the reset pages live on the web site. Without it the link points to `http://localhost:3000`, so set it in every deployed environment.
 
 ### Redis and queues
 

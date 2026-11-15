@@ -10993,12 +10993,21 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid or expired token */
+            /** @description Invalid or expired token (code INVALID_RESET_TOKEN), or a password that is not strong enough (validation message) */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example INVALID_RESET_TOKEN */
+                        code?: string;
+                        /** @example Invalid or expired reset token */
+                        message?: unknown;
+                        /** @example 400 */
+                        statusCode?: number;
+                    };
+                };
             };
         };
     };

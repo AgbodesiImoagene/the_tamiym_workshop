@@ -77,9 +77,25 @@ describe('resetPasswordSchema', () => {
 });
 
 describe('classifyResetError', () => {
-  it('treats a 400 as an expired or invalid link', () => {
-    expect(classifyResetError({ statusCode: 400, message: 'Invalid or expired token' })).toBe(
-      'invalid-link'
+  it('treats the stable INVALID_RESET_TOKEN code as an expired or invalid link', () => {
+    expect(
+      classifyResetError({
+        statusCode: 400,
+        code: 'INVALID_RESET_TOKEN',
+        message: 'Invalid or expired reset token',
+      })
+    ).toBe('invalid-link');
+  });
+
+  it('does not rely on the wording: a reworded message with the code is still a bad link', () => {
+    expect(
+      classifyResetError({ statusCode: 400, code: 'INVALID_RESET_TOKEN', message: 'Nope' })
+    ).toBe('invalid-link');
+  });
+
+  it('does not treat a 400 mentioning a token, but without the code, as a bad link', () => {
+    expect(classifyResetError({ statusCode: 400, message: 'token is required' })).toBe(
+      'password-rejected'
     );
   });
 

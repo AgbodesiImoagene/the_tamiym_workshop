@@ -548,7 +548,19 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid or expired token (code INVALID_RESET_TOKEN), or a password that is not strong enough (validation message)',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 400 },
+        code: { type: 'string', example: 'INVALID_RESET_TOKEN' },
+        message: { example: 'Invalid or expired reset token' },
+      },
+    },
+  })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
