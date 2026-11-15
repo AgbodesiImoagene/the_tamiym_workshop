@@ -120,6 +120,8 @@ Run in the worktree `.claude/worktrees/ttw-089-forgot-reset-password` (Node 24):
 
 **Not verified:** the Playwright spec `tests/e2e/web/password-reset.comprehensive.spec.ts` has never run. The machine has no Docker or Postgres, so the API and the e2e seed could not start. The real request, reset, single-use and sign-in journey, the session closure after reset, and the "Forgot password?" link in `apps/app` are therefore unplayed. The comprehensive tier does not run on a ticket-branch push: `playwright-comprehensive.yml` runs on `main`, nightly or by `workflow_dispatch`. To prove the spec before merging: bring `main` into the branch (it carries the TTW-218 trigger for `codex/ttw-**` pushes), push when the user asks, then run `gh workflow run playwright-comprehensive.yml --ref codex/ttw-089-add-forgot-and-reset-password-pages` and wait for green.
 
+**After the follow-ups and the merge of `main` (2026-11-15), on the merged tree:** `pnpm typecheck` 6 of 6; `pnpm lint` 0 errors (admin 21 and api 14 warnings, not checked against this diff); API unit suite 151 suites, 1511 tests; web 77 tests; app 120 tests (a first run failed `product-list-page` once under machine load, then passed alone and in the full app run; the file is unrelated to this change); `pnpm format:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm openapi:check` passed. The merge conflicted in the e2e seed and `identities.ts` with TTW-217's users; both sets were kept.
+
 ## Completion summary
 
 Pages, links, tests and seed are written; not complete. Open before closing the ticket: run the Playwright spec against a real API (CI), a second independent review round, and decide the follow-up tickets for M2 and L1.
