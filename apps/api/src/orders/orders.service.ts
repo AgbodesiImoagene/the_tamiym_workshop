@@ -59,6 +59,7 @@ import {
   computeOrderRequestFingerprint,
   type FingerprintAddress,
 } from './order-idempotency';
+import { assertAddressDeliverable } from '../shipping/address-deliverability';
 import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 
 type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
@@ -103,6 +104,11 @@ export class OrdersService {
     // One read: the fingerprint and the order snapshot describe the same address.
     const address = await this.prisma.address.findUnique({
       where: { id: dto.shippingAddressId },
+      // TTW-217: the snapshot is checked too, not only the quote's own read.
+      include: {
+        geoState: { select: { isActive: true } },
+        lga: { select: { isActive: true } },
+      },
     });
     const fingerprint = this.requestFingerprint(userId, dto, null, address);
     if (dto.idempotencyKey) {
@@ -152,6 +158,7 @@ export class OrdersService {
         if (!address || address.userId !== userId) {
           throw new ForbiddenException('Access denied to shipping address');
         }
+        assertAddressDeliverable(address);
 
         const expiresAt = new Date(
           Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,
@@ -269,6 +276,11 @@ export class OrdersService {
     // One read: the fingerprint and the order snapshot describe the same address.
     const address = await this.prisma.address.findUnique({
       where: { id: dto.shippingAddressId },
+      // TTW-217: the snapshot is checked too, not only the quote's own read.
+      include: {
+        geoState: { select: { isActive: true } },
+        lga: { select: { isActive: true } },
+      },
     });
     const fingerprint = this.requestFingerprint(
       userId,
@@ -325,6 +337,7 @@ export class OrdersService {
         if (!address || address.userId !== userId) {
           throw new ForbiddenException('Access denied to shipping address');
         }
+        assertAddressDeliverable(address);
 
         const expiresAt = new Date(
           Date.now() + ORDER_PENDING_EXPIRY_MINUTES * 60 * 1000,

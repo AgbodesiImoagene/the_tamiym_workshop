@@ -69,6 +69,21 @@ export const e2eUsers = {
     password: E2E_PASSWORD,
     role: 'CUSTOMER' as const,
   },
+  /**
+   * TTW-217: its only address is in a deactivated state, so checkout refuses
+   * it. Seeded that way because no admin route deactivates a state.
+   */
+  customerUndeliverable: {
+    email: 'undeliverable.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
+  /** TTW-217: active state (Lagos) but its address is linked to a deactivated LGA. */
+  customerUndeliverableLga: {
+    email: 'undeliverable-lga.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
 } as const;
 
 /**

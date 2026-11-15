@@ -93,8 +93,14 @@ const IDS = {
     customer: 'e2e-user-customer',
     // TTW-089: dedicated to the password-reset journey, which changes the password.
     passwordReset: 'e2e-user-password-reset',
+    // TTW-217: owns an address in the deactivated state (E2E_DORMANT_STATE).
+    customerUndeliverable: 'e2e-user-customer-undeliverable',
+    // TTW-217: owns an address in an active state, linked to a deactivated LGA.
+    customerUndeliverableLga: 'e2e-user-customer-undeliverable-lga',
   },
   address: 'e2e-address-customer-main',
+  addressUndeliverable: 'e2e-address-customer-undeliverable',
+  addressUndeliverableLga: 'e2e-address-customer-undeliverable-lga',
   payoutProfile: 'e2e-payout-profile-organizer-default',
   categories: {
     apparel: 'e2e-category-apparel',
@@ -449,6 +455,32 @@ async function main() {
           phone: '+2348000000006',
           emailVerifiedAt: daysAgo(10),
         },
+        {
+          // TTW-217: a customer whose only address is in a state we no longer
+          // deliver to, so checkout can show the refusal. Kept apart from the
+          // main customer: specs share that one's address and run in parallel.
+          id: IDS.users.customerUndeliverable,
+          email: 'undeliverable.e2e@tamiym.test',
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Uche',
+          lastName: 'Undeliverable',
+          phone: '+2348000000008',
+          emailVerifiedAt: daysAgo(10),
+        },
+        {
+          // TTW-217: same idea for a deactivated LGA in an active state.
+          id: IDS.users.customerUndeliverableLga,
+          email: 'undeliverable-lga.e2e@tamiym.test',
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Lola',
+          lastName: 'Undeliverable',
+          phone: '+2348000000009',
+          emailVerifiedAt: daysAgo(10),
+        },
       ],
     });
 
@@ -525,6 +557,48 @@ async function main() {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        country: 'Nigeria',
+        countryCode: 'NG',
+        isDefault: true,
+      },
+    });
+
+    // TTW-217: saved while the state was active, deactivated since (the state
+    // is seeded inactive above; no admin route deactivates a state).
+    await prisma.address.create({
+      data: {
+        id: IDS.addressUndeliverable,
+        userId: IDS.users.customerUndeliverable,
+        recipientName: 'Uche Undeliverable',
+        phone: '+2348000000008',
+        addressLine1: '3 Retired Road',
+        city: 'Ikeja',
+        state: E2E_DORMANT_STATE.name,
+        stateCode: E2E_DORMANT_STATE.code,
+        country: 'Nigeria',
+        countryCode: 'NG',
+        isDefault: true,
+      },
+    });
+
+    // TTW-217: saved while the LGA was active, deactivated since (seeded
+    // inactive above). The state, Lagos, is active.
+    const dormantLga = await prisma.geoLga.findUniqueOrThrow({
+      where: {
+        stateCode_name: { stateCode: 'LA', name: E2E_DORMANT_LGA_NAME },
+      },
+    });
+    await prisma.address.create({
+      data: {
+        id: IDS.addressUndeliverableLga,
+        userId: IDS.users.customerUndeliverableLga,
+        recipientName: 'Lola Undeliverable',
+        phone: '+2348000000009',
+        addressLine1: '5 Retired Close',
+        city: 'Ikeja',
+        state: 'Lagos',
+        stateCode: 'LA',
+        lgaId: dormantLga.id,
         country: 'Nigeria',
         countryCode: 'NG',
         isDefault: true,
