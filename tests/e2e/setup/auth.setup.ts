@@ -15,7 +15,12 @@ setup.beforeAll(() => {
 // customer surface (TTW-020). The saved storage state's Origin-derived
 // surface must match, or later `auth/me` cookie reads will 401.
 async function saveRoleState(
-  role: 'customer' | 'organiser' | 'admin',
+  role:
+    | 'customer'
+    | 'customer-undeliverable'
+    | 'customer-undeliverable-lga'
+    | 'organiser'
+    | 'admin',
   email: string,
   password: string,
   totpSecret?: string
@@ -34,6 +39,22 @@ async function saveRoleState(
 
 setup('authenticate customer @smoke', async () => {
   await saveRoleState('customer', e2eUsers.customer.email, e2eUsers.customer.password);
+});
+
+setup('authenticate customer with an undeliverable address', async () => {
+  await saveRoleState(
+    'customer-undeliverable',
+    e2eUsers.customerUndeliverable.email,
+    e2eUsers.customerUndeliverable.password
+  );
+});
+
+setup('authenticate customer with a deactivated LGA', async () => {
+  await saveRoleState(
+    'customer-undeliverable-lga',
+    e2eUsers.customerUndeliverableLga.email,
+    e2eUsers.customerUndeliverableLga.password
+  );
 });
 
 setup('authenticate organiser @smoke', async () => {

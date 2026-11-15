@@ -38,6 +38,24 @@ export function addressStateUnknown(): BadRequestException {
 }
 
 /**
+ * TTW-217: the saved address is in a state or LGA an admin deactivated after the
+ * address was saved. It still loads (so the customer can edit it) but it is no
+ * longer quoted or ordered. Orders that already exist are not affected.
+ */
+export const ADDRESS_STATE_NOT_DELIVERABLE = 'ADDRESS_STATE_NOT_DELIVERABLE';
+
+export const ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE =
+  'We do not deliver to this area.';
+
+export function addressStateNotDeliverable(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: ADDRESS_STATE_NOT_DELIVERABLE,
+    message: ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
+  });
+}
+
+/**
  * TTW-216: an address has one state, identified by its code. A request whose
  * `stateCode` and state text name two different states is refused instead of
  * storing a pair that contradicts itself.
