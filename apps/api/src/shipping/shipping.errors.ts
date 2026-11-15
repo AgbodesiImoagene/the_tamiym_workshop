@@ -36,3 +36,21 @@ export function addressStateUnknown(): BadRequestException {
     message: ADDRESS_STATE_UNKNOWN_MESSAGE,
   });
 }
+
+/**
+ * TTW-216: an address has one state, identified by its code. A request whose
+ * `stateCode` and state text name two different states is refused instead of
+ * storing a pair that contradicts itself.
+ */
+export const ADDRESS_STATE_MISMATCH = 'ADDRESS_STATE_MISMATCH';
+
+export const ADDRESS_STATE_MISMATCH_MESSAGE =
+  'The state code and the state name you sent are two different states. Choose one state from the list.';
+
+export function addressStateMismatch(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: ADDRESS_STATE_MISMATCH,
+    message: ADDRESS_STATE_MISMATCH_MESSAGE,
+  });
+}
