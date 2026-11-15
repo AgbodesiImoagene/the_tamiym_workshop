@@ -27,6 +27,7 @@ import {
 } from './campaign-line-price';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
+import { assertAddressDeliverable } from '../shipping/address-deliverability';
 import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 import {
   CampaignStatus,
@@ -239,6 +240,9 @@ export class PricingService {
         administrativeAreaLevel2: true,
         stateCode: true,
         lgaId: true,
+        // TTW-217: read with the address, so the checks cost no extra query.
+        geoState: { select: { isActive: true } },
+        lga: { select: { isActive: true } },
       },
     });
     if (!address) {
@@ -247,6 +251,11 @@ export class PricingService {
     if (address.userId !== userId) {
       throw new ForbiddenException('Access denied to this address');
     }
+    // TTW-217: one place for quotes and orders (orders call the quotes), so they
+    // cannot disagree. After the ownership check, so another user's address
+    // reveals nothing. An address with no state code has no state to check.
+    // The same rule applies to a deactivated LGA (owner decision, TTW-217).
+    assertAddressDeliverable(address);
     return address;
   }
 

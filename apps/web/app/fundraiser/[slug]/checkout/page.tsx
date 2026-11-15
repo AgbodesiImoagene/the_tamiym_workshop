@@ -30,7 +30,12 @@ import {
   type GeoState,
 } from '@/lib/geo';
 import { getPublicFundraiser } from '@/lib/fundraisers';
-import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
+import {
+  ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
+  isAddressStateNotDeliverable,
+  isShippingNotCovered,
+  SHIPPING_NOT_COVERED_MESSAGE,
+} from '@/lib/checkout-errors';
 import { webLoginWithNext, webRegisterWithNext } from '@/lib/site';
 
 interface CheckoutFormState {
@@ -272,6 +277,12 @@ export default function FundraiserCheckoutPage() {
         setError(SHIPPING_NOT_COVERED_MESSAGE);
         return;
       }
+      // TTW-217: the saved address is in a state we stopped delivering to.
+      if (isAddressStateNotDeliverable(err)) {
+        setQuote(null);
+        setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       if (apiError.code === 'EMAIL_NOT_VERIFIED') {
         router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
@@ -306,6 +317,12 @@ export default function FundraiserCheckoutPage() {
         setQuote(null);
         setQuoteAccepted(false);
         setError(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
+      if (isAddressStateNotDeliverable(err)) {
+        setQuote(null);
+        setQuoteAccepted(false);
+        setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
         return;
       }
       const apiError = err as ApiError;
@@ -498,7 +515,12 @@ export default function FundraiserCheckoutPage() {
                   </p>
                 ) : null}
                 {savedStateNotListed ? (
-                  <p className="text-xs font-normal text-red-700">Choose a state from the list.</p>
+                  <p className="text-xs font-normal text-red-700">
+                    {/* TTW-217: a saved state code missing from the active list was deactivated. */}
+                    {form.stateCode
+                      ? ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE
+                      : 'Choose a state from the list.'}
+                  </p>
                 ) : null}
               </div>
               <div className="space-y-2 text-sm font-medium text-black">

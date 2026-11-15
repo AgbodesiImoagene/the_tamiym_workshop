@@ -14,3 +14,19 @@ export function isShippingNotCovered(error: unknown): boolean {
     (error as { code?: unknown }).code === SHIPPING_ADDRESS_NOT_COVERED
   );
 }
+
+/**
+ * TTW-217: the API refuses a saved address whose state was deactivated after it
+ * was saved. The checkout shows the owner wording and keeps the cart.
+ */
+export const ADDRESS_STATE_NOT_DELIVERABLE = 'ADDRESS_STATE_NOT_DELIVERABLE';
+
+export const ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE = 'We do not deliver to this area.';
+
+export function isAddressStateNotDeliverable(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === ADDRESS_STATE_NOT_DELIVERABLE
+  );
+}

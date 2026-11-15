@@ -406,6 +406,123 @@ describe('PricingService', () => {
     });
   });
 
+  describe('address in a state we no longer deliver to (TTW-217)', () => {
+    const dto = {
+      shippingAddressId: 'addr-1',
+      items: [{ variantId: 'var-1', quantity: 1 }],
+    };
+    const deactivated = {
+      ...mockAddress,
+      geoState: { isActive: false },
+    };
+
+    async function expectNotDeliverable(promise: Promise<unknown>) {
+      const error: unknown = await promise.then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        statusCode: 400,
+        code: 'ADDRESS_STATE_NOT_DELIVERABLE',
+        message: 'We do not deliver to this area.',
+      });
+    }
+
+    it('refuses a standard quote before any pricing or shipping work', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(deactivated);
+
+      await expectNotDeliverable(service.quoteStandard('user-1', dto));
+      expect(prisma.siteSettings.findUnique).not.toHaveBeenCalled();
+      expect(resolver.resolveAddress).not.toHaveBeenCalled();
+    });
+
+    it('refuses a campaign quote', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(deactivated);
+
+      await expectNotDeliverable(
+        service.quoteCampaign('user-1', 'camp-1', dto),
+      );
+      expect(resolver.resolveAddress).not.toHaveBeenCalled();
+    });
+
+    it("still answers 403 for another user's address, never revealing its state", async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...deactivated,
+        userId: 'other-user',
+      });
+
+      await expect(service.quoteStandard('user-1', dto)).rejects.toMatchObject({
+        status: 403,
+      });
+    });
+
+    it('quotes an address whose state is active', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        geoState: { isActive: true },
+      });
+
+      await expect(service.quoteStandard('user-1', dto)).resolves.toBeDefined();
+    });
+
+    it('quotes an address with no state code (no state to check)', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        stateCode: null,
+        geoState: null,
+      });
+
+      await expect(service.quoteStandard('user-1', dto)).resolves.toBeDefined();
+    });
+
+    it('refuses a standard and a campaign quote when the LGA is deactivated', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        lgaId: 'lga-1',
+        geoState: { isActive: true },
+        lga: { isActive: false },
+      });
+
+      await expectNotDeliverable(service.quoteStandard('user-1', dto));
+      await expectNotDeliverable(
+        service.quoteCampaign('user-1', 'camp-1', dto),
+      );
+      expect(resolver.resolveAddress).not.toHaveBeenCalled();
+    });
+
+    it('quotes an address whose LGA is active, or that has no LGA', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        lgaId: 'lga-1',
+        geoState: { isActive: true },
+        lga: { isActive: true },
+      });
+      await expect(service.quoteStandard('user-1', dto)).resolves.toBeDefined();
+
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        geoState: { isActive: true },
+        lga: null,
+      });
+      await expect(service.quoteStandard('user-1', dto)).resolves.toBeDefined();
+    });
+
+    it('reads the state in the same query as the address', async () => {
+      await service.quoteStandard('user-1', dto);
+
+      expect(prisma.address.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.address.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            geoState: { select: { isActive: true } },
+            lga: { select: { isActive: true } },
+          }),
+        }),
+      );
+    });
+  });
+
   describe('address outside every shipping zone (TTW-086)', () => {
     const dto = {
       shippingAddressId: 'addr-1',

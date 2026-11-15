@@ -13,7 +13,12 @@ import {
 } from '@/lib/cart-store';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
-import { isShippingNotCovered, SHIPPING_NOT_COVERED_MESSAGE } from '@/lib/checkout-errors';
+import {
+  ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
+  isAddressStateNotDeliverable,
+  isShippingNotCovered,
+  SHIPPING_NOT_COVERED_MESSAGE,
+} from '@/lib/checkout-errors';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
 import { getGeoLgas, getGeoStates, lgaIdPayload } from '@/lib/geo';
 import { getUserAddresses, type ShippingAddress, upsertPrimaryAddress } from '@/lib/profile';
@@ -228,6 +233,12 @@ export default function DashboardCheckoutPage() {
         setError(SHIPPING_NOT_COVERED_MESSAGE);
         return;
       }
+      // TTW-217: the saved address is in a state we stopped delivering to.
+      if (isAddressStateNotDeliverable(err)) {
+        setQuote(null);
+        setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       setError(apiError.message || 'Failed to calculate your quote');
     } finally {
@@ -290,6 +301,11 @@ export default function DashboardCheckoutPage() {
       if (isShippingNotCovered(err)) {
         setQuote(null);
         setSubmitMessage(SHIPPING_NOT_COVERED_MESSAGE);
+        return;
+      }
+      if (isAddressStateNotDeliverable(err)) {
+        setQuote(null);
+        setSubmitMessage(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
         return;
       }
       const apiError = err as ApiError;
@@ -434,7 +450,10 @@ export default function DashboardCheckoutPage() {
                   ) : null}
                   {savedStateNotListed ? (
                     <p className="text-xs font-normal text-red-700">
-                      Choose a state from the list.
+                      {/* TTW-217: a saved state code missing from the active list was deactivated. */}
+                      {form.stateCode
+                        ? ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE
+                        : 'Choose a state from the list.'}
                     </p>
                   ) : null}
                 </div>

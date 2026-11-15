@@ -317,6 +317,76 @@ describe('OrdersService', () => {
       expect(line.productNameSnapshot).toBe('Classic Tee');
     });
 
+    // TTW-217 (security review): the snapshot of the address and the quote read
+    // the address separately. If the address moves to an active state between
+    // the two reads, the quote passes but the order would ship to the old
+    // (deactivated) state. The snapshot is checked too.
+    describe('snapshot of an address in a deactivated state or LGA (TTW-217)', () => {
+      const dto = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 2 }],
+      };
+
+      async function expectNotDeliverable(promise: Promise<unknown>) {
+        const error: unknown = await promise.then(
+          () => undefined,
+          (e: unknown) => e,
+        );
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).getResponse()).toMatchObject({
+          code: 'ADDRESS_STATE_NOT_DELIVERABLE',
+          message: 'We do not deliver to this area.',
+        });
+        expect(orderCreateMock).not.toHaveBeenCalled();
+      }
+
+      it.each([
+        ['state', { stateCode: 'ZZ', geoState: { isActive: false } }],
+        ['LGA', { lgaId: 'lga-1', lga: { isActive: false } }],
+      ])(
+        'refuses a standard and a campaign order whose snapshot has a deactivated %s even if the quote passed',
+        async (_name, extra) => {
+          (prisma.address.findUnique as jest.Mock).mockResolvedValue({
+            ...mockAddress,
+            ...extra,
+          });
+          (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+            variantId: 'var-1',
+            trackInventory: true,
+            stockOnHand: 10,
+            reserved: 0,
+          });
+
+          await expectNotDeliverable(service.create('user-1', dto));
+          await expectNotDeliverable(
+            service.createCampaignOrder('camp-1', 'user-1', dto),
+          );
+        },
+      );
+
+      it('reads the address once, with its state and LGA', async () => {
+        (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+        (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+          variantId: 'var-1',
+          trackInventory: true,
+          stockOnHand: 10,
+          reserved: 0,
+        });
+
+        await service.create('user-1', dto);
+
+        expect(prisma.address.findUnique).toHaveBeenCalledTimes(1);
+        expect(prisma.address.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({
+            include: {
+              geoState: { select: { isActive: true } },
+              lga: { select: { isActive: true } },
+            },
+          }),
+        );
+      });
+    });
+
     it('rejects unverified users with EMAIL_NOT_VERIFIED', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         emailVerifiedAt: null,
