@@ -3431,7 +3431,10 @@ export interface components {
             recipientName?: string;
             /** @example Lagos */
             state: string;
-            /** @example LA */
+            /**
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @example LA
+             */
             stateCode?: string;
         };
         CreateAdminNotificationRouteDto: {
@@ -4774,7 +4777,10 @@ export interface components {
             recipientName?: string;
             /** @example Lagos */
             state?: string;
-            /** @example LA */
+            /**
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @example LA
+             */
             stateCode?: string;
         };
         UpdateAdminNotificationRouteDto: {
@@ -11717,7 +11723,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11800,7 +11806,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12958,7 +12964,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -13031,7 +13037,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14281,7 +14287,10 @@ export interface operations {
                     recipientName?: string;
                     /** @example Lagos */
                     state: string;
-                    /** @example LA */
+                    /**
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @example LA
+                     */
                     stateCode?: string;
                 };
             };
@@ -14326,7 +14335,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14524,7 +14533,10 @@ export interface operations {
                     recipientName?: string;
                     /** @example Lagos */
                     state?: string;
-                    /** @example LA */
+                    /**
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @example LA
+                     */
                     stateCode?: string;
                 };
             };
@@ -14569,7 +14581,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
             400: {
                 headers: {
                     [name: string]: unknown;

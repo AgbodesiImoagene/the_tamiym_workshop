@@ -124,7 +124,12 @@ export class UpdateAddressDto {
   @IsNotEmpty()
   administrativeAreaLevel2?: string;
 
-  @ApiProperty({ example: 'LA', required: false })
+  @ApiProperty({
+    example: 'LA',
+    required: false,
+    description:
+      'Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).',
+  })
   @IsOptional()
   @IsString()
   @IsNotEmpty()

@@ -299,6 +299,7 @@
             "type": "string"
           },
           "stateCode": {
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
             "example": "LA",
             "type": "string"
           }
@@ -3695,6 +3696,7 @@
             "type": "string"
           },
           "stateCode": {
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
             "example": "LA",
             "type": "string"
           }
@@ -15059,7 +15061,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
           },
           "401": {
             "description": "Unauthorized"
@@ -15161,7 +15163,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
           },
           "401": {
             "description": "Unauthorized"
@@ -16610,7 +16612,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
           },
           "401": {
             "description": "Unauthorized"
@@ -16699,7 +16701,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry."
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
           },
           "401": {
             "description": "Unauthorized"
@@ -19042,6 +19044,7 @@
                     "type": "string"
                   },
                   "stateCode": {
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
                     "example": "LA",
                     "type": "string"
                   }
@@ -19170,7 +19173,7 @@
             "description": "Address created successfully"
           },
           "400": {
-            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
           },
           "401": {
             "description": "Unauthorized"
@@ -19496,6 +19499,7 @@
                     "type": "string"
                   },
                   "stateCode": {
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
                     "example": "LA",
                     "type": "string"
                   }
@@ -19619,7 +19623,7 @@
             "description": "Address updated successfully"
           },
           "400": {
-            "description": "Invalid input data, or a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
           },
           "401": {
             "description": "Unauthorized"
