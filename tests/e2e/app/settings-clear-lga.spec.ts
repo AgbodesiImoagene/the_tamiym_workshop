@@ -3,11 +3,14 @@ import { originForSurface } from '../fixtures/api';
 import { e2eUsers, urls } from '../fixtures/identities';
 
 /**
- * TTW-193: a customer can remove the LGA saved on an address. The test registers
+ * TTW-193 let a customer remove the LGA saved on an address; TTW-221 refuses it in a
+ * state that has LGAs (the refusal and its message are tested here). The test registers
  * its own customer, so it never touches the address shared by the other specs.
  */
 test.describe('Clear the saved LGA in settings @comprehensive @app', () => {
-  test('choose an LGA, save, empty it, save: the saved address has no LGA', async ({ browser }) => {
+  test('choose an LGA, save, empty it, save: refused with a message, the LGA stays', async ({
+    browser,
+  }) => {
     const context = await browser.newContext({ baseURL: urls.app });
     const register = await context.request.post(`${urls.api}/v1/auth/register`, {
       headers: { Origin: originForSurface('CUSTOMER') },
@@ -50,25 +53,23 @@ test.describe('Clear the saved LGA in settings @comprehensive @app', () => {
     await expect(lga).toHaveValue(savedBody.lgaId);
     await lga.selectOption({ value: '' });
 
+    // TTW-221: Lagos has LGAs, so an emptied LGA is refused. The customer sees
+    // why, and the saved address keeps its LGA.
     const cleared = page.waitForResponse(isAddressSave(['PATCH']));
     await addressForm.getByRole('button', { name: 'Save' }).click();
     const clearedResponse = await cleared;
-    expect(clearedResponse.status()).toBeLessThan(300);
+    expect(clearedResponse.status()).toBe(400);
     expect(clearedResponse.request().postDataJSON()).toMatchObject({
       stateCode: 'LA',
       lgaId: null,
     });
-    expect(await clearedResponse.json()).toMatchObject({
-      stateCode: 'LA',
-      lgaId: null,
-      administrativeAreaLevel2: null,
-    });
+    expect(await clearedResponse.json()).toMatchObject({ code: 'ADDRESS_LGA_REQUIRED' });
+    await expect(addressForm.getByRole('alert')).toContainText('Choose your LGA');
 
-    // The saved address really has no LGA: a reload shows an empty select.
     await page.reload();
     await expect(page.getByLabel('Street Address')).toHaveValue('1 Clear Street');
     await expect(state).toHaveValue('LA');
-    await expect(lga).toHaveValue('');
+    await expect(lga).toHaveValue(savedBody.lgaId);
 
     await context.close();
   });

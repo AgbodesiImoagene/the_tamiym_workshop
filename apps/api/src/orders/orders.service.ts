@@ -59,7 +59,10 @@ import {
   computeOrderRequestFingerprint,
   type FingerprintAddress,
 } from './order-idempotency';
-import { assertAddressDeliverable } from '../shipping/address-deliverability';
+import {
+  assertAddressDeliverable,
+  DELIVERABILITY_GEO_STATE_SELECT,
+} from '../shipping/address-deliverability';
 import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 
 type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
@@ -106,7 +109,7 @@ export class OrdersService {
       where: { id: dto.shippingAddressId },
       // TTW-217: the snapshot is checked too, not only the quote's own read.
       include: {
-        geoState: { select: { isActive: true } },
+        geoState: { select: DELIVERABILITY_GEO_STATE_SELECT },
         lga: { select: { isActive: true } },
       },
     });
@@ -278,7 +281,7 @@ export class OrdersService {
       where: { id: dto.shippingAddressId },
       // TTW-217: the snapshot is checked too, not only the quote's own read.
       include: {
-        geoState: { select: { isActive: true } },
+        geoState: { select: DELIVERABILITY_GEO_STATE_SELECT },
         lga: { select: { isActive: true } },
       },
     });

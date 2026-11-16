@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UserRole, UserStatus } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
 const PASSWORD = 'TestPassword1!';
@@ -54,6 +55,7 @@ describe('Address default and country code (e2e)', () => {
   beforeAll(async () => {
     app = await createE2eApp();
     prisma = app.get(PrismaService);
+    await ensureLga(prisma);
     await prisma.geoState.upsert({
       where: { code: STATE_CODE },
       update: { isActive: true },
@@ -96,6 +98,7 @@ describe('Address default and country code (e2e)', () => {
           addressLine1: '1 Test Road',
           city: 'Ikeja',
           state: 'Lagos',
+          administrativeAreaLevel2: 'Ikeja',
           country: 'Nigeria',
           ...body,
         });

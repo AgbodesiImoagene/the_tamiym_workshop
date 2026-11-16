@@ -90,3 +90,22 @@ export function addressCountryCodeInvalid(): BadRequestException {
     message: ADDRESS_COUNTRY_CODE_INVALID_MESSAGE,
   });
 }
+
+/**
+ * TTW-221 (gap 1): a Nigerian address in a state that has active LGAs must name
+ * one. Saving refuses an address without it, and a saved address that still has
+ * none is not quoted or ordered until the customer chooses one. Without it, a
+ * deactivated LGA could be skipped by leaving the LGA out.
+ */
+export const ADDRESS_LGA_REQUIRED = 'ADDRESS_LGA_REQUIRED';
+
+export const ADDRESS_LGA_REQUIRED_MESSAGE =
+  'Choose your LGA (local government area) from the list.';
+
+export function addressLgaRequired(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: ADDRESS_LGA_REQUIRED,
+    message: ADDRESS_LGA_REQUIRED_MESSAGE,
+  });
+}

@@ -15,6 +15,9 @@ describe('AddressNormalizationService', () => {
       },
       geoLga: {
         findFirst: jest.fn(),
+        // TTW-221: by default the state has no active LGA, so the "LGA
+        // required" rule stays dormant for the older tests below.
+        count: jest.fn().mockResolvedValue(0),
       },
     };
 
@@ -105,6 +108,298 @@ describe('AddressNormalizationService', () => {
       lgaId: 'lga-ikeja',
       provider: AddressProvider.GOOGLE_PLACES,
       googlePlaceId: 'place-1',
+    });
+  });
+
+  describe('TTW-221: an LGA is required in a state that has active LGAs', () => {
+    const lagos = { code: 'LA', name: 'Lagos', isActive: true };
+    const ikeja = { id: 'lga-ikeja', name: 'Ikeja', isActive: true };
+    const saved = {
+      addressLine1: '1 Test Street',
+      city: 'Ikeja',
+      state: 'Lagos',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Lagos',
+      administrativeAreaLevel2: 'Ikeja',
+      stateCode: 'LA',
+      lgaId: 'lga-ikeja',
+    };
+    const savedNoLga = {
+      ...saved,
+      administrativeAreaLevel2: null,
+      lgaId: null,
+    };
+    const base = { addressLine1: '1 Test Street', city: 'Lagos' };
+    const refused = { response: { code: 'ADDRESS_LGA_REQUIRED' } };
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(lagos);
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue(lagos);
+      (prisma.geoLga.count as jest.Mock).mockResolvedValue(3);
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+    });
+
+    it('refuses a new address with no LGA', async () => {
+      await expect(
+        service.normalizeForCreate({ ...base, state: 'Lagos' }),
+      ).rejects.toMatchObject(refused);
+      expect(prisma.geoLga.count).toHaveBeenCalledWith({
+        where: { stateCode: 'LA', isActive: true },
+      });
+    });
+
+    it('refuses a new address whose LGA text names no active LGA', async () => {
+      await expect(
+        service.normalizeForCreate({
+          ...base,
+          state: 'Lagos',
+          administrativeAreaLevel2: 'Nowhere',
+        }),
+      ).rejects.toMatchObject(refused);
+    });
+
+    it('accepts a new address with an LGA', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(ikeja);
+      const result = await service.normalizeForCreate({
+        ...base,
+        state: 'Lagos',
+        administrativeAreaLevel2: 'Ikeja',
+      });
+      expect(result.lgaId).toBe('lga-ikeja');
+    });
+
+    it('accepts a new address in a state that has no active LGA', async () => {
+      (prisma.geoLga.count as jest.Mock).mockResolvedValue(0);
+      const result = await service.normalizeForCreate({
+        ...base,
+        state: 'Lagos',
+      });
+      expect(result.lgaId).toBeNull();
+    });
+
+    it('does not ask a non-Nigerian address for an LGA', async () => {
+      const result = await service.normalizeForCreate({
+        ...base,
+        state: 'Accra',
+        countryCode: 'GH',
+      });
+      expect(result.lgaId).toBeNull();
+      expect(prisma.geoLga.count).not.toHaveBeenCalled();
+    });
+
+    it('refuses to clear the saved LGA', async () => {
+      await expect(
+        service.normalizeForUpdate(saved, { lgaId: null }),
+      ).rejects.toMatchObject(refused);
+    });
+
+    it('refuses an edit that replaces the LGA with one that does not resolve', async () => {
+      await expect(
+        service.normalizeForUpdate(saved, {
+          administrativeAreaLevel2: 'Nowhere',
+        }),
+      ).rejects.toMatchObject(refused);
+    });
+
+    it('refuses an edit that moves to another state without an LGA', async () => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
+        code: 'OG',
+        name: 'Ogun',
+        isActive: true,
+      });
+      await expect(
+        service.normalizeForUpdate(saved, { state: 'Ogun' }),
+      ).rejects.toMatchObject(refused);
+    });
+
+    it('refuses an edit that moves a non-Nigerian address to Nigeria without an LGA', async () => {
+      await expect(
+        service.normalizeForUpdate(
+          {
+            ...saved,
+            country: 'Ghana',
+            countryCode: 'GH',
+            stateCode: null,
+            lgaId: null,
+          },
+          { countryCode: 'NG', state: 'Lagos' },
+        ),
+      ).rejects.toMatchObject(refused);
+    });
+
+    it('lets a saved address with no LGA be edited on other fields', async () => {
+      const result = await service.normalizeForUpdate(savedNoLga, {
+        phone: '+2348012345678',
+      });
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: null });
+    });
+
+    it('lets a saved address with no LGA resend its state and an empty clear', async () => {
+      const result = await service.normalizeForUpdate(savedNoLga, {
+        state: 'Lagos',
+        lgaId: null,
+      });
+      expect(result).toMatchObject({ stateCode: 'LA', lgaId: null });
+    });
+
+    it('lets a saved address with no LGA gain one', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(ikeja);
+      const result = await service.normalizeForUpdate(savedNoLga, {
+        administrativeAreaLevel2: 'Ikeja',
+      });
+      expect(result.lgaId).toBe('lga-ikeja');
+    });
+
+    it('keeps the saved LGA on an unrelated edit', async () => {
+      const result = await service.normalizeForUpdate(saved, {
+        phone: '+2348012345678',
+      });
+      expect(result.lgaId).toBe('lga-ikeja');
+    });
+  });
+
+  describe('TTW-221: spaces in LGA and state names', () => {
+    const lagos = { code: 'LA', name: 'Lagos', isActive: true };
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(lagos);
+    });
+
+    it.each([
+      ['double space', 'Ikeja  Mainland'],
+      ['tab', 'Ikeja\tMainland'],
+      ['non-breaking space', 'Ikeja\u00a0Mainland'],
+      ['surrounding and mixed spaces', '  Ikeja \u00a0\t Mainland  '],
+    ])(
+      'looks the LGA up with single spaces (%s) and stores its canonical name',
+      async (_label, typed) => {
+        (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue({
+          id: 'lga-ikeja-mainland',
+          name: 'Ikeja Mainland',
+          isActive: true,
+        });
+
+        const result = await service.normalizeForCreate({
+          addressLine1: '1 Test Street',
+          city: 'Lagos',
+          state: 'Lagos',
+          administrativeAreaLevel2: typed,
+        });
+
+        expect(prisma.geoLga.findFirst).toHaveBeenCalledWith({
+          where: {
+            stateCode: 'LA',
+            name: { equals: 'Ikeja Mainland', mode: 'insensitive' },
+          },
+        });
+        expect(result.lgaId).toBe('lga-ikeja-mainland');
+        expect(result.administrativeAreaLevel2).toBe('Ikeja Mainland');
+      },
+    );
+
+    it('stores the single-spaced text when no LGA matches', async () => {
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Test Street',
+        city: 'Lagos',
+        state: 'Lagos',
+        administrativeAreaLevel2: 'Nowhere \t Town',
+      });
+
+      expect(result.lgaId).toBeNull();
+      expect(result.administrativeAreaLevel2).toBe('Nowhere Town');
+    });
+
+    it('looks a state typed with extra spaces up by its single-spaced name', async () => {
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
+        code: 'AK',
+        name: 'Akwa Ibom',
+        isActive: true,
+      });
+
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Test Street',
+        city: 'Uyo',
+        state: 'Akwa  Ibom',
+      });
+
+      expect(prisma.geoState.findFirst).toHaveBeenCalledWith({
+        where: {
+          isActive: true,
+          OR: [
+            { code: 'AKWA IBOM' },
+            { name: { equals: 'Akwa Ibom', mode: 'insensitive' } },
+          ],
+        },
+      });
+      expect(result.stateCode).toBe('AK');
+    });
+
+    const savedAkwaIbom = {
+      addressLine1: '1 Test Street',
+      city: 'Uyo',
+      state: 'Akwa Ibom',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Akwa Ibom',
+      administrativeAreaLevel2: 'Uyo',
+      stateCode: 'AK',
+      lgaId: 'lga-uyo',
+    };
+
+    it('does not see a re-spaced LGA text as a change of LGA', async () => {
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue({
+        code: 'AK',
+        name: 'Akwa Ibom',
+        isActive: true,
+      });
+      // The lookup finds nothing: only "not a change" keeps the saved id.
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.normalizeForUpdate(savedAkwaIbom, {
+        administrativeAreaLevel2: 'U yo'.replace(' ', ''),
+      });
+      expect(result.lgaId).toBe('lga-uyo');
+
+      const respaced = await service.normalizeForUpdate(
+        { ...savedAkwaIbom, administrativeAreaLevel2: 'Uyo South' },
+        { administrativeAreaLevel2: 'Uyo \u00a0 South' },
+      );
+      expect(respaced.lgaId).toBe('lga-uyo');
+    });
+
+    it('does not see a re-spaced state text as a change of state', async () => {
+      // The saved state is no longer offered: a real state change would be
+      // refused as unknown, a re-spaced resend must not be.
+      (prisma.geoState.findUnique as jest.Mock).mockResolvedValue({
+        code: 'AK',
+        name: 'Akwa Ibom',
+        isActive: false,
+      });
+      (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.normalizeForUpdate(savedAkwaIbom, {
+        state: 'Akwa  Ibom',
+      });
+
+      expect(result.stateCode).toBe('AK');
+      expect(result.lgaId).toBe('lga-uyo');
+    });
+
+    it('keeps a non-Nigerian state text single-spaced in both columns', async () => {
+      const result = await service.normalizeForCreate({
+        addressLine1: '1 Main Street',
+        city: 'New York',
+        state: 'New  York',
+        countryCode: 'US',
+      });
+
+      expect(result.state).toBe('New York');
+      expect(result.administrativeAreaLevel1).toBe('New York');
     });
   });
 

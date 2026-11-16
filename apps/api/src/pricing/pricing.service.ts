@@ -27,7 +27,10 @@ import {
 } from './campaign-line-price';
 import { ShippingDestinationResolver } from '../shipping/shipping-destination-resolver.service';
 import { ShippingRateEngine } from '../shipping/shipping-rate-engine.service';
-import { assertAddressDeliverable } from '../shipping/address-deliverability';
+import {
+  assertAddressDeliverable,
+  DELIVERABILITY_GEO_STATE_SELECT,
+} from '../shipping/address-deliverability';
 import { shippingAddressNotCovered } from '../shipping/shipping.errors';
 import {
   CampaignStatus,
@@ -241,7 +244,7 @@ export class PricingService {
         stateCode: true,
         lgaId: true,
         // TTW-217: read with the address, so the checks cost no extra query.
-        geoState: { select: { isActive: true } },
+        geoState: { select: DELIVERABILITY_GEO_STATE_SELECT },
         lga: { select: { isActive: true } },
       },
     });
