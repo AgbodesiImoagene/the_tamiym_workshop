@@ -30,6 +30,19 @@
       "tags": ["@smoke", "@web", "@visual"]
     },
     {
+      "id": "WEB-PASSWORD-RESET",
+      "surface": "web",
+      "feature": "Forgot-password and reset-password journey from the login page",
+      "prd_ref": "Accounts — password recovery",
+      "automation": "automated",
+      "tests": [
+        "tests/e2e/web/password-reset.comprehensive.spec.ts",
+        "tests/e2e/app/login-forgot-password.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@web", "@app", "@critical"]
+    },
+    {
       "id": "WEB-FUNDRAISER-LIST",
       "surface": "web",
       "feature": "Fundraiser listing states",
@@ -200,6 +213,16 @@
       "prd_ref": "Admin Dashboard",
       "automation": "automated",
       "tests": ["tests/e2e/admin/bulk-pricing.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
+      "id": "ADMIN-PRODUCT-SURCHARGES",
+      "surface": "admin",
+      "feature": "Admin sets size and print-side surcharges, and the customer quote reflects them",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/product-surcharges.comprehensive.spec.ts"],
       "browser_tiers": ["comprehensive"],
       "tags": ["@admin"]
     },

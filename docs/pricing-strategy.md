@@ -98,6 +98,14 @@ Uniqueness exists per option value and currency:
 
 - `@@unique([optionValueId, currency])`
 
+Admins write them through (TTW-094), all under `/v1/admin/products/:productId` and `ADMIN` only:
+
+- `PUT options/:optionId/values/:valueId/upcharges/:currency` with `{ "amount": 500 }` creates or replaces the upcharge. Repeating it is safe.
+- `DELETE` on the same path removes it, and succeeds when there is nothing to remove.
+- `GET surcharges` lists every size upcharge and product-level view surcharge of the product.
+
+The amount is at least 0, has at most 2 decimals and fits `Decimal(10, 2)`. The value must belong to that option and product, otherwise the API answers 404. Each change writes an audit entry (`catalog.option_value_upcharge.set` or `.delete`) with the amount before and after. A change applies to new quotes and orders only: an order keeps the price it was created with.
+
 ### Bulk pricing
 
 Bulk pricing is stored in:
@@ -129,6 +137,19 @@ View surcharge rules are stored in:
 Uniqueness includes currency:
 
 - `@@unique([productId, variantId, productViewId, currency])`
+
+That index does not stop two rows with no variant, because Postgres treats `NULL` values as distinct. A partial unique index does (TTW-094, listed in `database-only-objects.md`): at most one row per product, view and currency when `variantId` is `NULL`.
+
+Admins write the product-level surcharge (the row with no variant, which applies to every variant) through (TTW-094):
+
+- `PUT views/:viewId/surcharges/:currency` with `{ "amount": 1000 }` creates or replaces it. Repeating it is safe, including two requests at once.
+- `DELETE` on the same path removes the product-level row only, and succeeds when there is nothing to remove.
+
+Rules that already applied and are unchanged:
+
+- The first view of a design is free. The surcharge is charged for the other views, in `DesignView` id order.
+- Variant-level rows (`variantId` set) are still read by pricing, but these routes never create, change or delete them. Their rule is undefined when both a variant row and a product row exist, so editing them needs its own ticket.
+- A change applies to new quotes and orders only.
 
 ## Discounts
 

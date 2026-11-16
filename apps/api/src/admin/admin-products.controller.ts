@@ -8,9 +8,11 @@ import {
   HttpStatus,
   MaxFileSizeValidator,
   Param,
+  ParseEnumPipe,
   ParseFilePipe,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -29,7 +31,14 @@ import {
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
-import { UserRole } from '../generated/prisma/enums';
+import { CurrencyCode, UserRole } from '../generated/prisma/enums';
+import { SetSurchargeDto } from '../products/dto/set-surcharge.dto';
+import {
+  OptionValueUpchargeResponseDto,
+  ProductSurchargesResponseDto,
+  ViewSurchargeResponseDto,
+} from '../products/dto/surcharge-response.dto';
+import { ProductSurchargesService } from '../products/product-surcharges.service';
 import { CreateOptionDto } from '../products/dto/create-option.dto';
 import { CreateOptionValueDto } from '../products/dto/create-option-value.dto';
 import { CreatePrintAreaDto } from '../products/dto/create-print-area.dto';
@@ -67,7 +76,10 @@ type UploadedImageFile = {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly surchargesService: ProductSurchargesService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List all products (admin, no status filter)' })
@@ -549,5 +561,167 @@ export class AdminProductsController {
   @ApiResponse({ status: 404, description: 'Variant not found' })
   async removeVariant(@Param('variantId') variantId: string) {
     await this.productsService.removeVariant(variantId);
+  }
+
+  // ─── Size upcharges and print-side surcharges (TTW-094) ─────────────
+
+  @Get(':productId/surcharges')
+  @ApiOperation({
+    summary: 'List size upcharges and print-side surcharges (admin)',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Every size upcharge and product-level view surcharge',
+    type: ProductSurchargesResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  async listSurcharges(
+    @Param('productId') productId: string,
+  ): Promise<ProductSurchargesResponseDto> {
+    return this.surchargesService.listForProduct(productId);
+  }
+
+  @Put(':productId/options/:optionId/values/:valueId/upcharges/:currency')
+  @ApiOperation({
+    summary: 'Set the size (option value) upcharge for a currency (admin)',
+    description:
+      'Creates or replaces the upcharge. Safe to repeat. Applies to new quotes and orders only: existing orders keep their price.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiParam({ name: 'optionId', description: 'Option ID' })
+  @ApiParam({ name: 'valueId', description: 'Option value ID' })
+  @ApiParam({ name: 'currency', enum: CurrencyCode })
+  @ApiBody({ type: SetSurchargeDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Upcharge saved',
+    type: OptionValueUpchargeResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid amount or currency' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({
+    status: 404,
+    description: 'Option value not found for this product',
+  })
+  async setOptionValueUpcharge(
+    @Param('productId') productId: string,
+    @Param('optionId') optionId: string,
+    @Param('valueId') valueId: string,
+    @Param('currency', new ParseEnumPipe(CurrencyCode)) currency: CurrencyCode,
+    @Body() dto: SetSurchargeDto,
+  ): Promise<OptionValueUpchargeResponseDto> {
+    return this.surchargesService.setOptionValueUpcharge(
+      productId,
+      optionId,
+      valueId,
+      currency,
+      dto.amount,
+    );
+  }
+
+  @Delete(':productId/options/:optionId/values/:valueId/upcharges/:currency')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Remove the size (option value) upcharge for a currency (admin)',
+    description: 'Succeeds when there is nothing to remove.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiParam({ name: 'optionId', description: 'Option ID' })
+  @ApiParam({ name: 'valueId', description: 'Option value ID' })
+  @ApiParam({ name: 'currency', enum: CurrencyCode })
+  @ApiResponse({ status: 204, description: 'Upcharge removed or absent' })
+  @ApiResponse({ status: 400, description: 'Invalid currency' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({
+    status: 404,
+    description: 'Option value not found for this product',
+  })
+  async deleteOptionValueUpcharge(
+    @Param('productId') productId: string,
+    @Param('optionId') optionId: string,
+    @Param('valueId') valueId: string,
+    @Param('currency', new ParseEnumPipe(CurrencyCode)) currency: CurrencyCode,
+  ): Promise<void> {
+    await this.surchargesService.deleteOptionValueUpcharge(
+      productId,
+      optionId,
+      valueId,
+      currency,
+    );
+  }
+
+  @Put(':productId/views/:viewId/surcharges/:currency')
+  @ApiOperation({
+    summary: 'Set the print-side surcharge of a view for a currency (admin)',
+    description:
+      'Creates or replaces the product-level surcharge (all variants). Safe to repeat. The first view of a design is free; the surcharge applies to the other views. Applies to new quotes and orders only.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiParam({ name: 'viewId', description: 'Product view ID' })
+  @ApiParam({ name: 'currency', enum: CurrencyCode })
+  @ApiBody({ type: SetSurchargeDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Surcharge saved',
+    type: ViewSurchargeResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid amount or currency' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'View not found for this product' })
+  async setViewSurcharge(
+    @Param('productId') productId: string,
+    @Param('viewId') viewId: string,
+    @Param('currency', new ParseEnumPipe(CurrencyCode)) currency: CurrencyCode,
+    @Body() dto: SetSurchargeDto,
+  ): Promise<ViewSurchargeResponseDto> {
+    return this.surchargesService.setViewSurcharge(
+      productId,
+      viewId,
+      currency,
+      dto.amount,
+    );
+  }
+
+  @Delete(':productId/views/:viewId/surcharges/:currency')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Remove the print-side surcharge of a view for a currency (admin)',
+    description:
+      'Removes the product-level surcharge only. Succeeds when there is nothing to remove.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiParam({ name: 'viewId', description: 'Product view ID' })
+  @ApiParam({ name: 'currency', enum: CurrencyCode })
+  @ApiResponse({ status: 204, description: 'Surcharge removed or absent' })
+  @ApiResponse({ status: 400, description: 'Invalid currency' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'View not found for this product' })
+  async deleteViewSurcharge(
+    @Param('productId') productId: string,
+    @Param('viewId') viewId: string,
+    @Param('currency', new ParseEnumPipe(CurrencyCode)) currency: CurrencyCode,
+  ): Promise<void> {
+    await this.surchargesService.deleteViewSurcharge(
+      productId,
+      viewId,
+      currency,
+    );
   }
 }
