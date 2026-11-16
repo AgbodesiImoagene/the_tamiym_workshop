@@ -510,7 +510,7 @@ export function CustomerSettingsForm({
                           ? 'Select a state first'
                           : lgasQuery.isLoading
                             ? 'Loading LGAs...'
-                            : 'Select an LGA (optional)'}
+                            : 'Select an LGA'}
                       </option>
                       {lgas.map((item) => (
                         <option key={item.id} value={item.id}>
@@ -582,6 +582,13 @@ export function CustomerSettingsForm({
               )}
             />
 
+            {/* TTW-221: a refused save (for example no LGA) must be visible. */}
+            {addressMutation.isError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {(addressMutation.error as { message?: string }).message ||
+                  'We could not save your address.'}
+              </p>
+            ) : null}
             <SaveButton label="Save" loading={addressMutation.isPending} />
           </form>
         </FormProvider>

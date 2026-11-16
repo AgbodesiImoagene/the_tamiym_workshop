@@ -621,6 +621,25 @@ describe('DashboardCheckoutPage', () => {
     });
   });
 
+  describe('saved address with no LGA (TTW-221)', () => {
+    it('shows the choose-an-LGA message, no shipping price, and keeps the cart', async () => {
+      addCartItem(cartLine());
+      (quoteOrder as jest.Mock).mockRejectedValueOnce({
+        statusCode: 400,
+        code: 'ADDRESS_LGA_REQUIRED',
+        message: 'server wording',
+      });
+
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Choose your LGA');
+      expect(screen.getAllByText('Quote first')).toHaveLength(2);
+      expect(getCart()?.lines).toHaveLength(1);
+    });
+  });
+
   describe('address in a state we no longer deliver to (TTW-217)', () => {
     const notDeliverable = {
       statusCode: 400,

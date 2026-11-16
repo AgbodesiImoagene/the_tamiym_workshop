@@ -31,8 +31,10 @@ import {
 } from '@/lib/geo';
 import { getPublicFundraiser } from '@/lib/fundraisers';
 import {
+  ADDRESS_LGA_REQUIRED_MESSAGE,
   ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
   isAddressStateNotDeliverable,
+  isAddressLgaRequired,
   isShippingNotCovered,
   SHIPPING_NOT_COVERED_MESSAGE,
 } from '@/lib/checkout-errors';
@@ -283,6 +285,11 @@ export default function FundraiserCheckoutPage() {
         setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
         return;
       }
+      if (isAddressLgaRequired(err)) {
+        setQuote(null);
+        setError(ADDRESS_LGA_REQUIRED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       if (apiError.code === 'EMAIL_NOT_VERIFIED') {
         router.replace(`/auth/verify?next=${encodeURIComponent(checkoutPath)}`);
@@ -323,6 +330,12 @@ export default function FundraiserCheckoutPage() {
         setQuote(null);
         setQuoteAccepted(false);
         setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
+        return;
+      }
+      if (isAddressLgaRequired(err)) {
+        setQuote(null);
+        setQuoteAccepted(false);
+        setError(ADDRESS_LGA_REQUIRED_MESSAGE);
         return;
       }
       const apiError = err as ApiError;
@@ -541,7 +554,7 @@ export default function FundraiserCheckoutPage() {
                       ? 'Select a state first'
                       : !lgas && !lgasFailed
                         ? 'Loading LGAs...'
-                        : 'Select an LGA (optional)'}
+                        : 'Select an LGA'}
                   </option>
                   {(lgas ?? []).map((item) => (
                     <option key={item.id} value={item.id}>

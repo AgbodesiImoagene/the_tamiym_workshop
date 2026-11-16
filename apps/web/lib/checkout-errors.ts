@@ -30,3 +30,20 @@ export function isAddressStateNotDeliverable(error: unknown): boolean {
     (error as { code?: unknown }).code === ADDRESS_STATE_NOT_DELIVERABLE
   );
 }
+
+/**
+ * TTW-221: the API asks for an LGA when a Nigerian address in a state that has
+ * LGAs has none. The checkout shows this wording and keeps the cart.
+ */
+export const ADDRESS_LGA_REQUIRED = 'ADDRESS_LGA_REQUIRED';
+
+export const ADDRESS_LGA_REQUIRED_MESSAGE =
+  'Choose your LGA (local government area) for this address, then try again. Your cart is saved.';
+
+export function isAddressLgaRequired(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === ADDRESS_LGA_REQUIRED
+  );
+}

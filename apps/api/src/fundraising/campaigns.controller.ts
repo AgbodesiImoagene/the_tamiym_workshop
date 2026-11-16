@@ -337,7 +337,7 @@ export class CampaignsController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected.',
+      'Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -369,7 +369,7 @@ export class CampaignsController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected.',
+      'Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({

@@ -379,7 +379,16 @@ describe('OrdersService', () => {
         expect(prisma.address.findUnique).toHaveBeenCalledWith(
           expect.objectContaining({
             include: {
-              geoState: { select: { isActive: true } },
+              geoState: {
+                select: {
+                  isActive: true,
+                  lgas: {
+                    where: { isActive: true },
+                    select: { id: true },
+                    take: 1,
+                  },
+                },
+              },
               lga: { select: { isActive: true } },
             },
           }),

@@ -17,6 +17,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 /**
  * TTW-038: quotes and order creation run the real Prisma query shape against
@@ -156,6 +157,7 @@ describe('Pricing quote (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: (await ensureLga(prisma)).id,
         countryCode: 'NG',
         country: 'Nigeria',
       },

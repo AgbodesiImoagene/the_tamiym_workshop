@@ -3,10 +3,12 @@
  * outside every shipping zone by its stable code, not by the server wording.
  */
 import {
+  ADDRESS_LGA_REQUIRED_MESSAGE,
   ADDRESS_STATE_NOT_DELIVERABLE,
   ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
   SHIPPING_ADDRESS_NOT_COVERED,
   SHIPPING_NOT_COVERED_MESSAGE,
+  isAddressLgaRequired,
   isAddressStateNotDeliverable,
   isShippingNotCovered,
 } from '../lib/checkout-errors';
@@ -54,5 +56,21 @@ describe('isAddressStateNotDeliverable', () => {
 
   it('uses the owner wording', () => {
     expect(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE).toBe('We do not deliver to this area.');
+  });
+});
+
+/** TTW-221: a missing LGA is recognised by its stable code. */
+describe('isAddressLgaRequired', () => {
+  it('matches the stable code and ignores other errors', () => {
+    expect(
+      isAddressLgaRequired({ statusCode: 400, code: 'ADDRESS_LGA_REQUIRED', message: 'x' })
+    ).toBe(true);
+    expect(isAddressLgaRequired({ code: 'ADDRESS_STATE_NOT_DELIVERABLE' })).toBe(false);
+    expect(isAddressLgaRequired(null)).toBe(false);
+  });
+
+  it('tells the customer to choose an LGA and that the cart is kept', () => {
+    expect(ADDRESS_LGA_REQUIRED_MESSAGE).toMatch(/Choose your LGA/);
+    expect(ADDRESS_LGA_REQUIRED_MESSAGE).toMatch(/cart is saved/);
   });
 });

@@ -547,6 +547,10 @@ async function main() {
       },
     });
 
+    // TTW-221: Lagos has LGAs, so the customer's address carries one (Ikeja).
+    const ikeja = await prisma.geoLga.findUniqueOrThrow({
+      where: { stateCode_name: { stateCode: 'LA', name: 'Ikeja' } },
+    });
     await prisma.address.create({
       data: {
         id: IDS.address,
@@ -557,6 +561,7 @@ async function main() {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: ikeja.id,
         country: 'Nigeria',
         countryCode: 'NG',
         isDefault: true,

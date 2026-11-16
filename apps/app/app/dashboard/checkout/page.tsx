@@ -14,8 +14,10 @@ import {
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
 import {
+  ADDRESS_LGA_REQUIRED_MESSAGE,
   ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE,
   isAddressStateNotDeliverable,
+  isAddressLgaRequired,
   isShippingNotCovered,
   SHIPPING_NOT_COVERED_MESSAGE,
 } from '@/lib/checkout-errors';
@@ -239,6 +241,11 @@ export default function DashboardCheckoutPage() {
         setError(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
         return;
       }
+      if (isAddressLgaRequired(err)) {
+        setQuote(null);
+        setError(ADDRESS_LGA_REQUIRED_MESSAGE);
+        return;
+      }
       const apiError = err as ApiError;
       setError(apiError.message || 'Failed to calculate your quote');
     } finally {
@@ -306,6 +313,11 @@ export default function DashboardCheckoutPage() {
       if (isAddressStateNotDeliverable(err)) {
         setQuote(null);
         setSubmitMessage(ADDRESS_STATE_NOT_DELIVERABLE_MESSAGE);
+        return;
+      }
+      if (isAddressLgaRequired(err)) {
+        setQuote(null);
+        setSubmitMessage(ADDRESS_LGA_REQUIRED_MESSAGE);
         return;
       }
       const apiError = err as ApiError;
@@ -474,7 +486,7 @@ export default function DashboardCheckoutPage() {
                         ? 'Select a state first'
                         : lgasQuery.isLoading
                           ? 'Loading LGAs...'
-                          : 'Select an LGA (optional)'}
+                          : 'Select an LGA'}
                     </option>
                     {lgas.map((item) => (
                       <option key={item.id} value={item.id}>

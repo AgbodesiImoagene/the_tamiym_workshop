@@ -152,9 +152,11 @@ describe('Geo reference and address state (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        administrativeAreaLevel2: 'Ikeja',
         country: 'Nigeria',
       })
       .expect(201);
     expect(res.body).toMatchObject({ state: 'Lagos', stateCode: 'LA' });
+    expect(res.body.lgaId).toBeTruthy();
   });
 });
