@@ -613,6 +613,70 @@ describe('PricingService', () => {
     });
   });
 
+  describe('view surcharge when a variant row and a product row both exist (TTW-220)', () => {
+    const productRow = { variantId: null, surchargeAmount: 1000 };
+    const variantRow = { variantId: 'var-a', surchargeAmount: 400 };
+    const otherVariantRow = { variantId: 'var-b', surchargeAmount: 9999 };
+
+    /** A design with a free first view and a second view carrying `rules`. */
+    function designWith(rules: unknown[]) {
+      (prisma.designView.findMany as jest.Mock).mockResolvedValue([
+        { id: 'dv-1', productView: { pricingRules: [productRow] } },
+        { id: 'dv-2', productView: { pricingRules: rules } },
+      ]);
+    }
+    const surchargeFor = (variantId: string) =>
+      (
+        service as unknown as {
+          computeViewSurchargeForDesign: (
+            variantId: string,
+            productId: string,
+            designId: string | null,
+            currency: string,
+          ) => Promise<number>;
+        }
+      ).computeViewSurchargeForDesign(variantId, 'prod-1', 'design-1', 'NGN');
+
+    it.each([
+      ['product row first', [productRow, variantRow]],
+      ['variant row first', [variantRow, productRow]],
+    ])('the variant row wins (%s)', async (_label, rules) => {
+      designWith(rules);
+      expect(await surchargeFor('var-a')).toBe(400);
+    });
+
+    it('gives the same price on 20 repeated reads in either row order', async () => {
+      const seen = new Set<number>();
+      for (let i = 0; i < 20; i++) {
+        designWith(i % 2 ? [productRow, variantRow] : [variantRow, productRow]);
+        seen.add(await surchargeFor('var-a'));
+      }
+      expect([...seen]).toEqual([400]);
+    });
+
+    it('a variant row of 0 still wins over a positive product row', async () => {
+      designWith([productRow, { variantId: 'var-a', surchargeAmount: 0 }]);
+      expect(await surchargeFor('var-a')).toBe(0);
+    });
+
+    it('uses the product row for a variant that has no row of its own', async () => {
+      designWith([otherVariantRow, productRow]);
+      expect(await surchargeFor('var-a')).toBe(1000);
+    });
+
+    it('never uses another variant row when there is no product row', async () => {
+      designWith([otherVariantRow]);
+      expect(await surchargeFor('var-a')).toBe(0);
+    });
+
+    it('prices a product with only a product row, or only a variant row, as before', async () => {
+      designWith([productRow]);
+      expect(await surchargeFor('var-a')).toBe(1000);
+      designWith([variantRow]);
+      expect(await surchargeFor('var-a')).toBe(400);
+    });
+  });
+
   describe('buildPublicCampaignOffers', () => {
     const baseSource = {
       id: 'cp-1',
