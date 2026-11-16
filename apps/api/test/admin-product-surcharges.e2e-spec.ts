@@ -8,6 +8,7 @@ import { AuthService, isMfaChallengeResponse } from '../src/auth/auth.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PricingService } from '../src/pricing/pricing.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ensureLga } from './utils/geo-fixtures';
 import {
   AuthSurface,
   CurrencyCode,
@@ -171,6 +172,8 @@ describe('Admin product surcharges (e2e)', () => {
         maxDeliveryDays: 4,
       },
     });
+    // TTW-221: a Lagos address must carry an LGA, or the quote refuses it.
+    const lga = await ensureLga(prisma);
     const address = await prisma.address.create({
       data: {
         userId: user.id,
@@ -178,6 +181,8 @@ describe('Admin product surcharges (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: lga.id,
+        administrativeAreaLevel2: lga.name,
         countryCode: 'NG',
         country: 'Nigeria',
       },
