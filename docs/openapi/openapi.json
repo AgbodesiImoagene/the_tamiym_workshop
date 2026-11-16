@@ -225,6 +225,7 @@
           },
           "countryCode": {
             "default": "NG",
+            "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.",
             "example": "NG",
             "type": "string"
           },
@@ -3621,6 +3622,7 @@
             "type": "string"
           },
           "countryCode": {
+            "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.",
             "example": "NG",
             "type": "string"
           },
@@ -18988,6 +18990,7 @@
                   },
                   "countryCode": {
                     "default": "NG",
+                    "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.",
                     "example": "NG",
                     "type": "string"
                   },
@@ -19442,6 +19445,7 @@
                     "type": "string"
                   },
                   "countryCode": {
+                    "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.",
                     "example": "NG",
                     "type": "string"
                   },

@@ -7,9 +7,12 @@ import {
   IsPhoneNumber,
   IsEnum,
   IsNumber,
-  Length,
+  IsISO31661Alpha2,
+  Matches,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { canonicalCountryCode } from '../../shipping/country-code';
 import { AddressProvider } from '../../generated/prisma/enums';
 
 export class CreateAddressDto {
@@ -57,10 +60,21 @@ export class CreateAddressDto {
   @IsNotEmpty()
   country?: string;
 
-  @ApiProperty({ example: 'NG', default: 'NG', required: false })
+  @ApiProperty({
+    example: 'NG',
+    default: 'NG',
+    required: false,
+    description:
+      'ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.',
+  })
   @IsOptional()
-  @IsString()
-  @Length(2, 2)
+  @Transform(
+    ({ value }: { value: unknown }) => canonicalCountryCode(value) ?? value,
+  )
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'countryCode must be a valid ISO 3166-1 alpha-2 code',
+  })
+  @IsISO31661Alpha2()
   countryCode?: string;
 
   @ApiProperty({ example: 'Near the roundabout', required: false })
