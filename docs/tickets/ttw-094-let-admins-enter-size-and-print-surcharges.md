@@ -1,7 +1,7 @@
 # TTW-094 — Let admins enter size and print-side surcharges
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-095
@@ -133,4 +133,14 @@ Not run: `pnpm coverage:ratchet` and `pnpm coverage:diff` (need a coverage run a
 
 ## Completion summary
 
-Implemented, locally verified and independently reviewed (PASS, minor findings handled above). `pnpm coverage:ratchet` and `pnpm coverage:diff` are still to run, and nothing has been pushed, so CI has not run. Follow-up: TTW-220.
+Complete. Admins can set a size upcharge (option value) and a product-level print-side surcharge, through `PUT`/`DELETE` routes under `/v1/admin/products/:productId` and a "Size and print surcharges" panel on the product page. Quotes reflect them, orders already created never change, and each write is audited.
+
+Final evidence:
+
+- `pnpm coverage:ratchet`: passed (statements 83.75%, branches 67.82%, functions 73.39%, lines 84.02%, all above their floors). `pnpm coverage:diff`: 68 of 75 changed lines covered (90.67%, floor 80%).
+- CI on the ticket branch, run 43955854252, commit `b18b077` (`main` merged in): success, all jobs.
+- CI on `main` after the fast-forward push, commit `b18b077`: run 43957461507 (`CI`) success, run 43957461922 (`Playwright Comprehensive`) success. It includes `tests/e2e/admin/product-surcharges.comprehensive.spec.ts`.
+
+Follow-up: TTW-220 (a variant row and a product row for the same view) has its own ticket.
+
+Not done here, and out of scope: auditing the existing catalogue writes, and editing variant-level surcharges.
