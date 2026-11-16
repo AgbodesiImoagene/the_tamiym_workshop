@@ -701,7 +701,8 @@ model AdminMfaRecoveryCode {
 }
 
 /// Shipping or billing address for a user. Used at checkout and snapshotted on Order.
-/// Missing constraint: at most one address per user may have isDefault = true. Enforce in app when setting default, or add migration: CREATE UNIQUE INDEX addresses_one_default_per_user ON addresses (user_id) WHERE is_default = true;
+/// At most one address per user may have isDefault = true: enforced by the partial unique index
+/// `addresses_one_default_per_user` (WHERE isDefault = true) — TTW-222, raw SQL in its migration.
 model Address {
   id     String @id @default(cuid())
   userId String
