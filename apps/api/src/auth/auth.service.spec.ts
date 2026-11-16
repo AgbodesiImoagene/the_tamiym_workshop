@@ -52,6 +52,7 @@ describe('AuthService', () => {
   };
   let audit: { log: jest.Mock };
   let mailQueue: { add: jest.Mock };
+  let configGet: jest.Mock;
   let observability: { recordAuthLogin: jest.Mock };
   let jwtService: { sign: jest.Mock };
   let authSession: {
@@ -120,6 +121,7 @@ describe('AuthService', () => {
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
     mailQueue = { add: jest.fn().mockResolvedValue(undefined) };
+    configGet = jest.fn().mockReturnValue('http://localhost:3000');
     observability = { recordAuthLogin: jest.fn() };
     jwtService = { sign: jest.fn().mockReturnValue('jwt') };
     authSession = {
@@ -159,7 +161,7 @@ describe('AuthService', () => {
         },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('http://localhost:3000') },
+          useValue: { get: configGet },
         },
         {
           provide: getQueueToken(MAIL_QUEUE_NAME),
@@ -1454,6 +1456,54 @@ describe('AuthService', () => {
       expect(Object.values(row)).not.toContain(raw);
     });
 
+    describe('links point at the public web site (TTW-089)', () => {
+      const origins = (web?: string, frontend?: string) =>
+        configGet.mockImplementation(
+          (key: string, fallback?: string) =>
+            ({ WEB_APP_URL: web, FRONTEND_URL: frontend })[key] ?? fallback,
+        );
+
+      it('builds the reset and verification links from WEB_APP_URL, not the customer app URL', async () => {
+        origins('https://web.example', 'https://app.example');
+        prisma.user.findFirst.mockResolvedValue({
+          id: 'user-1',
+          email: 'a@example.com',
+          emailVerifiedAt: null,
+        });
+
+        await service.forgotPassword('a@example.com');
+        await service.resendVerification('a@example.com');
+
+        const urls = (
+          mailQueue.add.mock.calls as Array<[string, Record<string, string>]>
+        ).map(([, data]) => data.resetUrl ?? data.verifyUrl);
+        expect(urls[0]).toMatch(
+          /^https:\/\/web\.example\/reset-password\?token=/,
+        );
+        expect(urls[1]).toMatch(
+          /^https:\/\/web\.example\/verify-email\?token=/,
+        );
+      });
+
+      it('keeps using FRONTEND_URL when WEB_APP_URL is not set', async () => {
+        origins(undefined, 'https://legacy.example');
+        prisma.user.findFirst.mockResolvedValue({
+          id: 'user-1',
+          email: 'a@example.com',
+        });
+
+        await service.forgotPassword('a@example.com');
+
+        const [, data] = mailQueue.add.mock.calls[0] as [
+          string,
+          { resetUrl: string },
+        ];
+        expect(data.resetUrl).toMatch(
+          /^https:\/\/legacy\.example\/reset-password\?token=/,
+        );
+      });
+    });
+
     describe('token-bearing mail jobs leave Redis at their final failure (TTW-184)', () => {
       it('queues the reset link as { to, resetUrl } with removeOnFail: true', async () => {
         prisma.user.findFirst.mockResolvedValue({
@@ -1524,6 +1574,24 @@ describe('AuthService', () => {
           },
         }),
       );
+    });
+
+    it('refuses a bad reset token with the stable INVALID_RESET_TOKEN code (TTW-089)', async () => {
+      prisma.authToken.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('unknown', 'NewPassword123!'),
+      ).rejects.toMatchObject({
+        response: { statusCode: 400, code: 'INVALID_RESET_TOKEN' },
+      });
+
+      prisma.authToken.findFirst.mockResolvedValue({
+        ...liveRecord(TokenType.PASSWORD_RESET),
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+      await expect(
+        service.resetPassword('raw-reset', 'NewPassword123!'),
+      ).rejects.toMatchObject({ response: { code: 'INVALID_RESET_TOKEN' } });
     });
 
     it('rejects an unknown reset token without writing anything', async () => {

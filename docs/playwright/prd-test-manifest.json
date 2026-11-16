@@ -30,6 +30,19 @@
       "tags": ["@smoke", "@web", "@visual"]
     },
     {
+      "id": "WEB-PASSWORD-RESET",
+      "surface": "web",
+      "feature": "Forgot-password and reset-password journey from the login page",
+      "prd_ref": "Accounts — password recovery",
+      "automation": "automated",
+      "tests": [
+        "tests/e2e/web/password-reset.comprehensive.spec.ts",
+        "tests/e2e/app/login-forgot-password.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@web", "@app", "@critical"]
+    },
+    {
       "id": "WEB-FUNDRAISER-LIST",
       "surface": "web",
       "feature": "Fundraiser listing states",

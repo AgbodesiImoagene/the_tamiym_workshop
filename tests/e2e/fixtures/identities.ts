@@ -61,6 +61,15 @@ export const e2eUsers = {
     role: 'CUSTOMER' as const,
   },
   /**
+   * Dedicated to the password-reset journey (TTW-089). The journey changes the password to
+   * `ResetPassword1!`; never request a reset for this user: the API would delete its seeded tokens.
+   */
+  passwordReset: {
+    email: 'reset.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
+  /**
    * TTW-217: its only address is in a deactivated state, so checkout refuses
    * it. Seeded that way because no admin route deactivates a state.
    */
@@ -76,6 +85,19 @@ export const e2eUsers = {
     role: 'CUSTOMER' as const,
   },
 } as const;
+
+/**
+ * Raw password-reset tokens written by seed:e2e for `e2eUsers.passwordReset`
+ * (TTW-089). The API keeps only their sha256, so the emailed link cannot be read
+ * in a test. One valid token per Playwright attempt (retries stay idempotent);
+ * keep in sync with apps/api/scripts/seed-e2e-dummy-data.ts.
+ */
+export const E2E_PASSWORD_RESET_TOKENS = [
+  'e2e-reset-token-attempt-0',
+  'e2e-reset-token-attempt-1',
+  'e2e-reset-token-attempt-2',
+] as const;
+export const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
 
 export const urls = {
   api: process.env.PLAYWRIGHT_API_URL ?? 'http://localhost:3001',

@@ -14819,7 +14819,27 @@
             "description": "Password reset successfully"
           },
           "400": {
-            "description": "Invalid or expired token"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "INVALID_RESET_TOKEN",
+                      "type": "string"
+                    },
+                    "message": {
+                      "example": "Invalid or expired reset token"
+                    },
+                    "statusCode": {
+                      "example": 400,
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid or expired token (code INVALID_RESET_TOKEN), or a password that is not strong enough (validation message)"
           }
         },
         "summary": "Reset password with token",

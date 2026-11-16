@@ -16,6 +16,11 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+const WEB_URL = (process.env.NEXT_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000').replace(
+  /\/+$/,
+  ''
+);
+
 function readGoogleSignInErrorFromUrl(): string | null {
   if (typeof window === 'undefined') return null;
   const code = new URLSearchParams(window.location.search).get('error');
@@ -110,7 +115,16 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="password">Password</Label>
+                  {/* The reset pages live on the public site, where the emailed link points. */}
+                  <a
+                    href={`${WEB_URL}/auth/forgot-password`}
+                    className="text-xs font-medium text-primary hover:text-primary-700"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
                 <Input
                   id="password"
                   type="password"

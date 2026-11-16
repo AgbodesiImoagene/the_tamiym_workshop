@@ -82,6 +82,21 @@ export function isMfaChallengeResponse(
   return 'mfa' in result && 'mfa_token' in result;
 }
 
+/**
+ * The one refusal for a reset token that is unknown, expired or already used.
+ * The stable `code` lets clients tell it from a refused password without
+ * reading the wording (TTW-089).
+ */
+export const INVALID_RESET_TOKEN_CODE = 'INVALID_RESET_TOKEN';
+
+function invalidResetTokenError(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: INVALID_RESET_TOKEN_CODE,
+    message: 'Invalid or expired reset token',
+  });
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -242,10 +257,7 @@ export class AuthService {
           expiresAt,
         },
       });
-      const baseUrl = this.configService.get<string>(
-        'FRONTEND_URL',
-        'http://localhost:3000',
-      );
+      const baseUrl = this.webBaseUrl();
       const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
       await this.mailQueue.add(
         JOB_PASSWORD_RESET_EMAIL,
@@ -278,11 +290,11 @@ export class AuthService {
     });
 
     if (!record) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw invalidResetTokenError();
     }
     if (record.expiresAt < new Date()) {
       await this.prisma.authToken.deleteMany({ where: { id: record.id } });
-      throw new BadRequestException('Invalid or expired reset token');
+      throw invalidResetTokenError();
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -294,7 +306,7 @@ export class AuthService {
         where: { id: record.id, expiresAt: { gt: new Date() } },
       });
       if (consumed.count === 0) {
-        throw new BadRequestException('Invalid or expired reset token');
+        throw invalidResetTokenError();
       }
       await tx.user.update({
         where: { id: record.userId },
@@ -403,15 +415,24 @@ export class AuthService {
     return token;
   }
 
+  /**
+   * Origin of the public web site, where /reset-password and /verify-email live.
+   * `WEB_APP_URL` wins; `FRONTEND_URL` stays as the fallback so existing
+   * environments keep working (TTW-089).
+   */
+  private webBaseUrl(): string {
+    return (
+      this.configService.get<string>('WEB_APP_URL') ||
+      this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000')
+    );
+  }
+
   private async enqueueVerificationEmail(
     userId: string,
     email: string,
   ): Promise<void> {
     const token = await this.createVerificationToken(userId);
-    const baseUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+    const baseUrl = this.webBaseUrl();
     const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
     await this.mailQueue.add(
       JOB_VERIFICATION_EMAIL,
