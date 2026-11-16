@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { AddressProvider } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
-import { addressStateUnknown } from './shipping.errors';
+import { canonicalCountryCode } from './country-code';
+import {
+  addressCountryCodeInvalid,
+  addressStateMismatch,
+  addressStateUnknown,
+} from './shipping.errors';
 
 type AddressNormalizationInput = {
   addressLine1?: string;
@@ -101,10 +106,14 @@ export class AddressNormalizationService {
       existing?.administrativeAreaLevel1 ?? null,
       existing?.state ?? null,
     );
+    const stateUnchanged =
+      existing !== null && !this.isStateChange(input, existing);
     const resolvedState = await this.resolveState(
       countryCode,
       input,
       admin1Input,
+      existing,
+      stateUnchanged,
     );
 
     // TTW-185: an edit that changes the state must not keep the saved state
@@ -161,18 +170,31 @@ export class AddressNormalizationService {
         ? existing.lgaId
         : null) ??
       null;
-    const administrativeAreaLevel1 = resolvedState?.name ?? admin1Input ?? null;
+    // A saved state that is no longer offered keeps its saved text: the request
+    // text never overwrites it (TTW-216).
+    const keepSavedText =
+      !resolvedState && stateUnchanged && !!stateCode && existing !== null;
+    const administrativeAreaLevel1 = keepSavedText
+      ? (existing?.administrativeAreaLevel1 ?? existing?.state ?? null)
+      : (resolvedState?.name ?? admin1Input ?? null);
     const administrativeAreaLevel2 = resolvedLga?.name ?? admin2Input ?? null;
     const city = this.firstDefined(
       this.clean(input.city),
       locality,
       existing?.city ?? null,
     );
-    const state = this.firstDefined(
-      this.clean(input.state),
-      administrativeAreaLevel1,
-      existing?.state ?? null,
-    );
+    // TTW-216: a resolved state is stored under its canonical name, never the
+    // text the request sent. Without a resolved state (a saved address whose
+    // state is no longer offered) the old text rules still apply.
+    const state = resolvedState
+      ? resolvedState.name
+      : keepSavedText
+        ? (existing?.state ?? administrativeAreaLevel1)
+        : this.firstDefined(
+            this.clean(input.state),
+            administrativeAreaLevel1,
+            existing?.state ?? null,
+          );
     const provider =
       input.provider ??
       (input.googlePlaceId ? AddressProvider.GOOGLE_PLACES : undefined) ??
@@ -251,7 +273,12 @@ export class AddressNormalizationService {
   ) {
     const raw = this.clean(input.countryCode);
     if (raw) {
-      return raw.toUpperCase();
+      // TTW-219: one rule for the code, so "ＮＧ" or "ng" cannot skip the NG checks.
+      const code = canonicalCountryCode(raw);
+      if (!code) {
+        throw addressCountryCodeInvalid();
+      }
+      return code;
     }
     const country = this.firstDefined(
       this.clean(input.country),
@@ -325,35 +352,116 @@ export class AddressNormalizationService {
     return !savedText || savedText.toLowerCase() !== sentText.toLowerCase();
   }
 
+  /**
+   * The active `GeoState` the address belongs to, or null. TTW-216: the code
+   * identifies the state and decides the text.
+   *  - An explicit `stateCode` wins; a state text that names another known
+   *    state is a contradiction (400), a text that matches no state is replaced
+   *    by the canonical name.
+   *  - With no code, two state texts that name different states are a
+   *    contradiction too.
+   *  - An edit that does not change the state (names none, or resends the saved
+   *    text) resolves from the saved code first (a saved mismatched pair is
+   *    settled by its code), then from the saved text.
+   * A deactivated or unknown code stays unknown (TTW-194) and is checked
+   * before any mismatch, so the answer never tells the two apart.
+   */
   private async resolveState(
     countryCode: string,
     input: AddressNormalizationInput,
     admin1: string | null,
+    existing: ExistingAddressShape | null,
+    stateUnchanged: boolean,
   ) {
     if (countryCode !== 'NG') {
       return null;
     }
+    const sentTexts = this.distinctTexts(
+      this.clean(input.administrativeAreaLevel1),
+      this.clean(input.state),
+    );
     const explicitCode = this.clean(input.stateCode)?.toUpperCase();
     if (explicitCode) {
       const state = await this.prisma.geoState.findUnique({
         where: { code: explicitCode },
       });
       // TTW-194: a deactivated state is as unknown as one that does not exist.
-      return state?.isActive === false ? null : state;
+      const isActive = !!state && state.isActive !== false;
+      // The saved code of a legacy row may be deactivated; an edit of it that
+      // names another state is still a contradiction.
+      const isSavedCode =
+        !!existing &&
+        this.clean(existing.stateCode)?.toUpperCase() === explicitCode;
+      if (state && (isActive || isSavedCode)) {
+        await this.assertTextsAgree(state.code, sentTexts);
+      }
+      return isActive ? state : null;
+    }
+    if (sentTexts.length > 1) {
+      await this.assertTextsAgree(null, sentTexts);
+    }
+    const savedCode = this.clean(existing?.stateCode)?.toUpperCase();
+    if (stateUnchanged && savedCode) {
+      const saved = await this.prisma.geoState.findUnique({
+        where: { code: savedCode },
+      });
+      if (saved && saved.isActive !== false) {
+        return saved;
+      }
     }
     if (!admin1) {
       return null;
     }
-    const codeCandidate = admin1.toUpperCase();
     return this.prisma.geoState.findFirst({
       where: {
         isActive: true,
         OR: [
-          { code: codeCandidate },
+          { code: admin1.toUpperCase() },
           { name: { equals: admin1, mode: 'insensitive' } },
         ],
       },
     });
+  }
+
+  /**
+   * TTW-216: refuse a request that names two different active states. A text
+   * that matches no active state (a typo, or a deactivated state) is not a
+   * contradiction: the code decides and the text is replaced. Counting only
+   * active states keeps the answer from telling a deactivated state from one
+   * that does not exist.
+   */
+  private async assertTextsAgree(
+    code: string | null,
+    texts: string[],
+  ): Promise<void> {
+    const codes = new Set<string>(code ? [code] : []);
+    for (const text of texts) {
+      const found = await this.prisma.geoState.findFirst({
+        where: {
+          isActive: true,
+          OR: [
+            { code: text.toUpperCase() },
+            { name: { equals: text, mode: 'insensitive' } },
+          ],
+        },
+      });
+      if (found) {
+        codes.add(found.code);
+      }
+    }
+    if (codes.size > 1) {
+      throw addressStateMismatch();
+    }
+  }
+
+  private distinctTexts(...values: Array<string | null>) {
+    const seen = new Map<string, string>();
+    for (const value of values) {
+      if (value && !seen.has(value.toLowerCase())) {
+        seen.set(value.toLowerCase(), value);
+      }
+    }
+    return [...seen.values()];
   }
 
   private async resolveLga(

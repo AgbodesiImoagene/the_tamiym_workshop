@@ -621,6 +621,84 @@ describe('DashboardCheckoutPage', () => {
     });
   });
 
+  describe('address in a state we no longer deliver to (TTW-217)', () => {
+    const notDeliverable = {
+      statusCode: 400,
+      code: 'ADDRESS_STATE_NOT_DELIVERABLE',
+      message: 'server wording',
+    };
+    const shownMessage = 'We do not deliver to this area.';
+
+    it('shows the message, no shipping price, and keeps the cart', async () => {
+      addCartItem(cartLine());
+      (quoteOrder as jest.Mock).mockRejectedValueOnce(notDeliverable);
+
+      renderCheckout();
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(shownMessage);
+      expect(screen.getAllByText('Quote first')).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+      expect(getCart()?.lines).toHaveLength(1);
+    });
+
+    it('tells the customer we do not deliver there when the saved state is no longer listed', async () => {
+      addCartItem(cartLine());
+      // The state list only holds active states, so a saved state code missing
+      // from it belongs to a state that was deactivated.
+      (getUserAddresses as jest.Mock).mockResolvedValue([
+        { ...savedAddress, state: 'Retired State', stateCode: 'ZZ' },
+      ]);
+      renderCheckout();
+
+      await waitFor(() => expect(screen.getByLabelText('City')).toHaveValue('Ikeja'));
+      expect(await screen.findByText(shownMessage)).toBeInTheDocument();
+      expect(screen.queryByText('Choose a state from the list.')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Review quote' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+
+      // Choosing a state we deliver to carries on as before.
+      fireEvent.change(screen.getByRole('combobox', { name: 'State' }), {
+        target: { value: 'LA' },
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Review quote' })).toBeEnabled()
+      );
+      expect(screen.queryByText(shownMessage)).not.toBeInTheDocument();
+    });
+
+    it('drops the previous quote when a new review is refused', async () => {
+      addCartItem(cartLine());
+      renderCheckout();
+      await reviewQuote();
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeEnabled();
+
+      (quoteOrder as jest.Mock).mockRejectedValueOnce(notDeliverable);
+      fireEvent.click(screen.getByRole('button', { name: 'Review quote' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(shownMessage);
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+      expect(screen.getAllByText('Quote first')).toHaveLength(2);
+    });
+
+    it('shows the message for a refused order without clearing the cart or redirecting', async () => {
+      addCartItem(cartLine());
+      (createOrder as jest.Mock).mockRejectedValueOnce(notDeliverable);
+
+      renderCheckout();
+      await reviewQuote();
+      await placeOrder();
+
+      expect(await screen.findByText(shownMessage)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Place order and pay' })).toBeDisabled();
+      expect(initiateOrderPayment).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+      expect(getCart()?.lines).toHaveLength(1);
+      expect(getCart()?.pendingOrderId ?? null).toBeNull();
+    });
+  });
+
   // TTW-087: the state is chosen from our list, never typed.
   describe('state and LGA lists (TTW-087)', () => {
     it('offers the states as a list instead of a text field', async () => {

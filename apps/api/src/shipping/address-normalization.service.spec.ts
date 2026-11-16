@@ -29,6 +29,52 @@ describe('AddressNormalizationService', () => {
     prisma = module.get(PrismaService);
   });
 
+  describe('TTW-219: country code', () => {
+    const input = {
+      addressLine1: '12 Broad Street',
+      city: 'Lagos',
+      state: 'Nowhereland',
+    };
+
+    it.each(['\uFF2E\uFF27', 'ng', 'Ng'])(
+      'reads %j as NG, so an unknown state is still refused',
+      async (countryCode) => {
+        (prisma.geoState.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.geoState.findUnique as jest.Mock).mockResolvedValue(null);
+        await expect(
+          service.normalizeForCreate({ ...input, countryCode }),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_STATE_UNKNOWN' },
+        });
+      },
+    );
+
+    it.each(['XX', 'N1', 'NGA', '\u0131t'])(
+      'refuses %j with ADDRESS_COUNTRY_CODE_INVALID on create and update',
+      async (countryCode) => {
+        await expect(
+          service.normalizeForCreate({ ...input, countryCode }),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_COUNTRY_CODE_INVALID' },
+        });
+        await expect(
+          service.normalizeForUpdate(
+            { countryCode: 'NG', country: 'Nigeria' } as never,
+            { countryCode },
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'ADDRESS_COUNTRY_CODE_INVALID' },
+        });
+      },
+    );
+
+    it('keeps a valid non-Nigerian code working', async () => {
+      await expect(
+        service.normalizeForCreate({ ...input, countryCode: 'gh' }),
+      ).resolves.toMatchObject({ countryCode: 'GH' });
+    });
+  });
+
   it('normalizes Nigeria admin levels into stateCode and lgaId', async () => {
     (prisma.geoState.findFirst as jest.Mock).mockResolvedValue({
       code: 'LA',
@@ -962,6 +1008,353 @@ describe('AddressNormalizationService', () => {
       });
       expect(result.lgaId).toBe(OFF_LGA.id);
       expect(result.addressLine1).toBe('2 New Road');
+    });
+  });
+
+  describe('one state per address: the code decides the text (TTW-216)', () => {
+    type Row = { code: string; name: string; isActive: boolean };
+    const rows: Row[] = [
+      { code: 'LA', name: 'Lagos', isActive: true },
+      { code: 'AB', name: 'Abia', isActive: false },
+      { code: 'KN', name: 'Kano', isActive: true },
+    ];
+    type Where = {
+      code?: string;
+      isActive?: boolean;
+      OR?: Array<{ code?: string; name?: { equals: string } }>;
+    };
+    // Fake table that honours the filters the service sends.
+    const match = (where: Where) =>
+      rows.find(
+        (r) =>
+          (where.code === undefined || r.code === where.code) &&
+          (where.isActive === undefined || r.isActive === where.isActive) &&
+          (where.OR === undefined ||
+            where.OR.some(
+              (c) =>
+                (c.code !== undefined && r.code === c.code) ||
+                (c.name !== undefined &&
+                  r.name.toLowerCase() === c.name.equals.toLowerCase()),
+            )),
+      ) ?? null;
+
+    const base = {
+      addressLine1: '1 Main St',
+      city: 'Ikeja',
+      country: 'Nigeria',
+    };
+    // A saved row that contradicts itself: code LA (Lagos), text "Kano".
+    const savedMismatch = {
+      addressLine1: '1 Old Road',
+      city: 'Ikeja',
+      state: 'Kano',
+      country: 'Nigeria',
+      countryCode: 'NG',
+      provider: AddressProvider.MANUAL,
+      administrativeAreaLevel1: 'Kano',
+      stateCode: 'LA',
+      lgaId: null,
+    };
+    const savedAbia = {
+      ...savedMismatch,
+      state: 'Abia',
+      administrativeAreaLevel1: 'Abia',
+      stateCode: 'AB',
+    };
+
+    const expectMismatch = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toMatchObject({
+        response: expect.objectContaining({
+          statusCode: 400,
+          code: 'ADDRESS_STATE_MISMATCH',
+        }),
+      });
+    const expectUnknown = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toMatchObject({
+        response: expect.objectContaining({
+          statusCode: 400,
+          code: 'ADDRESS_STATE_UNKNOWN',
+        }),
+      });
+
+    beforeEach(() => {
+      (prisma.geoState.findFirst as jest.Mock).mockImplementation(
+        ({ where }: { where: Where }) => Promise.resolve(match(where)),
+      );
+      (prisma.geoState.findUnique as jest.Mock).mockImplementation(
+        ({ where }: { where: Where }) => Promise.resolve(match(where)),
+      );
+      (prisma.geoLga.findFirst as jest.Mock).mockResolvedValue(null);
+    });
+
+    describe('create', () => {
+      it('refuses an explicit code that names another state than the text', async () => {
+        await expectMismatch(
+          service.normalizeForCreate({
+            ...base,
+            stateCode: 'KN',
+            state: 'Lagos',
+          }),
+        );
+      });
+
+      it('does not tell a deactivated state from an unknown text: the code decides', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          stateCode: 'LA',
+          state: 'Abia',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('takes a text equal to a state code as that state', async () => {
+        await expectMismatch(
+          service.normalizeForCreate({ ...base, stateCode: 'KN', state: 'LA' }),
+        );
+        const result = await service.normalizeForCreate({
+          ...base,
+          state: 'LA',
+        });
+        expect(result).toMatchObject({ stateCode: 'LA', state: 'Lagos' });
+      });
+
+      it('accepts two texts that name the same state', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          state: 'Lagos',
+          administrativeAreaLevel1: 'LAGOS',
+        });
+        expect(result).toMatchObject({ stateCode: 'LA', state: 'Lagos' });
+      });
+
+      it('refuses an administrativeAreaLevel1 that contradicts the code', async () => {
+        await expectMismatch(
+          service.normalizeForCreate({
+            ...base,
+            stateCode: 'LA',
+            administrativeAreaLevel1: 'Kano',
+          }),
+        );
+      });
+
+      it('refuses two state texts that name different states, without a code', async () => {
+        await expectMismatch(
+          service.normalizeForCreate({
+            ...base,
+            state: 'Lagos',
+            administrativeAreaLevel1: 'Kano',
+          }),
+        );
+      });
+
+      it('stores the canonical name when the text is the same state in another case', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          stateCode: 'la',
+          state: '  LAGOS ',
+          administrativeAreaLevel1: 'lagos',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('replaces a text that matches no state by the canonical name of the code', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          stateCode: 'LA',
+          state: 'Lagos State',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('stores the canonical name when only the code is sent', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          stateCode: 'KN',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'KN',
+          state: 'Kano',
+          administrativeAreaLevel1: 'Kano',
+        });
+      });
+
+      it('stores the canonical name when only a text is sent', async () => {
+        const result = await service.normalizeForCreate({
+          ...base,
+          state: ' kano ',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'KN',
+          state: 'Kano',
+          administrativeAreaLevel1: 'Kano',
+        });
+      });
+
+      it('keeps ADDRESS_STATE_UNKNOWN (not a mismatch) for a deactivated code with another state in the text', async () => {
+        await expectUnknown(
+          service.normalizeForCreate({
+            ...base,
+            stateCode: 'AB',
+            state: 'Lagos',
+          }),
+        );
+      });
+
+      it('does not apply to a non-Nigerian address', async () => {
+        const result = await service.normalizeForCreate({
+          addressLine1: '1 High St',
+          city: 'London',
+          country: 'United Kingdom',
+          countryCode: 'GB',
+          state: 'England',
+          stateCode: 'KN',
+          administrativeAreaLevel1: 'Greater London',
+        });
+        expect(result).toMatchObject({
+          countryCode: 'GB',
+          state: 'England',
+          administrativeAreaLevel1: 'Greater London',
+        });
+        expect(prisma.geoState.findFirst).not.toHaveBeenCalled();
+        expect(prisma.geoState.findUnique).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('edit', () => {
+      const savedLagos = {
+        ...savedMismatch,
+        state: 'Lagos',
+        administrativeAreaLevel1: 'Lagos',
+        stateCode: 'LA',
+      };
+
+      it('refuses the saved code resent with the text of another state (the TTW-194 LOW 1 case)', async () => {
+        await expectMismatch(
+          service.normalizeForUpdate(savedLagos, {
+            stateCode: 'LA',
+            state: 'Kano',
+          }),
+        );
+      });
+
+      it('refuses a move to a code whose text is another state', async () => {
+        await expectMismatch(
+          service.normalizeForUpdate(savedLagos, {
+            stateCode: 'KN',
+            state: 'Lagos',
+          }),
+        );
+      });
+
+      it('canonicalises the same state resent in another case', async () => {
+        const result = await service.normalizeForUpdate(savedLagos, {
+          stateCode: 'LA',
+          state: 'LAGOS',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('moves to the new code and stores its canonical name', async () => {
+        const result = await service.normalizeForUpdate(savedLagos, {
+          stateCode: 'KN',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'KN',
+          state: 'Kano',
+          administrativeAreaLevel1: 'Kano',
+        });
+      });
+
+      it('lets the saved code decide when an edit names no state, on a saved mismatched row', async () => {
+        const result = await service.normalizeForUpdate(savedMismatch, {
+          phone: '+2348012345678',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+          phone: '+2348012345678',
+        });
+      });
+
+      it('lets the saved code decide when the edit resends the saved code on a mismatched row', async () => {
+        const result = await service.normalizeForUpdate(savedMismatch, {
+          stateCode: 'LA',
+          phone: '+2348012345678',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('keeps a saved deactivated state editable on other fields and leaves its text alone', async () => {
+        const result = await service.normalizeForUpdate(savedAbia, {
+          phone: '+2348012345678',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'AB',
+          state: 'Abia',
+          administrativeAreaLevel1: 'Abia',
+        });
+      });
+
+      it('still refuses a saved deactivated code resent with the text of another known state', async () => {
+        await expectMismatch(
+          service.normalizeForUpdate(savedAbia, {
+            stateCode: 'AB',
+            state: 'Lagos',
+          }),
+        );
+      });
+
+      it('keeps the saved code when the edit resends only the saved text of a mismatched row', async () => {
+        const result = await service.normalizeForUpdate(savedMismatch, {
+          state: 'Kano',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'LA',
+          state: 'Lagos',
+          administrativeAreaLevel1: 'Lagos',
+        });
+      });
+
+      it('never lets the request text overwrite the saved text of a deactivated state', async () => {
+        const result = await service.normalizeForUpdate(savedAbia, {
+          stateCode: 'AB',
+          state: 'foo',
+        });
+        expect(result).toMatchObject({
+          stateCode: 'AB',
+          state: 'Abia',
+          administrativeAreaLevel1: 'Abia',
+        });
+      });
+
+      it('keeps a saved deactivated state when the same code and text are resent', async () => {
+        const result = await service.normalizeForUpdate(savedAbia, {
+          stateCode: 'AB',
+          state: 'Abia',
+        });
+        expect(result).toMatchObject({ stateCode: 'AB', state: 'Abia' });
+      });
     });
   });
 });

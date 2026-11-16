@@ -14,6 +14,7 @@ export const PRIVATE_DISALLOW_PREFIXES = [
   '/auth/',
   '/orders/',
   '/verify-email',
+  '/reset-password',
   '/policies/',
 ] as const;
 

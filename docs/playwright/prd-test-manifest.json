@@ -30,6 +30,19 @@
       "tags": ["@smoke", "@web", "@visual"]
     },
     {
+      "id": "WEB-PASSWORD-RESET",
+      "surface": "web",
+      "feature": "Forgot-password and reset-password journey from the login page",
+      "prd_ref": "Accounts — password recovery",
+      "automation": "automated",
+      "tests": [
+        "tests/e2e/web/password-reset.comprehensive.spec.ts",
+        "tests/e2e/app/login-forgot-password.comprehensive.spec.ts"
+      ],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@web", "@app", "@critical"]
+    },
+    {
       "id": "WEB-FUNDRAISER-LIST",
       "surface": "web",
       "feature": "Fundraiser listing states",
@@ -46,6 +59,16 @@
       "prd_ref": "Fundraising — shareable pages",
       "automation": "automated",
       "tests": ["tests/e2e/web/fundraiser-detail.comprehensive.spec.ts"],
+      "browser_tiers": ["matrix", "comprehensive"],
+      "tags": ["@web", "@critical"]
+    },
+    {
+      "id": "WEB-CHECKOUT-UNDELIVERABLE-STATE",
+      "surface": "web",
+      "feature": "Fundraiser checkout tells a supporter whose saved address is in a state we no longer deliver to",
+      "prd_ref": "Checkout & Orders — delivery area",
+      "automation": "automated",
+      "tests": ["tests/e2e/web/fundraiser-checkout-undeliverable-state.comprehensive.spec.ts"],
       "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@web", "@critical"]
     },
@@ -92,6 +115,7 @@
         "tests/e2e/app/customer.smoke.spec.ts",
         "tests/e2e/app/dashboard-navigation.comprehensive.spec.ts",
         "tests/e2e/app/products-cart.comprehensive.spec.ts",
+        "tests/e2e/app/settings-default-address-refused.spec.ts",
         "tests/e2e/app/settings.comprehensive.spec.ts"
       ],
       "browser_tiers": ["smoke", "matrix", "comprehensive"],
@@ -143,7 +167,8 @@
         "tests/e2e/app/checkout-delivery-instructions.spec.ts",
         "tests/e2e/app/checkout-idempotency.spec.ts",
         "tests/e2e/app/checkout-order-note.spec.ts",
-        "tests/e2e/app/checkout-shipping-coverage.spec.ts"
+        "tests/e2e/app/checkout-shipping-coverage.spec.ts",
+        "tests/e2e/app/checkout-undeliverable-state.spec.ts"
       ],
       "browser_tiers": ["matrix", "journey"],
       "tags": ["@app", "@journey", "@critical"]

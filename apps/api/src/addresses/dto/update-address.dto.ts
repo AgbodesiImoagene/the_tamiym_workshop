@@ -7,9 +7,12 @@ import {
   IsNotEmpty,
   IsEnum,
   IsNumber,
-  Length,
+  IsISO31661Alpha2,
+  Matches,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { canonicalCountryCode } from '../../shipping/country-code';
 import { AddressProvider } from '../../generated/prisma/enums';
 
 export class UpdateAddressDto {
@@ -60,10 +63,20 @@ export class UpdateAddressDto {
   @IsNotEmpty()
   country?: string;
 
-  @ApiProperty({ example: 'NG', required: false })
+  @ApiProperty({
+    example: 'NG',
+    required: false,
+    description:
+      'ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII (for example NG); anything that is not a real code is refused with 400.',
+  })
   @IsOptional()
-  @IsString()
-  @Length(2, 2)
+  @Transform(
+    ({ value }: { value: unknown }) => canonicalCountryCode(value) ?? value,
+  )
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'countryCode must be a valid ISO 3166-1 alpha-2 code',
+  })
+  @IsISO31661Alpha2()
   countryCode?: string;
 
   @ApiProperty({ example: 'Near the roundabout', required: false })
@@ -111,7 +124,12 @@ export class UpdateAddressDto {
   @IsNotEmpty()
   administrativeAreaLevel2?: string;
 
-  @ApiProperty({ example: 'LA', required: false })
+  @ApiProperty({
+    example: 'LA',
+    required: false,
+    description:
+      'Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).',
+  })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
