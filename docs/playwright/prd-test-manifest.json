@@ -217,6 +217,16 @@
       "tags": ["@admin"]
     },
     {
+      "id": "ADMIN-PRODUCT-SURCHARGES",
+      "surface": "admin",
+      "feature": "Admin sets size and print-side surcharges, and the customer quote reflects them",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/product-surcharges.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
       "id": "ADMIN-MFA",
       "surface": "admin",
       "feature": "Privileged admin MFA login",

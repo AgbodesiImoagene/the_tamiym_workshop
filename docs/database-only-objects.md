@@ -52,21 +52,22 @@ Both columns are read-only and `variantKey` carries `@ignore`, so neither appear
 
 ### Partial unique indexes
 
-| Index                                                  | Table                             | Owner migration           | At most one row per…                                 |
-| ------------------------------------------------------ | --------------------------------- | ------------------------- | ---------------------------------------------------- |
-| `campaign_ledger_one_payment_settled_per_order`        | `campaign_balance_ledger_entries` | `20260819120000_ttw010_*` | order, for `PAYMENT_SETTLED` entries                 |
-| `campaign_ledger_one_payout_reserved_per_payout`       | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*` | payout, for `PAYOUT_RESERVED` entries                |
-| `campaign_ledger_one_payout_succeeded_per_payout`      | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*` | payout, for `PAYOUT_SUCCEEDED` entries               |
-| `campaign_ledger_one_payout_failed_release_per_payout` | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*` | payout, for `PAYOUT_FAILED` entries                  |
-| `campaign_ledger_one_refund_applied_per_refund`        | `campaign_balance_ledger_entries` | `20260820010000_ttw013_*` | refund, for `REFUND_APPLIED` entries                 |
-| `payments_one_active_attempt_per_order`                | `payments`                        | `20260819140000_ttw012_*` | order, while the payment is `PENDING` or `INITIATED` |
-| `reconciliation_findings_open_fingerprint_key`         | `reconciliation_findings`         | `20260820030000_ttw015_*` | fingerprint, while the finding is `OPEN`             |
-| `privacy_requests_one_active_erasure_per_user`         | `privacy_requests`                | `20260820201000_ttw025_*` | user, for active erasure requests                    |
-| `moderation_appeals_one_pending_per_decision`          | `moderation_appeals`              | `20260820220000_ttw027_*` | decision, while the appeal is `PENDING`              |
-| `organizer_applications_one_pending_per_user`          | `organizer_applications`          | `20260821010000_ttw030_*` | user, while the application is `PENDING`             |
-| `shipments_one_active_outbound_per_order`              | `shipments`                       | `20260821100000_ttw040_*` | order, for outbound shipments that are not cancelled |
-| `shipments_carrier_tracking_unique`                    | `shipments`                       | `20260821100000_ttw040_*` | carrier tracking key, when one is set                |
-| `user_payout_profiles_one_default_per_user`            | `user_payout_profiles`            | `20260821110000_ttw042_*` | user, for the default payout profile                 |
+| Index                                                  | Table                             | Owner migration                         | At most one row per…                                 |
+| ------------------------------------------------------ | --------------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| `campaign_ledger_one_payment_settled_per_order`        | `campaign_balance_ledger_entries` | `20260819120000_ttw010_*`               | order, for `PAYMENT_SETTLED` entries                 |
+| `campaign_ledger_one_payout_reserved_per_payout`       | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*`               | payout, for `PAYOUT_RESERVED` entries                |
+| `campaign_ledger_one_payout_succeeded_per_payout`      | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*`               | payout, for `PAYOUT_SUCCEEDED` entries               |
+| `campaign_ledger_one_payout_failed_release_per_payout` | `campaign_balance_ledger_entries` | `20260819130000_ttw011_*`               | payout, for `PAYOUT_FAILED` entries                  |
+| `campaign_ledger_one_refund_applied_per_refund`        | `campaign_balance_ledger_entries` | `20260820010000_ttw013_*`               | refund, for `REFUND_APPLIED` entries                 |
+| `payments_one_active_attempt_per_order`                | `payments`                        | `20260819140000_ttw012_*`               | order, while the payment is `PENDING` or `INITIATED` |
+| `reconciliation_findings_open_fingerprint_key`         | `reconciliation_findings`         | `20260820030000_ttw015_*`               | fingerprint, while the finding is `OPEN`             |
+| `privacy_requests_one_active_erasure_per_user`         | `privacy_requests`                | `20260820201000_ttw025_*`               | user, for active erasure requests                    |
+| `moderation_appeals_one_pending_per_decision`          | `moderation_appeals`              | `20260820220000_ttw027_*`               | decision, while the appeal is `PENDING`              |
+| `organizer_applications_one_pending_per_user`          | `organizer_applications`          | `20260821010000_ttw030_*`               | user, while the application is `PENDING`             |
+| `shipments_one_active_outbound_per_order`              | `shipments`                       | `20260821100000_ttw040_*`               | order, for outbound shipments that are not cancelled |
+| `shipments_carrier_tracking_unique`                    | `shipments`                       | `20260821100000_ttw040_*`               | carrier tracking key, when one is set                |
+| `user_payout_profiles_one_default_per_user`            | `user_payout_profiles`            | `20260821110000_ttw042_*`               | user, for the default payout profile                 |
+| `product_view_pricing_product_level_key`               | `product_view_pricing`            | `20261114221315_product_view_pricing_*` | product, view and currency, for rows with no variant |
 
 Each `*` stands for the rest of the migration folder name.
 
