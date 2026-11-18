@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ensureLga } from './utils/geo-fixtures';
 import { UserRole, UserStatus } from '../src/generated/prisma/enums';
 
 const CUSTOMER_ORIGIN = 'http://localhost:3000';
@@ -62,6 +63,8 @@ describe('One default address per customer (e2e)', () => {
       update: { isActive: true },
       create: { code: 'LA', name: 'Lagos', isActive: true },
     });
+    // TTW-221: a Lagos address must carry an LGA.
+    await ensureLga(prisma);
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const customer = await prisma.user.create({
       data: {
@@ -94,6 +97,7 @@ describe('One default address per customer (e2e)', () => {
           addressLine1: '1 Test Road',
           city: 'Ikeja',
           state: 'Lagos',
+          administrativeAreaLevel2: 'Ikeja',
           country: 'Nigeria',
           ...body,
         });
