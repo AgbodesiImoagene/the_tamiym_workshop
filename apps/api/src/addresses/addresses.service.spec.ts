@@ -271,6 +271,8 @@ describe('AddressesService', () => {
     it('should update and return address when found and owned by user', async () => {
       const updated = { ...mockAddress, addressLine1: '456 New St' };
       (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      // TTW-222: the address is read again under the lock.
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue(mockAddress);
       (prisma.address.updateMany as jest.Mock).mockResolvedValue({});
       (prisma.address.update as jest.Mock).mockResolvedValue(updated);
 
@@ -288,6 +290,20 @@ describe('AddressesService', () => {
           countryCode: 'NG',
         }),
       });
+    });
+
+    it('TTW-222: throws NotFoundException and writes nothing when the address vanished before the lock', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.update('user-1', 'addr-1', {
+          addressLine1: 'x',
+          isDefault: true,
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.address.updateMany).not.toHaveBeenCalled();
+      expect(prisma.address.update).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when address not found', async () => {
@@ -313,6 +329,11 @@ describe('AddressesService', () => {
   describe('remove', () => {
     it('should delete address when found and owned by user', async () => {
       (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      // TTW-222: the address is read again under the lock.
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        isDefault: false,
+      });
       (prisma.address.delete as jest.Mock).mockResolvedValue(mockAddress);
 
       await service.remove('user-1', 'addr-1');
@@ -320,6 +341,8 @@ describe('AddressesService', () => {
       expect(prisma.address.delete).toHaveBeenCalledWith({
         where: { id: 'addr-1' },
       });
+      // the re-read under the lock says "not default", so nothing is promoted
+      expect(prisma.address.update).not.toHaveBeenCalled();
     });
 
     it('should set new default when deleted address was default', async () => {
@@ -328,22 +351,32 @@ describe('AddressesService', () => {
         isDefault: true,
       });
       (prisma.address.delete as jest.Mock).mockResolvedValue(mockAddress);
-      (prisma.address.findFirst as jest.Mock).mockResolvedValue({
-        id: 'addr-2',
-        isDefault: false,
-      });
+      (prisma.address.findFirst as jest.Mock)
+        // re-read under the lock, then the most recent remaining address
+        .mockResolvedValueOnce({ ...mockAddress, isDefault: true })
+        .mockResolvedValueOnce({ id: 'addr-2', isDefault: false });
       (prisma.address.update as jest.Mock).mockResolvedValue({});
 
       await service.remove('user-1', 'addr-1');
 
-      expect(prisma.address.findFirst).toHaveBeenCalledWith({
+      expect(prisma.address.findFirst).toHaveBeenLastCalledWith({
         where: { userId: 'user-1' },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
       expect(prisma.address.update).toHaveBeenCalledWith({
         where: { id: 'addr-2' },
         data: { isDefault: true },
       });
+    });
+
+    it('TTW-222: throws NotFoundException and deletes nothing when the address vanished before the lock', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.remove('user-1', 'addr-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.address.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when address not found', async () => {

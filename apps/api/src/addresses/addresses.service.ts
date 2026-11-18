@@ -125,6 +125,9 @@ export class AddressesService {
     return this.prisma.$transaction(async (tx) => {
       await this.lockUserAddresses(tx, userId);
 
+      // TTW-222: the address may have been deleted since it was read above.
+      await this.requireOwnedAddress(tx, userId, addressId);
+
       // If setting as default, unset other default addresses
       if (updateAddressDto.isDefault === true) {
         await tx.address.updateMany({
@@ -146,26 +149,53 @@ export class AddressesService {
    * @param addressId Address ID
    */
   async remove(userId: string, addressId: string) {
-    const address = await this.findUnique(userId, addressId);
+    // Same ownership answers as before (404 / 403) without taking the lock.
+    await this.findUnique(userId, addressId);
 
-    await this.prisma.address.delete({
-      where: { id: addressId },
-    });
+    // TTW-222: delete and promotion are one transaction under the per-user lock.
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockUserAddresses(tx, userId);
 
-    // If deleted address was default, set the most recent address as default
-    if (address.isDefault) {
-      const mostRecent = await this.prisma.address.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      });
+      // Re-read under the lock: a parallel delete may have won, and the
+      // default flag may have moved since the first read.
+      const address = await this.requireOwnedAddress(tx, userId, addressId);
 
-      if (mostRecent) {
-        await this.prisma.address.update({
-          where: { id: mostRecent.id },
-          data: { isDefault: true },
+      await tx.address.delete({ where: { id: addressId } });
+
+      // If deleted address was default, set the most recent address as default
+      if (address.isDefault) {
+        const mostRecent = await tx.address.findFirst({
+          where: { userId },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         });
+
+        if (mostRecent) {
+          await tx.address.update({
+            where: { id: mostRecent.id },
+            data: { isDefault: true },
+          });
+        }
       }
+    });
+  }
+
+  /**
+   * TTW-222: read one of the user's addresses inside the locked transaction.
+   * A missing row is a 404 (the address was deleted in parallel), not a
+   * Prisma P2025 turned into a 500.
+   */
+  private async requireOwnedAddress(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    addressId: string,
+  ) {
+    const address = await tx.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!address) {
+      throw new NotFoundException('Address not found');
     }
+    return address;
   }
 
   /**
