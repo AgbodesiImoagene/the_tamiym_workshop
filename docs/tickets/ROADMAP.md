@@ -76,6 +76,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | Q39      | Délai de l'option express                                                                                                                                           | TTW-153          | Attendre la réponse                                                                               |
 | Nouvelle | Fichiers et licence web des polices Mundial et Neuffila Grotesk                                                                                                     | TTW-177          | Attendre la réponse ; sans licence, lui demander une police de remplacement validée               |
 | Nouvelle | Logos de paiement du pied de page (PayPal non accepté)                                                                                                              | TTW-178          | Retirer PayPal, garder les cartes acceptées par Paystack en version lisible sur fond bleu         |
+| Nouvelle | Délai après lequel un paiement Paystack ouvert mais jamais terminé est considéré abandonné (marge autour des 30 min)                                                | TTW-223          | Quelques minutes de marge, puis interroger Paystack avant d'annuler                               |
 | Nouvelle | Texte de la page Fundraiser : le Figma promet « no upfront costs, no inventory, no stress » et « risk-free », le site actuel ne le dit pas                          | —                | Garder le texte actuel tant que le client n'a pas confirmé que la promesse est vraie              |
 
 ### Déjà répondues : rien à attendre
@@ -147,15 +148,18 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | —   | [TTW-189](ttw-189-handle-duplicate-payment-captures.md)                            | 1D  | Tracer et signaler un second encaissement pour une même commande                        | —     | Critique | 6–10   | TTW-088          |
 | [x]  | —   | [TTW-190](ttw-190-make-extra-captures-visible-to-reconciliation.md)                | 1D  | Rendre les encaissements en trop visibles dans la réconciliation + alerte               | —     | Élevé    | 4–8    | TTW-189          |
 | [ ]  | —   | [TTW-191](ttw-191-refund-extra-payment-captures.md)                                | 1D  | Rembourser automatiquement les encaissements en trop (v2, reporté)                      | —     | Critique | 6–10   | TTW-190 (v2)     |
+| [ ]  | —   | [TTW-223](ttw-223-expire-abandoned-initiated-payments-and-release-stock.md)        | 1D  | Expirer les paiements abandonnés (INITIATED) et libérer le stock réservé                | —     | Critique | 4–8    | Délai (décision) |
+| [ ]  | —   | [TTW-224](ttw-224-treat-inconclusive-transfer-errors-as-pending-not-failed.md)     | 1D  | Traiter une erreur de virement non concluante comme « en attente », pas comme un échec  | —     | Critique | 6–10   | —                |
+| [ ]  | —   | [TTW-225](ttw-225-guard-payouts-against-overpayment-and-duplicate-runs.md)         | 1D  | Empêcher de verser plus que le solde et de créer deux runs pour le même solde           | —     | Critique | 6–10   | TTW-224          |
 
 ## Phase 2 : Comptes et achat d'un produit
 
 | Fait | N°  | Ticket                                                                   | Lot | Travail                                                                   | Excel    | Risque   | Heures | Attend                   |
 | ---- | --- | ------------------------------------------------------------------------ | --- | ------------------------------------------------------------------------- | -------- | -------- | ------ | ------------------------ |
 | [x]  | 10  | [TTW-092](ttw-092-build-product-detail-page.md)                          | 2A  | Fiche produit : galerie, taille, couleur, quantité par taille             | 2.2, 2.1 | Standard | 25–40  | —                        |
-| [ ]  | 11  | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)                | 2A  | Pages « mot de passe oublié » et réinitialisation                         | 1.1      | Élevé    | 6–10   | TTW-083                  |
+| [x]  | —   | [TTW-089](ttw-089-add-forgot-and-reset-password-pages.md)                | 2A  | Pages « mot de passe oublié » et réinitialisation                         | 1.1      | Élevé    | 6–10   | TTW-083                  |
 | [x]  | 12  | [TTW-094](ttw-094-let-admins-enter-size-and-print-surcharges.md)         | 2A  | Saisir les suppléments de taille et de face imprimée                      | 2.7      | Élevé    | 8–14   | —                        |
-| [ ]  | —   | [TTW-220](ttw-220-make-the-view-surcharge-rule-deterministic.md)         | 2A  | Rendre stable le supplément de face quand produit et variante se cumulent | 2.7      | Élevé    | 2–4    | TTW-094, règle à valider |
+| [x]  | —   | [TTW-220](ttw-220-make-the-view-surcharge-rule-deterministic.md)         | 2A  | Rendre stable le supplément de face quand produit et variante se cumulent | 2.7      | Élevé    | 2–4    | TTW-094, règle à valider |
 | [ ]  | 13  | [TTW-097](ttw-097-complete-shipping-zone-administration.md)              | 2A  | Corriger et supprimer tarifs et zones de livraison                        | 8.2      | Élevé    | 6–10   | —                        |
 | [ ]  | 14  | [TTW-091](ttw-091-remove-fake-profile-picture.md)                        | 2A  | Retirer la fausse photo de profil et son bouton                           | 1.2      | Faible   | 1      | —                        |
 | [ ]  | 15  | [TTW-090](ttw-090-show-email-verification-state-and-resend.md)           | 2B  | Message « e-mail non vérifié » et renvoi du lien                          | 1.4      | Élevé    | 3–5    | TTW-089                  |

@@ -1,7 +1,7 @@
 # TTW-089 — Add forgot-password and reset-password pages
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-083\
 **Blocks:** TTW-090
@@ -46,9 +46,9 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Acceptance criteria
 
-- [ ] A customer who forgot their password can recover the account from the login page.
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] A customer who forgot their password can recover the account from the login page.
+- [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -130,4 +130,14 @@ Run in the worktree `.claude/worktrees/ttw-089-forgot-reset-password` (Node 24):
 
 ## Completion summary
 
-Pages, links, tests and seed are written; not complete. Open before closing the ticket: run the Playwright spec against a real API (CI), a second independent review round, and decide the follow-up tickets for M2 and L1.
+**Complete, merged into `main` (`4496c2d`, 2026-11-16).** The forgot-password page (`/auth/forgot-password`) and the reset page (`/reset-password`, the path the email already used) exist on the web site. Both customer logins (web and app) link to the recovery flow. The API now refuses a bad, expired or used reset token with the stable code `INVALID_RESET_TOKEN`, and builds reset and verification links from `WEB_APP_URL` (fallback `FRONTEND_URL`).
+
+**Proof.** On `main` at `4496c2d`: CI succeeded (run `43952217480`) and Playwright Comprehensive succeeded (run `43952217551`, 200 passed, 3 skipped), including the 6 tests of `password-reset.comprehensive.spec.ts` (journey with session closure) and `login-forgot-password.comprehensive.spec.ts`. Two independent reviews: FAIL then PASS on the code.
+
+**Caveats, accepted when closing.**
+
+- The browser matrix (firefox, webkit, mobile) has not run these specs yet; that is the nightly `test:e2e:matrix`. The journey and the expired-link test are limited to `chromium-web` by design.
+- Error and success banners use the `red-` and `emerald-` classes already used by the login, register and verify pages, not new theme tokens. The criterion "theme tokens only" is met in that sense only.
+- The request step of the journey uses another user, because a request deletes the seeded tokens. The link-to-user binding is covered at API level (`auth-token-hashing`, `auth-link-retention`).
+
+**Follow-ups, not part of this ticket.** `forgotPassword` response time depends on whether the account exists (already on `main`). The register page accepts more symbols than the API (already on `main`). `NEXT_PUBLIC_WEB_URL` must be set in every deployed environment (documented in `docs/10-deployment-and-environments.md`).

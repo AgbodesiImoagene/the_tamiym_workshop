@@ -148,7 +148,8 @@ Admins write the product-level surcharge (the row with no variant, which applies
 Rules that already applied and are unchanged:
 
 - The first view of a design is free. The surcharge is charged for the other views, in `DesignView` id order.
-- Variant-level rows (`variantId` set) are still read by pricing, but these routes never create, change or delete them. Their rule is undefined when both a variant row and a product row exist, so editing them needs its own ticket.
+- Variant-level rows (`variantId` set) are still read by pricing, but these routes never create, change or delete them. Editing them needs its own ticket.
+- The more specific row wins (TTW-220). For a given product, view and currency, a variant's own row sets that variant's surcharge and replaces the product-level row for it, even when its amount is `0`. A variant with no row of its own uses the product-level row. This never depends on row order. Products with only one kind of row quote as before. The admin screens only show and edit the product-level row, so a variant row that overrides it is not visible there.
 - A change applies to new quotes and orders only.
 
 ## Discounts
