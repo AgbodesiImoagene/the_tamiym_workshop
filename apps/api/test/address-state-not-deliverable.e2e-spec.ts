@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
 import { closeE2eApp, createE2eApp } from './utils/create-e2e-app';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ensureLga } from './utils/geo-fixtures';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/orders/payments.service';
 import { PaystackTransactionClient } from '../src/orders/paystack-transaction.client';
@@ -178,7 +179,13 @@ describe('Address in a state we no longer deliver to (e2e)', () => {
     });
   }
 
-  function createAddress(userId: string, city: string, stateCode: string) {
+  async function createAddress(
+    userId: string,
+    city: string,
+    stateCode: string,
+  ) {
+    // TTW-221: the LGA test below gives this state an LGA, so addresses carry one.
+    const lga = await ensureLga(prisma, STATE_CODE, LGA_NAME);
     return prisma.address.create({
       data: {
         userId,
@@ -186,6 +193,7 @@ describe('Address in a state we no longer deliver to (e2e)', () => {
         city,
         state: STATE_NAME,
         stateCode,
+        lgaId: lga.id,
         countryCode: 'NG',
         country: 'Nigeria',
       },

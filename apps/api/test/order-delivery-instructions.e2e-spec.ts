@@ -15,6 +15,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 /**
  * TTW-198: delivery instructions entered on an address are copied to the order,
@@ -120,6 +121,7 @@ describe('Order delivery instructions (e2e)', () => {
       city: 'Ikeja',
       state: 'Lagos',
       stateCode: 'LA',
+      lgaId: (await ensureLga(prisma)).id,
       countryCode: 'NG',
       country: 'Nigeria',
       ...(instructions === undefined ? {} : { instructions }),

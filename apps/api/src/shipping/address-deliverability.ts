@@ -1,10 +1,16 @@
-import { addressStateNotDeliverable } from './shipping.errors';
+import {
+  addressLgaRequired,
+  addressStateNotDeliverable,
+} from './shipping.errors';
 
 /** What the check reads from an address row loaded with its state and LGA. */
 export type DeliverabilityAddress = {
+  countryCode?: string | null;
   stateCode?: string | null;
   lgaId?: string | null;
-  geoState?: { isActive: boolean } | null;
+  // `lgas` is the state's active LGAs, read with `take: 1` (see
+  // `DELIVERABILITY_GEO_STATE_SELECT`): only whether there is one matters.
+  geoState?: { isActive: boolean; lgas?: Array<{ id: string }> } | null;
   lga?: { isActive: boolean } | null;
 };
 
@@ -21,4 +27,21 @@ export function assertAddressDeliverable(address: DeliverabilityAddress): void {
   ) {
     throw addressStateNotDeliverable();
   }
+  // TTW-221: a Nigerian address in a state that has active LGAs needs one. An
+  // address saved before the rule, with none, is asked to choose before it is
+  // quoted or ordered.
+  if (
+    address.countryCode === 'NG' &&
+    address.stateCode &&
+    !address.lgaId &&
+    (address.geoState?.lgas?.length ?? 0) > 0
+  ) {
+    throw addressLgaRequired();
+  }
 }
+
+/** The state fields the check reads; one shared select for every caller. */
+export const DELIVERABILITY_GEO_STATE_SELECT = {
+  isActive: true,
+  lgas: { where: { isActive: true }, select: { id: true }, take: 1 },
+} as const;

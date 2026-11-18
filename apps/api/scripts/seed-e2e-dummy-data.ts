@@ -10,6 +10,7 @@
  */
 import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 import {
   CampaignStatus,
   CurrencyCode,
@@ -28,6 +29,7 @@ import {
   RefundStatus,
   ShippingRateProvider,
   ShippingRuleMatchType,
+  TokenType,
   UserRole,
   UserStatus,
   VirusScanStatus,
@@ -74,6 +76,14 @@ const E2E_APPROVER_RECOVERY_CODES = [
   'F678-90AB-CDEF-0123-4567-89AB-CDEF-0123',
 ] as const;
 
+/** TTW-089: raw reset tokens for the e2e user; keep in sync with tests/e2e/fixtures/identities.ts. */
+const E2E_PASSWORD_RESET_TOKENS = [
+  'e2e-reset-token-attempt-0',
+  'e2e-reset-token-attempt-1',
+  'e2e-reset-token-attempt-2',
+];
+const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -81,6 +91,8 @@ const IDS = {
     adminEnroll: 'e2e-user-admin-enroll',
     organizer: 'e2e-user-organizer',
     customer: 'e2e-user-customer',
+    // TTW-089: dedicated to the password-reset journey, which changes the password.
+    passwordReset: 'e2e-user-password-reset',
     // TTW-217: owns an address in the deactivated state (E2E_DORMANT_STATE).
     customerUndeliverable: 'e2e-user-customer-undeliverable',
     // TTW-217: owns an address in an active state, linked to a deactivated LGA.
@@ -433,6 +445,17 @@ async function main() {
           emailVerifiedAt: daysAgo(10),
         },
         {
+          id: IDS.users.passwordReset,
+          email: 'reset.e2e@tamiym.test',
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Rita',
+          lastName: 'Reset',
+          phone: '+2348000000006',
+          emailVerifiedAt: daysAgo(10),
+        },
+        {
           // TTW-217: a customer whose only address is in a state we no longer
           // deliver to, so checkout can show the refusal. Kept apart from the
           // main customer: specs share that one's address and run in parallel.
@@ -457,6 +480,28 @@ async function main() {
           lastName: 'Undeliverable',
           phone: '+2348000000009',
           emailVerifiedAt: daysAgo(10),
+        },
+      ],
+    });
+
+    // TTW-089: the API stores only sha256(token) (TTW-083), so Playwright cannot read an
+    // emailed link. Seed known raw tokens instead (keep in sync with
+    // tests/e2e/fixtures/identities.ts): one valid per Playwright attempt, one expired.
+    const sha256 = (value: string) =>
+      createHash('sha256').update(value, 'utf8').digest('hex');
+    await prisma.authToken.createMany({
+      data: [
+        ...E2E_PASSWORD_RESET_TOKENS.map((token) => ({
+          userId: IDS.users.passwordReset,
+          tokenHash: sha256(token),
+          tokenType: TokenType.PASSWORD_RESET,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        })),
+        {
+          userId: IDS.users.passwordReset,
+          tokenHash: sha256(E2E_EXPIRED_PASSWORD_RESET_TOKEN),
+          tokenType: TokenType.PASSWORD_RESET,
+          expiresAt: new Date(Date.now() - 60 * 60 * 1000),
         },
       ],
     });
@@ -502,6 +547,10 @@ async function main() {
       },
     });
 
+    // TTW-221: Lagos has LGAs, so the customer's address carries one (Ikeja).
+    const ikeja = await prisma.geoLga.findUniqueOrThrow({
+      where: { stateCode_name: { stateCode: 'LA', name: 'Ikeja' } },
+    });
     await prisma.address.create({
       data: {
         id: IDS.address,
@@ -512,6 +561,7 @@ async function main() {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: ikeja.id,
         country: 'Nigeria',
         countryCode: 'NG',
         isDefault: true,

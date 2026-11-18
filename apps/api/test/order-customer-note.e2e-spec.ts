@@ -14,6 +14,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 const PASSWORD = 'TestPassword1!';
 
@@ -118,6 +119,7 @@ describe('Order customer note (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: (await ensureLga(prisma)).id,
         countryCode: 'NG',
         country: 'Nigeria',
       },

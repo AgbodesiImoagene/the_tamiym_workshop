@@ -15,6 +15,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 /**
  * TTW-084: a fresh deployment must price with the configured VAT rate before
@@ -148,6 +149,7 @@ describe('Default site settings (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: (await ensureLga(prisma)).id,
         countryCode: 'NG',
         country: 'Nigeria',
       },

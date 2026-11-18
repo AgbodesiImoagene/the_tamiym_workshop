@@ -5,6 +5,7 @@ import type { Prisma } from '../generated/prisma/client';
 import { canonicalCountryCode } from './country-code';
 import {
   addressCountryCodeInvalid,
+  addressLgaRequired,
   addressStateMismatch,
   addressStateUnknown,
 } from './shipping.errors';
@@ -100,11 +101,13 @@ export class AddressNormalizationService {
       existing?.locality ?? null,
       existing?.city ?? null,
     );
+    // TTW-221: state and LGA names are matched with single spaces, like the
+    // shipping resolver does, so spacing never decides which row is found.
     const admin1Input = this.firstDefined(
-      this.clean(input.administrativeAreaLevel1),
-      this.clean(input.state),
-      existing?.administrativeAreaLevel1 ?? null,
-      existing?.state ?? null,
+      this.cleanName(input.administrativeAreaLevel1),
+      this.cleanName(input.state),
+      this.cleanName(existing?.administrativeAreaLevel1),
+      this.cleanName(existing?.state),
     );
     const stateUnchanged =
       existing !== null && !this.isStateChange(input, existing);
@@ -143,11 +146,11 @@ export class AddressNormalizationService {
     const lgaCleared =
       existing !== null &&
       input.lgaId === null &&
-      !this.clean(input.administrativeAreaLevel2);
+      !this.cleanName(input.administrativeAreaLevel2);
     const admin2Input = this.firstDefined(
-      this.clean(input.administrativeAreaLevel2),
+      this.cleanName(input.administrativeAreaLevel2),
       keepSavedLga && !lgaCleared
-        ? (existing?.administrativeAreaLevel2 ?? null)
+        ? this.cleanName(existing?.administrativeAreaLevel2)
         : null,
     );
     // An LGA cannot be checked against a state we do not know.
@@ -170,6 +173,22 @@ export class AddressNormalizationService {
         ? existing.lgaId
         : null) ??
       null;
+    // TTW-221: a Nigerian address in a state that has active LGAs must end up
+    // with one, so no address can skip the LGA refusal by leaving it out. An
+    // address saved before this rule, with no LGA, stays editable on other
+    // fields: it is only refused when the edit touches the state, the country
+    // or the LGA. Quotes and orders still ask it for an LGA.
+    if (countryCode === 'NG' && stateCode && !lgaId) {
+      const touchesLocation =
+        existing === null ||
+        stateChanged ||
+        lgaChanged ||
+        existing.countryCode !== 'NG' ||
+        !!existing.lgaId;
+      if (touchesLocation && (await this.stateHasActiveLgas(stateCode))) {
+        throw addressLgaRequired();
+      }
+    }
     // A saved state that is no longer offered keeps its saved text: the request
     // text never overwrites it (TTW-216).
     const keepSavedText =
@@ -191,7 +210,7 @@ export class AddressNormalizationService {
       : keepSavedText
         ? (existing?.state ?? administrativeAreaLevel1)
         : this.firstDefined(
-            this.clean(input.state),
+            this.cleanName(input.state),
             administrativeAreaLevel1,
             existing?.state ?? null,
           );
@@ -313,21 +332,22 @@ export class AddressNormalizationService {
   ) {
     const sameText = (a: string | null | undefined, b: string | null) =>
       !!a && !!b && a.toLowerCase() === b.toLowerCase();
+    // TTW-221: names compare with single spaces.
 
     const explicitCode = this.clean(input.stateCode);
     if (explicitCode) {
       return !sameText(this.clean(existing.stateCode), explicitCode);
     }
     const sentText = this.firstDefined(
-      this.clean(input.administrativeAreaLevel1),
-      this.clean(input.state),
+      this.cleanName(input.administrativeAreaLevel1),
+      this.cleanName(input.state),
     );
     if (!sentText) {
       return false;
     }
     return (
-      !sameText(this.clean(existing.administrativeAreaLevel1), sentText) &&
-      !sameText(this.clean(existing.state), sentText)
+      !sameText(this.cleanName(existing.administrativeAreaLevel1), sentText) &&
+      !sameText(this.cleanName(existing.state), sentText)
     );
   }
 
@@ -344,11 +364,11 @@ export class AddressNormalizationService {
     if (explicitId) {
       return explicitId !== (existing.lgaId ?? null);
     }
-    const sentText = this.clean(input.administrativeAreaLevel2);
+    const sentText = this.cleanName(input.administrativeAreaLevel2);
     if (!sentText) {
       return false;
     }
-    const savedText = this.clean(existing.administrativeAreaLevel2);
+    const savedText = this.cleanName(existing.administrativeAreaLevel2);
     return !savedText || savedText.toLowerCase() !== sentText.toLowerCase();
   }
 
@@ -377,8 +397,8 @@ export class AddressNormalizationService {
       return null;
     }
     const sentTexts = this.distinctTexts(
-      this.clean(input.administrativeAreaLevel1),
-      this.clean(input.state),
+      this.cleanName(input.administrativeAreaLevel1),
+      this.cleanName(input.state),
     );
     const explicitCode = this.clean(input.stateCode)?.toUpperCase();
     if (explicitCode) {
@@ -464,6 +484,13 @@ export class AddressNormalizationService {
     return [...seen.values()];
   }
 
+  private async stateHasActiveLgas(stateCode: string) {
+    const count = await this.prisma.geoLga.count({
+      where: { stateCode, isActive: true },
+    });
+    return count > 0;
+  }
+
   private async resolveLga(
     countryCode: string,
     input: AddressNormalizationInput,
@@ -506,6 +533,15 @@ export class AddressNormalizationService {
     }
     const trimmed = value.trim();
     return trimmed.length ? trimmed : null;
+  }
+
+  /**
+   * TTW-221: trim and collapse any run of whitespace (spaces, tabs, no-break
+   * spaces) to one space. Same rule as `normalizeKey` in the shipping
+   * resolver, so the LGA found here is the one a shipping rule matches.
+   */
+  private cleanName(value: string | undefined | null) {
+    return this.clean(value?.replace(/\s+/g, ' '));
   }
 
   private cleanNullable(

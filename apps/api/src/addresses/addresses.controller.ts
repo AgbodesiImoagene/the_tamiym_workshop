@@ -78,7 +78,7 @@ export class AddressesController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)',
+      'Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221)',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(
@@ -238,7 +238,7 @@ export class AddressesController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)',
+      'Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221)',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })

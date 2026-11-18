@@ -16,6 +16,7 @@ import {
   UserRole,
   UserStatus,
 } from '../src/generated/prisma/enums';
+import { ensureLga } from './utils/geo-fixtures';
 
 /**
  * TTW-037: one idempotency key creates at most one order and one inventory
@@ -116,6 +117,7 @@ describe('Order create idempotency (e2e)', () => {
         city: 'Ikeja',
         state: 'Lagos',
         stateCode: 'LA',
+        lgaId: (await ensureLga(prisma)).id,
         countryCode: 'NG',
         country: 'Nigeria',
       },

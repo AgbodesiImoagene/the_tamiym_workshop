@@ -220,37 +220,58 @@ describe('Clear the LGA saved on an address (e2e)', () => {
       .expect(200);
     expect(kept.body).toMatchObject({ stateCode: 'LA', lgaId: ikeja.id });
 
-    // lgaId null removes it, and nothing else about the state changes.
+    // TTW-221: Lagos has active LGAs, so lgaId null no longer removes it. The
+    // refusal changes nothing and the quote still uses the LGA rule.
     const cleared = await agent
       .patch(`/v1/users/addresses/${addressId}`)
       .set('Origin', CUSTOMER_ORIGIN)
       .set('x-csrf-token', csrf)
       .send({ state: 'Lagos', stateCode: 'LA', lgaId: null })
-      .expect(200);
-    expect(cleared.body).toMatchObject({
-      state: 'Lagos',
-      stateCode: 'LA',
-      lgaId: null,
-      administrativeAreaLevel2: null,
-    });
+      .expect(400);
+    expect(cleared.body).toMatchObject({ code: 'ADDRESS_LGA_REQUIRED' });
     const saved = await prisma.address.findUniqueOrThrow({
       where: { id: addressId },
     });
-    expect(saved).toMatchObject({
-      stateCode: 'LA',
-      lgaId: null,
-      administrativeAreaLevel2: null,
+    expect(saved).toMatchObject({ stateCode: 'LA', lgaId: ikeja.id });
+    expect(await quoteFee()).toBe(3500);
+
+    // An address saved before the rule, with no LGA, still loads and can be
+    // edited on other fields, but it is not quoted until an LGA is chosen.
+    const legacy = await prisma.address.create({
+      data: {
+        userId: customer.id,
+        addressLine1: '1 Old Street',
+        city: 'Ikeja',
+        state: 'Lagos',
+        stateCode: 'LA',
+        countryCode: 'NG',
+        country: 'Nigeria',
+      },
     });
-
-    expect(await quoteFee()).toBe(2500);
-
-    // The cleared address stays cleared on a later edit without lgaId.
-    const later = await agent
-      .patch(`/v1/users/addresses/${addressId}`)
+    const quoteLegacy = () =>
+      agent
+        .post('/v1/orders/quote')
+        .set('Origin', CUSTOMER_ORIGIN)
+        .set('x-csrf-token', csrf)
+        .send({
+          shippingAddressId: legacy.id,
+          items: [{ variantId: variant.id, quantity: 1 }],
+        });
+    const asked = await quoteLegacy().expect(400);
+    expect(asked.body).toMatchObject({ code: 'ADDRESS_LGA_REQUIRED' });
+    await agent
+      .patch(`/v1/users/addresses/${legacy.id}`)
       .set('Origin', CUSTOMER_ORIGIN)
       .set('x-csrf-token', csrf)
       .send({ phone: '+2348012345678' })
       .expect(200);
-    expect(later.body).toMatchObject({ lgaId: null });
+    await agent
+      .patch(`/v1/users/addresses/${legacy.id}`)
+      .set('Origin', CUSTOMER_ORIGIN)
+      .set('x-csrf-token', csrf)
+      .send({ lgaId: ikeja.id })
+      .expect(200);
+    const priced = await quoteLegacy().expect(200);
+    expect(Number(priced.body.shippingFee)).toBe(3500);
   });
 });

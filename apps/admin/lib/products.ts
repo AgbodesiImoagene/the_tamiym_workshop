@@ -343,6 +343,70 @@ export async function deleteAdminOptionValue(productId: string, optionId: string
   );
 }
 
+// ─── Size upcharges and print-side surcharges (TTW-094) ──────────────────────
+
+/** Currency the admin console edits today. The API accepts any `CurrencyCode`. */
+export const SURCHARGE_CURRENCY = 'NGN';
+
+export interface AdminOptionValueUpcharge {
+  optionId: string;
+  valueId: string;
+  currency: string;
+  /** Decimal string with 2 places, e.g. "500.00". */
+  amount: string;
+}
+
+export interface AdminViewSurcharge {
+  viewId: string;
+  currency: string;
+  /** Decimal string with 2 places, e.g. "1000.00". */
+  amount: string;
+}
+
+export interface AdminProductSurcharges {
+  optionValueUpcharges: AdminOptionValueUpcharge[];
+  viewSurcharges: AdminViewSurcharge[];
+}
+
+export async function getAdminProductSurcharges(productId: string) {
+  return apiClient.get<AdminProductSurcharges>(`/admin/products/${productId}/surcharges`);
+}
+
+export async function setAdminOptionValueUpcharge(
+  productId: string,
+  optionId: string,
+  valueId: string,
+  amount: number
+) {
+  return apiClient.put<AdminOptionValueUpcharge>(
+    `/admin/products/${productId}/options/${optionId}/values/${valueId}/upcharges/${SURCHARGE_CURRENCY}`,
+    { amount }
+  );
+}
+
+export async function deleteAdminOptionValueUpcharge(
+  productId: string,
+  optionId: string,
+  valueId: string
+) {
+  return apiClient.delete<void>(
+    `/admin/products/${productId}/options/${optionId}/values/${valueId}/upcharges/${SURCHARGE_CURRENCY}`
+  );
+}
+
+export async function setAdminViewSurcharge(productId: string, viewId: string, amount: number) {
+  return apiClient.put<AdminViewSurcharge>(
+    `/admin/products/${productId}/views/${viewId}/surcharges/${SURCHARGE_CURRENCY}`,
+    { amount }
+  );
+}
+
+export async function deleteAdminViewSurcharge(productId: string, viewId: string) {
+  return apiClient.delete<void>(
+    `/admin/products/${productId}/views/${viewId}/surcharges/${SURCHARGE_CURRENCY}`
+  );
+}
+
 // ─── Product-level prices ─────────────────────────────────────────────────────
 
 export async function upsertAdminProductPrice(

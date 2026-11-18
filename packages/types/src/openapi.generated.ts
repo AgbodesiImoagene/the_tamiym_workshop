@@ -1293,6 +1293,30 @@ export interface paths {
         patch: operations["AdminProductsController_updateOptionValue"];
         trace?: never;
     };
+    "/v1/admin/products/{productId}/options/{optionId}/values/{valueId}/upcharges/{currency}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the size (option value) upcharge for a currency (admin)
+         * @description Creates or replaces the upcharge. Safe to repeat. Applies to new quotes and orders only: existing orders keep their price.
+         */
+        put: operations["AdminProductsController_setOptionValueUpcharge"];
+        post?: never;
+        /**
+         * Remove the size (option value) upcharge for a currency (admin)
+         * @description Succeeds when there is nothing to remove.
+         */
+        delete: operations["AdminProductsController_deleteOptionValueUpcharge"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/products/{productId}/prices": {
         parameters: {
             query?: never;
@@ -1326,6 +1350,23 @@ export interface paths {
         head?: never;
         /** Update product price (admin) */
         patch: operations["AdminProductsController_updateProductPrice"];
+        trace?: never;
+    };
+    "/v1/admin/products/{productId}/surcharges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List size upcharges and print-side surcharges (admin) */
+        get: operations["AdminProductsController_listSurcharges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/products/{productId}/variants": {
@@ -1519,6 +1560,30 @@ export interface paths {
         head?: never;
         /** Update print area (admin) */
         patch: operations["AdminProductsController_updatePrintArea"];
+        trace?: never;
+    };
+    "/v1/admin/products/{productId}/views/{viewId}/surcharges/{currency}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the print-side surcharge of a view for a currency (admin)
+         * @description Creates or replaces the product-level surcharge (all variants). Safe to repeat. The first view of a design is free; the surcharge applies to the other views. Applies to new quotes and orders only.
+         */
+        put: operations["AdminProductsController_setViewSurcharge"];
+        post?: never;
+        /**
+         * Remove the print-side surcharge of a view for a currency (admin)
+         * @description Removes the product-level surcharge only. Succeeds when there is nothing to remove.
+         */
+        delete: operations["AdminProductsController_deleteViewSurcharge"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/reconciliation/findings": {
@@ -4300,8 +4365,57 @@ export interface components {
             /** @description Signed unsubscribe token from email footer (HMAC, scoped, expiring). */
             token: string;
         };
+        OptionValueUpchargeResponseDto: {
+            /**
+             * @description Decimal string with 2 places
+             * @example 500.00
+             */
+            amount: string;
+            /**
+             * @example NGN
+             * @enum {string}
+             */
+            currency: "NGN";
+            /** @description Option the value belongs to */
+            optionId: string;
+            /** @description Option value the upcharge applies to */
+            valueId: string;
+        };
         PrivacyReauthDto: {
             password: string;
+        };
+        ProductSurchargesResponseDto: {
+            optionValueUpcharges: {
+                /**
+                 * @description Decimal string with 2 places
+                 * @example 500.00
+                 */
+                amount: string;
+                /**
+                 * @example NGN
+                 * @enum {string}
+                 */
+                currency: "NGN";
+                /** @description Option the value belongs to */
+                optionId: string;
+                /** @description Option value the upcharge applies to */
+                valueId: string;
+            }[];
+            /** @description Product-level surcharges only. Variant-level overrides are not editable here. */
+            viewSurcharges: {
+                /**
+                 * @description Decimal string with 2 places
+                 * @example 1000.00
+                 */
+                amount: string;
+                /**
+                 * @example NGN
+                 * @enum {string}
+                 */
+                currency: "NGN";
+                /** @description Product view (front, back, ...) it applies to */
+                viewId: string;
+            }[];
         };
         PublicCampaignDesignDto: {
             /** @example design-1 */
@@ -4714,6 +4828,13 @@ export interface components {
              * @enum {string}
              */
             status?: "APPROVED" | "FLAGGED" | "REJECTED";
+        };
+        SetSurchargeDto: {
+            /**
+             * @description Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.
+             * @example 500
+             */
+            amount: number;
         };
         SubmitOrganizerApplicationDto: {
             intendedUse: string;
@@ -5247,6 +5368,20 @@ export interface components {
              * @example clx...
              */
             token: string;
+        };
+        ViewSurchargeResponseDto: {
+            /**
+             * @description Decimal string with 2 places
+             * @example 1000.00
+             */
+            amount: string;
+            /**
+             * @example NGN
+             * @enum {string}
+             */
+            currency: "NGN";
+            /** @description Product view (front, back, ...) it applies to */
+            viewId: string;
         };
     };
     responses: never;
@@ -8620,6 +8755,141 @@ export interface operations {
             };
         };
     };
+    AdminProductsController_setOptionValueUpcharge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: string;
+                /** @description Option ID */
+                optionId: string;
+                /** @description Option value ID */
+                valueId: string;
+                currency: "NGN";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.
+                     * @example 500
+                     */
+                    amount: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Upcharge saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Decimal string with 2 places
+                         * @example 500.00
+                         */
+                        amount: string;
+                        /**
+                         * @example NGN
+                         * @enum {string}
+                         */
+                        currency: "NGN";
+                        /** @description Option the value belongs to */
+                        optionId: string;
+                        /** @description Option value the upcharge applies to */
+                        valueId: string;
+                    };
+                };
+            };
+            /** @description Invalid amount or currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Option value not found for this product */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminProductsController_deleteOptionValueUpcharge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: string;
+                /** @description Option ID */
+                optionId: string;
+                /** @description Option value ID */
+                valueId: string;
+                currency: "NGN";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upcharge removed or absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Option value not found for this product */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminProductsController_upsertProductPrice: {
         parameters: {
             query?: never;
@@ -8695,6 +8965,82 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminProductsController_listSurcharges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every size upcharge and product-level view surcharge */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        optionValueUpcharges: {
+                            /**
+                             * @description Decimal string with 2 places
+                             * @example 500.00
+                             */
+                            amount: string;
+                            /**
+                             * @example NGN
+                             * @enum {string}
+                             */
+                            currency: "NGN";
+                            /** @description Option the value belongs to */
+                            optionId: string;
+                            /** @description Option value the upcharge applies to */
+                            valueId: string;
+                        }[];
+                        /** @description Product-level surcharges only. Variant-level overrides are not editable here. */
+                        viewSurcharges: {
+                            /**
+                             * @description Decimal string with 2 places
+                             * @example 1000.00
+                             */
+                            amount: string;
+                            /**
+                             * @example NGN
+                             * @enum {string}
+                             */
+                            currency: "NGN";
+                            /** @description Product view (front, back, ...) it applies to */
+                            viewId: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9281,6 +9627,135 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminProductsController_setViewSurcharge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: string;
+                /** @description Product view ID */
+                viewId: string;
+                currency: "NGN";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.
+                     * @example 500
+                     */
+                    amount: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Surcharge saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Decimal string with 2 places
+                         * @example 1000.00
+                         */
+                        amount: string;
+                        /**
+                         * @example NGN
+                         * @enum {string}
+                         */
+                        currency: "NGN";
+                        /** @description Product view (front, back, ...) it applies to */
+                        viewId: string;
+                    };
+                };
+            };
+            /** @description Invalid amount or currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description View not found for this product */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminProductsController_deleteViewSurcharge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: string;
+                /** @description Product view ID */
+                viewId: string;
+                currency: "NGN";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Surcharge removed or absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description View not found for this product */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11003,12 +11478,21 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid or expired token */
+            /** @description Invalid or expired token (code INVALID_RESET_TOKEN), or a password that is not strong enough (validation message) */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example INVALID_RESET_TOKEN */
+                        code?: string;
+                        /** @example Invalid or expired reset token */
+                        message?: unknown;
+                        /** @example 400 */
+                        statusCode?: number;
+                    };
+                };
             };
         };
     };
@@ -11723,7 +12207,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11806,7 +12290,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12964,7 +13448,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
+            /** @description Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -13037,7 +13521,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. */
+            /** @description Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14335,7 +14819,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -14581,7 +15065,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH) */
+            /** @description Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221) */
             400: {
                 headers: {
                     [name: string]: unknown;

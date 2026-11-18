@@ -2525,6 +2525,37 @@
         ],
         "type": "object"
       },
+      "OptionValueUpchargeResponseDto": {
+        "properties": {
+          "amount": {
+            "description": "Decimal string with 2 places",
+            "example": "500.00",
+            "type": "string"
+          },
+          "currency": {
+            "enum": [
+              "NGN"
+            ],
+            "example": "NGN",
+            "type": "string"
+          },
+          "optionId": {
+            "description": "Option the value belongs to",
+            "type": "string"
+          },
+          "valueId": {
+            "description": "Option value the upcharge applies to",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "optionId",
+          "valueId"
+        ],
+        "type": "object"
+      },
       "PrivacyReauthDto": {
         "properties": {
           "password": {
@@ -2534,6 +2565,79 @@
         },
         "required": [
           "password"
+        ],
+        "type": "object"
+      },
+      "ProductSurchargesResponseDto": {
+        "properties": {
+          "optionValueUpcharges": {
+            "items": {
+              "properties": {
+                "amount": {
+                  "description": "Decimal string with 2 places",
+                  "example": "500.00",
+                  "type": "string"
+                },
+                "currency": {
+                  "enum": [
+                    "NGN"
+                  ],
+                  "example": "NGN",
+                  "type": "string"
+                },
+                "optionId": {
+                  "description": "Option the value belongs to",
+                  "type": "string"
+                },
+                "valueId": {
+                  "description": "Option value the upcharge applies to",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "amount",
+                "currency",
+                "optionId",
+                "valueId"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "viewSurcharges": {
+            "description": "Product-level surcharges only. Variant-level overrides are not editable here.",
+            "items": {
+              "properties": {
+                "amount": {
+                  "description": "Decimal string with 2 places",
+                  "example": "1000.00",
+                  "type": "string"
+                },
+                "currency": {
+                  "enum": [
+                    "NGN"
+                  ],
+                  "example": "NGN",
+                  "type": "string"
+                },
+                "viewId": {
+                  "description": "Product view (front, back, ...) it applies to",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "amount",
+                "currency",
+                "viewId"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "optionValueUpcharges",
+          "viewSurcharges"
         ],
         "type": "object"
       },
@@ -3563,6 +3667,21 @@
         },
         "required": [
           "resolution"
+        ],
+        "type": "object"
+      },
+      "SetSurchargeDto": {
+        "properties": {
+          "amount": {
+            "description": "Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.",
+            "example": 500,
+            "maximum": 99999999.99,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "amount"
         ],
         "type": "object"
       },
@@ -4711,6 +4830,32 @@
         },
         "required": [
           "token"
+        ],
+        "type": "object"
+      },
+      "ViewSurchargeResponseDto": {
+        "properties": {
+          "amount": {
+            "description": "Decimal string with 2 places",
+            "example": "1000.00",
+            "type": "string"
+          },
+          "currency": {
+            "enum": [
+              "NGN"
+            ],
+            "example": "NGN",
+            "type": "string"
+          },
+          "viewId": {
+            "description": "Product view (front, back, ...) it applies to",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "viewId"
         ],
         "type": "object"
       }
@@ -10395,6 +10540,211 @@
         ]
       }
     },
+    "/v1/admin/products/{productId}/options/{optionId}/values/{valueId}/upcharges/{currency}": {
+      "delete": {
+        "description": "Succeeds when there is nothing to remove.",
+        "operationId": "AdminProductsController_deleteOptionValueUpcharge",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Option ID",
+            "in": "path",
+            "name": "optionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Option value ID",
+            "in": "path",
+            "name": "valueId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "enum": [
+                "NGN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Upcharge removed or absent"
+          },
+          "400": {
+            "description": "Invalid currency"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Option value not found for this product"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove the size (option value) upcharge for a currency (admin)",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "put": {
+        "description": "Creates or replaces the upcharge. Safe to repeat. Applies to new quotes and orders only: existing orders keep their price.",
+        "operationId": "AdminProductsController_setOptionValueUpcharge",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Option ID",
+            "in": "path",
+            "name": "optionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Option value ID",
+            "in": "path",
+            "name": "valueId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "enum": [
+                "NGN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "amount": {
+                    "description": "Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.",
+                    "example": 500,
+                    "maximum": 99999999.99,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "amount"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "amount": {
+                      "description": "Decimal string with 2 places",
+                      "example": "500.00",
+                      "type": "string"
+                    },
+                    "currency": {
+                      "enum": [
+                        "NGN"
+                      ],
+                      "example": "NGN",
+                      "type": "string"
+                    },
+                    "optionId": {
+                      "description": "Option the value belongs to",
+                      "type": "string"
+                    },
+                    "valueId": {
+                      "description": "Option value the upcharge applies to",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "amount",
+                    "currency",
+                    "optionId",
+                    "valueId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Upcharge saved"
+          },
+          "400": {
+            "description": "Invalid amount or currency"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Option value not found for this product"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Set the size (option value) upcharge for a currency (admin)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
     "/v1/admin/products/{productId}/prices": {
       "post": {
         "operationId": "AdminProductsController_upsertProductPrice",
@@ -10541,6 +10891,125 @@
           }
         ],
         "summary": "Update product price (admin)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/products/{productId}/surcharges": {
+      "get": {
+        "operationId": "AdminProductsController_listSurcharges",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "optionValueUpcharges": {
+                      "items": {
+                        "properties": {
+                          "amount": {
+                            "description": "Decimal string with 2 places",
+                            "example": "500.00",
+                            "type": "string"
+                          },
+                          "currency": {
+                            "enum": [
+                              "NGN"
+                            ],
+                            "example": "NGN",
+                            "type": "string"
+                          },
+                          "optionId": {
+                            "description": "Option the value belongs to",
+                            "type": "string"
+                          },
+                          "valueId": {
+                            "description": "Option value the upcharge applies to",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "currency",
+                          "optionId",
+                          "valueId"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "viewSurcharges": {
+                      "description": "Product-level surcharges only. Variant-level overrides are not editable here.",
+                      "items": {
+                        "properties": {
+                          "amount": {
+                            "description": "Decimal string with 2 places",
+                            "example": "1000.00",
+                            "type": "string"
+                          },
+                          "currency": {
+                            "enum": [
+                              "NGN"
+                            ],
+                            "example": "NGN",
+                            "type": "string"
+                          },
+                          "viewId": {
+                            "description": "Product view (front, back, ...) it applies to",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "currency",
+                          "viewId"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "optionValueUpcharges",
+                    "viewSurcharges"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Every size upcharge and product-level view surcharge"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "List size upcharges and print-side surcharges (admin)",
         "tags": [
           "Admin"
         ]
@@ -11603,6 +12072,188 @@
           }
         ],
         "summary": "Upsert print area (admin)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/products/{productId}/views/{viewId}/surcharges/{currency}": {
+      "delete": {
+        "description": "Removes the product-level surcharge only. Succeeds when there is nothing to remove.",
+        "operationId": "AdminProductsController_deleteViewSurcharge",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Product view ID",
+            "in": "path",
+            "name": "viewId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "enum": [
+                "NGN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Surcharge removed or absent"
+          },
+          "400": {
+            "description": "Invalid currency"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "View not found for this product"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove the print-side surcharge of a view for a currency (admin)",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "put": {
+        "description": "Creates or replaces the product-level surcharge (all variants). Safe to repeat. The first view of a design is free; the surcharge applies to the other views. Applies to new quotes and orders only.",
+        "operationId": "AdminProductsController_setViewSurcharge",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Product view ID",
+            "in": "path",
+            "name": "viewId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "currency",
+            "required": true,
+            "schema": {
+              "enum": [
+                "NGN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "amount": {
+                    "description": "Extra amount in the currency of the route, at most 2 decimals. Use DELETE to remove the surcharge.",
+                    "example": 500,
+                    "maximum": 99999999.99,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "amount"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "amount": {
+                      "description": "Decimal string with 2 places",
+                      "example": "1000.00",
+                      "type": "string"
+                    },
+                    "currency": {
+                      "enum": [
+                        "NGN"
+                      ],
+                      "example": "NGN",
+                      "type": "string"
+                    },
+                    "viewId": {
+                      "description": "Product view (front, back, ...) it applies to",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "amount",
+                    "currency",
+                    "viewId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Surcharge saved"
+          },
+          "400": {
+            "description": "Invalid amount or currency"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "View not found for this product"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Set the print-side surcharge of a view for a currency (admin)",
         "tags": [
           "Admin"
         ]
@@ -14168,7 +14819,27 @@
             "description": "Password reset successfully"
           },
           "400": {
-            "description": "Invalid or expired token"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "INVALID_RESET_TOKEN",
+                      "type": "string"
+                    },
+                    "message": {
+                      "example": "Invalid or expired reset token"
+                    },
+                    "statusCode": {
+                      "example": 400,
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid or expired token (code INVALID_RESET_TOKEN), or a password that is not strong enough (validation message)"
           }
         },
         "summary": "Reset password with token",
@@ -15061,7 +15732,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries."
           },
           "401": {
             "description": "Unauthorized"
@@ -15163,7 +15834,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries."
           },
           "401": {
             "description": "Unauthorized"
@@ -16612,7 +17283,7 @@
             "description": "Order created"
           },
           "400": {
-            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
+            "description": "Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries."
           },
           "401": {
             "description": "Unauthorized"
@@ -16701,7 +17372,7 @@
             "description": "Quote with line items, shipping, VAT, and total"
           },
           "400": {
-            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected."
+            "description": "Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries."
           },
           "401": {
             "description": "Unauthorized"
@@ -19173,7 +19844,7 @@
             "description": "Address created successfully"
           },
           "400": {
-            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221)"
           },
           "401": {
             "description": "Unauthorized"
@@ -19623,7 +20294,7 @@
             "description": "Address updated successfully"
           },
           "400": {
-            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH)"
+            "description": "Invalid input data; a Nigerian state the platform does not know (code ADDRESS_STATE_UNKNOWN); or a stateCode and a state text that name two different states (code ADDRESS_STATE_MISMATCH); or a Nigerian address in a state that has active LGAs with no LGA (code ADDRESS_LGA_REQUIRED, TTW-221)"
           },
           "401": {
             "description": "Unauthorized"

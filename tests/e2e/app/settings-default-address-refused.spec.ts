@@ -78,7 +78,12 @@ test.describe('Settings address save keeps the default address @comprehensive @a
     const csrf = (await context.cookies()).find((c) => c.name === 'ttw_customer_csrf')?.value ?? '';
     expect(csrf).not.toBe('');
     const headers = { Origin: originForSurface('CUSTOMER'), 'x-csrf-token': csrf };
-    const base = { city: 'Ikeja', state: 'Lagos', country: 'Nigeria' };
+    const base = {
+      city: 'Ikeja',
+      state: 'Lagos',
+      administrativeAreaLevel2: 'Ikeja',
+      country: 'Nigeria',
+    };
 
     // The default address, and a second address that is not the default.
     const main = await context.request.post(`${urls.api}/v1/users/addresses`, {
