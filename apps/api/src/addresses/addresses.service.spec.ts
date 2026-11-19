@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
 import { AddressesService } from './addresses.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddressProvider } from '../generated/prisma/enums';
@@ -367,6 +372,45 @@ describe('AddressesService', () => {
         where: { id: 'addr-2' },
         data: { isDefault: true },
       });
+    });
+
+    it('TTW-227: answers 409 ADDRESS_IN_USE when an order uses the address (foreign key P2003)', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        isDefault: true,
+      });
+      (prisma.address.delete as jest.Mock).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('FK', {
+          code: 'P2003',
+          clientVersion: 'test',
+        }),
+      );
+
+      const error = await service
+        .remove('user-1', 'addr-1')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        statusCode: 409,
+        code: 'ADDRESS_IN_USE',
+        message: 'This address is used by an order and cannot be deleted.',
+      });
+      // refused: nothing is promoted
+      expect(prisma.address.update).not.toHaveBeenCalled();
+    });
+
+    it('TTW-227: any other database error is not turned into a 409', async () => {
+      (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+      (prisma.address.findFirst as jest.Mock).mockResolvedValue({
+        ...mockAddress,
+        isDefault: false,
+      });
+      const boom = new Error('connection lost');
+      (prisma.address.delete as jest.Mock).mockRejectedValue(boom);
+
+      await expect(service.remove('user-1', 'addr-1')).rejects.toBe(boom);
     });
 
     it('TTW-222: throws NotFoundException and deletes nothing when the address vanished before the lock', async () => {
