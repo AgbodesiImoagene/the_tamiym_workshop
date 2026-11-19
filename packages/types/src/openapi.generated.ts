@@ -3477,7 +3477,10 @@ export interface components {
             landmark?: string;
             /** @example 6.5244 */
             latitude?: number;
-            /** @example cme4abcd1234 */
+            /**
+             * @description LGA id. Only used for Nigerian addresses: for any other country it is ignored and stored as null.
+             * @example cme4abcd1234
+             */
             lgaId?: string;
             /** @example Lagos */
             locality?: string;
@@ -3497,7 +3500,7 @@ export interface components {
             /** @example Lagos */
             state: string;
             /**
-             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
              * @example LA
              */
             stateCode?: string;
@@ -3875,7 +3878,7 @@ export interface components {
         };
         CreateShippingRuleDto: {
             /**
-             * @description ISO 3166-1 alpha-2 country code
+             * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.
              * @example NG
              */
             countryCode: string;
@@ -4880,7 +4883,7 @@ export interface components {
             /** @example 6.5244 */
             latitude?: number;
             /**
-             * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).
+             * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
              * @example cme4abcd1234
              */
             lgaId?: string | null;
@@ -4899,7 +4902,7 @@ export interface components {
             /** @example Lagos */
             state?: string;
             /**
-             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+             * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
              * @example LA
              */
             stateCode?: string;
@@ -5240,7 +5243,7 @@ export interface components {
         };
         UpdateShippingRuleDto: {
             /**
-             * @description ISO 3166-1 alpha-2 country code
+             * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.
              * @example NG
              */
             countryCode?: string;
@@ -10180,7 +10183,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description ISO 3166-1 alpha-2 country code
+                     * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.
                      * @example NG
                      */
                     countryCode?: string;
@@ -10524,7 +10527,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description ISO 3166-1 alpha-2 country code
+                     * @description ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.
                      * @example NG
                      */
                     countryCode: string;
@@ -14752,7 +14755,10 @@ export interface operations {
                     landmark?: string;
                     /** @example 6.5244 */
                     latitude?: number;
-                    /** @example cme4abcd1234 */
+                    /**
+                     * @description LGA id. Only used for Nigerian addresses: for any other country it is ignored and stored as null.
+                     * @example cme4abcd1234
+                     */
                     lgaId?: string;
                     /** @example Lagos */
                     locality?: string;
@@ -14772,7 +14778,7 @@ export interface operations {
                     /** @example Lagos */
                     state: string;
                     /**
-                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
                      * @example LA
                      */
                     stateCode?: string;
@@ -14999,7 +15005,7 @@ export interface operations {
                     /** @example 6.5244 */
                     latitude?: number;
                     /**
-                     * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).
+                     * @description LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
                      * @example cme4abcd1234
                      */
                     lgaId?: string | null;
@@ -15018,7 +15024,7 @@ export interface operations {
                     /** @example Lagos */
                     state?: string;
                     /**
-                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).
+                     * @description Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.
                      * @example LA
                      */
                     stateCode?: string;

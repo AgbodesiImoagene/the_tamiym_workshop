@@ -134,9 +134,15 @@ export class AddressNormalizationService {
     ) {
       throw addressStateUnknown();
     }
-    const stateCode = stateChanged
-      ? (resolvedState?.code ?? null)
-      : (resolvedState?.code ?? existing?.stateCode ?? null);
+    // TTW-226: a state code and an LGA belong to a Nigerian address only. A
+    // foreign address never keeps or receives them, whatever the request sends.
+    const isNigerian = countryCode === 'NG';
+    const leavesNigeria = !isNigerian && existing?.countryCode === 'NG';
+    const stateCode = !isNigerian
+      ? null
+      : stateChanged
+        ? (resolvedState?.code ?? null)
+        : (resolvedState?.code ?? existing?.stateCode ?? null);
     const keepSavedLga =
       !stateChanged || (!!stateCode && stateCode === existing?.stateCode);
 
@@ -147,9 +153,11 @@ export class AddressNormalizationService {
       existing !== null &&
       input.lgaId === null &&
       !this.cleanName(input.administrativeAreaLevel2);
+    // TTW-226: the saved LGA name of an address that leaves Nigeria names a
+    // Nigerian LGA, so it is not carried to the foreign address.
     const admin2Input = this.firstDefined(
       this.cleanName(input.administrativeAreaLevel2),
-      keepSavedLga && !lgaCleared
+      keepSavedLga && !lgaCleared && !leavesNigeria
         ? this.cleanName(existing?.administrativeAreaLevel2)
         : null,
     );
@@ -165,7 +173,8 @@ export class AddressNormalizationService {
     const lgaChanged = existing !== null && this.isLgaChange(input, existing);
     const lgaId =
       resolvedLga?.id ??
-      (keepSavedLga &&
+      (isNigerian &&
+      keepSavedLga &&
       !lgaCleared &&
       !lgaChanged &&
       !!stateCode &&

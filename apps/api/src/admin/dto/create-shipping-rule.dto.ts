@@ -8,12 +8,14 @@ import {
   Length,
   Min,
 } from 'class-validator';
+import { AddressText } from '../../addresses/dto/address-text.decorator';
 import { ShippingRuleMatchType } from '../../generated/prisma/enums';
 
 export class CreateShippingRuleDto {
   @ApiProperty({
     example: 'NG',
-    description: 'ISO 3166-1 alpha-2 country code',
+    description:
+      'ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.',
   })
   @IsString()
   @Length(2, 2)
@@ -28,7 +30,7 @@ export class CreateShippingRuleDto {
     description:
       'Canonical match value. For Nigeria ADMIN1 use state code; for ADMIN2 use LGA id or name.',
   })
-  @IsString()
+  @AddressText(200)
   matchValue!: string;
 
   @ApiPropertyOptional({
@@ -37,7 +39,7 @@ export class CreateShippingRuleDto {
       'Optional context to disambiguate the rule, such as the parent ADMIN1 code for ADMIN2.',
   })
   @IsOptional()
-  @IsString()
+  @AddressText(200)
   matchContext?: string | null;
 
   @ApiPropertyOptional({ example: 100, default: 100 })
