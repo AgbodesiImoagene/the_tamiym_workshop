@@ -9,6 +9,7 @@ import {
   ShippingRuleMatchType,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { canonicalCountryCode } from './country-code';
 
 type ShippingZoneInput = {
   name?: string;
@@ -328,6 +329,36 @@ export class ShippingAdminService {
   }
 
   /**
+   * TTW-226: the code is read with the rule addresses use (`canonicalCountryCode`),
+   * so a full-width or look-alike code cannot be stored and never match. A code
+   * that is not a real one is refused. A rule saved earlier keeps working: an
+   * unchanged stored value that is not canonical is kept as it is.
+   */
+  /** A stored full-width code and its folded form are the same country. */
+  private sameCountry(stored: string, code: string) {
+    return (canonicalCountryCode(stored) ?? stored) === code;
+  }
+
+  private resolveRuleCountryCode(
+    dto: ShippingRuleInput,
+    existing?: { countryCode: string },
+  ): string | undefined {
+    if (dto.countryCode === undefined || dto.countryCode === null) {
+      return undefined;
+    }
+    const code = canonicalCountryCode(dto.countryCode);
+    if (code) {
+      return code;
+    }
+    if (existing && dto.countryCode === existing.countryCode) {
+      return existing.countryCode;
+    }
+    throw new BadRequestException(
+      'countryCode must be a valid ISO 3166-1 alpha-2 code',
+    );
+  }
+
+  /**
    * `existing` is the rule being edited, if any. A rule keeps its deactivated
    * state (TTW-200): only a rule that newly names one is refused.
    */
@@ -340,7 +371,7 @@ export class ShippingAdminService {
       matchContext: string | null;
     },
   ) {
-    const countryCode = dto.countryCode?.trim().toUpperCase();
+    const countryCode = this.resolveRuleCountryCode(dto, existing);
     const matchType = dto.matchType;
     const matchValue = dto.matchValue?.trim();
     const priority = dto.priority ?? 100;
@@ -373,7 +404,8 @@ export class ShippingAdminService {
       }
       if (
         !(
-          existing?.countryCode === countryCode &&
+          existing &&
+          this.sameCountry(existing.countryCode, countryCode) &&
           existing.matchType === matchType &&
           existing.matchValue === state.code
         )
@@ -413,7 +445,8 @@ export class ShippingAdminService {
       }
       if (
         !(
-          existing?.countryCode === countryCode &&
+          existing &&
+          this.sameCountry(existing.countryCode, countryCode) &&
           existing.matchType === matchType &&
           existing.matchValue === lga.id &&
           existing.matchContext === state.code

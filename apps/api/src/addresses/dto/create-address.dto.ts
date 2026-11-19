@@ -1,36 +1,42 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsString,
   IsBoolean,
   IsOptional,
-  IsNotEmpty,
   IsPhoneNumber,
   IsEnum,
   IsNumber,
   IsISO31661Alpha2,
   Matches,
-  MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { AddressText } from './address-text.decorator';
 import { canonicalCountryCode } from '../../shipping/country-code';
 import { AddressProvider } from '../../generated/prisma/enums';
 
 export class CreateAddressDto {
-  @ApiProperty({ example: '123 Main Street' })
-  @IsString()
-  @IsNotEmpty()
+  @ApiProperty({
+    maxLength: 500,
+    example: '123 Main Street',
+  })
+  @AddressText(500)
   addressLine1!: string;
 
-  @ApiProperty({ example: 'Apt 4B', required: false })
+  @ApiProperty({
+    maxLength: 500,
+    example: 'Apt 4B',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(500)
   addressLine2?: string;
 
-  @ApiProperty({ example: 'John Doe', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'John Doe',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   recipientName?: string;
 
   @ApiProperty({ example: '+2348012345678', required: false })
@@ -38,26 +44,37 @@ export class CreateAddressDto {
   @IsPhoneNumber()
   phone?: string;
 
-  @ApiProperty({ example: 'Lagos' })
-  @IsString()
-  @IsNotEmpty()
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Lagos',
+  })
+  @AddressText(200)
   city!: string;
 
-  @ApiProperty({ example: 'Lagos' })
-  @IsString()
-  @IsNotEmpty()
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Lagos',
+  })
+  @AddressText(200)
   state!: string;
 
-  @ApiProperty({ example: '100001', required: false })
+  @ApiProperty({
+    maxLength: 20,
+    example: '100001',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(20)
   postalCode?: string;
 
-  @ApiProperty({ example: 'Nigeria', default: 'Nigeria', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Nigeria',
+    default: 'Nigeria',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   country?: string;
 
   @ApiProperty({
@@ -77,10 +94,13 @@ export class CreateAddressDto {
   @IsISO31661Alpha2()
   countryCode?: string;
 
-  @ApiProperty({ example: 'Near the roundabout', required: false })
+  @ApiProperty({
+    maxLength: 500,
+    example: 'Near the roundabout',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(500)
   landmark?: string;
 
   @ApiProperty({
@@ -93,50 +113,65 @@ export class CreateAddressDto {
       'Plain-text delivery instructions (at most 500 characters). Send null to remove saved instructions.',
   })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
+  @AddressText(500)
   instructions?: string | null;
 
-  @ApiProperty({ example: 'Lagos', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Lagos',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   locality?: string;
 
-  @ApiProperty({ example: 'Victoria Island', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Victoria Island',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   dependentLocality?: string;
 
-  @ApiProperty({ example: 'Lagos', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Lagos',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   administrativeAreaLevel1?: string;
 
-  @ApiProperty({ example: 'Ikeja', required: false })
+  @ApiProperty({
+    maxLength: 200,
+    example: 'Ikeja',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(200)
   administrativeAreaLevel2?: string;
 
   @ApiProperty({
+    maxLength: 10,
     example: 'LA',
     required: false,
     description:
-      'Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).',
+      'Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.',
   })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(10)
   stateCode?: string;
 
-  @ApiProperty({ example: 'cme4abcd1234', required: false })
+  @ApiProperty({
+    description:
+      'LGA id. Only used for Nigerian addresses: for any other country it is ignored and stored as null.',
+    maxLength: 64,
+    example: 'cme4abcd1234',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(64)
   lgaId?: string;
 
   @ApiProperty({
@@ -148,19 +183,22 @@ export class CreateAddressDto {
   @IsEnum(AddressProvider)
   provider?: AddressProvider;
 
-  @ApiProperty({ example: 'ChIJrTLr-GyuEmsRBfy61i59si0', required: false })
+  @ApiProperty({
+    maxLength: 300,
+    example: 'ChIJrTLr-GyuEmsRBfy61i59si0',
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(300)
   googlePlaceId?: string;
 
   @ApiProperty({
+    maxLength: 500,
     example: '12 Broad Street, Lagos, Nigeria',
     required: false,
   })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
+  @AddressText(500)
   formattedAddress?: string;
 
   @ApiProperty({ example: 6.5244, required: false })

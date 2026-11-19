@@ -200,27 +200,33 @@
         "properties": {
           "addressLine1": {
             "example": "123 Main Street",
+            "maxLength": 500,
             "type": "string"
           },
           "addressLine2": {
             "example": "Apt 4B",
+            "maxLength": 500,
             "type": "string"
           },
           "administrativeAreaLevel1": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "administrativeAreaLevel2": {
             "example": "Ikeja",
+            "maxLength": 200,
             "type": "string"
           },
           "city": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "country": {
             "default": "Nigeria",
             "example": "Nigeria",
+            "maxLength": 200,
             "type": "string"
           },
           "countryCode": {
@@ -231,14 +237,17 @@
           },
           "dependentLocality": {
             "example": "Victoria Island",
+            "maxLength": 200,
             "type": "string"
           },
           "formattedAddress": {
             "example": "12 Broad Street, Lagos, Nigeria",
+            "maxLength": 500,
             "type": "string"
           },
           "googlePlaceId": {
             "example": "ChIJrTLr-GyuEmsRBfy61i59si0",
+            "maxLength": 300,
             "type": "string"
           },
           "instructions": {
@@ -255,6 +264,7 @@
           },
           "landmark": {
             "example": "Near the roundabout",
+            "maxLength": 500,
             "type": "string"
           },
           "latitude": {
@@ -262,11 +272,14 @@
             "type": "number"
           },
           "lgaId": {
+            "description": "LGA id. Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
             "example": "cme4abcd1234",
+            "maxLength": 64,
             "type": "string"
           },
           "locality": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "longitude": {
@@ -279,6 +292,7 @@
           },
           "postalCode": {
             "example": "100001",
+            "maxLength": 20,
             "type": "string"
           },
           "provider": {
@@ -292,15 +306,18 @@
           },
           "recipientName": {
             "example": "John Doe",
+            "maxLength": 200,
             "type": "string"
           },
           "state": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "stateCode": {
-            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
             "example": "LA",
+            "maxLength": 10,
             "type": "string"
           }
         },
@@ -1132,7 +1149,7 @@
       "CreateShippingRuleDto": {
         "properties": {
           "countryCode": {
-            "description": "ISO 3166-1 alpha-2 country code",
+            "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.",
             "example": "NG",
             "type": "string"
           },
@@ -3718,26 +3735,32 @@
         "properties": {
           "addressLine1": {
             "example": "123 Main Street",
+            "maxLength": 500,
             "type": "string"
           },
           "addressLine2": {
             "example": "Apt 4B",
+            "maxLength": 500,
             "type": "string"
           },
           "administrativeAreaLevel1": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "administrativeAreaLevel2": {
             "example": "Ikeja",
+            "maxLength": 200,
             "type": "string"
           },
           "city": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "country": {
             "example": "Nigeria",
+            "maxLength": 200,
             "type": "string"
           },
           "countryCode": {
@@ -3747,14 +3770,17 @@
           },
           "dependentLocality": {
             "example": "Victoria Island",
+            "maxLength": 200,
             "type": "string"
           },
           "formattedAddress": {
             "example": "12 Broad Street, Lagos, Nigeria",
+            "maxLength": 500,
             "type": "string"
           },
           "googlePlaceId": {
             "example": "ChIJrTLr-GyuEmsRBfy61i59si0",
+            "maxLength": 300,
             "type": "string"
           },
           "instructions": {
@@ -3770,6 +3796,7 @@
           },
           "landmark": {
             "example": "Near the roundabout",
+            "maxLength": 500,
             "type": "string"
           },
           "latitude": {
@@ -3777,13 +3804,15 @@
             "type": "number"
           },
           "lgaId": {
-            "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).",
+            "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
             "example": "cme4abcd1234",
+            "maxLength": 64,
             "nullable": true,
             "type": "string"
           },
           "locality": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "longitude": {
@@ -3796,6 +3825,7 @@
           },
           "postalCode": {
             "example": "100001",
+            "maxLength": 20,
             "type": "string"
           },
           "provider": {
@@ -3808,15 +3838,18 @@
           },
           "recipientName": {
             "example": "John Doe",
+            "maxLength": 200,
             "type": "string"
           },
           "state": {
             "example": "Lagos",
+            "maxLength": 200,
             "type": "string"
           },
           "stateCode": {
-            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
+            "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
             "example": "LA",
+            "maxLength": 10,
             "type": "string"
           }
         },
@@ -4579,7 +4612,7 @@
       "UpdateShippingRuleDto": {
         "properties": {
           "countryCode": {
-            "description": "ISO 3166-1 alpha-2 country code",
+            "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.",
             "example": "NG",
             "type": "string"
           },
@@ -12914,7 +12947,7 @@
               "schema": {
                 "properties": {
                   "countryCode": {
-                    "description": "ISO 3166-1 alpha-2 country code",
+                    "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.",
                     "example": "NG",
                     "type": "string"
                   },
@@ -13430,7 +13463,7 @@
               "schema": {
                 "properties": {
                   "countryCode": {
-                    "description": "ISO 3166-1 alpha-2 country code",
+                    "description": "ISO 3166-1 alpha-2 country code. Full-width and lower-case letters are folded to upper-case ASCII; a value that is not a real code is refused with 400.",
                     "example": "NG",
                     "type": "string"
                   },
@@ -19616,27 +19649,33 @@
                 "properties": {
                   "addressLine1": {
                     "example": "123 Main Street",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "addressLine2": {
                     "example": "Apt 4B",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "administrativeAreaLevel1": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "administrativeAreaLevel2": {
                     "example": "Ikeja",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "city": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "country": {
                     "default": "Nigeria",
                     "example": "Nigeria",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "countryCode": {
@@ -19647,14 +19686,17 @@
                   },
                   "dependentLocality": {
                     "example": "Victoria Island",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "formattedAddress": {
                     "example": "12 Broad Street, Lagos, Nigeria",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "googlePlaceId": {
                     "example": "ChIJrTLr-GyuEmsRBfy61i59si0",
+                    "maxLength": 300,
                     "type": "string"
                   },
                   "instructions": {
@@ -19671,6 +19713,7 @@
                   },
                   "landmark": {
                     "example": "Near the roundabout",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "latitude": {
@@ -19678,11 +19721,14 @@
                     "type": "number"
                   },
                   "lgaId": {
+                    "description": "LGA id. Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
                     "example": "cme4abcd1234",
+                    "maxLength": 64,
                     "type": "string"
                   },
                   "locality": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "longitude": {
@@ -19695,6 +19741,7 @@
                   },
                   "postalCode": {
                     "example": "100001",
+                    "maxLength": 20,
                     "type": "string"
                   },
                   "provider": {
@@ -19708,15 +19755,18 @@
                   },
                   "recipientName": {
                     "example": "John Doe",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "state": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "stateCode": {
-                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
                     "example": "LA",
+                    "maxLength": 10,
                     "type": "string"
                   }
                 },
@@ -20073,26 +20123,32 @@
                 "properties": {
                   "addressLine1": {
                     "example": "123 Main Street",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "addressLine2": {
                     "example": "Apt 4B",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "administrativeAreaLevel1": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "administrativeAreaLevel2": {
                     "example": "Ikeja",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "city": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "country": {
                     "example": "Nigeria",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "countryCode": {
@@ -20102,14 +20158,17 @@
                   },
                   "dependentLocality": {
                     "example": "Victoria Island",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "formattedAddress": {
                     "example": "12 Broad Street, Lagos, Nigeria",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "googlePlaceId": {
                     "example": "ChIJrTLr-GyuEmsRBfy61i59si0",
+                    "maxLength": 300,
                     "type": "string"
                   },
                   "instructions": {
@@ -20125,6 +20184,7 @@
                   },
                   "landmark": {
                     "example": "Near the roundabout",
+                    "maxLength": 500,
                     "type": "string"
                   },
                   "latitude": {
@@ -20132,13 +20192,15 @@
                     "type": "number"
                   },
                   "lgaId": {
-                    "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed).",
+                    "description": "LGA id. Omit to keep the saved LGA; send null to remove it (the state is not changed). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
                     "example": "cme4abcd1234",
+                    "maxLength": 64,
                     "nullable": true,
                     "type": "string"
                   },
                   "locality": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "longitude": {
@@ -20151,6 +20213,7 @@
                   },
                   "postalCode": {
                     "example": "100001",
+                    "maxLength": 20,
                     "type": "string"
                   },
                   "provider": {
@@ -20163,15 +20226,18 @@
                   },
                   "recipientName": {
                     "example": "John Doe",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "state": {
                     "example": "Lagos",
+                    "maxLength": 200,
                     "type": "string"
                   },
                   "stateCode": {
-                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH).",
+                    "description": "Code of the state. It identifies the state and decides the stored name; a state text that names another state is refused (ADDRESS_STATE_MISMATCH). Only used for Nigerian addresses: for any other country it is ignored and stored as null.",
                     "example": "LA",
+                    "maxLength": 10,
                     "type": "string"
                   }
                 },
