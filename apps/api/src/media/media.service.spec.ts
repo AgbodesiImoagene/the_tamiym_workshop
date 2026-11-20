@@ -10,6 +10,7 @@ import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
+  MediaVisibility,
   ModerationStatus,
   VirusScanStatus,
 } from '../generated/prisma/enums';
@@ -56,6 +57,157 @@ describe('MediaService', () => {
     prisma = module.get(PrismaService);
     s3Service = module.get(S3Service);
     queue = module.get(getQueueToken(MEDIA_QUEUE));
+  });
+
+  describe('admin review of private uploads (TTW-099)', () => {
+    const privateAsset = {
+      id: 'media-p',
+      visibility: MediaVisibility.PRIVATE,
+      designAssets: [{ id: 'da-7', owner: { id: 'u1' } }],
+      derivatives: [
+        { type: MediaDerivativeType.ORIGINAL, url: null },
+        { type: MediaDerivativeType.THUMB, url: null },
+      ],
+    };
+
+    it('gives admins a stable access path instead of a stored URL (list)', async () => {
+      (prisma.mediaAsset as unknown as { findMany: jest.Mock }).findMany = jest
+        .fn()
+        .mockResolvedValue([privateAsset]);
+
+      const [asset] = await service.adminFindAll();
+
+      expect(asset.derivatives).toEqual([
+        {
+          type: MediaDerivativeType.ORIGINAL,
+          url: null,
+          accessPath: '/design-assets/da-7/file?variant=original',
+        },
+        {
+          type: MediaDerivativeType.THUMB,
+          url: null,
+          accessPath: '/design-assets/da-7/file?variant=thumb',
+        },
+      ]);
+    });
+
+    it('gives admins a stable access path (detail)', async () => {
+      (prisma.mediaAsset.findUnique as jest.Mock).mockResolvedValue({
+        ...privateAsset,
+        derivatives: [{ type: MediaDerivativeType.DISPLAY, url: null }],
+      });
+
+      const asset = await service.adminFindOne('media-p');
+
+      expect(asset.derivatives[0]).toEqual({
+        type: MediaDerivativeType.DISPLAY,
+        url: null,
+        accessPath: '/design-assets/da-7/file?variant=display',
+      });
+    });
+
+    it('leaves catalogue assets exactly as they were', async () => {
+      const publicAsset = {
+        id: 'media-c',
+        visibility: MediaVisibility.PUBLIC,
+        designAssets: [],
+        derivatives: [
+          {
+            type: MediaDerivativeType.DISPLAY,
+            url: 'https://cdn.example.com/d.webp',
+          },
+        ],
+      };
+      (prisma.mediaAsset as unknown as { findMany: jest.Mock }).findMany = jest
+        .fn()
+        .mockResolvedValue([publicAsset]);
+
+      const [asset] = await service.adminFindAll();
+
+      expect(asset.derivatives).toEqual(publicAsset.derivatives);
+    });
+  });
+
+  describe('private customer uploads (TTW-099)', () => {
+    const png = {
+      buffer: Buffer.from('png-bytes'),
+      mimetype: 'image/png',
+      originalname: 'logo.png',
+    };
+
+    it('stores a private upload in private storage and keeps no URL in the database', async () => {
+      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({
+        id: 'asset-9',
+      });
+      (
+        s3Service as unknown as { uploadPrivateObject: jest.Mock }
+      ).uploadPrivateObject = jest
+        .fn()
+        .mockResolvedValue({ key: 'media/asset-9/original.png' });
+
+      await service.createAssetFromUpload(png, {
+        visibility: MediaVisibility.PRIVATE,
+      });
+
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          visibility: MediaVisibility.PRIVATE,
+        }),
+      });
+      expect(s3Service.uploadObject).not.toHaveBeenCalled();
+      const updateData = (prisma.mediaAsset.update as jest.Mock).mock
+        .calls[0][0].data;
+      expect(updateData.originalKey).toBe('media/asset-9/original.png');
+      expect(updateData.originalUrl).toBeUndefined();
+      const derivative = (prisma.mediaDerivative.create as jest.Mock).mock
+        .calls[0][0].data;
+      expect(derivative.url).toBeNull();
+      expect(queue.add).toHaveBeenCalledWith(
+        'process',
+        { assetId: 'asset-9' },
+        expect.any(Object),
+      );
+    });
+
+    it('does not enqueue processing and creates no URL when private storage fails', async () => {
+      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({
+        id: 'asset-9',
+      });
+      (
+        s3Service as unknown as { uploadPrivateObject: jest.Mock }
+      ).uploadPrivateObject = jest
+        .fn()
+        .mockRejectedValue(new Error('storage down'));
+
+      await expect(
+        service.createAssetFromUpload(png, {
+          visibility: MediaVisibility.PRIVATE,
+        }),
+      ).rejects.toThrow('storage down');
+
+      expect(s3Service.uploadObject).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('keeps catalogue uploads public by default', async () => {
+      (prisma.mediaAsset.create as jest.Mock).mockResolvedValue({
+        id: 'asset-10',
+      });
+      (s3Service.uploadObject as jest.Mock).mockResolvedValue({
+        key: 'media/asset-10/original.png',
+        url: 'https://cdn.example.com/media/asset-10/original.png',
+      });
+
+      await service.createAssetFromUpload(png);
+
+      // No visibility passed: the database default (PUBLIC) applies.
+      expect(prisma.mediaAsset.create).toHaveBeenCalledWith({
+        data: expect.not.objectContaining({
+          visibility: MediaVisibility.PRIVATE,
+        }),
+      });
+      expect(s3Service.uploadObject).toHaveBeenCalled();
+    });
   });
 
   it('should enqueue an import URL asset', async () => {

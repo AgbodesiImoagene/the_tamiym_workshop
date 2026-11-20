@@ -8,6 +8,7 @@ import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
+  MediaVisibility,
   ModerationStatus,
   ModerationSubjectType,
   VirusScanStatus,
@@ -32,6 +33,11 @@ import {
 import { bullProcessorOptions } from '../queues/bull-processor.options';
 import { identifyImageBuffer } from './image-identify';
 import { SafeRemoteMediaFetcher } from './safe-remote-fetch';
+
+const MEDIA_SHARP_OPTIONS = {
+  failOn: 'error' as const,
+  limitInputPixels: MEDIA_SHARP_LIMIT_INPUT_PIXELS,
+};
 
 @Processor(MEDIA_QUEUE, bullProcessorOptions)
 export class MediaProcessor extends WorkerHost {
@@ -106,22 +112,35 @@ export class MediaProcessor extends WorkerHost {
           const identified = await identifyImageBuffer(buffer);
           const mimeType = identified.mimeType;
 
-          // AI moderation: use the public URL if available, otherwise skip image check.
+          // AI moderation. A PRIVATE (customer) asset is moderated from its bytes sent
+          // inline: no link, public or signed, ever leaves the system (TTW-099).
+          // A PUBLIC asset uses its public URL if available, otherwise skips the image check.
           // REJECTED → fail the asset (blocks use); FLAGGED → mark for human review but
           // keep the asset READY so the user's upload is not silently lost.
-          const assetForMod = await this.prisma.mediaAsset.findUnique({
-            where: { id: assetId },
-            select: { originalUrl: true },
-          });
-          const moderationResult = assetForMod?.originalUrl
-            ? await this.moderationService.moderateImage(
-                assetForMod.originalUrl,
-              )
-            : {
-                status: ModerationStatus.PENDING,
-                notes: 'No URL available for moderation',
-                maxScore: 0,
-              };
+          const isPrivate = asset.visibility === MediaVisibility.PRIVATE;
+          let displayBuffer: Buffer | undefined;
+          let moderationResult;
+          if (isPrivate) {
+            displayBuffer = await this.buildDisplayBuffer(buffer);
+            moderationResult = await this.moderationService.moderateImageBytes(
+              displayBuffer,
+              'image/webp',
+            );
+          } else {
+            const assetForMod = await this.prisma.mediaAsset.findUnique({
+              where: { id: assetId },
+              select: { originalUrl: true },
+            });
+            moderationResult = assetForMod?.originalUrl
+              ? await this.moderationService.moderateImage(
+                  assetForMod.originalUrl,
+                )
+              : {
+                  status: ModerationStatus.PENDING,
+                  notes: 'No URL available for moderation',
+                  maxScore: 0,
+                };
+          }
 
           if (moderationResult.status === ModerationStatus.REJECTED) {
             await this.prisma.$transaction(async (tx) => {
@@ -189,23 +208,9 @@ export class MediaProcessor extends WorkerHost {
             },
           });
 
-          const sharpOpts = {
-            failOn: 'error' as const,
-            limitInputPixels: MEDIA_SHARP_LIMIT_INPUT_PIXELS,
-          };
+          displayBuffer ??= await this.buildDisplayBuffer(buffer);
 
-          const displayBuffer = await sharp(buffer, sharpOpts)
-            .rotate()
-            .resize({
-              width: MEDIA_DISPLAY_MAX,
-              height: MEDIA_DISPLAY_MAX,
-              fit: 'inside',
-              withoutEnlargement: true,
-            })
-            .webp({ quality: 85 })
-            .toBuffer();
-
-          const thumbBuffer = await sharp(buffer, sharpOpts)
+          const thumbBuffer = await sharp(buffer, MEDIA_SHARP_OPTIONS)
             .rotate()
             .resize({
               width: MEDIA_THUMB_MAX,
@@ -220,11 +225,13 @@ export class MediaProcessor extends WorkerHost {
             assetId,
             MediaDerivativeType.DISPLAY,
             displayBuffer,
+            asset.visibility,
           );
           await this.saveDerivative(
             assetId,
             MediaDerivativeType.THUMB,
             thumbBuffer,
+            asset.visibility,
           );
 
           await this.prisma.$transaction(async (tx) => {
@@ -291,8 +298,14 @@ export class MediaProcessor extends WorkerHost {
       originalKey: string | null;
       originalMime: string | null;
       originalUrl: string | null;
+      visibility: MediaVisibility;
     },
-  ) {
+  ): Promise<{
+    buffer: Buffer;
+    mimeType: string;
+    originalKey: string;
+    originalUrl: string | null;
+  }> {
     if (asset.sourceType === MediaSourceType.IMPORT_URL) {
       const { buffer, mimeType, originalKey, originalUrl } =
         await this.fetchAndStoreOriginal(assetId, asset.sourceUrl);
@@ -325,30 +338,58 @@ export class MediaProcessor extends WorkerHost {
       return { buffer, mimeType, originalKey, originalUrl };
     }
 
-    if (!asset.originalKey || !asset.originalUrl) {
+    const isPrivate = asset.visibility === MediaVisibility.PRIVATE;
+    // A private asset has no stored URL: only its key.
+    if (!asset.originalKey || (!isPrivate && !asset.originalUrl)) {
       throw new Error('Missing original object reference');
     }
-    const buffer = await this.s3Service.getObjectBuffer(asset.originalKey);
+    const buffer = isPrivate
+      ? await this.s3Service.getPrivateObjectBuffer(asset.originalKey)
+      : await this.s3Service.getObjectBuffer(asset.originalKey);
     const mimeType = asset.originalMime ?? 'application/octet-stream';
     return {
       buffer,
       mimeType,
       originalKey: asset.originalKey,
-      originalUrl: asset.originalUrl,
+      originalUrl: isPrivate ? null : asset.originalUrl,
     };
+  }
+
+  private buildDisplayBuffer(buffer: Buffer): Promise<Buffer> {
+    return sharp(buffer, MEDIA_SHARP_OPTIONS)
+      .rotate()
+      .resize({
+        width: MEDIA_DISPLAY_MAX,
+        height: MEDIA_DISPLAY_MAX,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 85 })
+      .toBuffer();
   }
 
   private async saveDerivative(
     assetId: string,
     type: MediaDerivativeType,
     buffer: Buffer,
+    visibility: MediaVisibility,
   ) {
     const key = `media/${assetId}/${type.toLowerCase()}.webp`;
-    const upload = await this.s3Service.uploadObject({
-      key,
-      buffer,
-      contentType: 'image/webp',
-    });
+    const upload =
+      visibility === MediaVisibility.PRIVATE
+        ? {
+            ...(await this.s3Service.uploadPrivateObject({
+              key,
+              buffer,
+              contentType: 'image/webp',
+            })),
+            url: null,
+          }
+        : await this.s3Service.uploadObject({
+            key,
+            buffer,
+            contentType: 'image/webp',
+          });
     const meta = await sharp(buffer).metadata();
     await this.prisma.mediaDerivative.upsert({
       where: { assetId_type: { assetId, type } },

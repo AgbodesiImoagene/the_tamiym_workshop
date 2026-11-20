@@ -2588,6 +2588,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/design-assets/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a private design asset (image bytes) */
+        get: operations["DesignAssetsController_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/design-assets/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a short-lived signed link to a private design asset */
+        get: operations["DesignAssetsController_link"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/designs": {
         parameters: {
             query?: never;
@@ -12835,8 +12869,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         designAssetId?: string;
-                        originalUrl?: string | null;
-                        /** @example processing */
+                        /** @example pending */
                         status?: string;
                     };
                 };
@@ -12850,6 +12883,104 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DesignAssetsController_file: {
+        parameters: {
+            query?: {
+                /** @description Which rendition to read. Defaults to the original. */
+                variant?: "display" | "original" | "thumb";
+            };
+            header?: never;
+            path: {
+                /** @description Design asset id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image (PNG, JPEG or WebP). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            /** @description Unknown variant */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown file, file owned by someone else, file not usable (infected, rejected, failed) or rendition not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DesignAssetsController_link: {
+        parameters: {
+            query?: {
+                /** @description Which rendition to link. Defaults to the original. */
+                variant?: "display" | "original" | "thumb";
+            };
+            header?: never;
+            path: {
+                /** @description Design asset id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed link and its lifetime */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 300 */
+                        expiresInSeconds: number;
+                        url: string;
+                    };
+                };
+            };
+            /** @description Unknown variant */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown file, file owned by someone else, file not usable (infected, rejected, failed) or rendition not ready */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

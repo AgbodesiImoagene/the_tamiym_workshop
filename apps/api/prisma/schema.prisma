@@ -223,6 +223,13 @@ enum MediaDerivativeType {
   THUMB
 }
 
+/// Who may read a media object. PRIVATE objects live in the private bucket and are only
+/// reachable through short-lived signed links (TTW-099). PUBLIC is the catalogue.
+enum MediaVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 /// Virus scan status for media assets.
 enum VirusScanStatus {
   PENDING
@@ -1528,6 +1535,8 @@ model MediaAsset {
   moderationStatus ModerationStatus @default(PENDING)
   /// AI moderation notes (internal only): category scores and reasoning from the AI pre-screen.
   moderationNotes  String?
+  /// PRIVATE for customer uploads: no URL is stored, only object keys (TTW-099).
+  visibility       MediaVisibility  @default(PUBLIC)
 
   originalKey    String?
   originalUrl    String?
@@ -1665,7 +1674,8 @@ model MediaDerivative {
 
   type      MediaDerivativeType
   key       String
-  url       String
+  /// Null for PRIVATE assets: read through a signed link instead (TTW-099).
+  url       String?
   mimeType  String
   sizeBytes Int
   width     Int?

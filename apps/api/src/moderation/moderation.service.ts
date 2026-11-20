@@ -146,6 +146,19 @@ export class ModerationService {
     return this.moderate({ imageUrl });
   }
 
+  /**
+   * Moderate an image from its bytes, sent inline as a data URL (TTW-099). Used for
+   * private customer uploads: no link, public or signed, ever leaves the system.
+   */
+  async moderateImageBytes(
+    bytes: Buffer,
+    mimeType: string,
+  ): Promise<ModerationResult> {
+    return this.moderate({
+      imageUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
+    });
+  }
+
   // ---------------------------------------------------------------------------
 
   private classify(score: number): ModerationStatus {

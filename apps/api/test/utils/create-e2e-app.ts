@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule, TestingModuleBuilder } from '@nestjs/testing';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
 import cookieParser from 'cookie-parser';
@@ -45,11 +45,15 @@ async function resetAuthIpRateLimits(): Promise<void> {
  * Boot production AppModule with the same request pipeline essentials as main.ts
  * (validation, cookies, JSON body, v1 prefix, shutdown hooks).
  */
-export async function createE2eApp(): Promise<INestApplication<App>> {
+export async function createE2eApp(options?: {
+  /** Replace providers (for example an in-memory object store) before compile. */
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
+}): Promise<INestApplication<App>> {
   await resetAuthIpRateLimits();
-  const moduleFixture: TestingModule = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  const moduleFixture: TestingModule = await (
+    options?.configure ? options.configure(builder) : builder
+  ).compile();
 
   const app = moduleFixture.createNestApplication({
     bodyParser: false,

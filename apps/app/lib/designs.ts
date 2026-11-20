@@ -198,10 +198,40 @@ export async function uploadThumbnail(
   return response.json();
 }
 
+const API_BASE_URL = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+
+/**
+ * Stable API path of a private customer image (TTW-099). It needs the session cookie and
+ * is what a saved design stores: a storage link would expire, this path does not.
+ */
+export function designAssetFileUrl(
+  designAssetId: string,
+  variant: 'original' | 'display' | 'thumb' = 'original'
+): string {
+  return `${API_BASE_URL()}/design-assets/${encodeURIComponent(designAssetId)}/file?variant=${variant}`;
+}
+
+/**
+ * `crossOrigin` to give a Fabric image. Our own private files need the session cookie, so
+ * they load with credentials; everything else (the public catalogue) stays anonymous.
+ */
+export function imageCrossOrigin(src: string): 'use-credentials' | 'anonymous' {
+  try {
+    const url = new URL(src);
+    const base = new URL(API_BASE_URL());
+    if (url.origin === base.origin && url.pathname.startsWith(`${base.pathname}/design-assets/`)) {
+      return 'use-credentials';
+    }
+  } catch {
+    // Not a valid URL: treat as public.
+  }
+  return 'anonymous';
+}
+
 /** Upload a user image asset for use in the workshop canvas (PNG/JPEG/WebP, ≤ 10 MB). */
 export async function uploadDesignAsset(
   file: File
-): Promise<{ designAssetId: string; originalUrl: string | null; status: string }> {
+): Promise<{ designAssetId: string; status: string }> {
   const formData = new FormData();
   formData.append('file', file);
 

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { Button } from '@tamiym/ui';
-import { uploadDesignAsset } from '@/lib/designs';
+import { designAssetFileUrl, uploadDesignAsset } from '@/lib/designs';
 
 const MAX_FILE_SIZE_MB = 10;
 const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp';
@@ -38,16 +38,12 @@ export default function ImageTool({ onAddImage }: ImageToolProps) {
       setUploading(true);
 
       try {
-        const { designAssetId, originalUrl } = await uploadDesignAsset(file);
-
-        if (!originalUrl) {
-          setError('Upload succeeded but no URL returned — asset is still processing.');
-          return;
-        }
+        const { designAssetId } = await uploadDesignAsset(file);
 
         onAddImage({
           type: 'image',
-          src: originalUrl,
+          // Private file: read through the API with the session, never a storage link.
+          src: designAssetFileUrl(designAssetId),
           left: 50,
           top: 50,
           scaleX: 0.5,

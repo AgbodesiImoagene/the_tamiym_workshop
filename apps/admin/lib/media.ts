@@ -10,7 +10,10 @@ export type MediaDerivativeType = 'ORIGINAL' | 'DISPLAY' | 'THUMB';
 
 export interface MediaDerivative {
   type: MediaDerivativeType;
-  url: string;
+  /** Public URL. Null for a private customer upload (TTW-099): use `accessPath`. */
+  url: string | null;
+  /** API path (relative to the API base URL) for a private file, read with the admin session. */
+  accessPath?: string | null;
   width: number | null;
   height: number | null;
   sizeBytes: number | null;
@@ -46,7 +49,7 @@ export interface AdminMediaAsset {
   originalHeight: number | null;
   createdAt: string;
   updatedAt: string;
-  derivatives: Pick<MediaDerivative, 'type' | 'url'>[];
+  derivatives: Pick<MediaDerivative, 'type' | 'url' | 'accessPath'>[];
   designAssets: Pick<MediaDesignAsset, 'owner'>[];
   productImages: Pick<MediaProductImage, 'product'>[];
 }
@@ -73,13 +76,23 @@ export const MEDIA_STATUS_BADGE: Record<
   FLAGGED: { variant: 'brand', label: 'Flagged' },
 };
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
+
+/** Address to open a derivative: its public URL, or the API path of a private file. */
+export function derivativeHref(
+  derivative: Pick<MediaDerivative, 'url' | 'accessPath'>
+): string | null {
+  if (derivative.url) return derivative.url;
+  return derivative.accessPath ? `${API_BASE_URL}${derivative.accessPath}` : null;
+}
+
 /** Best available URL for display: prefer THUMB, then DISPLAY, then ORIGINAL */
 export function bestDerivativeUrl(
-  derivatives: Pick<MediaDerivative, 'type' | 'url'>[]
+  derivatives: Pick<MediaDerivative, 'type' | 'url' | 'accessPath'>[]
 ): string | null {
   for (const t of ['THUMB', 'DISPLAY', 'ORIGINAL'] as MediaDerivativeType[]) {
     const d = derivatives.find((x) => x.type === t);
-    if (d) return d.url;
+    if (d) return derivativeHref(d);
   }
   return null;
 }

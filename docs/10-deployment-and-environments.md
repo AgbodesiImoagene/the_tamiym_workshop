@@ -51,6 +51,7 @@ Startup validation in `apps/api/src/app.module.ts` rejects missing values and kn
 - `S3_ENDPOINT`
 - `S3_PUBLIC_URL`
 - `S3_BUCKET`
+- `S3_PRIVATE_BUCKET` (customer uploads: private, no ACL, read only through the API or short-lived signed links; must differ from `S3_BUCKET`)
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_REGION`

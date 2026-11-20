@@ -13,6 +13,7 @@ import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
+  MediaVisibility,
   ModerationStatus,
   ModerationSubjectType,
   VirusScanStatus,
@@ -47,12 +48,13 @@ export class MediaService {
    */
   async adminFindAll(status?: ModerationStatus) {
     const where = status ? { moderationStatus: status } : {};
-    return this.prisma.mediaAsset.findMany({
+    const assets = await this.prisma.mediaAsset.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         status: true,
+        visibility: true,
         scanStatus: true,
         errorMessage: true,
         moderationStatus: true,
@@ -69,6 +71,7 @@ export class MediaService {
         designAssets: {
           take: 1,
           select: {
+            id: true,
             owner: {
               select: {
                 id: true,
@@ -87,6 +90,7 @@ export class MediaService {
         },
       },
     });
+    return assets.map((asset) => this.withAccessPaths(asset));
   }
 
   /** Get a single media asset with full context for admin review. */
@@ -128,7 +132,32 @@ export class MediaService {
     if (!asset) {
       throw new NotFoundException('Media asset not found');
     }
-    return asset;
+    return this.withAccessPaths(asset);
+  }
+
+  /**
+   * Private assets keep no URL in the database. Give admins the stable API path that
+   * redirects to a short-lived signed link instead (TTW-099). Catalogue assets are
+   * returned unchanged.
+   */
+  private withAccessPaths<
+    T extends {
+      visibility: MediaVisibility;
+      designAssets: { id: string }[];
+      derivatives: { type: MediaDerivativeType; url: string | null }[];
+    },
+  >(asset: T) {
+    const designAssetId = asset.designAssets[0]?.id;
+    if (asset.visibility !== MediaVisibility.PRIVATE || !designAssetId) {
+      return asset;
+    }
+    return {
+      ...asset,
+      derivatives: asset.derivatives.map((derivative) => ({
+        ...derivative,
+        accessPath: `/design-assets/${designAssetId}/file?variant=${derivative.type.toLowerCase()}`,
+      })),
+    };
   }
 
   /**
@@ -183,13 +212,22 @@ export class MediaService {
     return asset;
   }
 
-  async createAssetFromUpload(file: UploadFile): Promise<MediaAsset> {
+  /**
+   * Store an uploaded image. Catalogue uploads are PUBLIC (the default). A PRIVATE
+   * upload (customer artwork, TTW-099) goes to the private bucket and keeps no URL in
+   * the database: it is only readable through a short-lived signed link.
+   */
+  async createAssetFromUpload(
+    file: UploadFile,
+    options?: { visibility?: MediaVisibility },
+  ): Promise<MediaAsset> {
     if (!MEDIA_SUPPORTED_MIME_TYPES.has(file.mimetype)) {
       throw new BadRequestException('Unsupported file type');
     }
     if (file.buffer.length > MEDIA_MAX_BYTES) {
       throw new BadRequestException('File is too large');
     }
+    const isPrivate = options?.visibility === MediaVisibility.PRIVATE;
 
     const asset = await this.prisma.mediaAsset.create({
       data: {
@@ -197,22 +235,32 @@ export class MediaService {
         status: MediaAssetStatus.PENDING,
         scanStatus: VirusScanStatus.PENDING,
         moderationStatus: ModerationStatus.PENDING,
+        ...(isPrivate ? { visibility: MediaVisibility.PRIVATE } : {}),
       },
     });
 
     const extension = this.getExtension(file.mimetype, file.originalname);
     const originalKey = `media/${asset.id}/original.${extension}`;
-    const originalUpload = await this.s3Service.uploadObject({
-      key: originalKey,
-      buffer: file.buffer,
-      contentType: file.mimetype,
-    });
+    const originalUpload = isPrivate
+      ? {
+          ...(await this.s3Service.uploadPrivateObject({
+            key: originalKey,
+            buffer: file.buffer,
+            contentType: file.mimetype,
+          })),
+          url: null,
+        }
+      : await this.s3Service.uploadObject({
+          key: originalKey,
+          buffer: file.buffer,
+          contentType: file.mimetype,
+        });
 
     await this.prisma.mediaAsset.update({
       where: { id: asset.id },
       data: {
         originalKey: originalUpload.key,
-        originalUrl: originalUpload.url,
+        ...(originalUpload.url ? { originalUrl: originalUpload.url } : {}),
         originalMime: file.mimetype,
         originalBytes: file.buffer.length,
       },

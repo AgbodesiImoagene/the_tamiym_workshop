@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -6,16 +7,26 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import type { ObjectCannedACL } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type UploadResult = {
   key: string;
   url: string;
 };
 
+/** Default and maximum lifetime of a signed read link (TTW-099). */
+export const SIGNED_READ_URL_TTL_SECONDS = 300;
+export const SIGNED_READ_URL_MAX_TTL_SECONDS = 900;
+
 @Injectable()
 export class S3Service {
   private readonly client: S3Client;
   private readonly bucket: string;
+  /**
+   * Bucket for customer uploads (TTW-099). Never served through S3_PUBLIC_URL,
+   * never written with an ACL, read only through short-lived signed links.
+   */
+  private readonly privateBucket: string;
   private readonly publicUrl?: string;
   /**
    * When true, PutObject requests include ACL: 'public-read'.
@@ -28,6 +39,13 @@ export class S3Service {
   constructor(private config: ConfigService) {
     const endpoint = this.config.get<string>('S3_ENDPOINT');
     this.bucket = this.config.get<string>('S3_BUCKET') ?? '';
+    this.privateBucket = this.config.get<string>('S3_PRIVATE_BUCKET') ?? '';
+    if (this.privateBucket && this.privateBucket === this.bucket) {
+      throw new InternalServerErrorException(
+        'S3_PRIVATE_BUCKET must be a different bucket from S3_BUCKET: ' +
+          'customer uploads must never share the public bucket.',
+      );
+    }
     this.publicUrl = this.config.get<string>('S3_PUBLIC_URL') || undefined;
     this.publicAcl = this.config.get<string>('S3_PUBLIC_ACL') === 'true';
 
@@ -98,6 +116,105 @@ export class S3Service {
     } catch {
       throw new InternalServerErrorException('Failed to download image');
     }
+  }
+
+  /**
+   * Write a customer upload to the private bucket. No ACL, no public URL: only the
+   * key is returned. Fails closed when the private bucket is not configured; it never
+   * falls back to the public bucket.
+   */
+  async uploadPrivateObject(params: {
+    key: string;
+    buffer: Buffer;
+    contentType: string;
+  }): Promise<{ key: string }> {
+    const bucket = this.requirePrivateBucket();
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: params.key,
+          Body: params.buffer,
+          ContentType: params.contentType,
+        }),
+      );
+    } catch {
+      throw new InternalServerErrorException('Failed to upload image');
+    }
+    return { key: params.key };
+  }
+
+  async getPrivateObjectBuffer(key: string): Promise<Buffer> {
+    const bucket = this.requirePrivateBucket();
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      const body = response.Body;
+      if (!body || typeof body === 'string') {
+        throw new InternalServerErrorException('Failed to read object body');
+      }
+      return Buffer.from(await body.transformToByteArray());
+    } catch {
+      throw new InternalServerErrorException('Failed to download image');
+    }
+  }
+
+  /** Stream a private object without loading it in memory. */
+  async getPrivateObjectStream(
+    key: string,
+  ): Promise<{ stream: Readable; contentLength?: number }> {
+    const bucket = this.requirePrivateBucket();
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      const body = response.Body;
+      if (!(body instanceof Readable)) {
+        throw new InternalServerErrorException('Failed to read object body');
+      }
+      return { stream: body, contentLength: response.ContentLength };
+    } catch {
+      throw new InternalServerErrorException('Failed to download image');
+    }
+  }
+
+  /**
+   * Signed GET link for a private object. Computed locally (no storage call), never
+   * persisted and never logged by callers. The lifetime is capped.
+   */
+  async createPrivateReadUrl(
+    key: string,
+    ttlSeconds: number = SIGNED_READ_URL_TTL_SECONDS,
+  ): Promise<string> {
+    const bucket = this.requirePrivateBucket();
+    const expiresIn = Math.max(
+      1,
+      Math.min(Math.floor(ttlSeconds), SIGNED_READ_URL_MAX_TTL_SECONDS),
+    );
+    try {
+      return await getSignedUrl(
+        // The presigner resolves a newer @smithy/types than client-s3 in the lockfile, so
+        // the two S3Client types differ nominally. Same runtime class.
+        this.client as unknown as Parameters<typeof getSignedUrl>[0],
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }) as unknown as Parameters<typeof getSignedUrl>[1],
+        { expiresIn },
+      );
+    } catch {
+      throw new InternalServerErrorException('Failed to sign image link');
+    }
+  }
+
+  private requirePrivateBucket(): string {
+    if (!this.privateBucket) {
+      throw new InternalServerErrorException(
+        'Private S3 bucket not configured',
+      );
+    }
+    return this.privateBucket;
   }
 
   private buildDefaultUrl(key: string): string {

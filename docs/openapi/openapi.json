@@ -16549,12 +16549,8 @@
                     "designAssetId": {
                       "type": "string"
                     },
-                    "originalUrl": {
-                      "nullable": true,
-                      "type": "string"
-                    },
                     "status": {
-                      "example": "processing",
+                      "example": "pending",
                       "type": "string"
                     }
                   },
@@ -16580,6 +16576,146 @@
           }
         ],
         "summary": "Upload a design asset (image layer)",
+        "tags": [
+          "Design Assets"
+        ]
+      }
+    },
+    "/v1/design-assets/{id}/file": {
+      "get": {
+        "operationId": "DesignAssetsController_file",
+        "parameters": [
+          {
+            "description": "Design asset id",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which rendition to read. Defaults to the original.",
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "enum": [
+                "display",
+                "original",
+                "thumb"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The image (PNG, JPEG or WebP)."
+          },
+          "400": {
+            "description": "Unknown variant"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Unknown file, file owned by someone else, file not usable (infected, rejected, failed) or rendition not ready"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Read a private design asset (image bytes)",
+        "tags": [
+          "Design Assets"
+        ]
+      }
+    },
+    "/v1/design-assets/{id}/link": {
+      "get": {
+        "operationId": "DesignAssetsController_link",
+        "parameters": [
+          {
+            "description": "Design asset id",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which rendition to link. Defaults to the original.",
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "enum": [
+                "display",
+                "original",
+                "thumb"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresInSeconds": {
+                      "example": 300,
+                      "type": "integer"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expiresInSeconds",
+                    "url"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Signed link and its lifetime"
+          },
+          "400": {
+            "description": "Unknown variant"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Unknown file, file owned by someone else, file not usable (infected, rejected, failed) or rendition not ready"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Get a short-lived signed link to a private design asset",
         "tags": [
           "Design Assets"
         ]

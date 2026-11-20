@@ -77,7 +77,7 @@ export class ProductsService {
   private attachImageUrl<
     T extends {
       mediaAsset?: {
-        derivatives: { type: MediaDerivativeType; url: string }[];
+        derivatives: { type: MediaDerivativeType; url: string | null }[];
       } | null;
     },
   >(image: T, preferred: MediaDerivativeType) {
@@ -94,7 +94,9 @@ export class ProductsService {
   }
 
   private resolveImageUrl(
-    derivatives: { type: MediaDerivativeType; url: string }[] | undefined,
+    derivatives:
+      | { type: MediaDerivativeType; url: string | null }[]
+      | undefined,
     preferred: MediaDerivativeType,
   ): string | null {
     if (!derivatives || derivatives.length === 0) {

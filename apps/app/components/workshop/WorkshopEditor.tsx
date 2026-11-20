@@ -11,6 +11,7 @@ import SavePanel from './SavePanel';
 import SharePanel from './SharePanel';
 import {
   createDesign,
+  imageCrossOrigin,
   updateDesign,
   uploadThumbnail,
   type Design,
@@ -207,8 +208,9 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import('fabric').then(async (mod: any) => {
       const ImageCtor = mod.FabricImage ?? mod.Image ?? mod.fabric?.Image;
-      const img = await ImageCtor.fromURL(String(imageObject.src ?? ''), {
-        crossOrigin: 'anonymous',
+      const src = String(imageObject.src ?? '');
+      const img = await ImageCtor.fromURL(src, {
+        crossOrigin: imageCrossOrigin(src),
       });
       img.set(imageObject);
       canvasRef.current.add(img);

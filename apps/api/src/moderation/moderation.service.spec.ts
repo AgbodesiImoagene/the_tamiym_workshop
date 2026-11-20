@@ -191,4 +191,45 @@ describe('ModerationService', () => {
       expect(result.maxScore).toBeCloseTo(0.8);
     });
   });
+
+  describe('moderateImageBytes() (TTW-099)', () => {
+    it('sends the image as an inline data URL, never as a link', async () => {
+      service = await buildService();
+      const mockCreate = jest.fn().mockResolvedValue({
+        results: [{ flagged: false, category_scores: { harassment: 0.1 } }],
+      });
+      (
+        service as unknown as { client: { moderations: { create: jest.Mock } } }
+      ).client = { moderations: { create: mockCreate } };
+
+      const result = await service.moderateImageBytes(
+        Buffer.from('webp-bytes'),
+        'image/webp',
+      );
+
+      expect(result.status).toBe(ModerationStatus.APPROVED);
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: 'omni-moderation-latest',
+        input: [
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/webp;base64,${Buffer.from('webp-bytes').toString('base64')}`,
+            },
+          },
+        ],
+      });
+    });
+
+    it('degrades to PENDING when AI moderation is not configured', async () => {
+      service = await buildService({}, false);
+
+      const result = await service.moderateImageBytes(
+        Buffer.from('x'),
+        'image/webp',
+      );
+
+      expect(result.status).toBe(ModerationStatus.PENDING);
+    });
+  });
 });

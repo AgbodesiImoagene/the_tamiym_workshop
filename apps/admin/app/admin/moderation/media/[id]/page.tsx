@@ -10,6 +10,7 @@ import {
   moderateMediaAsset,
   MEDIA_STATUS_BADGE,
   bestDerivativeUrl,
+  derivativeHref,
   formatBytes,
   type AdminMediaAssetDetail,
 } from '@/lib/media';
@@ -235,14 +236,16 @@ export default function AdminMediaDetailPage({ params }: { params: Promise<{ id:
                             </span>
                           ) : null}
                           {d.sizeBytes ? <span>{formatBytes(d.sizeBytes)}</span> : null}
-                          <a
-                            href={d.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            Open ↗
-                          </a>
+                          {derivativeHref(d) ? (
+                            <a
+                              href={derivativeHref(d) ?? undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Open ↗
+                            </a>
+                          ) : null}
                         </div>
                       </div>
                     ))}

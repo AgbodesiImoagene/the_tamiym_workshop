@@ -189,6 +189,12 @@ export enum MediaDerivativeType {
   THUMB = 'THUMB',
 }
 
+// reachable through short-lived signed links (TTW-099). PUBLIC is the catalogue.
+export enum MediaVisibility {
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
+}
+
 // Virus scan status for media assets.
 export enum VirusScanStatus {
   PENDING = 'PENDING',
