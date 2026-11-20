@@ -20,6 +20,12 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 - There is no systemd in the VM, so the Docker daemon must be started manually and kept running, e.g. in a tmux session: `sudo dockerd`. `/etc/docker/daemon.json` is preconfigured for this VM (`storage-driver: fuse-overlayfs`, `containerd-snapshotter: false` — required for Docker 29 + fuse-overlayfs). The `ubuntu` user is in the `docker` group, so `docker`/`docker compose` work without sudo once the daemon is up.
 - The optional `observability` compose profile (Jaeger/Prometheus/Grafana/OTel collector) is not needed for normal dev.
 
+### Local macOS machine (no Docker)
+
+- On the developer's Mac there is no Docker. PostgreSQL 17 (EDB installer, `/Library/PostgreSQL/17`) already listens on `localhost:5432` and a local Redis on `6379`, so the API integration/e2e tests and Playwright can run locally. `psql`, `createdb` and `pg_isready` are in `/Library/PostgreSQL/17/bin`, which is not on `PATH`.
+- `apps/api/.env.test` points at `tamiym_workshop_test` on that server. It is already migrated and seeded, and it is shared by every session on the machine. `seed:e2e` is not idempotent, so do not re-run it there. For a Playwright run that needs a new seed, create a throwaway database whose name matches `/test|e2e/i` (for example `tamiym_workshop_test_ttw093`), then run `migrate deploy` and `seed:e2e` against it with `DATABASE_URL` overridden (and a different `REDIS_DB`). Drop it afterwards.
+- Playwright uses ports 3000-3003 (and the API on 3001): do not run two Playwright runs on the same machine at the same time.
+
 ### API env files (both are needed, both are gitignored)
 
 - `apps/api/.env.local` — read by NestJS `ConfigModule` at runtime.

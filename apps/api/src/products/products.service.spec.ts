@@ -299,6 +299,24 @@ describe('ProductsService', () => {
       );
     });
 
+    it.each([
+      [ProductSort.NEWEST, { createdAt: 'desc' }],
+      [ProductSort.OLDEST, { createdAt: 'asc' }],
+      [ProductSort.NAME_ASC, { name: 'asc' }],
+      [ProductSort.NAME_DESC, { name: 'desc' }],
+    ])(
+      'orders by %s then by id, so offset pages never repeat or skip a product (TTW-093)',
+      async (sort, primary) => {
+        (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+
+        await service.findAll({ sort });
+
+        expect(prisma.product.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ orderBy: [primary, { id: 'asc' }] }),
+        );
+      },
+    );
+
     it('should apply sort and pagination (take/skip)', async () => {
       (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
 
@@ -310,7 +328,7 @@ describe('ProductsService', () => {
 
       expect(prisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          orderBy: { name: 'asc' },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
           take: 10,
           skip: 20,
         }),

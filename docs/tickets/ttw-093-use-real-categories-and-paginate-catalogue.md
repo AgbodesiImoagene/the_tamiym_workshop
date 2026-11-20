@@ -1,7 +1,7 @@
 # TTW-093 — Use real categories and paginate the customer catalogue
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, unverified end to end (Playwright and browser journey not run)\
+**Status:** Implemented and verified by Playwright (journey not played by hand in a browser; Figma not compared)\
 **Risk:** Standard\
 **Blocked by:** TTW-092\
 **Blocks:** None
@@ -67,7 +67,7 @@ Design (no API change):
 
 ## Implementation reviews
 
-Independent review (`/code-review`, high effort), 8 findings. Fixed: empty page > 0 on "All" now shows a message and a "Back to first page" button; the "All" tab value is the sentinel `__all__` so a real category slug cannot collide; `keepPreviousData` keeps the grid while the next page loads. Not applied, recorded as follow-ups: no tie-breaker on the API sort (`createdAt desc` alone, so offset paging can repeat or skip rows that share a timestamp: fix in `ProductsService.findAll`, API change out of scope here); the pre-existing "Best Seller" badge on the first card now appears on every page; an unknown `categorySlug` makes the API return all products; the design, product-detail and fundraiser screens still read only the first 20 products.
+Independent review (`/code-review`, high effort), 8 findings, none critical. Fixed: empty page > 0 on "All" now shows a message and a "Back to first page" button; the "All" tab value is the sentinel `__all__` so a real category slug cannot collide; `keepPreviousData` keeps the grid while the next page loads; `ProductsService.findAll` now orders by the chosen sort then `id`, so rows with equal `createdAt` or name cannot repeat or vanish across pages (tests: `products.service.spec.ts`, the existing sort-and-pagination test had to change from `{ name: 'asc' }` to `[{ name: 'asc' }, { id: 'asc' }]` because the order is now a list). Not applied, recorded as follow-ups: the pre-existing "Best Seller" badge on the first card now appears on every page; an unknown `categorySlug` makes the API return all products; the design, product-detail and fundraiser screens still read only the first 20 products; the Playwright run was a local one (see below), CI still has to confirm.
 
 ## Verification evidence
 
@@ -78,8 +78,16 @@ Run in `.claude/worktrees/ttw-093`, 2026-11-20:
 - `pnpm format:check` (root): passed. `pnpm docs:validate`, `pnpm playwright:validate`: passed.
 - `playwright test tests/e2e/app/products-cart.comprehensive.spec.ts --list` lists the new test at three viewports.
 
-Not verified: the Playwright test was not run (no Docker or Postgres on this machine), the seed with 22 extra products was not executed, and the journey was not played in a browser. `docs/tickets/ROADMAP.md` is not ticked for that reason. Needs a CI run or a local run with the test database.
+Added after the review (local macOS machine, PostgreSQL 17 on `localhost:5432`, throwaway database `tamiym_workshop_test_ttw093` created, migrated, seeded with `seed:e2e` (24 products) and dropped afterwards, `REDIS_DB=14`):
+
+- `pnpm --filter api test -- src/products`: 130 passed (5 failed before the tie-breaker change). `pnpm --filter api typecheck`: clean, `pnpm --filter api lint`: 0 errors.
+- `pnpm build`: exit 0.
+- `playwright test tests/e2e/app/products-cart.comprehensive.spec.ts --project=setup --project=chromium-app`: 20 passed, including the new TTW-093 test at the three viewports.
+- `playwright test --project=setup --project=chromium-app --project=chromium-web`: 122 passed, 3 skipped, 0 failed (the 22 extra seeded products broke no other spec).
+- `pnpm --filter api test:e2e -- test/products.e2e-spec.ts`: 3 passed.
+
+Not verified: the journey was not played by hand in a browser, the Figma was not compared, and the other Playwright projects (admin, journeys, a11y, visual, other browsers) were not run. `docs/tickets/ROADMAP.md` is not ticked: CI on the pushed branch is the final proof.
 
 ## Completion summary
 
-Done: tabs come from `GET /v1/categories`; the list pages through `GET /v1/products` with `limit`/`offset` (12 per page, one extra item fetched to detect a next page); empty category message; seed with a 22-product category; unit and Playwright tests. Deviation: three other screens needed `queryFn: () => getDashboardProducts()` because the function now takes an optional argument. Remaining: run the Playwright test and the browser journey, then tick the roadmap.
+Done: tabs come from `GET /v1/categories`; the list pages through `GET /v1/products` with `limit`/`offset` (12 per page, one extra item fetched to detect a next page); empty category message; seed with a 22-product category; unit and Playwright tests. Deviation: three other screens needed `queryFn: () => getDashboardProducts()` because the function now takes an optional argument. Added after review: id tie-breaker in the API sort. Remaining: CI run on the pushed branch, then tick the roadmap.
