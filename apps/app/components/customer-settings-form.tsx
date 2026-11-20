@@ -24,6 +24,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
   changePassword,
@@ -231,12 +232,9 @@ export function CustomerSettingsForm({
   const router = useRouter();
 
   // TTW-229: go back in the history; a page opened directly has no previous page of this
-  // site, so fall back to the dashboard. The Navigation API only counts entries of this
-  // site (a direct visit has none); browsers without it fall back to the history length.
+  // site, so fall back to the dashboard.
   const goBack = () => {
-    const navigation = (window as Window & { navigation?: { canGoBack: boolean } }).navigation;
-    const canGoBack = navigation ? navigation.canGoBack : window.history.length > 1;
-    if (canGoBack) router.back();
+    if (canGoBack()) router.back();
     else router.push('/dashboard');
   };
 

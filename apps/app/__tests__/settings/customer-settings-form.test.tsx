@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomerSettingsForm } from '@/components/customer-settings-form';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import {
   changePassword,
@@ -19,6 +20,8 @@ const push = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ back, push, replace: jest.fn() }),
 }));
+
+jest.mock('@/lib/can-go-back', () => ({ canGoBack: jest.fn() }));
 
 jest.mock('@/lib/geo', () => ({
   ...jest.requireActual('@/lib/geo'),
@@ -390,23 +393,16 @@ describe('CustomerSettingsForm delivery instructions', () => {
   });
 });
 
-// TTW-228: the chevron at the top of the page goes back.
+// TTW-229: the chevron at the top of the page goes back. Whether there is a page to go
+// back to is decided by `canGoBack` (see __tests__/lib/can-go-back.test.ts).
 describe('CustomerSettingsForm back button', () => {
-  function setHistoryLength(length: number) {
-    Object.defineProperty(window.history, 'length', { value: length, configurable: true });
-  }
-
-  afterEach(() => {
-    delete (window as unknown as { navigation?: unknown }).navigation;
-  });
-
   it('has an accessible name', () => {
     renderForm();
     expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
   });
 
-  it('goes back in the history when there is a previous page', () => {
-    setHistoryLength(3);
+  it('goes back in the history when there is a previous page of the site', () => {
+    (canGoBack as jest.Mock).mockReturnValue(true);
     renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
@@ -416,21 +412,7 @@ describe('CustomerSettingsForm back button', () => {
   });
 
   it('goes to the dashboard when the page was opened directly', () => {
-    setHistoryLength(1);
-    renderForm();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
-
-    expect(push).toHaveBeenCalledWith('/dashboard');
-    expect(back).not.toHaveBeenCalled();
-  });
-
-  it('trusts the Navigation API over the history length when the browser has it', () => {
-    // A direct visit still has an earlier entry (another site, a blank tab): length 2.
-    setHistoryLength(2);
-    (window as unknown as { navigation: { canGoBack: boolean } }).navigation = {
-      canGoBack: false,
-    };
+    (canGoBack as jest.Mock).mockReturnValue(false);
     renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Go back' }));

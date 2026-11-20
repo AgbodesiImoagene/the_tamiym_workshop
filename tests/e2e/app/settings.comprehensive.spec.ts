@@ -83,20 +83,31 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
 
-  // TTW-229: the chevron at the top of the page goes back.
-  test('back button returns to the previous page, or to the dashboard on a direct visit', async ({
-    customerPage,
-  }) => {
-    await customerPage.goto('/dashboard/settings');
+  // TTW-229: the chevron at the top of the page goes back in this site's history.
+  test('back button returns to the page the customer came from', async ({ customerPage }) => {
+    await customerPage.goto('/dashboard');
+    await customerPage.getByRole('link', { name: 'manage' }).click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/settings/);
+
     await customerPage.getByRole('button', { name: 'Go back' }).click();
     await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
 
-    await customerPage.goto('/dashboard/profile');
-    await customerPage.getByRole('button', { name: 'Go back' }).click();
-    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
-    await customerPage.goto('/dashboard/settings');
-    await customerPage.getByRole('button', { name: 'Go back' }).click();
-    // Came from the dashboard: back, not a new entry.
-    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
+    // It stepped back (no new history entry): the settings page is still ahead.
+    await customerPage.goForward();
+    await expect(customerPage).toHaveURL(/\/dashboard\/settings/);
+  });
+
+  test('back button goes to the dashboard when the page was opened directly', async ({
+    customerPage,
+  }) => {
+    // A direct visit has no earlier page of this site: going back would leave the app.
+    // Each path gets a fresh tab (same login) so that no earlier page of the site exists.
+    for (const path of ['/dashboard/settings', '/dashboard/profile']) {
+      const page = await customerPage.context().newPage();
+      await page.goto(path);
+      await page.getByRole('button', { name: 'Go back' }).click();
+      await expect(page).toHaveURL(/\/dashboard\/?$/);
+      await page.close();
+    }
   });
 });

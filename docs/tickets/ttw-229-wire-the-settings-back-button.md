@@ -15,7 +15,7 @@ The chevron at the top of the profile and settings pages looks like a "back" but
 Decision of the owner: the chevron goes back in the browser history.
 
 - Click calls `router.back()` (`useRouter` from `next/navigation`).
-- When the page was opened directly (no previous page of this site), `router.back()` would leave the app or do nothing, so go to `/dashboard` with `router.push` instead. The check uses `window.navigation.canGoBack` (Navigation API, same-site entries only) and falls back to `window.history.length > 1` in browsers without it. Plain `history.length` alone was tried first and failed in Playwright: a direct visit already has an earlier entry (`about:blank`), so Back left the app.
+- When the page was opened directly (no previous page of this site), `router.back()` would leave the app or do nothing, so go to `/dashboard` with `router.push` instead. The check lives in `apps/app/lib/can-go-back.ts` and uses `window.navigation.canGoBack` (Navigation API, same-site entries only) and falls back to `window.history.length > 1` in browsers without it. Plain `history.length` alone was tried first and failed in Playwright: a direct visit already has an earlier entry (`about:blank`), so Back left the app.
 - Add an English `aria-label` ("Go back"). No design change.
 
 Rejected: a plain link to `/dashboard` (the owner chose history), and hiding the chevron on a direct visit (design change).
@@ -64,17 +64,29 @@ Low risk: implementation review only.
 
 ## Implementation reviews
 
-Independent review not run in this session (Low risk: to be done by the owner's reviewer). The first Playwright run found a real defect in the first version (history length), fixed as described in Proposal.
+**Review 1** (independent session, `ttw-091` documentation session) — 4 findings, all handled:
+
+1. The Playwright test always ended on `/dashboard` and could not tell `router.back()` from `router.push('/dashboard')`. Fixed: two tests. "Came from" starts on `/dashboard`, clicks `manage`, clicks "Go back", then `goForward()` must return to settings (proves a step back, not a new entry). "Opened directly" uses a fresh tab per path (`/dashboard/settings`, `/dashboard/profile`) and must end on `/dashboard`.
+2. Without `window.navigation`, `history.length > 1` also counts pages of other sites. `document.referrer` was considered and rejected: it is only set at the first document load and does not follow in-app navigation, so it would send a customer who navigated inside the app to the dashboard instead of back. **Choice: keep the rule and record the limit** (below).
+3. The Jest test redefined `window.history.length` without restoring it. Fixed in `__tests__/lib/can-go-back.test.ts` (original descriptor restored in `afterEach`).
+4. The `window.navigation` cast was duplicated. Fixed: `canGoBack()` in `apps/app/lib/can-go-back.ts` with its own test; the component test mocks it.
+
+Verdict: PASS after fixes (re-verified below).
+
+## Deviations from the plan
+
+- First version used `history.length > 1` only: it failed in Playwright (a direct visit already has an earlier `about:blank` entry). Replaced by the Navigation API check with a `history.length` fallback.
+- Known limit: in browsers without the Navigation API (Firefox and Safari at the time of writing), a customer who reached the page from an external link and has no earlier page of this site is sent back to that external site. Accepted as a small, low-risk edge; the Navigation API covers Chromium.
 
 ## Verification evidence
 
 All run from the worktree on `claude/ttw-229-settings-back-button-6561ab`.
 
 - Red first: the 3 new Jest tests failed before the change (`Tests: 3 failed, 121 passed`).
-- `pnpm --filter app test -- settings`: `Test Suites: 12 passed`, `Tests: 125 passed` (4 new tests under "CustomerSettingsForm back button").
+- After review 1: `pnpm --filter app test -- "settings|can-go-back"`: `Test Suites: 13 passed`, `Tests: 126 passed` (3 component tests for the button, 2 for `canGoBack`).
 - `pnpm --filter app typecheck`: no error. `pnpm --filter app lint`: no error.
 - `pnpm format:check`: "All matched files use Prettier code style!". `pnpm docs:validate`: passed. `pnpm playwright:validate`: passed.
-- `pnpm exec playwright test tests/e2e/app/settings.comprehensive.spec.ts --project=setup --project=chromium-app` after `pnpm build`: `17 passed`, including "back button returns to the previous page, or to the dashboard on a direct visit" on desktop-1440, tablet-834 and mobile-393. First run with the `history.length` version: 3 failed (URL stayed `about:blank`).
+- `pnpm --filter app build` then `pnpm exec playwright test tests/e2e/app/settings.comprehensive.spec.ts --project=setup --project=chromium-app`: `20 passed`, including "back button returns to the page the customer came from" and "back button goes to the dashboard when the page was opened directly" on desktop-1440, tablet-834 and mobile-393. (One build attempt failed on Next.js's online security advisory check and was repeated; the run above is on the fresh build.)
 - Not covered: Firefox and Safari (no Playwright project for the customer app there); their path is the `history.length` fallback, covered by Jest only.
 
 ## Completion summary
