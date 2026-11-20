@@ -107,6 +107,8 @@ On `main` after the fast-forward (commit 3a0719c): run 44767730502 (`CI`) succes
 
 Second run on `main` (commit f87ed5c, documentation only): run 44772343448 (`CI`) success, **339 s (5 min 39 s)**, 19 of 19 jobs successful; `API Integration` 336 s, `API Open Handles` 199 s. Run 44772343628 (`Playwright Comprehensive`) success, 273 s.
 
+One more measure, on a ticket branch (not `main`, so it does not count for the five-run criterion below): `codex/ttw-230-upgrade-next-for-the-security-advisory`, run 44775221215 (`CI`), commit "record the independent review of TTW-230": success, **364 s (6 min 4 s)**, 19 of 19 jobs successful; `API Integration` 361 s, `API Open Handles` 252 s. The three runs after the change (379 s, 339 s, 364 s) vary by about 40 s, against 597 s before.
+
 ## Completion summary (provisional)
 
 The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` went from 9 min 57 s to 6 min 19 s (about 37 % shorter), measured on one run before and two after (379 s and 339 s). No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
