@@ -17,6 +17,8 @@ interface LayerListProps {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, direction: LayerMoveDirection) => void;
+  /** True while the canvas cannot act on the layers yet (it is still loading them). */
+  disabled?: boolean;
 }
 
 const KIND_LABEL: Record<LayerItem['kind'], string> = {
@@ -35,6 +37,7 @@ export default function LayerList({
   onSelect,
   onDelete,
   onMove,
+  disabled = false,
 }: LayerListProps) {
   const topFirst = [...layers].reverse();
 
@@ -62,6 +65,7 @@ export default function LayerList({
                   type="button"
                   aria-label={`Select ${layer.label}`}
                   aria-pressed={selected}
+                  disabled={disabled}
                   onClick={() => onSelect(layer.id)}
                   className="flex min-w-0 flex-1 flex-col items-start rounded px-1 py-0.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
@@ -73,7 +77,7 @@ export default function LayerList({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Move ${layer.label} up`}
-                  disabled={position === 0}
+                  disabled={disabled || position === 0}
                   onClick={() => onMove(layer.id, 'up')}
                 >
                   ↑
@@ -83,7 +87,7 @@ export default function LayerList({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Move ${layer.label} down`}
-                  disabled={position === topFirst.length - 1}
+                  disabled={disabled || position === topFirst.length - 1}
                   onClick={() => onMove(layer.id, 'down')}
                 >
                   ↓
@@ -93,6 +97,7 @@ export default function LayerList({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Delete ${layer.label}`}
+                  disabled={disabled}
                   onClick={() => onDelete(layer.id)}
                 >
                   ✕
