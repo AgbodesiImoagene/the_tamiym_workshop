@@ -326,7 +326,7 @@ describe.each(['Profile', 'Settings'])('CustomerSettingsForm on the %s page', (p
     renderForm(pageTitle);
     await loaded();
 
-    expect(screen.queryByRole('img', { name: 'Profile' })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: /profile picture/i })).not.toBeInTheDocument();
   });
 

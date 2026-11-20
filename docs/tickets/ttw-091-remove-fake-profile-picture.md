@@ -1,7 +1,7 @@
 # TTW-091 — Remove the fake profile picture and its button
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (relecture indépendante à faire)\
+**Status:** Implemented-unverified (prêt à clore après la fusion sur `main` et le CI)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -59,7 +59,12 @@ Not required for a low-risk ticket.
 
 ## Implementation reviews
 
-Pending : la relecture indépendante reste à faire avant de clore le ticket.
+Relecture indépendante (revue de code du diff contre `main`, niveau faible) : 2 remarques mineures, toutes deux corrigées.
+
+- Le test Playwright ne vérifiait l'absence de photo que sur `/dashboard/profile` : l'assertion existe maintenant aussi sur `/dashboard/settings`, limitée au formulaire des informations personnelles (la page contient d'autres images de décor).
+- Le test Jest cherchait seulement une image nommée « Profile » : il vérifie maintenant qu'il n'y a aucune image dans le formulaire.
+
+Après correction : Jest `21 passed`, lint et format OK, Playwright `14 passed (24.1s)`.
 
 ## Verification evidence
 
