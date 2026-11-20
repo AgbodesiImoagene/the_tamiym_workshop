@@ -1,7 +1,7 @@
 # TTW-215 — Reduce the cost of the API e2e suite in CI
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress — promoted on 2026-11-20 on trigger 4 (see Promotion)\
+**Status:** In progress — change merged and green on main; five-run check pending\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -78,9 +78,9 @@ Options to weigh in the design review, cheapest first:
 
 ## Acceptance criteria
 
-- [ ] The trigger that promoted the ticket no longer fires on five consecutive `main` runs.
-- [ ] No spec was removed, skipped or weakened.
-- [ ] Required quality gates pass, with before/after durations recorded below.
+- [ ] The trigger that promoted the ticket no longer fires on five consecutive `main` runs. (One run measured so far, 6 min 19 s; to be checked on the next four.)
+- [x] No spec was removed, skipped or weakened.
+- [x] Required quality gates pass, with before/after durations recorded below.
 
 ## Out of scope
 
@@ -103,8 +103,10 @@ After (branch `claude/ttw-215-parallel-open-handle-proof`, run 44765976764, comm
 
 Local gates: `pnpm workflows:validate`, `pnpm format:check`, `pnpm docs:validate` and `pnpm e2e-open-handles:test` (10 of 10) pass.
 
-Not yet recorded: the same durations on `main` after the merge, which is the final proof.
+On `main` after the fast-forward (commit 3a0719c): run 44767730502 (`CI`) success, **379 s (6 min 19 s)**, 19 of 19 jobs successful; `API Integration` 375 s, `API Open Handles` 182 s. Run 44767730307 (`Playwright Comprehensive`) success, 249 s.
 
-## Completion summary
+## Completion summary (provisional)
 
-Pending implementation.
+The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` went from 9 min 57 s to 6 min 19 s (about 37 % shorter), measured on one run before and one after. No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
+
+Left for later, not done here: splitting passes 1 and 2 of `API Integration` across two jobs (about 2 more minutes, more work, and the passes share a database), and running pass 2 only on `main` (not decided: its purpose has not been confirmed). The ticket's acceptance criterion about five consecutive `main` runs is not measured yet: only one run on `main` after the change exists.
