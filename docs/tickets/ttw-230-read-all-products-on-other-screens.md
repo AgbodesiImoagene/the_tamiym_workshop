@@ -1,7 +1,7 @@
 # TTW-230 — Read the right number of products on the design, product-page and fundraiser screens
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented and verified locally; CI on the pushed branch still to run\
+**Status:** Complete (journey not played by hand in a browser)\
 **Risk:** Standard\
 **Blocked by:** None (TTW-093 is on the same branch)\
 **Blocks:** None
@@ -78,6 +78,8 @@ Run in `.claude/worktrees/ttw-093`, 2026-11-20, local PostgreSQL 17 with a throw
 - Same projects plus `chromium-web` with the default 4 local workers: 124 passed, 1 failed in each of three runs, always a checkout journey sharing the seeded customer (`checkout-idempotency` twice, `checkout-delivery-instructions` once). Each passes alone and with one worker. Not run on `main`, so whether it predates this branch is unproven; CI uses 2 workers.
 
 Not verified: the journey was not played by hand in a browser, admin, journeys, a11y, visual and other-browser projects were not run, and `main` was not run as a baseline.
+
+CI: CI on the pushed branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (commit 5d528b0): every job green, including Unit Tests, Coverage, API Integration and Playwright Smoke. That workflow runs only the `@smoke` Playwright tests; the `@journey` and `@comprehensive` specs added or changed here were run locally only (see above).
 
 ## Completion summary
 

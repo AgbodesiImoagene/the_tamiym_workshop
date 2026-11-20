@@ -1,7 +1,7 @@
 # TTW-231 — Give each checkout journey its own customer so they can run in parallel
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented and verified locally; CI still to run\
+**Status:** Complete (matrix workflow not run)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -78,6 +78,8 @@ Local PostgreSQL 17, throwaway database dropped afterwards, Redis DB 14, 2026-11
 Finding to know: the e2e specs are not re-runnable on a database that already ran them. Repeating the full suite on the same database failed on stock used by earlier orders and on the password-reset tokens (three per seed). CI always seeds a fresh database, so it is not hit; locally, recreate the database between full runs. Not changed here.
 
 Not verified: CI (`playwright-matrix.yml`, 2 workers, other browsers), and the admin and a11y projects.
+
+CI: CI on the pushed branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (commit 5d528b0): every job green, including Unit Tests, Coverage, API Integration and Playwright Smoke. That workflow runs only the `@smoke` Playwright tests; the `@journey` and `@comprehensive` specs added or changed here were run locally only (see above).
 
 ## Completion summary
 

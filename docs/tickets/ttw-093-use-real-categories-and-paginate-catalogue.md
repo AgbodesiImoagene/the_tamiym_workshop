@@ -1,7 +1,7 @@
 # TTW-093 — Use real categories and paginate the customer catalogue
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented and verified by Playwright (journey not played by hand in a browser; Figma not compared)\
+**Status:** Complete (Figma not compared; journey not played by hand in a browser)\
 **Risk:** Standard\
 **Blocked by:** TTW-092\
 **Blocks:** None
@@ -87,6 +87,8 @@ Added after the review (local macOS machine, PostgreSQL 17 on `localhost:5432`, 
 - `pnpm --filter api test:e2e -- test/products.e2e-spec.ts`: 3 passed.
 
 Not verified: the journey was not played by hand in a browser, the Figma was not compared, and the other Playwright projects (admin, journeys, a11y, visual, other browsers) were not run. `docs/tickets/ROADMAP.md` is not ticked: CI on the pushed branch is the final proof.
+
+CI: CI on the pushed branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (commit 5d528b0): every job green, including Unit Tests, Coverage, API Integration and Playwright Smoke. That workflow runs only the `@smoke` Playwright tests; the `@journey` and `@comprehensive` specs added or changed here were run locally only (see above).
 
 ## Completion summary
 
