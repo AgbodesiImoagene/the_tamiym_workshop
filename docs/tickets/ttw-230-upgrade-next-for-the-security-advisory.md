@@ -81,8 +81,9 @@ Run in the worktree on 2026-11-20 after `pnpm up -r next@16.4.6 eslint-config-ne
 - Playwright smoke, run alone with `CI=1` so that no server is reused: `pnpm test:e2e:smoke` → 40 passed, 1 flaky (`auth-mfa-sessions.smoke.spec.ts:42` "admin MFA recovery code completes session over HTTP": 401 on the first attempt, passed on retry). Not investigated further; it exercises the seeded single-use recovery codes of the shared test database, not Next.js.
 - A first smoke run (41 passed) is **not** evidence: the ports were held by another session's servers (Next 16.4.4) and the config reuses running servers outside CI.
 - `pnpm audit` and the other dependencies were not looked at (out of scope).
-- **Not verified:** not pushed, so no CI run; only `chromium` projects ran; independent review done (PASS).
+- CI on the pushed branch `codex/ttw-230-upgrade-next-for-the-security-advisory` (commit `c4a81dd`), run 44775221215: conclusion `success`, all 19 jobs green, including Production Build, Production Audit, Playwright Smoke, the three Next.js container builds, Lint, Type Check, Unit Tests, API Integration and Documentation.
+- **Not verified:** the run on `main` after the merge, which is the final proof. Locally only the `chromium` projects ran.
 
 ## Completion summary
 
-Implemented locally: Next.js 16.4.6, build unblocked. Independent review: PASS. Remaining: CI after a push when asked.
+Implemented: Next.js 16.4.6, build unblocked. Independent review: PASS. CI on the branch is green. Remaining: merge into `main` when asked, then the run on `main` is the final proof.
