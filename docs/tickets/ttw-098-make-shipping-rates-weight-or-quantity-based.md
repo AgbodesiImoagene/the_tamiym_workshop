@@ -1,7 +1,7 @@
 # TTW-098 — Make shipping rates configurable by weight or quantity
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, committed locally on `codex/ttw-098-make-shipping-rates-weight-or-quantity-b` (not pushed; CI not yet run)\
+**Status:** Implemented, green CI on branch `codex/ttw-098-make-shipping-rates-weight-or-quantity-b`; not merged into `main` yet\
 **Risk:** High\
 **Blocked by:** TTW-097, TTW-086\
 **Blocks:** None
@@ -90,7 +90,10 @@ Run from the worktree, against a throwaway database `tamiym_workshop_test_ttw098
 - `pnpm lint` 0 errors (warnings pre-existing); `pnpm typecheck` 6/6; `pnpm format:check` clean; `pnpm migrations:check`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate` pass.
 - `pnpm --filter api test:coverage` then `pnpm coverage:ratchet` passed (lines 84.79 % vs floor 56 %); `pnpm coverage:diff` passed (51/63, 80.95 %, floor 80 %). `pnpm build` passed.
 
-Not verified: GitHub CI (nothing pushed), `pnpm audit:prod`, a manual run of the real customer checkout page (the quote was exercised through the API as the shopper's app does, not through the checkout UI), the shared test database (needs a re-seed for the Yobe state before the new Playwright spec can run there).
+- GitHub CI on the branch, run [44797701063](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44797701063) (commit a49f7d7): all 19 jobs succeeded (lint, type check, format, unit tests, production audit, coverage, documentation, migration baseline, OpenAPI, API integration, Playwright smoke, production build, container builds). The CI smoke tier does not run the new `comprehensive` spec, which was only run locally.
+- Shared test database `tamiym_workshop_test`: migration `20261120182351_ttw098_shipping_rate_brackets` applied with `migrate deploy`. State Yobe was already there, so no re-seed was needed.
+
+Not verified: a manual run of the real customer checkout page (the quote was exercised through the API as the shopper's app does, not through the checkout UI), the new Playwright spec in CI. The run on `main` (final proof) does not exist yet: nothing is merged.
 
 ## Completion summary
 
