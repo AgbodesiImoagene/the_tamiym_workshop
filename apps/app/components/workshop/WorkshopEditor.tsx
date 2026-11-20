@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { Button } from '@tamiym/ui';
 import ViewTabs from './ViewTabs';
 import TextTool from './TextTool';
 import ImageTool from './ImageTool';
 import OptionPicker from './OptionPicker';
 import SavePanel from './SavePanel';
 import SharePanel from './SharePanel';
+import LayerList, { type LayerItem } from './LayerList';
+import type { WorkshopCanvasControls, WorkshopHistoryState } from './WorkshopCanvas';
 import {
   createDesign,
-  imageCrossOrigin,
   updateDesign,
   uploadThumbnail,
   type Design,
@@ -73,9 +75,10 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
     return { version: 1, productId: product.id, views };
   });
 
-  // Reference to the active canvas DOM element for thumbnail capture
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const canvasRef = useRef<any>(null);
+  // Controls of the active canvas (add, delete, undo, ...), filled in by WorkshopCanvas
+  const controlRef = useRef<WorkshopCanvasControls | null>(null);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [history, setHistory] = useState<WorkshopHistoryState>({ canUndo: false, canRedo: false });
 
   // Auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,12 +129,12 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   );
 
   const captureThumbnail = useCallback(async (): Promise<Blob | null> => {
-    if (!canvasRef.current) return null;
     try {
-      const dataUrl: string = canvasRef.current.toDataURL({
+      const dataUrl = controlRef.current?.toDataURL({
         format: 'webp',
         quality: 0.8,
       });
+      if (!dataUrl) return null;
       const res = await fetch(dataUrl);
       return res.blob();
     } catch {
@@ -191,36 +194,83 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   }, [handleSave]);
 
   const handleAddText = useCallback((textObject: Record<string, unknown>) => {
-    if (!canvasRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    import('fabric').then((mod: any) => {
-      const IText = mod.IText ?? mod.fabric?.IText;
-      const itext = new IText(String(textObject.text ?? 'Text'), textObject);
-      canvasRef.current.add(itext);
-      canvasRef.current.setActiveObject(itext);
-      canvasRef.current.requestRenderAll?.();
-      canvasRef.current.renderAll?.();
-    });
+    void controlRef.current?.addText(textObject);
   }, []);
 
   const handleAddImage = useCallback((imageObject: Record<string, unknown>) => {
-    if (!canvasRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    import('fabric').then(async (mod: any) => {
-      const ImageCtor = mod.FabricImage ?? mod.Image ?? mod.fabric?.Image;
-      const src = String(imageObject.src ?? '');
-      const img = await ImageCtor.fromURL(src, {
-        crossOrigin: imageCrossOrigin(src),
-      });
-      img.set(imageObject);
-      canvasRef.current.add(img);
-      canvasRef.current.setActiveObject(img);
-      canvasRef.current.requestRenderAll?.();
-      canvasRef.current.renderAll?.();
-    });
+    void controlRef.current?.addImage(imageObject);
   }, []);
 
+  const handleDelete = useCallback(() => {
+    controlRef.current?.deleteSelected();
+  }, []);
+  const handleUndo = useCallback(() => {
+    void controlRef.current?.undo();
+  }, []);
+  const handleRedo = useCallback(() => {
+    void controlRef.current?.redo();
+  }, []);
+
+  // The canvas is rebuilt on every view change: selection and history start again.
+  const handleViewChange = useCallback((viewKey: string) => {
+    setSelectedLayerId(null);
+    setHistory({ canUndo: false, canRedo: false });
+    setActiveViewKey(viewKey);
+  }, []);
+
+  // Delete / Backspace remove the selected layer, Ctrl/Cmd+Z undoes, +Shift (or Y) redoes.
+  // Never while typing in a field, including Fabric's own text editor (a hidden textarea).
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedLayerId) {
+        event.preventDefault();
+        controlRef.current?.deleteSelected();
+        return;
+      }
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey && history.canUndo) {
+        event.preventDefault();
+        void controlRef.current?.undo();
+      } else if (((key === 'z' && event.shiftKey) || key === 'y') && history.canRedo) {
+        event.preventDefault();
+        void controlRef.current?.redo();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selectedLayerId, history]);
+
   const activeView = designableViews.find((v) => v.key === activeViewKey);
+
+  // A stable array: a new one on every render would make the canvas reload the template
+  // layers each time the selection or the history changes.
+  const activeViewEffects = useMemo(
+    () => (activeView?.effects ?? []).filter((e) => activeEffects.some((ae) => ae.id === e.id)),
+    [activeView, activeEffects]
+  );
+
+  const layerItems = useMemo<LayerItem[]>(() => {
+    const objects = designData.views[activeViewKey]?.fabricJson?.objects ?? [];
+    return objects.flatMap((o): LayerItem[] => {
+      const layerId = (o.data as { layerId?: string } | undefined)?.layerId;
+      if (!layerId) return [];
+      // Fabric v7 writes "IText", "Textbox", "FabricImage"; older saves may hold "i-text".
+      const type = String(o.type ?? '').toLowerCase();
+      if (type.includes('text')) {
+        return [
+          { id: layerId, label: String(o.text ?? '').trim() || 'Text', kind: 'text' as const },
+        ];
+      }
+      if (type.includes('image')) {
+        return [{ id: layerId, label: 'Image', kind: 'image' as const }];
+      }
+      return [{ id: layerId, label: 'Layer', kind: 'other' as const }];
+    });
+  }, [designData, activeViewKey]);
 
   return (
     <div className="flex h-full min-h-screen flex-col bg-zinc-50">
@@ -240,23 +290,53 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         views={designableViews}
         activeViewKey={activeViewKey}
         designData={designData}
-        onViewChange={setActiveViewKey}
+        onViewChange={handleViewChange}
       />
 
       {/* Main editor area */}
       <div className="flex flex-1 gap-0">
         {/* Canvas */}
-        <div className="flex flex-1 items-start justify-center p-6">
+        <div className="flex flex-1 flex-col items-center gap-3 p-6">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUndo}
+              disabled={!history.canUndo}
+            >
+              Undo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRedo}
+              disabled={!history.canRedo}
+            >
+              Redo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={!selectedLayerId}
+            >
+              Delete
+            </Button>
+          </div>
           {activeView && (
             <WorkshopCanvas
               viewKey={activeViewKey}
               printArea={activeView.printArea}
               templateLayers={activeView.templateLayers}
-              activeEffects={activeView.effects.filter((e) =>
-                activeEffects.some((ae) => ae.id === e.id)
-              )}
+              activeEffects={activeViewEffects}
               fabricJson={designData.views[activeViewKey]?.fabricJson ?? null}
               onLayersChange={(json) => handleLayersChange(activeViewKey, json)}
+              onSelectionChange={setSelectedLayerId}
+              onHistoryChange={setHistory}
+              controlRef={controlRef}
             />
           )}
         </div>
@@ -280,6 +360,15 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
 
           {/* Image tool */}
           <ImageTool onAddImage={handleAddImage} />
+
+          {/* Layers */}
+          <LayerList
+            layers={layerItems}
+            selectedId={selectedLayerId}
+            onSelect={(id) => controlRef.current?.selectLayer(id)}
+            onDelete={(id) => controlRef.current?.deleteLayer(id)}
+            onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
+          />
 
           <hr className="border-zinc-100" />
 

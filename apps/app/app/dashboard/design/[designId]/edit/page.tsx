@@ -1,31 +1,15 @@
-import { notFound } from 'next/navigation';
-import WorkshopEditor from '@/components/workshop/WorkshopEditor';
-import { getDesign, getProductWorkshop } from '@/lib/designs';
+import EditDesignLoader from '@/components/workshop/EditDesignLoader';
 
 interface EditDesignPageProps {
   params: Promise<{ designId: string }>;
 }
 
+/**
+ * The design belongs to the signed-in customer, whose cookie only the browser sends, so the
+ * data is loaded by `EditDesignLoader` in the browser (TTW-233). This page fetches nothing.
+ */
 export default async function EditDesignPage({ params }: EditDesignPageProps) {
   const { designId } = await params;
 
-  let design;
-  try {
-    design = await getDesign(designId);
-  } catch {
-    notFound();
-  }
-
-  if (!design) notFound();
-
-  let workshopContext;
-  try {
-    workshopContext = await getProductWorkshop(design.productId);
-  } catch {
-    notFound();
-  }
-
-  if (!workshopContext) notFound();
-
-  return <WorkshopEditor workshopContext={workshopContext} existingDesign={design} />;
+  return <EditDesignLoader designId={designId} />;
 }
