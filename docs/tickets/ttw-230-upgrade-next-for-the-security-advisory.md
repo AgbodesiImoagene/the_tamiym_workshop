@@ -1,7 +1,7 @@
 # TTW-230 — Upgrade Next.js to fix the security advisory that stops `next build`
 
 **Epic:** 8 — Client review delivery  
-**Status:** In progress (implemented locally, review pending, not pushed)  
+**Status:** In progress (implemented locally, reviewed, not pushed)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -47,9 +47,9 @@ Rejected: a canary or a new minor (`16.5.0-canary.*`): more risk than a security
 
 ## Acceptance criteria
 
-- [ ] `pnpm build` exits 0 for the three Next.js apps, with no `SecurityFatalError`.
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` and the Playwright smoke pass.
-- [ ] Only versions and the lockfile change.
+- [x] `pnpm build` exits 0 for the three Next.js apps, with no `SecurityFatalError`.
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test` and the Playwright smoke pass (one flaky smoke test, see evidence).
+- [x] Only versions and the lockfile change (plus this ticket and its index row).
 
 ## Out of scope
 
@@ -68,21 +68,21 @@ Recorded 2026-11-20 before implementation (Standard risk), by the implementing s
 
 ## Implementation reviews
 
-Pending: independent review not done yet.
+2026-11-20, independent read-only reviewer (fresh agent, nothing run): **PASS**, no blocking finding. It confirmed that only versions, the lockfile, the ticket and one README row changed, that the lockfile importers changed only for `next` and `eslint-config-next`, that no override, workflow or Dockerfile pins the old version, and that the "Not verified" list is honest. Two documentation findings, both fixed here: the sentence on transitive churn above was too narrow, and the acceptance criteria are ticked below. The reviewer could not read the 16.4.6 changelog; the recorded lint, typecheck, test and smoke runs cover that risk.
 
 ## Verification evidence
 
 Run in the worktree on 2026-11-20 after `pnpm up -r next@16.4.6 eslint-config-next@16.4.6`:
 
-- Diff: `next` and `eslint-config-next` in `apps/web`, `apps/app`, `apps/admin`, and the `^` range in `packages/config`, plus `pnpm-lock.yaml` written by pnpm. The only direct dependencies that changed are those two; the rest of the lockfile churn is transitive (Babel, typescript-eslint, `baseline-browser-mapping`) coming from `eslint-config-next`.
+- Diff: `next` and `eslint-config-next` in `apps/web`, `apps/app`, `apps/admin`, and the `^` range in `packages/config`, plus `pnpm-lock.yaml` written by pnpm. The only direct dependencies that changed are those two; the rest of the lockfile churn is transitive. Part comes from `eslint-config-next` (Babel, typescript-eslint, eslint-plugin-import dependencies, `baseline-browser-mapping`); part is `pnpm up -r` re-resolving floating ranges that have nothing to do with it (for example `@smithy/*` optional packages, `semver`, `nanoid`, `tslib`, `browserslist`, `caniuse-lite`). No major version changed.
 - `pnpm build`: 5 tasks successful, no `SecurityFatalError` (it ended `exit 1` on 16.4.4).
 - `pnpm lint`: 6 tasks successful. `pnpm typecheck`: 6 successful. `pnpm test`: web 79, app 130, api 1844 tests, all pass.
 - `pnpm docs:validate`: passed.
 - Playwright smoke, run alone with `CI=1` so that no server is reused: `pnpm test:e2e:smoke` → 40 passed, 1 flaky (`auth-mfa-sessions.smoke.spec.ts:42` "admin MFA recovery code completes session over HTTP": 401 on the first attempt, passed on retry). Not investigated further; it exercises the seeded single-use recovery codes of the shared test database, not Next.js.
 - A first smoke run (41 passed) is **not** evidence: the ports were held by another session's servers (Next 16.4.4) and the config reuses running servers outside CI.
 - `pnpm audit` and the other dependencies were not looked at (out of scope).
-- **Not verified:** not pushed, so no CI run; only `chromium` projects ran; independent review pending.
+- **Not verified:** not pushed, so no CI run; only `chromium` projects ran; independent review done (PASS).
 
 ## Completion summary
 
-Implemented locally: Next.js 16.4.6, build unblocked. Remaining: independent review, then CI after a push when asked.
+Implemented locally: Next.js 16.4.6, build unblocked. Independent review: PASS. Remaining: CI after a push when asked.
