@@ -66,7 +66,7 @@ Recorded 2026-11-20, before implementation (High risk: auth).
 ## Deviations from the plan
 
 - Sign-up: no separate screen. After sign-up the user lands on `/dashboard`, where the banner states that the email must be verified before ordering.
-- Playwright covers sign up → message → resend. "Verify, then order" is not played in e2e: the link is only in the email, which e2e cannot read.
+- Playwright covers sign up → message → resend, and "verify, then order". The link is only in the email, which e2e cannot read, so `seed:e2e` writes a known verification token for one unverified customer per Playwright attempt (2: CI retries once), with a deliverable address. The journey logs in, is refused at checkout with the explanation and the resend button, verifies on the public site, then places the order (Paystack initiation simulated as in the other checkout specs).
 
 ## Implementation reviews
 
@@ -80,8 +80,10 @@ Run in the worktree on 2026-11-20:
 - `pnpm --filter app typecheck`: pass. `pnpm --filter app lint`: pass.
 - `pnpm --filter app test`: 15 suites, 140 tests, all pass.
 - `pnpm playwright:validate`: passed. `playwright test --list`: the new spec is discovered. Prettier check on touched paths: pass.
-- **Not verified:** the new Playwright spec was not run (no Docker, no `apps/api/.env*` on this machine, so no API/DB). The journey was not played in a browser. Independent review not done yet.
+- Playwright, run locally on 2026-11-20 against a real API + Postgres (local PostgreSQL 17 test DB `tamiym_workshop_test`, Redis) after `pnpm build` and `seed:e2e`: `pnpm exec playwright test tests/e2e/app/email-verification-banner.comprehensive.spec.ts --project=setup --project=chromium-app` → 7 passed (5 setup + the 2 tests of the spec).
+- `pnpm --filter api typecheck`: pass (seed script touched).
+- **Not verified:** only the `chromium-app` project ran (not the other browser tiers or full CI). Independent review not done yet.
 
 ## Completion summary
 
-Implemented: banner with resend in the dashboard shell, explanation after sign-up, and `EMAIL_NOT_VERIFIED` handling at checkout. Remaining: run the Playwright spec with the full stack, play the journey in a browser, independent review (auth, High risk), then CI after a push when asked.
+Implemented: banner with resend in the dashboard shell, explanation after sign-up, and `EMAIL_NOT_VERIFIED` handling at checkout. Remaining: independent review (auth, High risk), then CI after a push when asked.

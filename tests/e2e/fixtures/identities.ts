@@ -99,6 +99,17 @@ export const E2E_PASSWORD_RESET_TOKENS = [
 ] as const;
 export const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
 
+/**
+ * TTW-090: customers whose email is not verified, one per Playwright attempt, each with a raw
+ * verification token written by seed:e2e (the API keeps only its sha256, and an email cannot be
+ * read in a test). Keep in sync with apps/api/scripts/seed-e2e-dummy-data.ts.
+ */
+export const e2eUnverifiedCustomers = [0, 1].map((attempt) => ({
+  email: `unverified.${attempt}.e2e@tamiym.test`,
+  password: E2E_PASSWORD,
+  verificationToken: `e2e-verify-token-attempt-${attempt}`,
+}));
+
 export const urls = {
   api: process.env.PLAYWRIGHT_API_URL ?? 'http://localhost:3001',
   web: process.env.PLAYWRIGHT_WEB_URL ?? 'http://localhost:3000',
