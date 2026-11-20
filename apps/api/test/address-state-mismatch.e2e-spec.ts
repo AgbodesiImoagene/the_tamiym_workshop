@@ -15,6 +15,11 @@ const PASSWORD = 'TestPassword1!';
 // file running in parallel.
 const STATE_CODE = 'ZM';
 const STATE_NAME = 'Zeta Mismatch Test State';
+// TTW-228: the second state the test needs next to Lagos. It is created here
+// (active, no LGAs) instead of read from the database, so the test does not
+// depend on which states and LGAs the database holds.
+const OTHER_CODE = 'ZN';
+const OTHER_NAME = 'Zeta Other Test State';
 
 function cookieValue(res: Response, name: string): string | undefined {
   const setCookie = res.headers['set-cookie'];
@@ -45,12 +50,23 @@ describe('Address keeps one state: the code decides the text (e2e)', () => {
   beforeAll(async () => {
     app = await createE2eApp();
     prisma = app.get(PrismaService);
+    // TTW-228: the LGA needs its state, and a database with only the migrations
+    // has no Lagos yet.
+    await prisma.geoState.upsert({
+      where: { code: 'LA' },
+      update: { isActive: true },
+      create: { code: 'LA', name: 'Lagos', isActive: true },
+    });
     await ensureLga(prisma);
   });
 
   afterAll(async () => {
-    await prisma.address.deleteMany({ where: { stateCode: STATE_CODE } });
-    await prisma.geoState.deleteMany({ where: { code: STATE_CODE } });
+    await prisma.address.deleteMany({
+      where: { stateCode: { in: [STATE_CODE, OTHER_CODE] } },
+    });
+    await prisma.geoState.deleteMany({
+      where: { code: { in: [STATE_CODE, OTHER_CODE] } },
+    });
     await closeE2eApp(app);
   });
 
@@ -61,9 +77,10 @@ describe('Address keeps one state: the code decides the text (e2e)', () => {
       update: { isActive: true },
       create: { code: 'LA', name: 'Lagos', isActive: true },
     });
-    const other = await prisma.geoState.findFirstOrThrow({
-      where: { isActive: true, NOT: { code: 'LA' } },
-      orderBy: { code: 'asc' },
+    const other = await prisma.geoState.upsert({
+      where: { code: OTHER_CODE },
+      update: { isActive: true, name: OTHER_NAME },
+      create: { code: OTHER_CODE, name: OTHER_NAME, isActive: true },
     });
     await prisma.geoState.upsert({
       where: { code: STATE_CODE },
