@@ -19,7 +19,7 @@ export class ProductsController {
   @ApiResponse({
     status: 200,
     description:
-      'List of products with category, prices (NGN), and thumbnail (no variants)',
+      'List of products with category, prices (NGN), thumbnail, and a card summary (colours, size range, bulk tier). No raw variants.',
     schema: {
       type: 'array',
       items: {
@@ -47,6 +47,35 @@ export class ProductsController {
                 currency: { type: 'string' },
                 compareAt: { type: 'number', nullable: true },
               },
+            },
+          },
+          colors: {
+            type: 'array',
+            description:
+              'Colours of the available variants, each once. `hex` is null when none is recorded.',
+            items: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                name: { type: 'string' },
+                hex: { type: 'string', nullable: true },
+              },
+            },
+          },
+          sizeRange: {
+            type: 'string',
+            nullable: true,
+            description:
+              'First and last size, for example "S-5XL"; null without sizes',
+          },
+          bulkTier: {
+            type: 'object',
+            nullable: true,
+            description:
+              'Product-level bulk tier with the lowest unit price (NGN); null without tiers. Display only: the cart quote is the price authority.',
+            properties: {
+              minQuantity: { type: 'integer' },
+              pricePerUnit: { type: 'number' },
             },
           },
           productImageRoles: {

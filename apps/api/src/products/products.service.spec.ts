@@ -182,11 +182,38 @@ describe('ProductsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return products with ACTIVE status and slim include (no variants)', async () => {
+    // TTW-204: replaces the earlier "slim include, no variants" test. The list now reads
+    // variants and product-level tiers, but exposes only the derived card summary.
+    it('should return products with ACTIVE status and a card summary instead of raw variants and tiers', async () => {
       const slimProduct = {
         ...mockProduct,
         prices: [{ amount: 5000, currency: 'NGN', compareAt: null }],
         productImageRoles: [],
+        variants: [
+          {
+            optionValues: [
+              {
+                option: { code: 'color' },
+                optionValue: {
+                  valueCode: 'RED',
+                  displayName: 'Red',
+                  sortOrder: 0,
+                  metadata: { hex: '#ef2557' },
+                },
+              },
+              {
+                option: { code: 'size' },
+                optionValue: {
+                  valueCode: 'S',
+                  displayName: 'S',
+                  sortOrder: 0,
+                  metadata: null,
+                },
+              },
+            ],
+          },
+        ],
+        bulkPricingTiers: [{ minQuantity: 30, pricePerUnit: '3800.00' }],
       };
       (prisma.product.findMany as jest.Mock).mockResolvedValue([slimProduct]);
 
@@ -199,15 +226,44 @@ describe('ProductsService', () => {
             category: { select: { id: true, name: true, slug: true } },
             prices: expect.any(Object),
             productImageRoles: expect.any(Object),
+            variants: expect.objectContaining({
+              where: { isAvailable: true },
+            }),
+            bulkPricingTiers: expect.objectContaining({
+              where: { variantId: null, currency: 'NGN' },
+            }),
           }),
         }),
       );
-      expect(prisma.product.findMany).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: expect.objectContaining({ variants: expect.anything() }),
-        }),
-      );
-      expect(result).toEqual([slimProduct]);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: slimProduct.id,
+        colors: [{ code: 'RED', name: 'Red', hex: '#ef2557' }],
+        sizeRange: 'S',
+        bulkTier: { minQuantity: 30, pricePerUnit: 3800 },
+      });
+      expect(result[0]).not.toHaveProperty('variants');
+      expect(result[0]).not.toHaveProperty('bulkPricingTiers');
+    });
+
+    it('should keep a product without variants or tiers, with an empty summary', async () => {
+      (prisma.product.findMany as jest.Mock).mockResolvedValue([
+        {
+          ...mockProduct,
+          prices: [],
+          productImageRoles: [],
+          variants: [],
+          bulkPricingTiers: [],
+        },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result[0]).toMatchObject({
+        colors: [],
+        sizeRange: null,
+        bulkTier: null,
+      });
     });
 
     it('should filter by categoryId when provided', async () => {

@@ -14422,18 +14422,29 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of products with category, prices (NGN), and thumbnail (no variants) */
+            /** @description List of products with category, prices (NGN), thumbnail, and a card summary (colours, size range, bulk tier). No raw variants. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Product-level bulk tier with the lowest unit price (NGN); null without tiers. Display only: the cart quote is the price authority. */
+                        bulkTier?: {
+                            minQuantity?: number;
+                            pricePerUnit?: number;
+                        } | null;
                         category?: {
                             id?: string;
                             name?: string;
                             slug?: string;
                         };
+                        /** @description Colours of the available variants, each once. `hex` is null when none is recorded. */
+                        colors?: {
+                            code?: string;
+                            hex?: string | null;
+                            name?: string;
+                        }[];
                         description?: string | null;
                         id?: string;
                         name?: string;
@@ -14450,6 +14461,8 @@ export interface operations {
                                 url?: string;
                             };
                         }[];
+                        /** @description First and last size, for example "S-5XL"; null without sizes */
+                        sizeRange?: string | null;
                         slug?: string;
                         status?: string;
                     }[];

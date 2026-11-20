@@ -48,6 +48,7 @@ import {
   TemplateEffectType,
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
+import { summarizeProductCard } from './product-card-summary';
 
 type UploadedImageFile = {
   buffer: Buffer;
@@ -261,10 +262,34 @@ export class ProductsService {
             },
           },
         },
+        // TTW-204: only to derive the card summary; never returned as such.
+        variants: {
+          where: { isAvailable: true },
+          select: {
+            optionValues: {
+              select: {
+                option: { select: { code: true } },
+                optionValue: {
+                  select: {
+                    valueCode: true,
+                    displayName: true,
+                    sortOrder: true,
+                    metadata: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        bulkPricingTiers: {
+          where: { variantId: null, currency: DEFAULT_CURRENCY },
+          select: { minQuantity: true, pricePerUnit: true },
+        },
       },
     });
-    return products.map((product) => ({
+    return products.map(({ variants, bulkPricingTiers, ...product }) => ({
       ...product,
+      ...summarizeProductCard({ variants, bulkPricingTiers }),
       productImageRoles: product.productImageRoles.map((role) => ({
         ...role,
         image: role.image
