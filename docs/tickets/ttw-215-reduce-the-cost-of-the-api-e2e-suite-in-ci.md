@@ -134,6 +134,16 @@ The passes themselves did not get shorter: this ticket moved the proof, it did n
 
 One more measure, on a ticket branch (not `main`, so it does not count for the five-run criterion below): `codex/ttw-230-upgrade-next-for-the-security-advisory`, run 44775221215 (`CI`), commit "record the independent review of TTW-230": success, **364 s (6 min 4 s)**, 19 of 19 jobs successful; `API Integration` 361 s, `API Open Handles` 252 s. The three runs after the change (379 s, 339 s, 364 s) vary by about 40 s, against 597 s before.
 
+## Follow-up: Playwright browser install (2026-11-20)
+
+The five-run check above left `Playwright Smoke` out, and it turned out to matter. On two runs the step `Install Playwright Chromium` (`playwright install --with-deps chromium`) took 513 s (run 44754489108) and 441 s (run 44784730403, which then lasted 574 s in all, because that job alone set the length of the run). The log of the first one shows `apt` downloading font packages (`fonts-unifont`, `fonts-ipafont`, `fonts-tlwg`) from the Ubuntu mirror of the runner. Over the last 24 `CI` runs, the step took 17 to 48 s in 22 of them and 441 s or 513 s in 2: about one run in twelve, and these were the two longest runs of the day. The libraries Chromium needs were already on the runner image ("already the newest version" in the log); only the fonts were being installed.
+
+Change (branch `claude/ttw-215-playwright-without-system-fonts`): `ci.yml` (`Playwright Smoke`) and `playwright-comprehensive.yml` now run `playwright install chromium` without `--with-deps`. `playwright-matrix.yml` is unchanged: it keeps `--with-deps` for its visual and accessibility projects. Without the fonts, only the look of the text can change. `Playwright Smoke` takes no screenshot to compare. `Playwright Comprehensive` includes the `chromium-a11y` project (axe checks), which is the one thing to watch.
+
+To verify before this counts as done: `Playwright Smoke` and `Playwright Comprehensive` must pass without `--with-deps` (Chromium must start, and the a11y project must give the same results as on `main`). The speed gain can only be seen when the slow mirror strikes again, so it cannot be proven by a single run. The result is recorded below once measured.
+
+Result: pending.
+
 ## Completion summary
 
 The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` is shorter by roughly 1 to 2 minutes: four runs after the change took 329 s to 402 s, against 459 s for a same-afternoon control with the old structure (the 597 s first measured was a slow runner). No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.

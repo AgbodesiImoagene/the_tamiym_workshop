@@ -416,8 +416,15 @@ jobs:
         run: pnpm --filter api exec prisma migrate deploy
       - name: Seed e2e identities
         run: pnpm --filter api seed:e2e
+      # TTW-215: no `--with-deps`. It runs apt to install system packages, and the font
+      # packages sometimes take 7 to 9 minutes to download (2 runs out of 24 measured:
+      # 513 s and 441 s, against 17 to 48 s the other times). That one step then sets the
+      # length of the whole run. The libraries Chromium needs are already on the runner
+      # image. Without the fonts, only the look of the text changes: this job takes no
+      # screenshots to compare. The visual and accessibility runs of playwright-matrix.yml
+      # keep `--with-deps`.
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
       - name: Production build
         run: pnpm build
       - name: Run Playwright smoke
