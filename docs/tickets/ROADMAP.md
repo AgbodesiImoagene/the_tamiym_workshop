@@ -175,7 +175,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [ ]  | 17  | [TTW-098](ttw-098-make-shipping-rates-weight-or-quantity-based.md)       | 2B  | Tarif de livraison selon le poids ou la quantité                          | 5.7      | Élevé    | 6–10   | TTW-097, TTW-086         |
 | [ ]  | 18  | [TTW-095](ttw-095-compute-bulk-tiers-on-total-product-quantity.md)       | 2C  | Palier de prix calculé sur le total du produit                            | 8.5      | Élevé    | 4–8    | TTW-094, Q38             |
 | [ ]  | 19  | [TTW-096](ttw-096-apply-product-and-order-discounts.md)                  | 2D  | Faire fonctionner les remises produit et commande                         | 8.1      | Élevé    | 10–16  | TTW-095                  |
-| [ ]  | —   | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)         | 2C  | Liste produits : vraies couleurs, vrai prix, cartes comme Figma           | Figma    | Standard | 6–10   | TTW-093                  |
+| [x]  | —   | [TTW-204](ttw-204-show-real-product-data-on-the-product-list.md)         | 2C  | Liste produits : vraies couleurs, vrai prix, cartes comme Figma           | Figma    | Standard | 6–10   | TTW-093                  |
 
 ## Phase 3 : Commander son design et l'imprimer
 

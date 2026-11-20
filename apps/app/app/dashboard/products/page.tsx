@@ -3,7 +3,11 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { getDashboardCategories, getDashboardProducts } from '@/lib/products';
+import {
+  type DashboardProduct,
+  getDashboardCategories,
+  getDashboardProducts,
+} from '@/lib/products';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -23,16 +27,16 @@ const previewCards = [
   { name: 'Workshop Hoodie', subtitle: 'Preview while catalog is being published' },
 ];
 
-const colorDots = [
-  '#1497c6',
-  '#c25c88',
-  '#ef2557',
-  '#fefefe',
-  '#54b96a',
-  '#4a2aa0',
-  '#c48a28',
-  '#3d3d3d',
-];
+/** From the real bulk tier when there is one, else the base price, else a quote. Display only. */
+function priceLine(product: DashboardProduct) {
+  const price = product.prices[0];
+  if (!price) return 'Quote on request';
+  if (product.bulkTier) {
+    const { pricePerUnit, minQuantity } = product.bulkTier;
+    return `${formatCurrency(pricePerUnit, price.currency)} each for ${minQuantity} items`;
+  }
+  return `${formatCurrency(price.amount, price.currency)} each`;
+}
 
 export default function DashboardProductsPage() {
   const router = useRouter();
@@ -145,16 +149,12 @@ export default function DashboardProductsPage() {
           <div className="space-y-8">
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product, index) => {
-                const price = product.prices[0];
                 const imageUrl =
                   product.productImageRoles[0]?.image?.url ??
                   fallbackImages[index % fallbackImages.length];
 
                 return (
-                  <article
-                    key={product.id}
-                    className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
-                  >
+                  <article key={product.id} className="overflow-hidden bg-background">
                     <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
                       <Image
                         src={imageUrl}
@@ -165,27 +165,29 @@ export default function DashboardProductsPage() {
                       />
                     </div>
 
-                    <div className="space-y-3 p-5">
-                      <div className="flex flex-wrap gap-2">
-                        {colorDots.map((color) => (
-                          <span
-                            key={`${product.id}-${color}`}
-                            className="h-3 w-3 rounded-sm border border-black/10"
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
+                    <div className="space-y-3 px-1 py-4">
+                      {product.colors && product.colors.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {product.colors.map((color) => (
+                            <span
+                              key={`${product.id}-${color.code}`}
+                              data-testid="product-colour"
+                              role="img"
+                              aria-label={color.name}
+                              title={color.name}
+                              className="h-3 w-3 rounded-sm border border-border bg-muted"
+                              style={color.hex ? { backgroundColor: color.hex } : undefined}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
                       <div className="space-y-1">
                         <p className="text-base font-bold">{product.name}</p>
-                        <p className="text-sm text-black/80">
-                          {price
-                            ? `${formatCurrency(price.amount, price.currency)} each`
-                            : 'Quote on request'}{' '}
-                          {product.category?.name ? `for ${product.category.name}` : ''}
-                        </p>
-                        <p className="text-sm text-black/70">
-                          {product.description || 'No Minimum'}
-                        </p>
+                        {product.sizeRange ? (
+                          <p className="text-sm text-black/70">{product.sizeRange}</p>
+                        ) : null}
+                        <p className="text-sm text-black/80">{priceLine(product)}</p>
+                        <p className="text-sm text-black/70">No Minimum</p>
                       </div>
                       <div className="flex items-center gap-3 pt-2">
                         <Link

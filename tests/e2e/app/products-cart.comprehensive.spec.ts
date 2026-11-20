@@ -65,6 +65,40 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await expect(customerPage.getByText('Bulk Item 01')).toBeVisible();
   });
 
+  test('each card shows its own colours and sizes, with no invented data (TTW-204)', async ({
+    customerPage,
+  }) => {
+    await customerPage.goto('/dashboard/products');
+    await customerPage.getByRole('tab', { name: 'Apparel' }).click();
+
+    const card = (name: string) =>
+      customerPage
+        .getByRole('article')
+        .filter({ has: customerPage.getByText(name, { exact: true }) });
+    const tee = card('Classic Tee');
+    const hoodie = card('Campus Hoodie');
+
+    // The tee has two colours with a hex and two sizes in the seed.
+    await expect(tee.getByTestId('product-colour')).toHaveCount(2);
+    await expect(tee.getByTitle('Navy')).toBeVisible();
+    await expect(tee.getByTitle('White')).toBeVisible();
+    await expect(tee.getByText('Medium-Large')).toBeVisible();
+
+    // The hoodie has sizes but no colour: no colour square, not the fixed palette.
+    await expect(hoodie.getByTestId('product-colour')).toHaveCount(0);
+    await expect(hoodie.getByText('Small-Medium')).toBeVisible();
+
+    // The price line no longer names the category, and the description never replaces "No Minimum".
+    await expect(tee.getByText('No Minimum')).toBeVisible();
+    await expect(tee.getByText(/ each for [A-Za-z]/)).toHaveCount(0);
+    await expect(tee.getByText(/Soft cotton/)).toHaveCount(0);
+    await expect(customerPage.getByText(/best seller/i)).toHaveCount(0);
+
+    // Choosing size and colour, and so adding to the cart, stays one click away.
+    await tee.getByRole('link', { name: 'View product' }).click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/products\/e2e-product-classic-tee$/);
+  });
+
   test('buys several sizes of one product in a single action (TTW-092)', async ({
     customerPage,
   }) => {

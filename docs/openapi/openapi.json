@@ -19072,6 +19072,19 @@
                 "schema": {
                   "items": {
                     "properties": {
+                      "bulkTier": {
+                        "description": "Product-level bulk tier with the lowest unit price (NGN); null without tiers. Display only: the cart quote is the price authority.",
+                        "nullable": true,
+                        "properties": {
+                          "minQuantity": {
+                            "type": "integer"
+                          },
+                          "pricePerUnit": {
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
                       "category": {
                         "properties": {
                           "id": {
@@ -19085,6 +19098,25 @@
                           }
                         },
                         "type": "object"
+                      },
+                      "colors": {
+                        "description": "Colours of the available variants, each once. `hex` is null when none is recorded.",
+                        "items": {
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "hex": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
                       },
                       "description": {
                         "nullable": true,
@@ -19138,6 +19170,11 @@
                         },
                         "type": "array"
                       },
+                      "sizeRange": {
+                        "description": "First and last size, for example \"S-5XL\"; null without sizes",
+                        "nullable": true,
+                        "type": "string"
+                      },
                       "slug": {
                         "type": "string"
                       },
@@ -19151,7 +19188,7 @@
                 }
               }
             },
-            "description": "List of products with category, prices (NGN), and thumbnail (no variants)"
+            "description": "List of products with category, prices (NGN), thumbnail, and a card summary (colours, size range, bulk tier). No raw variants."
           }
         },
         "summary": "List products (catalogue)",

@@ -21,6 +21,12 @@ export interface DashboardProduct {
       altText?: string | null;
     } | null;
   }>;
+  /** List card summary (TTW-204). Absent on the detail endpoint. */
+  colors?: Array<{ code: string; name: string; hex: string | null }>;
+  /** For example "S-5XL"; `null` when the product has no sizes. */
+  sizeRange?: string | null;
+  /** Product-level bulk tier with the lowest unit price; display only. */
+  bulkTier?: { minQuantity: number; pricePerUnit: number } | null;
 }
 
 export interface DashboardProductDetail extends DashboardProduct {
