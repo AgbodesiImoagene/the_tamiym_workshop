@@ -1,7 +1,7 @@
 # TTW-091 — Remove the fake profile picture and its button
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (parcours Playwright non joué, voir les preuves)\
+**Status:** Implemented-unverified (relecture indépendante à faire)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -46,7 +46,7 @@ Client answers:
 ## Acceptance criteria
 
 - [x] No user sees a demo photo or an inactive button in settings (Jest, les deux pages Profile et Settings).
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated. (Couverture Playwright mise à jour ; parcours **non joué** : voir ci-dessous.)
+- [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
 - [x] Required quality gates pass, with evidence recorded below (hors parcours Playwright).
 
 ## Out of scope
@@ -71,7 +71,7 @@ Constat confirmé sur `main` (147d5d5) : image de démo + bouton sans action dan
 - `pnpm --filter app lint` → OK, sans erreur.
 - `pnpm format:check` → « All matched files use Prettier code style! ».
 - `pnpm playwright:validate` → « Playwright manifest validation passed. »
-- **Non vérifié** : `tests/e2e/app/settings.comprehensive.spec.ts` (assertions ajoutées) n'a pas été exécuté, ni le parcours dans le navigateur. Il démarre l'API et trois sites sur les ports 3000 à 3003 et écrit dans la base de test partagée avec la session TTW-097 menée en parallèle.
+- Playwright : `pnpm build` (5 tâches OK), `prisma migrate deploy` (aucune migration en attente) et `seed:e2e` sur `tamiym_workshop_test`, puis `pnpm exec playwright test tests/e2e/app/settings.comprehensive.spec.ts --project=setup --project=chromium-app` → `14 passed (28.2s)` (3 tailles d'écran ; « profile page reuses settings form controls » inclut les assertions « pas d'image Profile, pas de bouton Profile Picture »).
 - `pnpm docs:validate` → « Documentation validation passed. »
 - Non lancés : tests API, `pnpm verify`.
 
@@ -81,6 +81,6 @@ Retiré : l'image de démo, le bouton « Upload/Update Profile Picture », l'ent
 
 Écarts au plan : les tests ont été ajoutés au fichier existant `apps/app/__tests__/settings/customer-settings-form.test.tsx` (pas de nouveau fichier).
 
-Reste à faire : jouer le spec Playwright et le parcours navigateur, puis la relecture indépendante.
+Reste à faire : la relecture indépendante. Le chevron « retour » sans action est traité dans un ticket séparé (TTW-228).
 
 À signaler, hors périmètre : le bouton « retour » (chevron) en haut du formulaire n'a pas d'action.
