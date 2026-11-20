@@ -228,6 +228,55 @@ export function imageCrossOrigin(src: string): 'use-credentials' | 'anonymous' {
   return 'anonymous';
 }
 
+/**
+ * Public, token-scoped path of a customer image used by a shared design (TTW-234). The
+ * share token is the capability: no session, no cookie.
+ */
+export function sharedDesignAssetUrl(
+  shareToken: string,
+  designAssetId: string,
+  variant: 'original' | 'display' | 'thumb' = 'original'
+): string {
+  return `${API_BASE_URL()}/public/designs/${encodeURIComponent(shareToken)}/assets/${encodeURIComponent(designAssetId)}/file?variant=${variant}`;
+}
+
+/**
+ * Copy of a saved design whose customer images read through the share token instead of the
+ * owner's session (TTW-234). Public images and text are left as they are, and the input
+ * is not modified: the saved design keeps its session-only paths.
+ */
+export function rewriteSharedImageSources(
+  fabricJson: FabricJson | null,
+  shareToken: string
+): FabricJson | null {
+  if (!fabricJson) return fabricJson;
+  return { ...fabricJson, objects: rewriteObjects(fabricJson.objects, shareToken) };
+}
+
+/** Objects can nest (a group holds `objects`), as the server's scan of the design does. */
+function rewriteObjects(
+  objects: Record<string, unknown>[],
+  shareToken: string
+): Record<string, unknown>[] {
+  return objects.map((object) => {
+    const designAssetId = (object.data as { designAssetId?: unknown } | undefined)?.designAssetId;
+    if (typeof designAssetId === 'string' && designAssetId.length > 0) {
+      return {
+        ...object,
+        src: sharedDesignAssetUrl(shareToken, designAssetId),
+        crossOrigin: 'anonymous',
+      };
+    }
+    if (Array.isArray(object.objects)) {
+      return {
+        ...object,
+        objects: rewriteObjects(object.objects as Record<string, unknown>[], shareToken),
+      };
+    }
+    return object;
+  });
+}
+
 /** Upload a user image asset for use in the workshop canvas (PNG/JPEG/WebP, ≤ 10 MB). */
 export async function uploadDesignAsset(
   file: File

@@ -103,7 +103,8 @@ Date: 2026-11-20. Scope decided by the user: **everything** of a customer upload
 Independent review (`/code-review high`, 2026-11-20) reported 9 findings:
 
 - Fixed: stale design review in this ticket.
-- Not fixed, recorded under Remaining: shared design page (`apps/app/app/design/shared/[shareToken]/page.tsx`) shows blank customer images to anonymous visitors; `S3_PRIVATE_BUCKET` is not provisioned in OpenTofu or validated at startup; no lifecycle cleanup of rejected, infected or orphaned private objects; streamed S3 body not destroyed on client abort; duplicated bucket code in `S3Service`; type casts caused by duplicate `@smithy/types`; the owner can read the original before the scan completes (needed so the canvas shows the image right after upload); no browser run of the workshop.
+- Handled in [TTW-234](ttw-234-show-private-customer-images-on-shared-designs.md): the shared design page (`apps/app/app/design/shared/[shareToken]/page.tsx`) showed blank customer images to anonymous visitors.
+- Not fixed, recorded under Remaining: `S3_PRIVATE_BUCKET` is not provisioned in OpenTofu or validated at startup; no lifecycle cleanup of rejected, infected or orphaned private objects; streamed S3 body not destroyed on client abort; duplicated bucket code in `S3Service`; type casts caused by duplicate `@smithy/types`; the owner can read the original before the scan completes (needed so the canvas shows the image right after upload); no browser run of the workshop.
 
 A second review pass after the Remaining items are handled is still to do.
 
@@ -123,7 +124,6 @@ Run from the worktree `codex/ttw-099-make-customer-uploads-private`, on 2026-11-
 
 ## Remaining
 
-- Shared designs: give anonymous viewers access to customer images through the share token (new ticket, regression of this change).
 - Provision a private bucket in `infra/modules/spaces` and in the runtime secrets, and validate `S3_PRIVATE_BUCKET` at startup in production.
 - Lifecycle cleanup of rejected, infected and orphaned private objects (and TTW-120 for deleted accounts).
 - Play the workshop journey in a browser against MinIO: add an image, save, reload, thumbnail export.

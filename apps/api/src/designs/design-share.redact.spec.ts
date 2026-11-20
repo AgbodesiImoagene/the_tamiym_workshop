@@ -13,6 +13,14 @@ describe('redactPublicDesignShareUrl', () => {
     );
   });
 
+  it('redacts the bearer on the shared image path too (TTW-234)', () => {
+    expect(
+      redactPublicDesignShareUrl(
+        '/v1/public/designs/supersecrettokenvalue/assets/da_1/file?variant=thumb',
+      ),
+    ).toBe('/v1/public/designs/[REDACTED]/assets/da_1/file?variant=thumb');
+  });
+
   it('leaves unrelated URLs alone', () => {
     expect(redactPublicDesignShareUrl('/v1/designs/abc')).toBe(
       '/v1/designs/abc',

@@ -3,6 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MediaService } from '../media/media.service';
 import { S3Service } from '../storage/s3.service';
 import { MEDIA_SUPPORTED_MIME_TYPES } from '../media/media.constants';
+import { hashDesignShareToken } from '../designs/design-share.crypto';
+import {
+  isShareLinkOpen,
+  isShareTokenShape,
+} from '../designs/design-share.policy';
+import { collectDesignAssetIds } from './design-data-assets';
 import type { Readable } from 'node:stream';
 import {
   MediaAssetStatus,
@@ -30,6 +36,31 @@ const VARIANT_TO_DERIVATIVE: Record<
   display: MediaDerivativeType.DISPLAY,
   thumb: MediaDerivativeType.THUMB,
 };
+
+const READ_SELECT = {
+  ownerUserId: true,
+  mediaAsset: {
+    select: {
+      status: true,
+      scanStatus: true,
+      moderationStatus: true,
+      visibility: true,
+      originalKey: true,
+      originalMime: true,
+      derivatives: { select: { type: true, key: true, mimeType: true } },
+    },
+  },
+} as const;
+
+interface ReadableMedia {
+  status: MediaAssetStatus;
+  scanStatus: VirusScanStatus;
+  moderationStatus: ModerationStatus;
+  visibility: MediaVisibility;
+  originalKey: string | null;
+  originalMime: string | null;
+  derivatives: { type: MediaDerivativeType; key: string; mimeType: string }[];
+}
 
 @Injectable()
 export class DesignAssetsService {
@@ -98,6 +129,70 @@ export class DesignAssetsService {
       designAssetId,
       variant,
     );
+    return this.streamFile(key, mimeType);
+  }
+
+  /**
+   * Bytes of a private customer image for the holder of a design share link, no session
+   * (TTW-234). Every denial is the same 404, so nothing can be enumerated. The link must be
+   * live and its design approved (same rule as the shared design itself), the design must
+   * use this asset, and the asset must belong to the design's owner: a share token opens
+   * the images of its own design and nothing else. Rejected, infected or failed files stay
+   * closed, with no admin exception.
+   */
+  async openSharedFile(
+    shareToken: string,
+    designAssetId: string,
+    variant: DesignAssetVariant,
+  ): Promise<{
+    stream: Readable;
+    contentLength?: number;
+    contentType: string;
+  }> {
+    if (!isShareTokenShape(shareToken)) {
+      throw new NotFoundException('File not found');
+    }
+    const link = await this.prisma.designShareLink.findUnique({
+      where: { tokenHash: hashDesignShareToken(shareToken) },
+      select: {
+        expiresAt: true,
+        revokedAt: true,
+        design: {
+          select: { userId: true, moderationStatus: true, designData: true },
+        },
+      },
+    });
+    if (
+      !link ||
+      !isShareLinkOpen(link) ||
+      !collectDesignAssetIds(link.design.designData).has(designAssetId)
+    ) {
+      throw new NotFoundException('File not found');
+    }
+
+    const designAsset = await this.prisma.designAsset.findUnique({
+      where: { id: designAssetId },
+      select: READ_SELECT,
+    });
+    if (!designAsset || designAsset.ownerUserId !== link.design.userId) {
+      throw new NotFoundException('File not found');
+    }
+    const { key, mimeType } = this.resolveReadable(
+      designAsset.mediaAsset,
+      variant,
+      false,
+    );
+    return this.streamFile(key, mimeType);
+  }
+
+  private async streamFile(
+    key: string,
+    mimeType: string | null,
+  ): Promise<{
+    stream: Readable;
+    contentLength?: number;
+    contentType: string;
+  }> {
     const { stream, contentLength } = await this.s3.getPrivateObjectStream(key);
     // Only an image type we accepted at upload is ever announced, so a browser never
     // gets a chance to run a stored file as a page.
@@ -119,34 +214,31 @@ export class DesignAssetsService {
   ): Promise<{ key: string; mimeType: string | null }> {
     const designAsset = await this.prisma.designAsset.findUnique({
       where: { id: designAssetId },
-      select: {
-        ownerUserId: true,
-        mediaAsset: {
-          select: {
-            status: true,
-            scanStatus: true,
-            moderationStatus: true,
-            visibility: true,
-            originalKey: true,
-            originalMime: true,
-            derivatives: { select: { type: true, key: true, mimeType: true } },
-          },
-        },
-      },
+      select: READ_SELECT,
     });
 
     const isAdmin = actor.role === UserRole.ADMIN;
     if (!designAsset || (!isAdmin && designAsset.ownerUserId !== actor.id)) {
       throw new NotFoundException('File not found');
     }
+    return this.resolveReadable(designAsset.mediaAsset, variant, isAdmin);
+  }
 
-    const media = designAsset.mediaAsset;
-    // Legacy public assets are not in the private bucket: never read them from there.
+  /**
+   * Key and mime type of one rendition. Legacy public assets are never read from the
+   * private bucket. Unless `allowUnusable` (admin review), a file that failed scanning or
+   * processing, or that moderation rejected, stays closed.
+   */
+  private resolveReadable(
+    media: ReadableMedia,
+    variant: DesignAssetVariant,
+    allowUnusable: boolean,
+  ): { key: string; mimeType: string | null } {
     if (media.visibility !== MediaVisibility.PRIVATE) {
       throw new NotFoundException('File not found');
     }
     if (
-      !isAdmin &&
+      !allowUnusable &&
       (media.status === MediaAssetStatus.FAILED ||
         media.scanStatus === VirusScanStatus.INFECTED ||
         media.scanStatus === VirusScanStatus.FAILED ||
