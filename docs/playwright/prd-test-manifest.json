@@ -178,6 +178,16 @@
       "tags": ["@app"]
     },
     {
+      "id": "APP-WORKSHOP-LAYERS",
+      "surface": "app",
+      "feature": "Design workshop delete, undo/redo and layer list",
+      "prd_ref": "Design Workshop",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/design-workshop.layers.spec.ts"],
+      "browser_tiers": ["matrix"],
+      "tags": ["@app", "@critical"]
+    },
+    {
       "id": "APP-CHECKOUT",
       "surface": "app",
       "feature": "Customer checkout address, quote and payment",

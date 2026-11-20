@@ -2,11 +2,36 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
+import { createLayerHistory, type LayerHistory } from './layer-history';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricCanvas = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FabricNS = any;
+
+/** What the editor can ask the canvas to do. Filled in by WorkshopCanvas once it is ready. */
+export interface WorkshopCanvasControls {
+  /** Add a text layer built from a Fabric IText descriptor, and select it. */
+  addText: (descriptor: Record<string, unknown>) => Promise<void>;
+  /** Add an image layer built from a Fabric image descriptor (`src` required), and select it. */
+  addImage: (descriptor: Record<string, unknown>) => Promise<void>;
+  /** Delete the selected customer layers. Returns false when there was nothing to delete. */
+  deleteSelected: () => boolean;
+  /** Delete one customer layer by id. */
+  deleteLayer: (layerId: string) => boolean;
+  selectLayer: (layerId: string) => void;
+  /** Move a customer layer one step up or down. Returns false at the edge of the stack. */
+  moveLayer: (layerId: string, direction: 'up' | 'down') => boolean;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+  /** The canvas picture, for the thumbnail. */
+  toDataURL: (options?: Record<string, unknown>) => string | null;
+}
+
+export interface WorkshopHistoryState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
 
 interface WorkshopCanvasProps {
   viewKey: string;
@@ -17,10 +42,44 @@ interface WorkshopCanvasProps {
   width?: number;
   height?: number;
   onLayersChange?: (json: FabricJson) => void;
+  /** Called with the layer id of the selected customer layer, or null. */
+  onSelectionChange?: (layerId: string | null) => void;
+  onHistoryChange?: (state: WorkshopHistoryState) => void;
+  /** Receives the canvas controls once the canvas is ready (editable canvases only). */
+  controlRef?: { current: WorkshopCanvasControls | null };
   readOnly?: boolean;
 }
 
 const DEFAULT_SIZE = 600;
+const SERIALISED_PROPS = ['designAssetId', 'data'];
+
+let layerCounter = 0;
+/** A unique id for a customer layer. Not a secret: it only tells layers apart. */
+function newLayerId(): string {
+  layerCounter += 1;
+  return `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${layerCounter}`;
+}
+
+const isUserObject = (o: FabricCanvas): boolean => !o.data?.isTemplateLayer;
+const getUserObjects = (canvas: FabricCanvas): FabricCanvas[] =>
+  canvas.getObjects().filter(isUserObject);
+/**
+ * Fabric v6+ only honours the list of extra properties in `toObject(props)`: `toJSON()`
+ * ignores it, which would drop `data` (layer id, asset id). `toJSON` is the fallback.
+ */
+const toPlain = (target: FabricCanvas): Record<string, unknown> =>
+  typeof target.toObject === 'function'
+    ? target.toObject(SERIALISED_PROPS)
+    : target.toJSON(SERIALISED_PROPS);
+const serialiseUserObjects = (canvas: FabricCanvas): Record<string, unknown>[] =>
+  getUserObjects(canvas).map(toPlain);
+
+/** Layers saved before layer ids existed get one when the view is loaded. */
+function assignLayerIds(canvas: FabricCanvas) {
+  getUserObjects(canvas).forEach((o: FabricCanvas) => {
+    if (!o.data?.layerId) o.set({ data: { ...o.data, layerId: newLayerId() } });
+  });
+}
 
 /**
  * WorkshopCanvas wraps a Fabric.js canvas. It:
@@ -28,8 +87,10 @@ const DEFAULT_SIZE = 600;
  * - Applies option-value effects (TINT via BlendColor filter, REPLACE_IMAGE by swapping src)
  * - Clips user layers to the PrintArea bounds
  * - Fires `onLayersChange` on every modification with the serialised user-layer JSON
+ * - Gives the editor controls to add, delete, select, reorder, undo and redo customer layers
  *
- * Template layers are always reconstructed from props — they are never in fabricJson.
+ * Template layers are always reconstructed from props — they are never in fabricJson, and
+ * delete/undo/redo/reorder never touch them.
  * Fabric.js is imported dynamically (browser-only). Compatible with fabric v7 named exports.
  */
 export default function WorkshopCanvas({
@@ -41,12 +102,32 @@ export default function WorkshopCanvas({
   width = DEFAULT_SIZE,
   height = DEFAULT_SIZE,
   onLayersChange,
+  onSelectionChange,
+  onHistoryChange,
+  controlRef,
   readOnly = false,
 }: WorkshopCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas>(null);
   const fabricModuleRef = useRef<FabricNS>(null);
   const lastJsonRef = useRef<string>('');
+  const historyRef = useRef<LayerHistory | null>(null);
+  // While true, canvas events are ignored: a batch of changes is reported once at its end.
+  const silentRef = useRef(false);
+  // While true, the reported change is a restore and must not become a new history entry.
+  const restoringRef = useRef(false);
+  const restoreQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingRestoresRef = useRef(0);
+
+  // The Fabric listeners live as long as the canvas: they read the latest callbacks here.
+  const onLayersChangeRef = useRef(onLayersChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const onHistoryChangeRef = useRef(onHistoryChange);
+  useEffect(() => {
+    onLayersChangeRef.current = onLayersChange;
+    onSelectionChangeRef.current = onSelectionChange;
+    onHistoryChangeRef.current = onHistoryChange;
+  });
 
   const buildLayerKey = (layerId: string) => `__template_${layerId}`;
 
@@ -115,21 +196,6 @@ export default function WorkshopCanvas({
     [templateLayers, activeEffects, width, height]
   );
 
-  const loadUserLayers = useCallback(
-    async (canvas: FabricCanvas, json: FabricJson | null) => {
-      if (!json || json.objects.length === 0) return;
-      await canvas.loadFromJSON({ ...json });
-      canvas.getObjects().forEach((o: FabricCanvas) => {
-        if (!o.data?.isTemplateLayer) {
-          o.set({ selectable: !readOnly, evented: !readOnly });
-        }
-      });
-      canvas.requestRenderAll?.();
-      canvas.renderAll?.();
-    },
-    [readOnly]
-  );
-
   const buildClipPath = useCallback(
     (canvas: FabricCanvas, fabric: FabricNS) => {
       if (!printArea) return;
@@ -146,23 +212,235 @@ export default function WorkshopCanvas({
     [printArea, width, height]
   );
 
+  const notifyHistory = useCallback(() => {
+    const history = historyRef.current;
+    onHistoryChangeRef.current?.({
+      canUndo: history?.canUndo() ?? false,
+      canRedo: history?.canRedo() ?? false,
+    });
+  }, []);
+
   const emitChange = useCallback(
     (canvas: FabricCanvas) => {
-      if (!onLayersChange) return;
-      const userObjects = canvas.getObjects().filter((o: FabricCanvas) => !o.data?.isTemplateLayer);
+      if (silentRef.current) return;
+      assignLayerIds(canvas);
+      const userJson = serialiseUserObjects(canvas);
 
+      // Not yet recording while the first load is still running (historyRef is null).
+      if (historyRef.current && !restoringRef.current) {
+        historyRef.current.push(JSON.stringify(userJson));
+        notifyHistory();
+      }
+
+      const onChange = onLayersChangeRef.current;
+      if (!onChange) return;
       const json: FabricJson = {
-        ...canvas.toJSON(['designAssetId', 'data']),
-        objects: userObjects.map(
-          (o: FabricCanvas) => o.toJSON(['designAssetId', 'data']) as Record<string, unknown>
-        ),
+        ...toPlain(canvas),
+        objects: userJson,
       };
       const serialised = JSON.stringify(json);
       if (serialised === lastJsonRef.current) return;
       lastJsonRef.current = serialised;
-      onLayersChange(json);
+      onChange(json);
     },
-    [onLayersChange]
+    [notifyHistory]
+  );
+
+  /** Run several canvas changes, then report them once (and record them unless restoring). */
+  const applyBatch = useCallback(
+    (canvas: FabricCanvas, change: () => void, recordInHistory: boolean) => {
+      silentRef.current = true;
+      try {
+        change();
+      } finally {
+        silentRef.current = false;
+      }
+      restoringRef.current = !recordInHistory;
+      try {
+        emitChange(canvas);
+      } finally {
+        restoringRef.current = false;
+      }
+      canvas.requestRenderAll?.();
+    },
+    [emitChange]
+  );
+
+  const addUserObjects = useCallback(
+    (canvas: FabricCanvas, objects: FabricCanvas[]) => {
+      objects.forEach((o) => {
+        o.set({ selectable: !readOnly, evented: !readOnly });
+        canvas.add(o);
+      });
+    },
+    [readOnly]
+  );
+
+  const loadUserLayers = useCallback(
+    async (canvas: FabricCanvas, fabric: FabricNS, json: FabricJson | null) => {
+      if (!json || json.objects.length === 0) return;
+      // Enliven + add rather than loadFromJSON: loadFromJSON would clear the template layers.
+      const objects = await fabric.util.enlivenObjects(json.objects);
+      if (fabricRef.current !== canvas) return; // the view changed while loading
+      silentRef.current = true;
+      try {
+        addUserObjects(canvas, objects);
+      } finally {
+        silentRef.current = false;
+      }
+      canvas.requestRenderAll?.();
+      canvas.renderAll?.();
+    },
+    [addUserObjects]
+  );
+
+  const restoreSnapshot = useCallback(
+    async (canvas: FabricCanvas, fabric: FabricNS, snapshot: string) => {
+      const items = JSON.parse(snapshot) as Record<string, unknown>[];
+      const objects = items.length > 0 ? await fabric.util.enlivenObjects(items) : [];
+      if (fabricRef.current !== canvas) return false; // the canvas was rebuilt meanwhile
+      // Fabric silently drops an object it cannot load (an image whose URL no longer
+      // answers). Restoring a partial state would lose a layer without a word: refuse.
+      if (objects.length !== items.length) return false;
+      applyBatch(
+        canvas,
+        () => {
+          canvas.discardActiveObject?.();
+          getUserObjects(canvas).forEach((o: FabricCanvas) => canvas.remove(o));
+          addUserObjects(canvas, objects);
+        },
+        false
+      );
+      return true;
+    },
+    [applyBatch, addUserObjects]
+  );
+
+  const buildControls = useCallback(
+    (canvas: FabricCanvas, fabric: FabricNS): WorkshopCanvasControls => {
+      const findLayer = (layerId: string) =>
+        getUserObjects(canvas).find((o: FabricCanvas) => o.data?.layerId === layerId);
+
+      const removeObjects = (objects: FabricCanvas[]) => {
+        if (objects.length === 0) return false;
+        applyBatch(
+          canvas,
+          () => {
+            canvas.discardActiveObject?.();
+            objects.forEach((o) => canvas.remove(o));
+          },
+          true
+        );
+        return true;
+      };
+
+      const step = (direction: 'undo' | 'redo') => {
+        // One restore at a time, in order, because enlivening objects is asynchronous.
+        // The history only moves when its turn comes, so it always matches the canvas.
+        pendingRestoresRef.current += 1;
+        restoreQueueRef.current = restoreQueueRef.current.then(async () => {
+          try {
+            const history = historyRef.current;
+            const snapshot = history ? history[direction]() : null;
+            if (snapshot === null) return;
+            notifyHistory();
+            const restored = await restoreSnapshot(canvas, fabric, snapshot);
+            if (!restored && historyRef.current) {
+              // Nothing changed on the canvas: put the history back where it was.
+              historyRef.current[direction === 'undo' ? 'redo' : 'undo']();
+              notifyHistory();
+            }
+          } finally {
+            pendingRestoresRef.current -= 1;
+          }
+        });
+        return restoreQueueRef.current;
+      };
+      // While an undo or redo is still being applied, other changes would be recorded against
+      // a canvas that is about to be replaced: they wait for the user to try again.
+      const busy = () => pendingRestoresRef.current > 0;
+
+      return {
+        async addText(descriptor) {
+          if (busy()) return;
+          const { type: _type, text, data, ...options } = descriptor;
+          void _type;
+          const IText = fabric.IText ?? fabric.fabric?.IText;
+          const itext = new IText(String(text ?? 'Text'), {
+            ...options,
+            data: { ...(data as object | undefined), layerId: newLayerId() },
+          });
+          canvas.add(itext);
+          canvas.setActiveObject(itext);
+          canvas.requestRenderAll?.();
+        },
+
+        async addImage(descriptor) {
+          if (busy()) return;
+          const { type: _type, src, data, ...options } = descriptor;
+          void _type;
+          const ImageCtor = fabric.FabricImage ?? fabric.Image ?? fabric.fabric?.Image;
+          const img = await ImageCtor.fromURL(String(src ?? ''), { crossOrigin: 'anonymous' });
+          if (fabricRef.current !== canvas) return; // the canvas was rebuilt while loading
+          img.set({
+            ...options,
+            data: { ...(data as object | undefined), layerId: newLayerId() },
+          });
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          canvas.requestRenderAll?.();
+        },
+
+        deleteSelected() {
+          if (busy()) return false;
+          const selected: FabricCanvas[] = canvas.getActiveObjects
+            ? canvas.getActiveObjects()
+            : [canvas.getActiveObject()].filter(Boolean);
+          // Never delete a layer while its text is being typed.
+          if (selected.some((o) => o.isEditing)) return false;
+          return removeObjects(selected.filter(isUserObject));
+        },
+
+        deleteLayer(layerId) {
+          if (busy()) return false;
+          const layer = findLayer(layerId);
+          return layer ? removeObjects([layer]) : false;
+        },
+
+        selectLayer(layerId) {
+          const layer = findLayer(layerId);
+          if (!layer) return;
+          canvas.setActiveObject(layer);
+          canvas.requestRenderAll?.();
+        },
+
+        moveLayer(layerId, direction) {
+          if (busy()) return false;
+          const layers = getUserObjects(canvas);
+          const index = layers.findIndex((o: FabricCanvas) => o.data?.layerId === layerId);
+          const target = direction === 'up' ? index + 1 : index - 1;
+          // Stay among the customer layers: template layers sit below and are never crossed.
+          if (index < 0 || target < 0 || target >= layers.length) return false;
+          if (direction === 'up') canvas.bringObjectForward(layers[index]);
+          else canvas.sendObjectBackwards(layers[index]);
+          emitChange(canvas);
+          canvas.requestRenderAll?.();
+          return true;
+        },
+
+        undo: () => step('undo'),
+        redo: () => step('redo'),
+
+        toDataURL(options) {
+          try {
+            return canvas.toDataURL(options);
+          } catch {
+            return null;
+          }
+        },
+      };
+    },
+    [applyBatch, emitChange, notifyHistory, restoreSnapshot]
   );
 
   // Initialise and tear down Fabric canvas
@@ -190,20 +468,50 @@ export default function WorkshopCanvas({
 
       buildClipPath(canvas, fabric);
 
-      loadTemplateLayers(canvas, fabric).then(() => {
-        if (!mounted) return;
-        return loadUserLayers(canvas, fabricJson);
-      });
-
       if (!readOnly) {
         canvas.on('object:modified', () => emitChange(canvas));
         canvas.on('object:added', () => emitChange(canvas));
         canvas.on('object:removed', () => emitChange(canvas));
+
+        const reportSelection = () => {
+          // A drag-selection holds several objects: report the first customer layer so
+          // that Delete stays available (deleteSelected removes all of them).
+          const selected: FabricCanvas[] = canvas.getActiveObjects
+            ? canvas.getActiveObjects()
+            : [canvas.getActiveObject()].filter(Boolean);
+          const layerId = selected.find(isUserObject)?.data?.layerId ?? null;
+          onSelectionChangeRef.current?.(layerId);
+        };
+        canvas.on('selection:created', reportSelection);
+        canvas.on('selection:updated', reportSelection);
+        canvas.on('selection:cleared', reportSelection);
       }
+
+      void (async () => {
+        let templateError: unknown = null;
+        try {
+          await loadTemplateLayers(canvas, fabric);
+        } catch (err) {
+          templateError = err;
+        }
+        if (!mounted) return;
+        await loadUserLayers(canvas, fabric, fabricJson);
+        if (!mounted) return;
+
+        // The loaded layers are the first history entry: undo never goes before them.
+        assignLayerIds(canvas);
+        historyRef.current = createLayerHistory(JSON.stringify(serialiseUserObjects(canvas)));
+        emitChange(canvas);
+        notifyHistory();
+        if (!readOnly && controlRef) controlRef.current = buildControls(canvas, fabric);
+        if (templateError) throw templateError;
+      })();
     });
 
     return () => {
       mounted = false;
+      historyRef.current = null;
+      if (controlRef) controlRef.current = null;
       if (fabricRef.current) {
         fabricRef.current.dispose();
         fabricRef.current = null;
