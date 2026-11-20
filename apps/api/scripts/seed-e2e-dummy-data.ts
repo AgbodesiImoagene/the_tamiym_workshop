@@ -84,6 +84,15 @@ const E2E_PASSWORD_RESET_TOKENS = [
 ];
 const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
 
+/**
+ * TTW-090: raw email-verification tokens, one per Playwright attempt (a verified user cannot be
+ * verified again, so each attempt gets its own unverified customer). Keep in sync with
+ * tests/e2e/fixtures/identities.ts.
+ */
+const E2E_UNVERIFIED_ATTEMPTS = [0, 1] as const;
+const e2eVerificationToken = (attempt: number) =>
+  `e2e-verify-token-attempt-${attempt}`;
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -463,6 +472,18 @@ async function main() {
           phone: '+2348000000006',
           emailVerifiedAt: daysAgo(10),
         },
+        // TTW-090: customers whose email is not verified yet, one per Playwright attempt.
+        ...E2E_UNVERIFIED_ATTEMPTS.map((attempt) => ({
+          id: `e2e-user-unverified-${attempt}`,
+          email: `unverified.${attempt}.e2e@tamiym.test`,
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Una',
+          lastName: `Unverified${attempt}`,
+          phone: `+234800000001${attempt}`,
+          emailVerifiedAt: null,
+        })),
         {
           // TTW-217: a customer whose only address is in a state we no longer
           // deliver to, so checkout can show the refusal. Kept apart from the
@@ -503,6 +524,12 @@ async function main() {
           userId: IDS.users.passwordReset,
           tokenHash: sha256(token),
           tokenType: TokenType.PASSWORD_RESET,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        })),
+        ...E2E_UNVERIFIED_ATTEMPTS.map((attempt) => ({
+          userId: `e2e-user-unverified-${attempt}`,
+          tokenHash: sha256(e2eVerificationToken(attempt)),
+          tokenType: TokenType.EMAIL_VERIFICATION,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         })),
         {
@@ -575,6 +602,27 @@ async function main() {
         isDefault: true,
       },
     });
+
+    // TTW-090: each unverified customer has a deliverable address, so checkout reaches the
+    // order step (where the API refuses until the email is verified).
+    for (const attempt of E2E_UNVERIFIED_ATTEMPTS) {
+      await prisma.address.create({
+        data: {
+          id: `e2e-address-unverified-${attempt}`,
+          userId: `e2e-user-unverified-${attempt}`,
+          recipientName: `Una Unverified${attempt}`,
+          phone: `+234800000001${attempt}`,
+          addressLine1: '5 Verify Close',
+          city: 'Ikeja',
+          state: 'Lagos',
+          stateCode: 'LA',
+          lgaId: ikeja.id,
+          country: 'Nigeria',
+          countryCode: 'NG',
+          isDefault: true,
+        },
+      });
+    }
 
     // TTW-217: saved while the state was active, deactivated since (the state
     // is seeded inactive above; no admin route deactivates a state).

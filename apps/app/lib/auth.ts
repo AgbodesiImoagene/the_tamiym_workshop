@@ -12,6 +12,8 @@ export interface User {
   firstName?: string | null;
   lastName?: string | null;
   role: UserRole;
+  /** True when the API reports the email as verified (TTW-023). */
+  emailVerified?: boolean;
   /**
    * Session CSRF token echoed back by the API for cookie sessions (TTW-020).
    * Absent for bearer-only callers.
@@ -110,4 +112,11 @@ export const authApi = {
     }
     return user;
   },
+
+  /**
+   * Ask for a new verification link (TTW-090). The API answers the same way
+   * whether or not the account exists, and rate-limits the endpoint.
+   */
+  resendVerification: async (email: string): Promise<{ message: string }> =>
+    apiClient.post<{ message: string }>('/auth/resend-verification', { email }),
 };

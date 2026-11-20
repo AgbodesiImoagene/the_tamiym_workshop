@@ -11,6 +11,8 @@ import {
   setCartPendingOrder,
   useCart,
 } from '@/lib/cart-store';
+import { EmailVerificationNotice } from '@/components/email-verification-banner';
+import { EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE, isEmailNotVerified } from '@/lib/email-verification';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
 import {
@@ -82,6 +84,8 @@ export default function DashboardCheckoutPage() {
   const [isQuoting, setIsQuoting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  // TTW-090: the API refused the order because the account email is unverified.
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
   // LGA currently saved on the account address (TTW-193): emptying it must be sent as null.
   const [savedLgaId, setSavedLgaId] = useState<string | null>(null);
@@ -275,6 +279,7 @@ export default function DashboardCheckoutPage() {
     }
     setError(null);
     setSubmitMessage(null);
+    setEmailNotVerified(false);
     setIsSubmitting(true);
     try {
       const shippingAddressId = savedAddressId || (await ensureAddress());
@@ -318,6 +323,10 @@ export default function DashboardCheckoutPage() {
       if (isAddressLgaRequired(err)) {
         setQuote(null);
         setSubmitMessage(ADDRESS_LGA_REQUIRED_MESSAGE);
+        return;
+      }
+      if (isEmailNotVerified(err)) {
+        setEmailNotVerified(true);
         return;
       }
       const apiError = err as ApiError;
@@ -641,6 +650,12 @@ export default function DashboardCheckoutPage() {
                 <p role="alert" className="text-sm text-red-700">
                   {error}
                 </p>
+              ) : null}
+              {emailNotVerified && user ? (
+                <EmailVerificationNotice
+                  email={user.email}
+                  message={EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE}
+                />
               ) : null}
               {submitMessage ? (
                 <p role="alert" className="text-sm text-red-700">

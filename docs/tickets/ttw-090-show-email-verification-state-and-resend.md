@@ -1,7 +1,7 @@
 # TTW-090 — Show the email-verification state and offer a resend
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** In review (implemented locally, not pushed)\
 **Risk:** High\
 **Blocked by:** TTW-089\
 **Blocks:** None
@@ -45,7 +45,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Acceptance criteria
 
-- [ ] An unverified user understands what to do and can resend the link.
+- [x] An unverified user (component tests; not yet played in a browser) understands what to do and can resend the link.
 - [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
 - [ ] Required quality gates pass, with evidence recorded below.
 
@@ -55,16 +55,43 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Design review
 
-Pending.
+Recorded 2026-11-20, before implementation (High risk: auth).
+
+- Finding confirmed on `main` (20c8c33): `GET /auth/me` returns `emailVerified`, `POST /auth/resend-verification` exists (public, rate-limited, neutral answer), orders answer `403 EMAIL_NOT_VERIFIED`. `apps/app` showed nothing. No API, DTO or OpenAPI change is needed.
+- The API stays the authority: the app only reads `emailVerified` and the error code. A hidden banner never grants anything.
+- No account enumeration: the resend is called with the email of the signed-in user, and the API answer is the same whether or not the account exists. 429 is shown as "wait a few minutes".
+- The banner lives in `CustomerDashboardShell`, so every dashboard page shows it. It reads the user with its own React Query call (`['auth','me']`), so the 12 pages that use the shell did not need changing.
+- No new logs or metrics. Nothing sensitive is logged client-side.
+
+## Deviations from the plan
+
+- Sign-up: no separate screen. After sign-up the user lands on `/dashboard`, where the banner states that the email must be verified before ordering.
+- Playwright covers sign up → message → resend, and "verify, then order". The link is only in the email, which e2e cannot read, so `seed:e2e` writes a known verification token for one unverified customer per Playwright attempt (2: CI retries once), with a deliverable address. The journey logs in, is refused at checkout with the explanation and the resend button, verifies on the public site, then places the order (Paystack initiation simulated as in the other checkout specs).
 
 ## Implementation reviews
 
-Pending.
+2026-11-20, independent read-only reviewer (fresh agent, High risk charter: auth security, correctness, project rules): **PASS**, no blocking finding. The reviewer read the diff and did not run the tests (those runs are under Verification evidence). Open low-severity points, not fixed in this ticket:
+
+1. Stale banner after verifying in another tab: **fixed**. The banner query now refetches on window focus (test: "hides itself when the user verifies elsewhere"). The second `/auth/me` request per page remains: sharing the user across the 12 pages would touch each of them, which is out of this ticket's scope.
+2. Same sentence twice at checkout: **fixed**. The in-form notice has its own wording (`EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE`), and the e2e refusal locator uses it.
+3. No cooldown after a resend: **fixed**. After a successful resend the button reads "Resend in Ns" for 30 s (test with fake timers).
+4. Interception of `initiate-payment`: **checked, no change**. `checkout-idempotency`, `checkout-order-note` and `checkout-delivery-instructions` already intercept the same route to simulate Paystack, so this is no new precedent.
+5. Double click: **test added** ("sends only one request when the button is clicked twice in a row"). It passed at once, because the button is disabled while sending; it now protects that behaviour.
 
 ## Verification evidence
 
-Pending implementation.
+Run in the worktree on 2026-11-20:
+
+- Tests written first, failed with "Cannot find module" (components/email-verification-banner and lib/email-verification absent), then passed after implementation (10 tests).
+- `pnpm --filter app typecheck`: pass. `pnpm --filter app lint`: pass.
+- `pnpm --filter app test`: 15 suites, 140 tests, all pass.
+- `pnpm playwright:validate`: passed. `playwright test --list`: the new spec is discovered. Prettier check on touched paths: pass.
+- Playwright, run locally on 2026-11-20 against a real API + Postgres (local PostgreSQL 17 test DB `tamiym_workshop_test`, Redis) after `pnpm build` and `seed:e2e`: `pnpm exec playwright test tests/e2e/app/email-verification-banner.comprehensive.spec.ts --project=setup --project=chromium-app` → 7 passed (5 setup + the 2 tests of the spec).
+- `pnpm --filter api typecheck`: pass (seed script touched).
+- After the review fixes: `pnpm --filter app test` 15 suites / 144 tests pass (3 new tests failed first, for the right reasons: missing refetch, missing cooldown, missing constant); app typecheck and lint pass; the Playwright spec passes again (7 passed).
+- **Caveat, now resolved:** on Next.js 16.4.4, `pnpm --filter app build` compiled then failed with a `SecurityFatalError`. TTW-230 upgraded Next.js to 16.4.6 on `main` (`618c683`). After rebasing this branch onto it (2026-11-20): `pnpm install --frozen-lockfile` and `pnpm build` exit 0, `pnpm --filter app typecheck` and `lint` pass, `pnpm --filter app test` 15 suites / 144 tests pass, and the Playwright spec was run again alone with `CI=1` (no server reuse) on the fresh build: 7 passed (5 setup + 2 tests).
+- **Not verified:** only the `chromium-app` project ran (not the other browser tiers). CI on the pushed branch (commit `aace21b`), run 44781197814: `success`, all 19 jobs green. The independent review was done (PASS, see above); it read the code before the review fixes, which were not reviewed again.
 
 ## Completion summary
 
-Pending implementation.
+Implemented: banner with resend in the dashboard shell, explanation after sign-up, and `EMAIL_NOT_VERIFIED` handling at checkout. Independent review: PASS (see above) (auth, High risk), then CI after a push when asked.
