@@ -84,6 +84,7 @@ Left as known limits, not fixed: the coverage model counts only ADMIN1/ADMIN2 ru
 - `pnpm --filter api test:e2e -- test/shipping-zone-admin-corrections.e2e-spec.ts` (real Postgres): 13/13 (re-run after the third-review fixes).
 - `pnpm exec playwright test tests/e2e/admin/shipping-zone-corrections.comprehensive.spec.ts --project=setup --project=chromium-admin`: 3/3 (8 with setup).
 - `pnpm lint` (0 errors, existing warnings only), `pnpm typecheck`, `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm build`: passed.
+- After the merge, `Playwright Comprehensive` failed on `main` (run 44760026312): the CI database only holds the states of `seed:e2e`, so `Kebbi` did not exist for the corrections spec. Fixed by adding Kebbi (`KE`, same as `prisma/seed.ts`) to `apps/api/scripts/seed-e2e-dummy-data.ts`; the CI run after the fix is the proof.
 - Not run: `pnpm audit:prod`, `pnpm migrations:check` (no migration), browsers other than Chromium.
 
 ## Completion summary

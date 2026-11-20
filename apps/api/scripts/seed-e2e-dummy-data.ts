@@ -280,6 +280,14 @@ async function main() {
         isActive: true,
       },
     });
+    // TTW-097: a state no zone and no other spec uses, so the shipping
+    // corrections spec can make it the only coverage of a zone and see the
+    // warning. Same code and name as prisma/seed.ts.
+    await prisma.geoState.upsert({
+      where: { code: 'KE' },
+      update: { name: 'Kebbi', isActive: true },
+      create: { code: 'KE', name: 'Kebbi', isActive: true },
+    });
     await prisma.geoLga.upsert({
       where: {
         stateCode_name: {
