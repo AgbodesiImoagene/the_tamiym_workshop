@@ -161,7 +161,7 @@ On every PR:
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
-- `pnpm --filter api test:e2e` (GitHub Actions **API Integration** job with Postgres 16 + Redis 7 services; two passes + open-handle proof)
+- `pnpm --filter api test:e2e` (GitHub Actions **API Integration** job with Postgres 16 + Redis 7 services; two passes in this job; the open-handle proof runs in its own **API Open Handles** job, in parallel)
 - `pnpm test:coverage` + coverage ratchet / diff-coverage
 - `pnpm build`
 

@@ -1,7 +1,7 @@
 # TTW-215 — Reduce the cost of the API e2e suite in CI
 
 **Epic:** 8 — Client review delivery\
-**Status:** Deferred — not needed for the launch; promote only on a trigger below\
+**Status:** In progress — promoted on 2026-11-20 on trigger 4 (see Promotion)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -24,6 +24,12 @@ On the slow runner passes 1 and 2 used about 77 % of their 3 minutes. TTW-213 ra
 ## Decision: not urgent
 
 This is **not needed for the launch**. Nothing here affects the application or its quality: the worst case today is a CI failure with no real cause, which a re-run clears. Ticket work that brings the launch closer, with its quality gates kept, goes first.
+
+## Promotion
+
+Promoted on 2026-11-20 by the owner on trigger 4 below: waiting for CI slows development. Baseline from `main`, run 44762096522 (commit 8d0b7c8): `API Integration` took about 10 minutes and decided the length of the whole run (about 9 min 57 s), while every other job finished in under 4 minutes. Its steps: pass 1 173 s, pass 2 167 s, open-handle proof 199 s.
+
+First change (the "split the suite across two parallel jobs" option, cut the cheapest way): the open-handle proof moves out of `API Integration` into its own job, `API Open Handles`, with its own Postgres and Redis. It starts on a freshly migrated database and does not read what passes 1 and 2 leave behind. Passes 1 and 2 stay in `API Integration`, one after the other on the same database. The invariants of this ticket hold: no spec is removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
 
 ## Triggers to promote it
 
@@ -83,7 +89,7 @@ Options to weigh in the design review, cheapest first:
 
 ## Design review
 
-Pending (only when promoted).
+Not required for a low-risk ticket.
 
 ## Implementation reviews
 
