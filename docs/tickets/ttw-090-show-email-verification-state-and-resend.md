@@ -72,11 +72,11 @@ Recorded 2026-11-20, before implementation (High risk: auth).
 
 2026-11-20, independent read-only reviewer (fresh agent, High risk charter: auth security, correctness, project rules): **PASS**, no blocking finding. The reviewer read the diff and did not run the tests (those runs are under Verification evidence). Open low-severity points, not fixed in this ticket:
 
-1. The banner adds a second `/auth/me` request per dashboard page; a user who verifies in another tab sees a stale banner until the next navigation.
-2. On a checkout refusal, the shell banner and the in-form notice show the same sentence with two "Resend link" buttons. The e2e `refusal` locator passed locally (7 passed), so no strict-mode clash was observed.
-3. No client-side cooldown after a resend (the server rate limit applies).
-4. The e2e spec intercepts `**/v1/orders/*/initiate-payment`, as the other checkout specs do (to simulate Paystack).
-5. The "disabled while sending" unit test does not click twice.
+1. Stale banner after verifying in another tab: **fixed**. The banner query now refetches on window focus (test: "hides itself when the user verifies elsewhere"). The second `/auth/me` request per page remains: sharing the user across the 12 pages would touch each of them, which is out of this ticket's scope.
+2. Same sentence twice at checkout: **fixed**. The in-form notice has its own wording (`EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE`), and the e2e refusal locator uses it.
+3. No cooldown after a resend: **fixed**. After a successful resend the button reads "Resend in Ns" for 30 s (test with fake timers).
+4. Interception of `initiate-payment`: **checked, no change**. `checkout-idempotency`, `checkout-order-note` and `checkout-delivery-instructions` already intercept the same route to simulate Paystack, so this is no new precedent.
+5. Double click: **test added** ("sends only one request when the button is clicked twice in a row"). It passed at once, because the button is disabled while sending; it now protects that behaviour.
 
 ## Verification evidence
 
@@ -88,6 +88,8 @@ Run in the worktree on 2026-11-20:
 - `pnpm playwright:validate`: passed. `playwright test --list`: the new spec is discovered. Prettier check on touched paths: pass.
 - Playwright, run locally on 2026-11-20 against a real API + Postgres (local PostgreSQL 17 test DB `tamiym_workshop_test`, Redis) after `pnpm build` and `seed:e2e`: `pnpm exec playwright test tests/e2e/app/email-verification-banner.comprehensive.spec.ts --project=setup --project=chromium-app` → 7 passed (5 setup + the 2 tests of the spec).
 - `pnpm --filter api typecheck`: pass (seed script touched).
+- After the review fixes: `pnpm --filter app test` 15 suites / 144 tests pass (3 new tests failed first, for the right reasons: missing refetch, missing cooldown, missing constant); app typecheck and lint pass; the Playwright spec passes again (7 passed).
+- **Caveat:** `pnpm --filter app build` compiled and finished TypeScript and page generation, then failed with a Next.js 16.4.4 `SecurityFatalError` ("known security vulnerability"). `package.json` and the lockfile are untouched by this ticket, so this is outside its scope and needs its own ticket (upgrade Next). The Playwright run used the freshly written output.
 - **Not verified:** only the `chromium-app` project ran (not the other browser tiers or full CI). Independent review not done yet.
 
 ## Completion summary

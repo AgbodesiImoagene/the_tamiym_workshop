@@ -12,7 +12,7 @@ import {
   useCart,
 } from '@/lib/cart-store';
 import { EmailVerificationNotice } from '@/components/email-verification-banner';
-import { isEmailNotVerified } from '@/lib/email-verification';
+import { EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE, isEmailNotVerified } from '@/lib/email-verification';
 import { createOrder, initiateOrderPayment, quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { ORDER_NOTE_MAX_LENGTH } from '@/lib/order-note';
 import {
@@ -651,7 +651,12 @@ export default function DashboardCheckoutPage() {
                   {error}
                 </p>
               ) : null}
-              {emailNotVerified && user ? <EmailVerificationNotice email={user.email} /> : null}
+              {emailNotVerified && user ? (
+                <EmailVerificationNotice
+                  email={user.email}
+                  message={EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE}
+                />
+              ) : null}
               {submitMessage ? (
                 <p role="alert" className="text-sm text-red-700">
                   {submitMessage}

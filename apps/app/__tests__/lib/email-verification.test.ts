@@ -4,6 +4,7 @@
  */
 import {
   EMAIL_NOT_VERIFIED,
+  EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE,
   EMAIL_NOT_VERIFIED_MESSAGE,
   isEmailNotVerified,
 } from '@/lib/email-verification';
@@ -25,5 +26,10 @@ describe('isEmailNotVerified', () => {
   it('explains in English that verification is required before ordering', () => {
     expect(EMAIL_NOT_VERIFIED_MESSAGE).toMatch(/verify your email/i);
     expect(EMAIL_NOT_VERIFIED_MESSAGE).toMatch(/order/i);
+  });
+
+  it('words the checkout refusal differently from the banner, so the page never repeats itself', () => {
+    expect(EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE).toMatch(/not (been )?placed/i);
+    expect(EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE).not.toBe(EMAIL_NOT_VERIFIED_MESSAGE);
   });
 });

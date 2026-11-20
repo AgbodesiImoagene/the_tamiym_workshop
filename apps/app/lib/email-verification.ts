@@ -14,3 +14,7 @@ export function isEmailNotVerified(error: unknown): boolean {
     (error as { code?: unknown }).code === EMAIL_NOT_VERIFIED
   );
 }
+
+/** Checkout refusal wording: the order was not placed; the banner above keeps its own sentence. */
+export const EMAIL_NOT_VERIFIED_CHECKOUT_MESSAGE =
+  'Your order has not been placed because your email is not verified yet. Open the link we emailed you, then place the order again.';

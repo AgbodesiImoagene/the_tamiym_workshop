@@ -86,7 +86,7 @@ test.describe('Unverified email banner @comprehensive @app', () => {
       await page.getByRole('button', { name: 'Place order and pay' }).click();
       const refusal = page
         .getByRole('status')
-        .filter({ hasText: /verify your email before you place an order/i });
+        .filter({ hasText: /order has not been placed because your email is not verified/i });
       await expect(refusal).toBeVisible();
       await expect(refusal.getByRole('button', { name: 'Resend link' })).toBeEnabled();
       await expect(page).toHaveURL(/\/dashboard\/checkout/);

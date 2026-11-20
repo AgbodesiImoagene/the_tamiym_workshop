@@ -2,7 +2,7 @@
  * TTW-090: while the account email is unverified, the customer app shows a banner
  * with a resend action. The API stays the authority for the verified state.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   EmailVerificationBanner,
@@ -41,6 +41,19 @@ describe('EmailVerificationBanner', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('hides itself when the user verifies elsewhere and comes back to this tab', async () => {
+    getMe.mockResolvedValueOnce({ ...baseUser, emailVerified: false });
+    renderWithQuery(<EmailVerificationBanner />);
+    expect(await screen.findByRole('status')).toBeInTheDocument();
+
+    getMe.mockResolvedValue({ ...baseUser, emailVerified: true });
+    act(() => {
+      // react-query's focus manager listens for `visibilitychange` on window.
+      window.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+
   it('renders nothing when the user cannot be loaded', async () => {
     getMe.mockRejectedValue({ statusCode: 401, message: 'Unauthorized' });
     renderWithQuery(<EmailVerificationBanner />);
@@ -67,6 +80,38 @@ describe('EmailVerificationNotice resend', () => {
     done();
     await screen.findByText(/we sent a new link/i);
     expect(resend).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends only one request when the button is clicked twice in a row', async () => {
+    let done!: () => void;
+    resend.mockReturnValue(new Promise<void>((r) => (done = r)));
+    render(<EmailVerificationNotice email="ada@example.com" />);
+    const button = screen.getByRole('button', { name: /resend/i });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(resend).toHaveBeenCalledTimes(1);
+    done();
+    await screen.findByText(/we sent a new link/i);
+  });
+
+  it('waits before offering another resend, then enables the button again', async () => {
+    jest.useFakeTimers();
+    try {
+      resend.mockResolvedValue({ message: 'ok' });
+      render(<EmailVerificationNotice email="ada@example.com" />);
+      fireEvent.click(screen.getByRole('button', { name: /resend/i }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('button', { name: /resend in \d+s/i })).toBeDisabled();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+      expect(screen.getByRole('button', { name: 'Resend link' })).toBeEnabled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('explains the throttle (429) and lets the user retry later', async () => {
