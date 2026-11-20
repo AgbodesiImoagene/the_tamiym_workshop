@@ -1,7 +1,7 @@
 # TTW-090 — Show the email-verification state and offer a resend
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review (implemented locally, not pushed)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-089\
 **Blocks:** None
@@ -90,8 +90,10 @@ Run in the worktree on 2026-11-20:
 - `pnpm --filter api typecheck`: pass (seed script touched).
 - After the review fixes: `pnpm --filter app test` 15 suites / 144 tests pass (3 new tests failed first, for the right reasons: missing refetch, missing cooldown, missing constant); app typecheck and lint pass; the Playwright spec passes again (7 passed).
 - **Caveat, now resolved:** on Next.js 16.4.4, `pnpm --filter app build` compiled then failed with a `SecurityFatalError`. TTW-230 upgraded Next.js to 16.4.6 on `main` (`618c683`). After rebasing this branch onto it (2026-11-20): `pnpm install --frozen-lockfile` and `pnpm build` exit 0, `pnpm --filter app typecheck` and `lint` pass, `pnpm --filter app test` 15 suites / 144 tests pass, and the Playwright spec was run again alone with `CI=1` (no server reuse) on the fresh build: 7 passed (5 setup + 2 tests).
-- **Not verified:** only the `chromium-app` project ran (not the other browser tiers). CI on the pushed branch (commit `aace21b`), run 44781197814: `success`, all 19 jobs green. The independent review was done (PASS, see above); it read the code before the review fixes, which were not reviewed again.
+- CI on the pushed branch (commit `aace21b`), run 44781197814: `success`, all 19 jobs green.
+- CI on `main` after the merge (`ad22899`): `CI` run 44784730403 `success` (all jobs green) and `Playwright Comprehensive` run 44784730379 `success`.
+- **Not verified:** nothing left open for this ticket. Locally only the `chromium-app` project ran; CI ran the full set. The independent review (PASS, see above) read the code before the review fixes, which were not reviewed again.
 
 ## Completion summary
 
-Implemented: banner with resend in the dashboard shell, explanation after sign-up, and `EMAIL_NOT_VERIFIED` handling at checkout. Independent review: PASS (see above) (auth, High risk), then CI after a push when asked.
+Merged into `main` as `ad22899`; `CI` and `Playwright Comprehensive` are green on `main`. Delivered: banner with resend in the dashboard shell, explanation after sign-up, `EMAIL_NOT_VERIFIED` handling at checkout, and the e2e journey "verify, then order" (seeded unverified customers). Independent review: PASS (auth, High risk). Nothing remaining.
