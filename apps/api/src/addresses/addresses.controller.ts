@@ -264,6 +264,11 @@ export class AddressesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Address not found' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'The address is used by an order and cannot be deleted (code ADDRESS_IN_USE).',
+  })
   async remove(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     await this.addressesService.remove(user.id, id);
   }

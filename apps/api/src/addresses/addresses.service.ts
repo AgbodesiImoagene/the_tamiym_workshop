@@ -8,6 +8,7 @@ import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { AddressNormalizationService } from '../shipping/address-normalization.service';
 import { Prisma } from '../generated/prisma/client';
+import { addressInUse } from './addresses.errors';
 
 @Injectable()
 export class AddressesService {
@@ -153,30 +154,43 @@ export class AddressesService {
     await this.findUnique(userId, addressId);
 
     // TTW-222: delete and promotion are one transaction under the per-user lock.
-    await this.prisma.$transaction(async (tx) => {
-      await this.lockUserAddresses(tx, userId);
+    // TTW-227: an order that uses the address makes the database refuse the
+    // delete (foreign key, Prisma P2003). The whole transaction rolls back, so
+    // nothing changes, and the customer gets a 409 instead of a 500.
+    await this.prisma
+      .$transaction(async (tx) => {
+        await this.lockUserAddresses(tx, userId);
 
-      // Re-read under the lock: a parallel delete may have won, and the
-      // default flag may have moved since the first read.
-      const address = await this.requireOwnedAddress(tx, userId, addressId);
+        // Re-read under the lock: a parallel delete may have won, and the
+        // default flag may have moved since the first read.
+        const address = await this.requireOwnedAddress(tx, userId, addressId);
 
-      await tx.address.delete({ where: { id: addressId } });
+        await tx.address.delete({ where: { id: addressId } });
 
-      // If deleted address was default, set the most recent address as default
-      if (address.isDefault) {
-        const mostRecent = await tx.address.findFirst({
-          where: { userId },
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        });
-
-        if (mostRecent) {
-          await tx.address.update({
-            where: { id: mostRecent.id },
-            data: { isDefault: true },
+        // If deleted address was default, set the most recent address as default
+        if (address.isDefault) {
+          const mostRecent = await tx.address.findFirst({
+            where: { userId },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           });
+
+          if (mostRecent) {
+            await tx.address.update({
+              where: { id: mostRecent.id },
+              data: { isDefault: true },
+            });
+          }
         }
-      }
-    });
+      })
+      .catch((error: unknown) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2003'
+        ) {
+          throw addressInUse();
+        }
+        throw error;
+      });
   }
 
   /**

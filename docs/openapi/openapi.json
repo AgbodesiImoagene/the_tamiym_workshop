@@ -19940,6 +19940,9 @@
           },
           "404": {
             "description": "Address not found"
+          },
+          "409": {
+            "description": "The address is used by an order and cannot be deleted (code ADDRESS_IN_USE)."
           }
         },
         "security": [

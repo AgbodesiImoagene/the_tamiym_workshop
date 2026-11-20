@@ -14955,6 +14955,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The address is used by an order and cannot be deleted (code ADDRESS_IN_USE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     AddressesController_update: {

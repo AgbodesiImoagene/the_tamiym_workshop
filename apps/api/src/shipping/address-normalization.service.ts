@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AddressProvider } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
-import { canonicalCountryCode } from './country-code';
+import { canonicalCountryCode, countryCodeFromName } from './country-code';
 import {
   addressCountryCodeInvalid,
   addressLgaRequired,
@@ -308,10 +308,15 @@ export class AddressNormalizationService {
       }
       return code;
     }
-    const country = this.firstDefined(
-      this.clean(input.country),
-      existing?.country ?? null,
-    );
+    // TTW-227: no code sent. A country name that we recognise gives its code
+    // ("Ghana" gives GH), on create and on edit, so the text and the code cannot
+    // disagree. An unrecognised name keeps the saved code.
+    const sentCountry = this.clean(input.country);
+    const fromName = countryCodeFromName(sentCountry);
+    if (fromName) {
+      return fromName;
+    }
+    const country = this.firstDefined(sentCountry, existing?.country ?? null);
     if (country?.toLowerCase() === 'nigeria') {
       return 'NG';
     }
