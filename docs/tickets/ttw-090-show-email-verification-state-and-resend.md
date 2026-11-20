@@ -90,7 +90,7 @@ Run in the worktree on 2026-11-20:
 - `pnpm --filter api typecheck`: pass (seed script touched).
 - After the review fixes: `pnpm --filter app test` 15 suites / 144 tests pass (3 new tests failed first, for the right reasons: missing refetch, missing cooldown, missing constant); app typecheck and lint pass; the Playwright spec passes again (7 passed).
 - **Caveat, now resolved:** on Next.js 16.4.4, `pnpm --filter app build` compiled then failed with a `SecurityFatalError`. TTW-230 upgraded Next.js to 16.4.6 on `main` (`618c683`). After rebasing this branch onto it (2026-11-20): `pnpm install --frozen-lockfile` and `pnpm build` exit 0, `pnpm --filter app typecheck` and `lint` pass, `pnpm --filter app test` 15 suites / 144 tests pass, and the Playwright spec was run again alone with `CI=1` (no server reuse) on the fresh build: 7 passed (5 setup + 2 tests).
-- **Not verified:** only the `chromium-app` project ran (not the other browser tiers). Not pushed, so no CI run yet. The independent review was done (PASS, see above); it read the code before the review fixes, which were not reviewed again.
+- **Not verified:** only the `chromium-app` project ran (not the other browser tiers). CI on the pushed branch (commit `aace21b`), run 44781197814: `success`, all 19 jobs green. The independent review was done (PASS, see above); it read the code before the review fixes, which were not reviewed again.
 
 ## Completion summary
 
