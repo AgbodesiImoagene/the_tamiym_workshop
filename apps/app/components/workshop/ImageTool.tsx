@@ -13,13 +13,15 @@ interface ImageToolProps {
    * `designAssetId` is stored as custom data on the object.
    */
   onAddImage: (imageObject: Record<string, unknown>) => void;
+  /** True while the canvas cannot take a layer yet (it is still loading). */
+  disabled?: boolean;
 }
 
 /**
  * File picker for uploading image layers to the Design Workshop canvas.
  * Uploads to the API, then emits a Fabric.js-compatible image descriptor.
  */
-export default function ImageTool({ onAddImage }: ImageToolProps) {
+export default function ImageTool({ onAddImage, disabled = false }: ImageToolProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export default function ImageTool({ onAddImage }: ImageToolProps) {
         type="file"
         accept={ACCEPTED_TYPES}
         onChange={handleFileChange}
-        disabled={uploading}
+        disabled={uploading || disabled}
         className="sr-only"
         id="image-tool-input"
       />
@@ -85,7 +87,7 @@ export default function ImageTool({ onAddImage }: ImageToolProps) {
       <Button
         variant="secondary"
         size="sm"
-        disabled={uploading}
+        disabled={uploading || disabled}
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? 'Uploading…' : 'Choose image'}

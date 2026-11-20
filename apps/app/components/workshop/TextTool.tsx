@@ -37,13 +37,15 @@ const ALIGN_ICONS: Record<'left' | 'center' | 'right', string> = {
 interface TextToolProps {
   /** Called with a fabric.IText-compatible JSON to add to the canvas */
   onAddText: (textObject: Record<string, unknown>) => void;
+  /** True while the canvas cannot take a layer yet (it is still loading). */
+  disabled?: boolean;
 }
 
 /**
  * Toolbar for adding styled IText objects to the canvas.
  * Calls `onAddText` with a Fabric.js-compatible text object definition.
  */
-export default function TextTool({ onAddText }: TextToolProps) {
+export default function TextTool({ onAddText, disabled = false }: TextToolProps) {
   const [text, setText] = useState('Your text here');
   const [fontFamily, setFontFamily] = useState('Arial');
   const [fontSize, setFontSize] = useState(24);
@@ -178,7 +180,7 @@ export default function TextTool({ onAddText }: TextToolProps) {
         </Tooltip>
       </div>
 
-      <Button variant="secondary" size="sm" onClick={handleAdd} disabled={!text.trim()}>
+      <Button variant="secondary" size="sm" onClick={handleAdd} disabled={disabled || !text.trim()}>
         Add to canvas
       </Button>
     </div>

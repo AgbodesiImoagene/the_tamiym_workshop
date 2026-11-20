@@ -134,6 +134,19 @@ describe('WorkshopEditor layer controls', () => {
     expect(screen.getByRole('button', { name: 'Select Hello' })).toBeDisabled();
   });
 
+  it('keeps "Add to canvas" disabled until the canvas is ready, then adds the text', () => {
+    mockCanvasReady = false;
+    const { unmount } = renderEditor();
+    expect(screen.getByRole('button', { name: 'Add to canvas' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Choose image' })).toBeDisabled();
+    unmount();
+
+    mockCanvasReady = true;
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    expect(mockControls.addText).toHaveBeenCalledTimes(1);
+  });
+
   it('hands the canvas the same effects array on every render, so templates are not reloaded', () => {
     mockSeenEffects.length = 0;
     renderEditor();

@@ -358,10 +358,10 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
           <hr className="border-zinc-100" />
 
           {/* Text tool */}
-          <TextTool onAddText={handleAddText} />
+          <TextTool onAddText={handleAddText} disabled={!canvasReady} />
 
           {/* Image tool */}
-          <ImageTool onAddImage={handleAddImage} />
+          <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
 
           {/* Layers */}
           <LayerList
