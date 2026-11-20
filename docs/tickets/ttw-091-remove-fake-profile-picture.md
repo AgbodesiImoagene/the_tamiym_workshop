@@ -1,7 +1,7 @@
 # TTW-091 — Remove the fake profile picture and its button
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented-unverified (parcours Playwright non joué, voir les preuves)\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -45,9 +45,9 @@ Client answers:
 
 ## Acceptance criteria
 
-- [ ] No user sees a demo photo or an inactive button in settings.
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] No user sees a demo photo or an inactive button in settings (Jest, les deux pages Profile et Settings).
+- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated. (Couverture Playwright mise à jour ; parcours **non joué** : voir ci-dessous.)
+- [x] Required quality gates pass, with evidence recorded below (hors parcours Playwright).
 
 ## Out of scope
 
@@ -59,12 +59,28 @@ Not required for a low-risk ticket.
 
 ## Implementation reviews
 
-Pending.
+Pending : la relecture indépendante reste à faire avant de clore le ticket.
 
 ## Verification evidence
 
-Pending implementation.
+Constat confirmé sur `main` (147d5d5) : image de démo + bouton sans action dans `customer-settings-form.tsx`.
+
+- Test écrit d'abord : `pnpm --filter app test -- settings/customer-settings-form` → 2 échecs attendus (« shows no profile picture and no picture button », pages Profile et Settings : `img alt="Profile"` présente), 19 réussites.
+- Après correctif : même commande → `Tests: 21 passed, 21 total`.
+- `pnpm --filter app typecheck` → OK, sans erreur.
+- `pnpm --filter app lint` → OK, sans erreur.
+- `pnpm format:check` → « All matched files use Prettier code style! ».
+- `pnpm playwright:validate` → « Playwright manifest validation passed. »
+- **Non vérifié** : `tests/e2e/app/settings.comprehensive.spec.ts` (assertions ajoutées) n'a pas été exécuté, ni le parcours dans le navigateur. Il démarre l'API et trois sites sur les ports 3000 à 3003 et écrit dans la base de test partagée avec la session TTW-097 menée en parallèle.
+- `pnpm docs:validate` → « Documentation validation passed. »
+- Non lancés : tests API, `pnpm verify`.
 
 ## Completion summary
 
-Pending implementation.
+Retiré : l'image de démo, le bouton « Upload/Update Profile Picture », l'entrée `settingsProfilePhoto` de `apps/app/lib/assets.ts` et le fichier `settings-profile-photo.png`. Rien n'a été mis à la place.
+
+Écarts au plan : les tests ont été ajoutés au fichier existant `apps/app/__tests__/settings/customer-settings-form.test.tsx` (pas de nouveau fichier).
+
+Reste à faire : jouer le spec Playwright et le parcours navigateur, puis la relecture indépendante.
+
+À signaler, hors périmètre : le bouton « retour » (chevron) en haut du formulaire n'a pas d'action.

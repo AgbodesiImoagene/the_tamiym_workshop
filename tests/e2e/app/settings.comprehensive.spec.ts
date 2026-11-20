@@ -80,6 +80,9 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await customerPage.goto('/dashboard/profile');
     await expect(customerPage.getByRole('heading', { name: /Profile/i })).toBeVisible();
     await expect(customerPage.getByLabel('First Name')).toBeVisible();
+    // TTW-091: no demo photo and no inactive picture button.
+    await expect(customerPage.getByRole('img', { name: 'Profile', exact: true })).toHaveCount(0);
+    await expect(customerPage.getByRole('button', { name: /profile picture/i })).toHaveCount(0);
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
 });
