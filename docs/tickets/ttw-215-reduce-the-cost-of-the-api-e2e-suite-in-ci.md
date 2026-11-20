@@ -97,7 +97,13 @@ Pending.
 
 ## Verification evidence
 
-Pending implementation.
+Before (`main`, run 44762096522, commit 8d0b7c8): run 9 min 57 s; `API Integration` about 10 minutes (pass 1 173 s, pass 2 167 s, proof 199 s in series).
+
+After (branch `claude/ttw-215-parallel-open-handle-proof`, run 44765976764, commit f120cae): **success, run 393 s (6 min 33 s)**, about 3 min 24 s (34 %) shorter. `API Integration` 389 s (passes 1 and 2 only), `API Open Handles` 233 s in parallel, `Playwright Smoke` 154 s. The longest job is now `API Integration`; all 19 jobs succeeded. Measured on one run only: the duration varies with the runner GitHub gives that day (see Background).
+
+Local gates: `pnpm workflows:validate`, `pnpm format:check`, `pnpm docs:validate` and `pnpm e2e-open-handles:test` (10 of 10) pass.
+
+Not yet recorded: the same durations on `main` after the merge, which is the final proof.
 
 ## Completion summary
 
