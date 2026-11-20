@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ShippingRuleMatchType } from '../generated/prisma/enums';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingAdminService } from './shipping-admin.service';
 
@@ -17,20 +18,26 @@ const LGA = { id: 'lga-1', name: 'Ikeja', stateCode: 'ZT', isActive: true };
 describe('ShippingAdminService - deactivated state', () => {
   let service: ShippingAdminService;
   let prisma: {
-    shippingZone: { findUnique: jest.Mock };
+    shippingZone: { findUnique: jest.Mock; findMany: jest.Mock };
     shippingZoneRule: {
       create: jest.Mock;
       update: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
     };
     geoState: { findFirst: jest.Mock; findUnique: jest.Mock };
     geoLga: { findFirst: jest.Mock };
     $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    shippingZoneArea: { create: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
-      shippingZone: { findUnique: jest.fn().mockResolvedValue({ id: 'z1' }) },
+      shippingZone: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'z1' }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       shippingZoneRule: {
         create: jest
           .fn()
@@ -39,15 +46,23 @@ describe('ShippingAdminService - deactivated state', () => {
           .fn()
           .mockImplementation(({ data }) => ({ id: 'r1', ...data })),
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       geoState: { findFirst: jest.fn(), findUnique: jest.fn() },
       geoLga: { findFirst: jest.fn().mockResolvedValue(LGA) },
       $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      shippingZoneArea: { create: jest.fn().mockResolvedValue({ id: 'a1' }) },
     };
+    // updateRule runs in a transaction (TTW-097): hand it the same mock client.
+    prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) =>
+      cb(prisma),
+    );
     const module = await Test.createTestingModule({
       providers: [
         ShippingAdminService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: { log: jest.fn() } },
       ],
     }).compile();
     service = module.get(ShippingAdminService);
@@ -353,6 +368,7 @@ describe('ShippingAdminService geo lists', () => {
     };
     const service = new ShippingAdminService(
       prisma as unknown as PrismaService,
+      { log: jest.fn() } as unknown as AuditService,
     );
     return { prisma, service };
   }

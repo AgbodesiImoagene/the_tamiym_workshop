@@ -12777,6 +12777,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -12785,6 +12794,9 @@
           },
           "404": {
             "description": "Rate not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -12810,6 +12822,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -12877,6 +12898,9 @@
           },
           "404": {
             "description": "Rate not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -12905,6 +12929,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -12913,6 +12946,9 @@
           },
           "404": {
             "description": "Rule not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -12938,6 +12974,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -12989,6 +13034,9 @@
           },
           "404": {
             "description": "Rule not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -13084,6 +13132,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -13092,6 +13149,9 @@
           },
           "404": {
             "description": "Zone not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -13152,6 +13212,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -13178,6 +13247,9 @@
           },
           "404": {
             "description": "Zone not found"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
           }
         },
         "security": [
@@ -13280,6 +13352,63 @@
           }
         ],
         "summary": "Add area to zone",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/shipping-zones/{zoneId}/areas/{areaId}": {
+      "delete": {
+        "operationId": "AdminShippingController_deleteArea",
+        "parameters": [
+          {
+            "description": "Zone ID",
+            "in": "path",
+            "name": "zoneId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Area ID",
+            "in": "path",
+            "name": "areaId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.",
+            "in": "query",
+            "name": "acknowledgeCoverageLoss",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Area removed with its rule"
+          },
+          "404": {
+            "description": "Area not found in this zone"
+          },
+          "409": {
+            "description": "SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove an area (state or LGA) from a zone",
         "tags": [
           "Admin"
         ]

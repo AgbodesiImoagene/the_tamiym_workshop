@@ -9,6 +9,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Query,
+  applyDecorators,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +19,7 @@ import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles/roles.guard';
@@ -30,6 +33,27 @@ import { UpdateShippingRateDto } from './dto/update-shipping-rate.dto';
 import { CreateShippingRuleDto } from './dto/create-shipping-rule.dto';
 import { UpdateShippingRuleDto } from './dto/update-shipping-rule.dto';
 import { ShippingAdminService } from '../shipping/shipping-admin.service';
+
+/** TTW-097: a change that leaves a state without delivery needs this flag. */
+const CoverageGuarded = () =>
+  applyDecorators(
+    ApiQuery({
+      name: 'acknowledgeCoverageLoss',
+      required: false,
+      type: Boolean,
+      description:
+        'Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing.',
+    }),
+    ApiResponse({
+      status: 409,
+      description:
+        'SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery',
+    }),
+  );
+
+const acknowledged = (value?: string) => ({
+  acknowledgeCoverageLoss: value === 'true',
+});
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -95,6 +119,7 @@ export class AdminShippingController {
   }
 
   @Patch('shipping-zones/:id')
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Update shipping zone' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -104,20 +129,47 @@ export class AdminShippingController {
   async updateZone(
     @Param('id') id: string,
     @Body() dto: UpdateShippingZoneDto,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
   ) {
-    return this.shippingAdmin.updateZone(id, dto);
+    return this.shippingAdmin.updateZone(id, dto, acknowledged(acknowledge));
   }
 
   @Delete('shipping-zones/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Delete shipping zone' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Zone ID' })
   @ApiResponse({ status: 204, description: 'Zone deleted' })
   @ApiResponse({ status: 404, description: 'Zone not found' })
-  async deleteZone(@Param('id') id: string) {
-    await this.shippingAdmin.deleteZone(id);
+  async deleteZone(
+    @Param('id') id: string,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
+  ) {
+    await this.shippingAdmin.deleteZone(id, acknowledged(acknowledge));
+  }
+
+  @Delete('shipping-zones/:zoneId/areas/:areaId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @CoverageGuarded()
+  @ApiOperation({ summary: 'Remove an area (state or LGA) from a zone' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'zoneId', description: 'Zone ID' })
+  @ApiParam({ name: 'areaId', description: 'Area ID' })
+  @ApiResponse({ status: 204, description: 'Area removed with its rule' })
+  @ApiResponse({ status: 404, description: 'Area not found in this zone' })
+  async deleteArea(
+    @Param('zoneId') zoneId: string,
+    @Param('areaId') areaId: string,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
+  ) {
+    await this.shippingAdmin.deleteArea(
+      zoneId,
+      areaId,
+      acknowledged(acknowledge),
+    );
   }
 
   @Get('shipping-zones/:zoneId/areas')
@@ -171,6 +223,7 @@ export class AdminShippingController {
   }
 
   @Patch('shipping-rules/:id')
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Update generic shipping rule' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -180,20 +233,25 @@ export class AdminShippingController {
   async updateRule(
     @Param('id') id: string,
     @Body() dto: UpdateShippingRuleDto,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
   ) {
-    return this.shippingAdmin.updateRule(id, dto);
+    return this.shippingAdmin.updateRule(id, dto, acknowledged(acknowledge));
   }
 
   @Delete('shipping-rules/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Delete generic shipping rule' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Shipping rule ID' })
   @ApiResponse({ status: 204, description: 'Rule deleted' })
   @ApiResponse({ status: 404, description: 'Rule not found' })
-  async deleteRule(@Param('id') id: string) {
-    await this.shippingAdmin.deleteRule(id);
+  async deleteRule(
+    @Param('id') id: string,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
+  ) {
+    await this.shippingAdmin.deleteRule(id, acknowledged(acknowledge));
   }
 
   @Get('shipping-zones/:zoneId/rates')
@@ -221,6 +279,7 @@ export class AdminShippingController {
   }
 
   @Patch('shipping-rates/:id')
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Update shipping rate' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -230,19 +289,24 @@ export class AdminShippingController {
   async updateRate(
     @Param('id') id: string,
     @Body() dto: UpdateShippingRateDto,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
   ) {
-    return this.shippingAdmin.updateRate(id, dto);
+    return this.shippingAdmin.updateRate(id, dto, acknowledged(acknowledge));
   }
 
   @Delete('shipping-rates/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @CoverageGuarded()
   @ApiOperation({ summary: 'Delete shipping rate' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Shipping rate ID' })
   @ApiResponse({ status: 204, description: 'Rate deleted' })
   @ApiResponse({ status: 404, description: 'Rate not found' })
-  async deleteRate(@Param('id') id: string) {
-    await this.shippingAdmin.deleteRate(id);
+  async deleteRate(
+    @Param('id') id: string,
+    @Query('acknowledgeCoverageLoss') acknowledge?: string,
+  ) {
+    await this.shippingAdmin.deleteRate(id, acknowledged(acknowledge));
   }
 }

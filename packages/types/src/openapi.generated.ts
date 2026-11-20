@@ -1865,6 +1865,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/shipping-zones/{zoneId}/areas/{areaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an area (state or LGA) from a zone */
+        delete: operations["AdminShippingController_deleteArea"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/shipping-zones/{zoneId}/rates": {
         parameters: {
             query?: never;
@@ -10054,7 +10071,10 @@ export interface operations {
     };
     AdminShippingController_deleteRate: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Shipping rate ID */
@@ -10078,11 +10098,21 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     AdminShippingController_updateRate: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Shipping rate ID */
@@ -10139,11 +10169,21 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     AdminShippingController_deleteRule: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Shipping rule ID */
@@ -10167,11 +10207,21 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     AdminShippingController_updateRule: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Shipping rule ID */
@@ -10209,6 +10259,13 @@ export interface operations {
             };
             /** @description Rule not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10291,7 +10348,10 @@ export interface operations {
     };
     AdminShippingController_deleteZone: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Zone ID */
@@ -10315,11 +10375,21 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     AdminShippingController_updateZone: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
             header?: never;
             path: {
                 /** @description Zone ID */
@@ -10345,6 +10415,13 @@ export interface operations {
             };
             /** @description Zone not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10406,6 +10483,46 @@ export interface operations {
             };
             /** @description Invalid state/LGA */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminShippingController_deleteArea: {
+        parameters: {
+            query?: {
+                /** @description Set to true to confirm a change that leaves states without delivery. Without it the API answers 409 SHIPPING_COVERAGE_WOULD_BE_LOST and changes nothing. */
+                acknowledgeCoverageLoss?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Zone ID */
+                zoneId: string;
+                /** @description Area ID */
+                areaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Area removed with its rule */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Area not found in this zone */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description SHIPPING_COVERAGE_WOULD_BE_LOST: the change would leave the listed states without delivery */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

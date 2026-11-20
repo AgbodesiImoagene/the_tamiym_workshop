@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ShippingRuleMatchType } from '../generated/prisma/enums';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShippingAdminService } from './shipping-admin.service';
 
@@ -13,18 +14,23 @@ import { ShippingAdminService } from './shipping-admin.service';
 describe('ShippingAdminService - country code (TTW-226)', () => {
   let service: ShippingAdminService;
   let prisma: {
-    shippingZone: { findUnique: jest.Mock };
+    shippingZone: { findUnique: jest.Mock; findMany: jest.Mock };
     shippingZoneRule: {
       create: jest.Mock;
       update: jest.Mock;
       findUnique: jest.Mock;
     };
     geoState: { findFirst: jest.Mock; findUnique: jest.Mock };
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
   };
 
   beforeEach(async () => {
     prisma = {
-      shippingZone: { findUnique: jest.fn().mockResolvedValue({ id: 'z1' }) },
+      shippingZone: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'z1' }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       shippingZoneRule: {
         create: jest
           .fn()
@@ -40,11 +46,18 @@ describe('ShippingAdminService - country code (TTW-226)', () => {
           .mockResolvedValue({ code: 'LA', name: 'Lagos', isActive: true }),
         findUnique: jest.fn(),
       },
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
+    // updateRule runs in a transaction (TTW-097): hand it the same mock client.
+    prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) =>
+      cb(prisma),
+    );
     const module = await Test.createTestingModule({
       providers: [
         ShippingAdminService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: { log: jest.fn() } },
       ],
     }).compile();
     service = module.get(ShippingAdminService);

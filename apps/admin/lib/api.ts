@@ -91,6 +91,8 @@ export function csrfHeaders(): Record<string, string> {
 export interface ApiError {
   message: string;
   statusCode?: number;
+  /** Parsed JSON body of an error response, when there is one (e.g. `code`). */
+  body?: unknown;
 }
 
 export class ApiClient {
@@ -135,6 +137,7 @@ export class ApiClient {
       try {
         const data = await response.json();
         error.message = data.message || data.error || response.statusText;
+        error.body = data;
       } catch {
         // If response is not JSON, use statusText
       }

@@ -64,7 +64,8 @@ export async function createShippingZone(
 
 /** Removes a zone (and, by cascade, its areas) through `DELETE /admin/shipping-zones/:id`. */
 export async function deleteShippingZone(admin: APIRequestContext, id: string): Promise<void> {
-  const res = await admin.delete(`admin/shipping-zones/${id}`);
+  // Cleanup is deliberate: acknowledge the coverage warning (TTW-097).
+  const res = await admin.delete(`admin/shipping-zones/${id}?acknowledgeCoverageLoss=true`);
   // 404: already gone (the test removed it). Anything else is a real cleanup failure.
   if (!res.ok() && res.status() !== 404) {
     throw new Error(`Deleting shipping zone ${id} failed: ${res.status()} ${await res.text()}`);
@@ -78,6 +79,57 @@ export async function listZoneAreas(admin: APIRequestContext, zoneId: string): P
     throw new Error(`Listing areas of zone ${zoneId} failed: ${res.status()} ${await res.text()}`);
   }
   return (await res.json()) as unknown[];
+}
+
+/** The code of the state called `name`, from the real admin geo list. */
+export async function stateCodeByName(admin: APIRequestContext, name: string): Promise<string> {
+  const res = await admin.get('admin/geo/states');
+  if (!res.ok()) {
+    throw new Error(`Listing states failed: ${res.status()} ${await res.text()}`);
+  }
+  const states = (await res.json()) as Array<{ code: string; name: string }>;
+  const state = states.find((candidate) => candidate.name === name);
+  if (!state) throw new Error(`State "${name}" is not in the test database`);
+  return state.code;
+}
+
+/** Maps a whole state to the zone (`POST /admin/shipping-zones/:id/areas`). */
+export async function addZoneArea(
+  admin: APIRequestContext,
+  zoneId: string,
+  stateCode: string
+): Promise<void> {
+  const res = await admin.post(`admin/shipping-zones/${zoneId}/areas`, { data: { stateCode } });
+  if (!res.ok()) {
+    throw new Error(`Adding area ${stateCode} failed: ${res.status()} ${await res.text()}`);
+  }
+}
+
+/** Adds an active flat rate to the zone (`POST /admin/shipping-zones/:id/rates`). */
+export async function addZoneRate(
+  admin: APIRequestContext,
+  zoneId: string,
+  flatFee: number
+): Promise<{ id: string }> {
+  const res = await admin.post(`admin/shipping-zones/${zoneId}/rates`, {
+    data: { serviceLevel: 'STANDARD', currency: 'NGN', flatFee, priority: 100 },
+  });
+  if (!res.ok()) {
+    throw new Error(`Adding rate failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: string };
+}
+
+/** The rates the zone has right now, read from the real API. */
+export async function listZoneRates(
+  admin: APIRequestContext,
+  zoneId: string
+): Promise<Array<{ id: string; flatFee: string | number }>> {
+  const res = await admin.get(`admin/shipping-zones/${zoneId}/rates`);
+  if (!res.ok()) {
+    throw new Error(`Listing rates of zone ${zoneId} failed: ${res.status()} ${await res.text()}`);
+  }
+  return (await res.json()) as Array<{ id: string; flatFee: string | number }>;
 }
 
 /** The site settings the admin form edits (`GET`/`PATCH /admin/site-settings`). */

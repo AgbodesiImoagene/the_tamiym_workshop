@@ -1,9 +1,14 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
+import type { AuditLogInput } from '../audit/audit.types';
+import type { Prisma } from '../generated/prisma/client';
 import {
+  AuditAction,
   CurrencyCode,
   ShippingRateProvider,
   ShippingRuleMatchType,
@@ -38,9 +43,24 @@ type ShippingRateInput = {
   maxDeliveryDays?: number | null;
 };
 
+/**
+ * TTW-097: a correction that would leave a state with no delivery is refused
+ * (409 `SHIPPING_COVERAGE_WOULD_BE_LOST`) unless the admin acknowledged it.
+ */
+export type CoverageOptions = { acknowledgeCoverageLoss?: boolean };
+
+/** Internal: `unaffected` marks a change that cannot alter coverage (no lock, no scan). */
+type GuardOptions = CoverageOptions & { unaffected?: boolean };
+
+export const SHIPPING_COVERAGE_WOULD_BE_LOST =
+  'SHIPPING_COVERAGE_WOULD_BE_LOST';
+
 @Injectable()
 export class ShippingAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * TTW-199: deactivated states stay in the admin list (the rows carry
@@ -104,25 +124,109 @@ export class ShippingAdminService {
     return zone;
   }
 
-  async updateZone(id: string, dto: ShippingZoneInput) {
-    await this.assertZoneExists(id);
-    return this.prisma.shippingZone.update({
+  async updateZone(
+    id: string,
+    dto: ShippingZoneInput,
+    opts: CoverageOptions = {},
+  ) {
+    const existing = await this.prisma.shippingZone.findUnique({
       where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+    });
+    if (!existing) {
+      throw new NotFoundException('Shipping zone not found');
+    }
+    return this.withCoverageGuard(
+      this.guardFor(opts, dto.isActive !== undefined),
+      async (tx) => {
+        const updated = await tx.shippingZone.update({
+          where: { id },
+          data: {
+            ...(dto.name !== undefined ? { name: dto.name } : {}),
+            ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          },
+          include: {
+            areas: { include: { state: true, lga: true } },
+            rules: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
+            rates: { orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }] },
+          },
+        });
+        return {
+          result: updated,
+          audit: {
+            eventName: 'shipping.zone.updated',
+            action: AuditAction.UPDATE,
+            entityType: 'ShippingZone',
+            entityId: id,
+            before: { name: existing.name, isActive: existing.isActive },
+            after: { name: updated.name, isActive: updated.isActive },
+          },
+        };
       },
-      include: {
-        areas: { include: { state: true, lga: true } },
-        rules: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
-        rates: { orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }] },
-      },
+    );
+  }
+
+  async deleteZone(id: string, opts: CoverageOptions = {}) {
+    const existing = await this.prisma.shippingZone.findUnique({
+      where: { id },
+    });
+    if (!existing) {
+      throw new NotFoundException('Shipping zone not found');
+    }
+    await this.withCoverageGuard(opts, async (tx) => {
+      await tx.shippingZone.delete({ where: { id } });
+      return {
+        result: undefined,
+        audit: {
+          eventName: 'shipping.zone.deleted',
+          action: AuditAction.DELETE,
+          entityType: 'ShippingZone',
+          entityId: id,
+          before: { name: existing.name, isActive: existing.isActive },
+        },
+      };
     });
   }
 
-  async deleteZone(id: string) {
-    await this.assertZoneExists(id);
-    await this.prisma.shippingZone.delete({ where: { id } });
+  async deleteArea(zoneId: string, areaId: string, opts: CoverageOptions = {}) {
+    const area = await this.prisma.shippingZoneArea.findFirst({
+      where: { id: areaId, zoneId },
+    });
+    if (!area) {
+      throw new NotFoundException('Shipping area not found in this zone');
+    }
+    await this.withCoverageGuard(opts, async (tx) => {
+      await tx.shippingZoneArea.delete({ where: { id: areaId } });
+      // `createArea` mirrors every area as a rule: remove that rule too, or the
+      // state would keep matching this zone.
+      await tx.shippingZoneRule.deleteMany({
+        where: area.lgaId
+          ? {
+              zoneId,
+              countryCode: 'NG',
+              matchType: ShippingRuleMatchType.ADMIN2,
+              matchValue: area.lgaId,
+              matchContext: area.stateCode,
+            }
+          : {
+              zoneId,
+              countryCode: 'NG',
+              matchType: ShippingRuleMatchType.ADMIN1,
+              matchValue: area.stateCode,
+            },
+      });
+      return {
+        result: undefined,
+        audit: {
+          eventName: 'shipping.area.deleted',
+          action: AuditAction.DELETE,
+          entityType: 'ShippingZoneArea',
+          entityId: areaId,
+          targetType: 'ShippingZone',
+          targetId: zoneId,
+          before: { stateCode: area.stateCode, lgaId: area.lgaId },
+        },
+      };
+    });
   }
 
   async listAreas(zoneId: string) {
@@ -229,41 +333,74 @@ export class ShippingAdminService {
     });
   }
 
-  async updateRule(id: string, dto: ShippingRuleInput) {
-    const existing = await this.prisma.shippingZoneRule.findUnique({
-      where: { id },
-    });
-    if (!existing) {
-      throw new NotFoundException('Shipping rule not found');
-    }
-    const normalized = await this.normalizeRuleInput(
-      {
-        countryCode: dto.countryCode ?? existing.countryCode,
-        matchType: dto.matchType ?? existing.matchType,
-        matchValue: dto.matchValue ?? existing.matchValue,
-        matchContext:
-          dto.matchContext !== undefined
-            ? dto.matchContext
-            : existing.matchContext,
-        priority: dto.priority ?? existing.priority,
-        isActive: dto.isActive ?? existing.isActive,
-      },
-      existing,
-    );
-    return this.prisma.shippingZoneRule.update({
-      where: { id },
-      data: normalized,
+  async updateRule(
+    id: string,
+    dto: ShippingRuleInput,
+    opts: CoverageOptions = {},
+  ) {
+    return this.withCoverageGuard(opts, async (tx) => {
+      // Read after the lock: another admin may have changed the row while this
+      // request waited, and we must not write that stale copy back.
+      const existing = await tx.shippingZoneRule.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException('Shipping rule not found');
+      }
+      const normalized = await this.normalizeRuleInput(
+        {
+          countryCode: dto.countryCode ?? existing.countryCode,
+          matchType: dto.matchType ?? existing.matchType,
+          matchValue: dto.matchValue ?? existing.matchValue,
+          matchContext:
+            dto.matchContext !== undefined
+              ? dto.matchContext
+              : existing.matchContext,
+          priority: dto.priority ?? existing.priority,
+          isActive: dto.isActive ?? existing.isActive,
+        },
+        existing,
+      );
+      const updated = await tx.shippingZoneRule.update({
+        where: { id },
+        data: normalized,
+      });
+      return {
+        result: updated,
+        audit: {
+          eventName: 'shipping.rule.updated',
+          action: AuditAction.UPDATE,
+          entityType: 'ShippingZoneRule',
+          entityId: id,
+          targetType: 'ShippingZone',
+          targetId: existing.zoneId,
+          before: this.ruleSnapshot(existing),
+          after: this.ruleSnapshot(updated),
+        },
+      };
     });
   }
 
-  async deleteRule(id: string) {
+  async deleteRule(id: string, opts: CoverageOptions = {}) {
     const existing = await this.prisma.shippingZoneRule.findUnique({
       where: { id },
     });
     if (!existing) {
       throw new NotFoundException('Shipping rule not found');
     }
-    await this.prisma.shippingZoneRule.delete({ where: { id } });
+    await this.withCoverageGuard(opts, async (tx) => {
+      await tx.shippingZoneRule.delete({ where: { id } });
+      return {
+        result: undefined,
+        audit: {
+          eventName: 'shipping.rule.deleted',
+          action: AuditAction.DELETE,
+          entityType: 'ShippingZoneRule',
+          entityId: id,
+          targetType: 'ShippingZone',
+          targetId: existing.zoneId,
+          before: this.ruleSnapshot(existing),
+        },
+      };
+    });
   }
 
   async listRates(zoneId: string) {
@@ -281,51 +418,263 @@ export class ShippingAdminService {
     });
   }
 
-  async updateRate(id: string, dto: ShippingRateInput) {
+  async updateRate(
+    id: string,
+    dto: ShippingRateInput,
+    opts: CoverageOptions = {},
+  ) {
+    return this.withCoverageGuard(
+      this.guardFor(
+        opts,
+        dto.isActive !== undefined ||
+          dto.effectiveFrom !== undefined ||
+          dto.effectiveTo !== undefined ||
+          dto.serviceLevel !== undefined ||
+          dto.provider !== undefined ||
+          dto.currency !== undefined,
+      ),
+      async (tx) => {
+        // Read after the lock: see `updateRule`.
+        const existing = await tx.shippingRate.findUnique({ where: { id } });
+        if (!existing) {
+          throw new NotFoundException('Shipping rate not found');
+        }
+        const data = this.normalizeRateInput(existing.zoneId, {
+          provider: dto.provider ?? existing.provider,
+          serviceLevel: dto.serviceLevel ?? existing.serviceLevel,
+          currency: dto.currency ?? existing.currency,
+          flatFee:
+            dto.flatFee !== undefined ? dto.flatFee : Number(existing.flatFee),
+          priority: dto.priority ?? existing.priority,
+          isActive: dto.isActive ?? existing.isActive,
+          effectiveFrom:
+            dto.effectiveFrom !== undefined
+              ? dto.effectiveFrom
+              : (existing.effectiveFrom?.toISOString() ?? null),
+          effectiveTo:
+            dto.effectiveTo !== undefined
+              ? dto.effectiveTo
+              : (existing.effectiveTo?.toISOString() ?? null),
+          minDeliveryDays:
+            dto.minDeliveryDays !== undefined
+              ? dto.minDeliveryDays
+              : existing.minDeliveryDays,
+          maxDeliveryDays:
+            dto.maxDeliveryDays !== undefined
+              ? dto.maxDeliveryDays
+              : existing.maxDeliveryDays,
+        });
+        const updated = await tx.shippingRate.update({ where: { id }, data });
+        return {
+          result: updated,
+          audit: {
+            eventName: 'shipping.rate.updated',
+            action: AuditAction.UPDATE,
+            entityType: 'ShippingRate',
+            entityId: id,
+            targetType: 'ShippingZone',
+            targetId: existing.zoneId,
+            before: this.rateSnapshot(existing),
+            after: this.rateSnapshot(updated),
+          },
+        };
+      },
+    );
+  }
+
+  async deleteRate(id: string, opts: CoverageOptions = {}) {
     const existing = await this.prisma.shippingRate.findUnique({
       where: { id },
     });
     if (!existing) {
       throw new NotFoundException('Shipping rate not found');
     }
-    return this.prisma.shippingRate.update({
-      where: { id },
-      data: this.normalizeRateInput(existing.zoneId, {
-        provider: dto.provider ?? existing.provider,
-        serviceLevel: dto.serviceLevel ?? existing.serviceLevel,
-        currency: dto.currency ?? existing.currency,
-        flatFee:
-          dto.flatFee !== undefined ? dto.flatFee : Number(existing.flatFee),
-        priority: dto.priority ?? existing.priority,
-        isActive: dto.isActive ?? existing.isActive,
-        effectiveFrom:
-          dto.effectiveFrom !== undefined
-            ? dto.effectiveFrom
-            : (existing.effectiveFrom?.toISOString() ?? null),
-        effectiveTo:
-          dto.effectiveTo !== undefined
-            ? dto.effectiveTo
-            : (existing.effectiveTo?.toISOString() ?? null),
-        minDeliveryDays:
-          dto.minDeliveryDays !== undefined
-            ? dto.minDeliveryDays
-            : existing.minDeliveryDays,
-        maxDeliveryDays:
-          dto.maxDeliveryDays !== undefined
-            ? dto.maxDeliveryDays
-            : existing.maxDeliveryDays,
-      }),
+    await this.withCoverageGuard(opts, async (tx) => {
+      await tx.shippingRate.delete({ where: { id } });
+      return {
+        result: undefined,
+        audit: {
+          eventName: 'shipping.rate.deleted',
+          action: AuditAction.DELETE,
+          entityType: 'ShippingRate',
+          entityId: id,
+          targetType: 'ShippingZone',
+          targetId: existing.zoneId,
+          before: this.rateSnapshot(existing),
+        },
+      };
     });
   }
 
-  async deleteRate(id: string) {
-    const existing = await this.prisma.shippingRate.findUnique({
-      where: { id },
-    });
-    if (!existing) {
-      throw new NotFoundException('Shipping rate not found');
+  private ruleSnapshot(rule: {
+    countryCode: string;
+    matchType: ShippingRuleMatchType;
+    matchValue: string;
+    matchContext: string | null;
+    priority: number;
+    isActive: boolean;
+  }) {
+    return {
+      countryCode: rule.countryCode,
+      matchType: rule.matchType,
+      matchValue: rule.matchValue,
+      matchContext: rule.matchContext,
+      priority: rule.priority,
+      isActive: rule.isActive,
+    };
+  }
+
+  private rateSnapshot(rate: {
+    provider: ShippingRateProvider;
+    serviceLevel: string;
+    currency: CurrencyCode;
+    flatFee: { toString(): string } | number;
+    priority: number;
+    isActive: boolean;
+    effectiveFrom: Date | null;
+    effectiveTo: Date | null;
+    minDeliveryDays: number | null;
+    maxDeliveryDays: number | null;
+  }) {
+    return {
+      provider: rate.provider,
+      serviceLevel: rate.serviceLevel,
+      currency: rate.currency,
+      flatFee: Number(rate.flatFee),
+      priority: rate.priority,
+      isActive: rate.isActive,
+      effectiveFrom: rate.effectiveFrom,
+      effectiveTo: rate.effectiveTo,
+      minDeliveryDays: rate.minDeliveryDays,
+      maxDeliveryDays: rate.maxDeliveryDays,
+    };
+  }
+
+  /**
+   * Runs `change` in a transaction and, unless the admin acknowledged it, rolls
+   * back with a 409 when it leaves a state that had delivery with none. A state
+   * is covered when an active zone has an active ADMIN1/ADMIN2 rule for it and
+   * at least one active rate (a zone without a rate is refused, TTW-086).
+   */
+  private async withCoverageGuard<T>(
+    opts: GuardOptions,
+    change: (
+      tx: Prisma.TransactionClient,
+    ) => Promise<{ result: T; audit: AuditLogInput }>,
+  ): Promise<T> {
+    const { result, audit } = await this.runGuarded(opts, change);
+    // Written after the commit: `AuditService.log` swallows its own errors, and
+    // a failed insert inside the transaction would abort it.
+    await this.audit.log(audit);
+    return result;
+  }
+
+  private async runGuarded<T>(
+    opts: GuardOptions,
+    change: (
+      tx: Prisma.TransactionClient,
+    ) => Promise<{ result: T; audit: AuditLogInput }>,
+  ) {
+    const scans = !opts.acknowledgeCoverageLoss && !opts.unaffected;
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          if (!opts.unaffected) {
+            // Serialise every change that can alter coverage, confirmed or not:
+            // two admins removing the last two rates of a state at once would
+            // each see the other one still covering it.
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('shipping-coverage-guard'))`;
+          }
+          const now = new Date();
+          const before = scans ? await this.coveredStateCodes(tx, now) : null;
+          const outcome = await change(tx);
+          if (before) {
+            const after = await this.coveredStateCodes(tx, now);
+            const lost = [...before].filter((code) => !after.has(code)).sort();
+            if (lost.length > 0) {
+              const states = await tx.geoState.findMany({
+                where: { code: { in: lost } },
+                select: { code: true, name: true },
+                orderBy: { code: 'asc' },
+              });
+              throw new ConflictException({
+                code: SHIPPING_COVERAGE_WOULD_BE_LOST,
+                message:
+                  'This change would leave these states without delivery. Confirm to continue.',
+                uncoveredStates: states,
+              });
+            }
+          }
+          return outcome;
+        },
+        // Explicit, because a request may wait on the coverage lock behind
+        // another admin: Prisma's defaults (2 s wait, 5 s run) are too tight.
+        { maxWait: 5_000, timeout: 15_000 },
+      );
+    } catch (error) {
+      // Another admin deleted the row between our read and our write.
+      if ((error as { code?: string } | null)?.code === 'P2025') {
+        throw new NotFoundException('Shipping record not found');
+      }
+      throw error;
     }
-    await this.prisma.shippingRate.delete({ where: { id } });
+  }
+
+  /** Only a change to these fields can alter which states have delivery. */
+  private guardFor(
+    opts: CoverageOptions,
+    affectsCoverage: boolean,
+  ): GuardOptions {
+    return affectsCoverage ? opts : { unaffected: true };
+  }
+
+  private async coveredStateCodes(
+    tx: Prisma.TransactionClient,
+    now: Date,
+  ): Promise<Set<string>> {
+    // Same rate window as `InternalZoneRateProvider`: a rate outside its
+    // effective dates does not quote, so it does not cover a state.
+    const zones = await tx.shippingZone.findMany({
+      where: {
+        isActive: true,
+        rates: {
+          some: {
+            isActive: true,
+            // The only rate `quote` ever asks for (default service level, NGN).
+            provider: ShippingRateProvider.INTERNAL,
+            currency: CurrencyCode.NGN,
+            serviceLevel: 'STANDARD',
+            OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: now } }],
+            AND: [
+              { OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }] },
+            ],
+          },
+        },
+      },
+      select: {
+        rules: {
+          where: {
+            isActive: true,
+            countryCode: 'NG',
+            matchType: {
+              in: [ShippingRuleMatchType.ADMIN1, ShippingRuleMatchType.ADMIN2],
+            },
+          },
+          select: { matchType: true, matchValue: true, matchContext: true },
+        },
+      },
+    });
+    const codes = new Set<string>();
+    for (const zone of zones) {
+      for (const rule of zone.rules) {
+        const code =
+          rule.matchType === ShippingRuleMatchType.ADMIN2
+            ? rule.matchContext
+            : rule.matchValue;
+        if (code) codes.add(code);
+      }
+    }
+    return codes;
   }
 
   /**

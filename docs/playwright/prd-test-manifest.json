@@ -227,6 +227,16 @@
       "tags": ["@admin"]
     },
     {
+      "id": "ADMIN-SHIPPING-CORRECTIONS",
+      "surface": "admin",
+      "feature": "Admin corrects a shipping rate, removes a state from a zone and deletes a rate, with a warning before a state loses delivery",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/shipping-zone-corrections.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
       "id": "ADMIN-MFA",
       "surface": "admin",
       "feature": "Privileged admin MFA login",

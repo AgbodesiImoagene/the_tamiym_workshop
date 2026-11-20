@@ -1,7 +1,7 @@
 # TTW-097 — Complete shipping zone and rate administration
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-098
@@ -47,10 +47,10 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Acceptance criteria
 
-- [ ] An admin can correct every zone and rate mistake from the screen.
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
-- [ ] Swagger, shared contracts, migrations and docs are updated where applicable.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] An admin can correct every zone and rate mistake from the screen.
+- [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
+- [x] Swagger, shared contracts, migrations and docs are updated where applicable.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -58,16 +58,34 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Design review
 
-Pending.
+Recorded after the first implementation pass (the order the workflow asks for was not followed: design was settled while reading the code).
+
+- **Finding confirmed on `main`:** `PATCH/DELETE` already existed for zones, rules and rates but the screen did not call them; there was no route to remove an area, and no audit.
+- **Area removal:** `DELETE /v1/admin/shipping-zones/:zoneId/areas/:areaId` deletes the area and the rule `createArea` mirrors from it (ADMIN1 by state code, ADMIN2 by LGA id and state), in one transaction. Known limit: a rule an admin created by hand with the same match is removed too.
+- **Coverage warning:** every PATCH/DELETE of zone, rule, rate and area runs in a transaction. The set of covered states (active zone, active ADMIN1/ADMIN2 NG rule, at least one rate the quote engine can use: active, INTERNAL, NGN, STANDARD, inside its effective window) is computed before and after. If a state drops out, the change rolls back with `409 SHIPPING_COVERAGE_WOULD_BE_LOST` and the list of states; `?acknowledgeCoverageLoss=true` confirms. Known limits: CITY/POSTAL rules are not counted, and an LGA-level rule counts its whole state as covered.
+- **Audit:** `shipping.{zone,rule,rate,area}.{updated,deleted}` written right after the commit, outside the transaction and best-effort (`AuditService.log` swallows its own errors, and a failed insert inside the transaction would abort it; no PII).
+- **Invariant 1:** orders keep a `shippingBreakdown` snapshot and have no foreign key to rates; proved by an e2e test (fee and total unchanged after editing then deleting the rate).
+- **Not done:** a rule PATCH from the screen (rules can only be deleted there); the API route exists.
 
 ## Implementation reviews
 
-Pending.
+`/code-review` (high) on the working tree: 10 findings. Fixed: rate effective window in the coverage guard; zone deletion no longer refetches a 404; duplicated query helper; this ticket; concurrent delete now answers 404 (P2025 mapped); the audit row is written after the commit, outside the transaction; the coverage scans are skipped for changes that cannot alter coverage (name, fee, priority, delivery days); e2e state codes are unique per run and the audit rows are cleaned up.
+
+Second, fresh-session review (FAIL, then fixed): the guard now only counts the rate `InternalZoneRateProvider` asks for (INTERNAL, NGN, STANDARD) and scans when a rate's service level, provider or currency changes; guarded changes take a Postgres advisory lock (`pg_advisory_xact_lock`) so two admins cannot each remove one of the last two rates; one clock for both scans; the zone form no longer resets on a refetch; the audit wording above. The lock is proved by an e2e test that holds it from another transaction and checks the deletion waits (it fails without the lock).
+
+Third review (fresh session, PASS with 4 non-blocking findings), 1 to 3 fixed (a fourth review, PASS, no blocking finding, confirmed the fixes; it re-ran 245 unit tests, not the e2e or Playwright): `updateRate` and `updateRule` now read the row inside the transaction, after the lock, so a request that waited cannot write back a stale copy (for example an `isActive` another admin just changed) or audit a stale `before`; the lock is also taken for a confirmed change (`acknowledgeCoverageLoss=true`) that can affect coverage, so it waits for a guarded one (only the scans are skipped); the transaction has an explicit `maxWait` 5 s / `timeout` 15 s because it can queue behind the lock. Finding 4, not fixed: the guard does not use `ShippingDestinationResolver`, so its fallback to areas that have no rule is not modelled (same known limit as below).
+
+Left as known limits, not fixed: the coverage model counts only ADMIN1/ADMIN2 rules, and an LGA rule counts its whole state as covered (a proper fix reuses `ShippingDestinationResolver`); removing an area also removes a hand-made rule with the same match, because rules carry no marker of who created them (without it, a legacy area removal would leave the state matching the zone).
 
 ## Verification evidence
 
-Pending implementation.
+- `pnpm --filter api test:coverage`: 163 suites, 1844 tests passed. `pnpm coverage:ratchet` passed. `pnpm coverage:diff`: 87/88 changed lines covered (98.86%).
+- `pnpm test` (web 79, app 121, api 1815 before the extra specs): all passed.
+- `pnpm --filter api test:e2e -- test/shipping-zone-admin-corrections.e2e-spec.ts` (real Postgres): 13/13 (re-run after the third-review fixes).
+- `pnpm exec playwright test tests/e2e/admin/shipping-zone-corrections.comprehensive.spec.ts --project=setup --project=chromium-admin`: 3/3 (8 with setup).
+- `pnpm lint` (0 errors, existing warnings only), `pnpm typecheck`, `pnpm format:check`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm build`: passed.
+- Not run: `pnpm audit:prod`, `pnpm migrations:check` (no migration), browsers other than Chromium.
 
 ## Completion summary
 
-Pending implementation.
+An admin can edit and delete rates, delete rules and zones, and remove a state or LGA from a zone from the zone page, with a confirmation and a warning before a state loses delivery. No schema change, no migration. Local commit only; nothing pushed.
