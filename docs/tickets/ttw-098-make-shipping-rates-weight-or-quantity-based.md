@@ -1,7 +1,7 @@
 # TTW-098 — Make shipping rates configurable by weight or quantity
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, green CI on branch `codex/ttw-098-make-shipping-rates-weight-or-quantity-b`; not merged into `main` yet\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-097, TTW-086\
 **Blocks:** None
@@ -93,8 +93,11 @@ Run from the worktree, against a throwaway database `tamiym_workshop_test_ttw098
 - GitHub CI on the branch, run [44797701063](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44797701063) (commit a49f7d7): all 19 jobs succeeded (lint, type check, format, unit tests, production audit, coverage, documentation, migration baseline, OpenAPI, API integration, Playwright smoke, production build, container builds). The CI smoke tier does not run the new `comprehensive` spec, which was only run locally.
 - Shared test database `tamiym_workshop_test`: migration `20261120182351_ttw098_shipping_rate_brackets` applied with `migrate deploy`. State Yobe was already there, so no re-seed was needed.
 
-Not verified: a manual run of the real customer checkout page (the quote was exercised through the API as the shopper's app does, not through the checkout UI), the new Playwright spec in CI. The run on `main` (final proof) does not exist yet: nothing is merged.
+- `main` moved (TTW-204) during the work: `origin/main` was merged into the branch with no conflict, then typecheck, `openapi:check`, `migrations:check`, `format:check` and the API unit tests (1878) were run again. Branch CI on the merge commit 140173e: run [44801612563](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44801612563), success. An earlier run of the doc commit failed once on the 3-minute limit of "Run API e2e (pass 1)" (307 tests passed, 178 s against 137 s on the previous run), and passed on re-run: runner variance, the step has little margin.
+- Merged into `main` by fast-forward (`git push origin HEAD:main`). CI on `main` at 140173e: run [44802702985](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44802702985), success.
+
+Not verified: a manual run of the real customer checkout page (the quote was exercised through the API as the shopper's app does, not through the checkout UI), the new Playwright spec in CI (the CI smoke tier does not run it).
 
 ## Completion summary
 
-Admins can edit a shipping rate in the zone screen to charge by number of items or by total weight, with brackets on top of the flat fee. Rates without brackets behave exactly as before. The bracket applied is frozen on each order. New: migration `20261120182351_ttw098_shipping_rate_brackets`, `ShippingRateBracketDto`, `SHIPPING_WEIGHT_UNKNOWN`, seed state Yobe, docs (`pricing-strategy.md`, shipping runbook). Remaining: push and read CI when asked, re-seed the shared test DB, client decision on "free shipping above an amount".
+Admins can edit a shipping rate in the zone screen to charge by number of items or by total weight, with brackets on top of the flat fee. Rates without brackets behave exactly as before. The bracket applied is frozen on each order. New: migration `20261120182351_ttw098_shipping_rate_brackets`, `ShippingRateBracketDto`, `SHIPPING_WEIGHT_UNKNOWN`, seed state Yobe, docs (`pricing-strategy.md`, shipping runbook). Merged into `main` with green CI. Remaining: a client decision and a separate ticket for "free shipping above an amount".
