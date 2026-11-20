@@ -27,7 +27,7 @@ Note: Figma's "2-Day Express Production Available" badge is TTW-153, and the col
 ## Proposal
 
 - Show each product's real colours and real size range, from its variants.
-- Show "Best Seller" only from real data, or remove it until there is a rule for it (decision to record in the design review).
+- Show "Best Seller" only from real data. The tag was removed in TTW-093 (decision of 2026-11-20: no rule for it yet); bring it back here only with a rule and real sales data.
 - Write the price line from the real bulk tier ("each for N items"), and show the real minimum order or "No Minimum".
 - Match the Figma card layout: photo, colours, name, size range, price, minimum. Keep add-to-cart reachable, because removing it would break the purchase path, and record where it goes in the design review.
 

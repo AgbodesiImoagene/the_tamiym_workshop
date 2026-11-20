@@ -13,7 +13,7 @@ import {
   updateCampaignOffer,
 } from '@/lib/campaign-authoring';
 import { getMyDesigns, Design } from '@/lib/designs';
-import { getDashboardProducts, DashboardProduct } from '@/lib/products';
+import { getAllDashboardProducts, DashboardProduct } from '@/lib/products';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -201,7 +201,7 @@ export default function CampaignAuthoringPage() {
 
   const productsQuery = useQuery({
     queryKey: ['campaign-authoring-products'],
-    queryFn: getDashboardProducts,
+    queryFn: getAllDashboardProducts,
     enabled: !!user,
   });
 

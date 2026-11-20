@@ -3,23 +3,17 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { getDashboardProducts } from '@/lib/products';
-import { useQuery } from '@tanstack/react-query';
+import { getDashboardCategories, getDashboardProducts } from '@/lib/products';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { Tabs, TabsList, TabsTrigger } from '@tamiym/ui';
+import { useEffect, useState } from 'react';
+import { Button, Tabs, TabsList, TabsTrigger } from '@tamiym/ui';
 
-const categoryTabs = [
-  'All',
-  'T-Shirts',
-  'Long Sleeve T-Shirts',
-  'Polos',
-  'Hoodies',
-  'Sweatshirts',
-  'Caps',
-] as const;
+// Not a valid slug, so it can never collide with a real category.
+const ALL_CATEGORIES = '__all__';
+const PAGE_SIZE = 12;
 
 const fallbackImages = customerAssets.productFallbacks;
 
@@ -40,24 +34,12 @@ const colorDots = [
   '#3d3d3d',
 ];
 
-function getCategoryLabel(name?: string | null) {
-  if (!name) {
-    return 'All';
-  }
-
-  const normalized = name.toLowerCase();
-  const matched = categoryTabs.find((tab) =>
-    tab === 'All' ? false : normalized.includes(tab.toLowerCase().replace(/s$/, ''))
-  );
-
-  return matched ?? 'All';
-}
-
 export default function DashboardProductsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<(typeof categoryTabs)[number]>('All');
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORIES);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -76,22 +58,31 @@ export default function DashboardProductsPage() {
     void fetchUser();
   }, [router]);
 
-  const productsQuery = useQuery({
-    queryKey: ['dashboard-products'],
-    queryFn: getDashboardProducts,
+  const categoriesQuery = useQuery({
+    queryKey: ['dashboard-categories'],
+    queryFn: getDashboardCategories,
     enabled: !!user,
   });
 
-  const filteredProducts = useMemo(() => {
-    const products = productsQuery.data ?? [];
-    if (activeCategory === 'All') {
-      return products;
-    }
+  const categorySlug = activeCategory === ALL_CATEGORIES ? undefined : activeCategory;
 
-    return products.filter(
-      (product) => getCategoryLabel(product.category?.name) === activeCategory
-    );
-  }, [activeCategory, productsQuery.data]);
+  // The API returns no total: ask for one extra product to know whether a next page exists.
+  const productsQuery = useQuery({
+    queryKey: ['dashboard-products', categorySlug ?? ALL_CATEGORIES, page],
+    queryFn: () =>
+      getDashboardProducts({ categorySlug, limit: PAGE_SIZE + 1, offset: page * PAGE_SIZE }),
+    enabled: !!user,
+    placeholderData: keepPreviousData,
+  });
+
+  const fetchedProducts = productsQuery.data ?? [];
+  const filteredProducts = fetchedProducts.slice(0, PAGE_SIZE);
+  const hasNextPage = fetchedProducts.length > PAGE_SIZE;
+
+  const selectCategory = (value: string) => {
+    setActiveCategory(value);
+    setPage(0);
+  };
 
   if (error) {
     return (
@@ -121,26 +112,29 @@ export default function DashboardProductsPage() {
           </div>
 
           <div className="overflow-x-auto border-b border-black/10 pb-1">
-            <Tabs
-              value={activeCategory}
-              onValueChange={(val) => setActiveCategory(val as typeof activeCategory)}
-            >
+            <Tabs value={activeCategory} onValueChange={selectCategory}>
               <TabsList
                 variant="line"
                 className="h-auto w-auto justify-start rounded-none bg-transparent px-0 pb-0"
               >
-                {categoryTabs.map((category) => (
+                {[
+                  { id: ALL_CATEGORIES, name: 'All', slug: ALL_CATEGORIES },
+                  ...(categoriesQuery.data ?? []),
+                ].map((category) => (
                   <TabsTrigger
-                    key={category}
-                    value={category}
+                    key={category.id}
+                    value={category.slug}
                     className="rounded-none border-x-0 border-t-0 pb-2 pt-1 text-sm font-medium whitespace-nowrap data-active:border-b-[4px] data-active:border-[#1e39d2] data-active:bg-transparent data-active:text-[#1e39d2] data-active:shadow-none"
                   >
-                    {category}
+                    {category.name}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           </div>
+          {categoriesQuery.isError ? (
+            <p className="text-sm text-red-700">We could not load the categories.</p>
+          ) : null}
         </div>
 
         {productsQuery.isLoading ? (
@@ -148,68 +142,102 @@ export default function DashboardProductsPage() {
         ) : productsQuery.isError ? (
           <p className="text-sm text-red-700">We could not load your product catalogue.</p>
         ) : filteredProducts.length > 0 ? (
-          <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-            {filteredProducts.map((product, index) => {
-              const price = product.prices[0];
-              const imageUrl =
-                product.productImageRoles[0]?.image?.url ??
-                fallbackImages[index % fallbackImages.length];
+          <div className="space-y-8">
+            <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+              {filteredProducts.map((product, index) => {
+                const price = product.prices[0];
+                const imageUrl =
+                  product.productImageRoles[0]?.image?.url ??
+                  fallbackImages[index % fallbackImages.length];
 
-              return (
-                <article
-                  key={product.id}
-                  className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
+                return (
+                  <article
+                    key={product.id}
+                    className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
+                  >
+                    <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
+                      <Image
+                        src={imageUrl}
+                        alt={product.productImageRoles[0]?.image?.altText || product.name}
+                        fill
+                        className="object-contain p-5"
+                        sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
+                      />
+                    </div>
+
+                    <div className="space-y-3 p-5">
+                      <div className="flex flex-wrap gap-2">
+                        {colorDots.map((color) => (
+                          <span
+                            key={`${product.id}-${color}`}
+                            className="h-3 w-3 rounded-sm border border-black/10"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-base font-bold">{product.name}</p>
+                        <p className="text-sm text-black/80">
+                          {price
+                            ? `${formatCurrency(price.amount, price.currency)} each`
+                            : 'Quote on request'}{' '}
+                          {product.category?.name ? `for ${product.category.name}` : ''}
+                        </p>
+                        <p className="text-sm text-black/70">
+                          {product.description || 'No Minimum'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 pt-2">
+                        <Link
+                          href={`/dashboard/products/${product.id}`}
+                          className="rounded-full bg-[#004385] px-4 py-2 text-xs font-semibold text-white"
+                        >
+                          View product
+                        </Link>
+                        <Link
+                          href="/dashboard/cart"
+                          className="text-xs font-semibold text-[#004385]"
+                        >
+                          Go to cart
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            {page > 0 || hasNextPage ? (
+              <nav aria-label="Pagination" className="flex items-center justify-center gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={page === 0}
+                  onClick={() => setPage((current) => current - 1)}
                 >
-                  <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
-                    {index === 0 ? (
-                      <span className="absolute left-0 top-0 z-10 rounded-br-md bg-[#004385] px-3 py-1 text-xs font-semibold text-white">
-                        Best Seller
-                      </span>
-                    ) : null}
-                    <Image
-                      src={imageUrl}
-                      alt={product.productImageRoles[0]?.image?.altText || product.name}
-                      fill
-                      className="object-contain p-5"
-                      sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                    />
-                  </div>
-
-                  <div className="space-y-3 p-5">
-                    <div className="flex flex-wrap gap-2">
-                      {colorDots.map((color) => (
-                        <span
-                          key={`${product.id}-${color}`}
-                          className="h-3 w-3 rounded-sm border border-black/10"
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-base font-bold">{product.name}</p>
-                      <p className="text-sm text-black/80">
-                        {price
-                          ? `${formatCurrency(price.amount, price.currency)} each`
-                          : 'Quote on request'}{' '}
-                        {product.category?.name ? `for ${product.category.name}` : ''}
-                      </p>
-                      <p className="text-sm text-black/70">{product.description || 'No Minimum'}</p>
-                    </div>
-                    <div className="flex items-center gap-3 pt-2">
-                      <Link
-                        href={`/dashboard/products/${product.id}`}
-                        className="rounded-full bg-[#004385] px-4 py-2 text-xs font-semibold text-white"
-                      >
-                        View product
-                      </Link>
-                      <Link href="/dashboard/cart" className="text-xs font-semibold text-[#004385]">
-                        Go to cart
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                  Previous page
+                </Button>
+                <span className="text-sm text-muted-foreground">Page {page + 1}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!hasNextPage}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next page
+                </Button>
+              </nav>
+            ) : null}
+          </div>
+        ) : activeCategory !== ALL_CATEGORIES || page > 0 ? (
+          <div className="rounded-[24px] border border-dashed border-black/20 bg-[#f8fbff] px-5 py-4 text-sm text-black/70">
+            {page > 0
+              ? 'There are no more products on this page.'
+              : 'No products in this category yet.'}
+            {page > 0 ? (
+              <Button type="button" variant="outline" className="ml-3" onClick={() => setPage(0)}>
+                Back to first page
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-5">

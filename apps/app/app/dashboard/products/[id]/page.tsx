@@ -61,13 +61,15 @@ function ProductDetailContent({ productId }: { productId: string }) {
     enabled: !!user && !!productId,
     retry: false,
   });
-  const listQuery = useQuery({
-    queryKey: ['dashboard-products'],
-    queryFn: getDashboardProducts,
-    enabled: !!user,
-  });
 
   const product = productQuery.data;
+  const categorySlug = product?.category?.slug;
+  // Products of the same category only; one extra leaves room for the current product.
+  const listQuery = useQuery({
+    queryKey: ['dashboard-related-products', categorySlug],
+    queryFn: () => getDashboardProducts({ categorySlug, limit: MAX_RELATED_PRODUCTS + 1 }),
+    enabled: !!user && !!categorySlug,
+  });
   const groups = useMemo(() => (product ? groupVariantsByColor(product) : []), [product]);
   const activeGroup = groups.find((group) => group.code === selectedColor) ?? groups[0];
   const images = useMemo(

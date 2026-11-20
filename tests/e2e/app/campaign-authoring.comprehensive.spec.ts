@@ -45,4 +45,21 @@ describeViewportMatrix('Organiser campaign authoring @comprehensive @app @critic
       await organiserPage.keyboard.press('Escape');
     }
   });
+
+  test('product list of a draft campaign reaches products beyond the first 20 (TTW-232)', async ({
+    organiserPage,
+  }) => {
+    await organiserPage.goto('/dashboard/fundraiser');
+    await organiserPage
+      .getByPlaceholder('Draft fundraiser title')
+      .fill(`Product list check ${Date.now()}`);
+    await organiserPage.getByRole('button', { name: /Create draft fundraiser/i }).click();
+
+    // Creating a draft opens its editor, where the product is chosen.
+    await expect(organiserPage.getByTestId('campaign-authoring-editor')).toBeVisible();
+    const productSelect = organiserPage.getByRole('combobox', { name: 'Product', exact: true });
+    await expect(productSelect).toBeVisible();
+    // "Bulk Item 01" is the oldest of 24 seeded products, so it is past the API's first 20.
+    await expect(productSelect.locator('option', { hasText: 'Bulk Item 01' })).toHaveCount(1);
+  });
 });

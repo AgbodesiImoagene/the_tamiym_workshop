@@ -56,8 +56,47 @@ export interface DashboardProductDetail extends DashboardProduct {
   }>;
 }
 
-export async function getDashboardProducts() {
-  return apiClient.get<DashboardProduct[]>('/products');
+export interface DashboardCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface DashboardProductsParams {
+  categorySlug?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getDashboardCategories() {
+  return apiClient.get<DashboardCategory[]>('/categories');
+}
+
+/** With no argument, behaves as before: the API default page (20 products). */
+export async function getDashboardProducts(params: DashboardProductsParams = {}) {
+  const query = new URLSearchParams();
+  if (params.categorySlug) query.set('categorySlug', params.categorySlug);
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+  const qs = query.toString();
+  return apiClient.get<DashboardProduct[]>(qs ? `/products?${qs}` : '/products');
+}
+
+const ALL_PRODUCTS_PAGE_SIZE = 100; // the API maximum
+const ALL_PRODUCTS_MAX_PAGES = 50; // bounds the read at 5,000 products
+
+/** Every product, read page by page (the API has no total). Fails if any page fails. */
+export async function getAllDashboardProducts() {
+  const all: DashboardProduct[] = [];
+  for (let page = 0; page < ALL_PRODUCTS_MAX_PAGES; page += 1) {
+    const batch = await getDashboardProducts({
+      limit: ALL_PRODUCTS_PAGE_SIZE,
+      offset: page * ALL_PRODUCTS_PAGE_SIZE,
+    });
+    all.push(...batch);
+    if (batch.length < ALL_PRODUCTS_PAGE_SIZE) break;
+  }
+  return all;
 }
 
 export async function getDashboardProductDetail(productId: string) {

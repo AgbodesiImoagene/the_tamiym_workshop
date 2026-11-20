@@ -93,6 +93,15 @@ const E2E_UNVERIFIED_ATTEMPTS = [0, 1] as const;
 const e2eVerificationToken = (attempt: number) =>
   `e2e-verify-token-attempt-${attempt}`;
 
+const BULK_PRODUCT_COUNT = 22;
+
+/** TTW-231: one customer per checkout journey that saves the address. */
+const CHECKOUT_CUSTOMERS = [
+  ['checkoutIdempotency', 'checkout-idempotency', '+2348000000014'],
+  ['checkoutInstructions', 'checkout-instructions', '+2348000000015'],
+  ['checkoutNote', 'checkout-note', '+2348000000016'],
+] as const;
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -106,6 +115,10 @@ const IDS = {
     customerUndeliverable: 'e2e-user-customer-undeliverable',
     // TTW-217: owns an address in an active state, linked to a deactivated LGA.
     customerUndeliverableLga: 'e2e-user-customer-undeliverable-lga',
+    // TTW-231: one customer per checkout journey that saves the address.
+    checkoutIdempotency: 'e2e-user-checkout-idempotency',
+    checkoutInstructions: 'e2e-user-checkout-instructions',
+    checkoutNote: 'e2e-user-checkout-note',
   },
   address: 'e2e-address-customer-main',
   addressUndeliverable: 'e2e-address-customer-undeliverable',
@@ -114,6 +127,7 @@ const IDS = {
   categories: {
     apparel: 'e2e-category-apparel',
     accessories: 'e2e-category-accessories',
+    bulk: 'e2e-category-bulk',
   },
   products: {
     tee: 'e2e-product-classic-tee',
@@ -510,6 +524,18 @@ async function main() {
           phone: '+2348000000009',
           emailVerifiedAt: daysAgo(10),
         },
+        ...CHECKOUT_CUSTOMERS.map(([key, emailName, phone]) => ({
+          // TTW-231: same profile as the main customer, own address.
+          id: IDS.users[key],
+          email: `${emailName}.e2e@tamiym.test`,
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Kemi',
+          lastName: 'Checkout',
+          phone,
+          emailVerifiedAt: daysAgo(10),
+        })),
       ],
     });
 
@@ -624,6 +650,26 @@ async function main() {
       });
     }
 
+    // TTW-231: the checkout journeys each save their own address copy.
+    for (const [key, , phone] of CHECKOUT_CUSTOMERS) {
+      await prisma.address.create({
+        data: {
+          id: `e2e-address-${IDS.users[key].replace('e2e-user-', '')}`,
+          userId: IDS.users[key],
+          recipientName: 'Kemi Checkout',
+          phone,
+          addressLine1: '12 Allen Avenue',
+          city: 'Ikeja',
+          state: 'Lagos',
+          stateCode: 'LA',
+          lgaId: ikeja.id,
+          country: 'Nigeria',
+          countryCode: 'NG',
+          isDefault: true,
+        },
+      });
+    }
+
     // TTW-217: saved while the state was active, deactivated since (the state
     // is seeded inactive above; no admin route deactivates a state).
     await prisma.address.create({
@@ -680,6 +726,12 @@ async function main() {
           slug: 'accessories-e2e',
           description: 'E2E accessories fixtures',
         },
+        {
+          id: IDS.categories.bulk,
+          name: 'Bulk Catalogue',
+          slug: 'bulk-catalogue-e2e',
+          description: 'TTW-093: more products than one catalogue page',
+        },
       ],
     });
 
@@ -703,6 +755,19 @@ async function main() {
           status: ProductStatus.ACTIVE,
           weightGrams: 640,
         },
+        // TTW-093: 22 products in one category, so the customer catalogue needs a
+        // second page (page size 12) and "All" holds more than the API default of 20.
+        // Dated well before the other fixtures so they stay at the front of the list.
+        ...Array.from({ length: BULK_PRODUCT_COUNT }, (_, index) => ({
+          id: `e2e-product-bulk-${String(index + 1).padStart(2, '0')}`,
+          categoryId: IDS.categories.bulk,
+          name: `Bulk Item ${String(index + 1).padStart(2, '0')}`,
+          slug: `bulk-item-${String(index + 1).padStart(2, '0')}-e2e`,
+          description: 'Pagination fixture.',
+          status: ProductStatus.ACTIVE,
+          weightGrams: 100,
+          createdAt: new Date(Date.UTC(2020, 0, 1, 0, index)),
+        })),
       ],
     });
 

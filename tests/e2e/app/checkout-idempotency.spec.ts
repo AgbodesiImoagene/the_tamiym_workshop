@@ -10,6 +10,9 @@ import { test } from '../fixtures/test';
  * intercepted: the first call fails at the network layer, the second returns a
  * simulated Paystack session (ordinary CI never calls live Paystack).
  */
+// TTW-231: its own customer, because checkout saves the address and parallel journeys must not share it.
+test.use({ customerAuthState: 'customer-checkout-idempotency' });
+
 test.describe('Customer checkout retry @app @journey', () => {
   test('re-clicking after a payment initiation failure creates one order', async ({
     customerPage,

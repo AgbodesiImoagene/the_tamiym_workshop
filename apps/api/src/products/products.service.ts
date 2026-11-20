@@ -212,7 +212,7 @@ export class ProductsService {
     }
 
     const sort: ProductSort = query?.sort ?? ProductSort.NEWEST;
-    const orderBy: Prisma.ProductOrderByWithRelationInput =
+    const primaryOrder: Prisma.ProductOrderByWithRelationInput =
       sort === ProductSort.OLDEST
         ? { createdAt: 'asc' }
         : sort === ProductSort.NAME_ASC
@@ -220,6 +220,12 @@ export class ProductsService {
           : sort === ProductSort.NAME_DESC
             ? { name: 'desc' }
             : { createdAt: 'desc' };
+    // `id` makes the order total: rows sharing a createdAt or name keep a fixed
+    // position, so limit/offset pages never repeat or skip a product.
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] = [
+      primaryOrder,
+      { id: 'asc' },
+    ];
 
     const limit = Math.min(query?.limit ?? DEFAULT_LIMIT, 100);
     const offset = query?.offset ?? 0;
