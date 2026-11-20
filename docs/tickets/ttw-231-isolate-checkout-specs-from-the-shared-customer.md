@@ -8,7 +8,7 @@
 
 ## Background
 
-Found while verifying TTW-093 and TTW-230. With the default local worker count, a full `chromium-app` run failed in three of four runs on a checkout journey that passes alone and with one worker: `checkout-idempotency.spec.ts` (twice) and `checkout-delivery-instructions.spec.ts` (once).
+Found while verifying TTW-093 and TTW-232. With the default local worker count, a full `chromium-app` run failed in three of four runs on a checkout journey that passes alone and with one worker: `checkout-idempotency.spec.ts` (twice) and `checkout-delivery-instructions.spec.ts` (once).
 
 Cause, shown with a temporary diagnostic copy of the spec and by reading the code:
 

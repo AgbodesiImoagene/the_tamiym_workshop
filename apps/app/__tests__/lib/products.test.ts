@@ -1,5 +1,5 @@
 /**
- * TTW-230: reading the product list page by page.
+ * TTW-232: reading the product list page by page.
  * The API returns at most 100 products per request and no total.
  */
 import { apiClient } from '@/lib/api';

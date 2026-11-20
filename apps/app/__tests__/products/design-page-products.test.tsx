@@ -1,5 +1,5 @@
 /**
- * TTW-230: the design screen shows six products, so it asks the API for six, not twenty.
+ * TTW-232: the design screen shows six products, so it asks the API for six, not twenty.
  */
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -34,7 +34,7 @@ jest.mock('@/lib/designs', () => ({
 
 jest.mock('@/lib/products', () => ({ getDashboardProducts: jest.fn() }));
 
-describe('design screen products (TTW-230)', () => {
+describe('design screen products (TTW-232)', () => {
   it('asks the API for the six products it shows', async () => {
     jest.mocked(getMyDesigns).mockResolvedValue([]);
     jest.mocked(getDashboardProducts).mockResolvedValue(

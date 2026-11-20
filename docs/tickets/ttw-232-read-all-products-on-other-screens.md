@@ -1,4 +1,4 @@
-# TTW-230 — Read the right number of products on the design, product-page and fundraiser screens
+# TTW-232 — Read the right number of products on the design, product-page and fundraiser screens
 
 **Epic:** 8 — Client review delivery\
 **Status:** Complete (journey not played by hand in a browser)\

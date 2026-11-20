@@ -151,7 +151,7 @@ beforeEach(() => {
 });
 
 describe('product detail page (TTW-092)', () => {
-  it('asks the API for products of the same category, with room for the current one (TTW-230)', async () => {
+  it('asks the API for products of the same category, with room for the current one (TTW-232)', async () => {
     renderPage();
     await screen.findByRole('region', { name: /related products/i });
     expect(listMock).toHaveBeenCalledWith({ categorySlug: 't-shirts', limit: 5 });

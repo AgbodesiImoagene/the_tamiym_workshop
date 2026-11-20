@@ -46,7 +46,7 @@ describeViewportMatrix('Organiser campaign authoring @comprehensive @app @critic
     }
   });
 
-  test('product list of a draft campaign reaches products beyond the first 20 (TTW-230)', async ({
+  test('product list of a draft campaign reaches products beyond the first 20 (TTW-232)', async ({
     organiserPage,
   }) => {
     await organiserPage.goto('/dashboard/fundraiser');
