@@ -16,11 +16,13 @@ import {
   Textarea,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
   changePassword,
@@ -225,6 +227,15 @@ export function CustomerSettingsForm({
     },
   });
 
+  const router = useRouter();
+
+  // TTW-229: go back in the history; a page opened directly has no previous page of this
+  // site, so fall back to the dashboard.
+  const goBack = () => {
+    if (canGoBack()) router.back();
+    else router.push('/dashboard');
+  };
+
   const addressMutation = useMutation({
     mutationFn: upsertPrimaryAddress,
     onSuccess: async () => {
@@ -235,7 +246,12 @@ export function CustomerSettingsForm({
   return (
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
-        <button type="button" className="rounded-full p-1 text-black">
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={goBack}
+          className="rounded-full p-1 text-black"
+        >
           <svg
             viewBox="0 0 24 24"
             className="h-6 w-6"

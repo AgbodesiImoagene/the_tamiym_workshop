@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomerSettingsForm } from '@/components/customer-settings-form';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import {
   changePassword,
@@ -13,6 +14,14 @@ import {
   updateUserProfile,
   upsertPrimaryAddress,
 } from '@/lib/profile';
+
+const back = jest.fn();
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ back, push, replace: jest.fn() }),
+}));
+
+jest.mock('@/lib/can-go-back', () => ({ canGoBack: jest.fn() }));
 
 jest.mock('@/lib/geo', () => ({
   ...jest.requireActual('@/lib/geo'),
@@ -403,5 +412,34 @@ describe('CustomerSettingsForm delivery instructions', () => {
 
     await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
     expect(sentPayloads()[0]).toEqual(expect.objectContaining({ instructions: null }));
+  });
+});
+
+// TTW-229: the chevron at the top of the page goes back. Whether there is a page to go
+// back to is decided by `canGoBack` (see __tests__/lib/can-go-back.test.ts).
+describe('CustomerSettingsForm back button', () => {
+  it('has an accessible name', () => {
+    renderForm();
+    expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
+  });
+
+  it('goes back in the history when there is a previous page of the site', () => {
+    (canGoBack as jest.Mock).mockReturnValue(true);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('goes to the dashboard when the page was opened directly', () => {
+    (canGoBack as jest.Mock).mockReturnValue(false);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(push).toHaveBeenCalledWith('/dashboard');
+    expect(back).not.toHaveBeenCalled();
   });
 });
