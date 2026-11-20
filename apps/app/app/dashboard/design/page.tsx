@@ -20,6 +20,9 @@ const MODERATION_BADGE: Record<string, { label: string; variant: BadgeVariant }>
   REJECTED: { label: 'Rejected', variant: 'danger' },
 };
 
+/** Cards shown under "Start from a product". */
+const START_PRODUCTS_COUNT = 6;
+
 export default function DashboardDesignPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -45,7 +48,7 @@ export default function DashboardDesignPage() {
 
   const productsQuery = useQuery({
     queryKey: ['dashboard-products-design'],
-    queryFn: () => getDashboardProducts(),
+    queryFn: () => getDashboardProducts({ limit: START_PRODUCTS_COUNT }),
     enabled: !!user,
   });
 
@@ -177,7 +180,7 @@ export default function DashboardDesignPage() {
               <p className="text-sm text-zinc-500">No products available.</p>
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {products.slice(0, 6).map((product) => {
+                {products.slice(0, START_PRODUCTS_COUNT).map((product) => {
                   const imageUrl = product.productImageRoles[0]?.image?.url ?? null;
                   const price = product.prices[0];
 

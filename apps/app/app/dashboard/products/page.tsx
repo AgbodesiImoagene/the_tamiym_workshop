@@ -156,11 +156,6 @@ export default function DashboardProductsPage() {
                     className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
                   >
                     <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
-                      {index === 0 ? (
-                        <span className="absolute left-0 top-0 z-10 rounded-br-md bg-[#004385] px-3 py-1 text-xs font-semibold text-white">
-                          Best Seller
-                        </span>
-                      ) : null}
                       <Image
                         src={imageUrl}
                         alt={product.productImageRoles[0]?.image?.altText || product.name}

@@ -151,6 +151,13 @@ beforeEach(() => {
 });
 
 describe('product detail page (TTW-092)', () => {
+  it('asks the API for products of the same category, with room for the current one (TTW-230)', async () => {
+    renderPage();
+    await screen.findByRole('region', { name: /related products/i });
+    expect(listMock).toHaveBeenCalledWith({ categorySlug: 't-shirts', limit: 5 });
+    expect(listMock).not.toHaveBeenCalledWith();
+  });
+
   it('buys several sizes in one action, one cart line per chosen variant', async () => {
     renderPage();
     await screen.findByRole('heading', { name: 'Classic Tee', level: 1 });

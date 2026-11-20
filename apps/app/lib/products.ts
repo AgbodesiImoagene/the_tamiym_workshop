@@ -82,6 +82,23 @@ export async function getDashboardProducts(params: DashboardProductsParams = {})
   return apiClient.get<DashboardProduct[]>(qs ? `/products?${qs}` : '/products');
 }
 
+const ALL_PRODUCTS_PAGE_SIZE = 100; // the API maximum
+const ALL_PRODUCTS_MAX_PAGES = 50; // bounds the read at 5,000 products
+
+/** Every product, read page by page (the API has no total). Fails if any page fails. */
+export async function getAllDashboardProducts() {
+  const all: DashboardProduct[] = [];
+  for (let page = 0; page < ALL_PRODUCTS_MAX_PAGES; page += 1) {
+    const batch = await getDashboardProducts({
+      limit: ALL_PRODUCTS_PAGE_SIZE,
+      offset: page * ALL_PRODUCTS_PAGE_SIZE,
+    });
+    all.push(...batch);
+    if (batch.length < ALL_PRODUCTS_PAGE_SIZE) break;
+  }
+  return all;
+}
+
 export async function getDashboardProductDetail(productId: string) {
   return apiClient.get<DashboardProductDetail>(`/products/${productId}`);
 }

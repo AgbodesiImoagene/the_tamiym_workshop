@@ -185,6 +185,12 @@ describe('product list categories and pagination (TTW-093)', () => {
     });
   });
 
+  it('does not tag any product as a best seller (no sales data behind it)', async () => {
+    renderPage();
+    await screen.findAllByRole('link', { name: 'View product' });
+    expect(screen.queryByText('Best Seller')).not.toBeInTheDocument();
+  });
+
   it('shows no pagination when everything fits on one page', async () => {
     renderPage();
     await screen.findAllByRole('link', { name: 'View product' });
