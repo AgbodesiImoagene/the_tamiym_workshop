@@ -179,17 +179,18 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 3 : Commander son design et l'imprimer
 
-| Fait | N°  | Ticket                                                               | Lot | Travail                                                        | Excel     | Risque   | Heures | Attend           |
-| ---- | --- | -------------------------------------------------------------------- | --- | -------------------------------------------------------------- | --------- | -------- | ------ | ---------------- |
-| [ ]  | 20  | [TTW-099](ttw-099-make-customer-uploads-private.md)                  | 3A  | Rendre les fichiers clients privés, avec des liens temporaires | 11.3, 9.7 | Élevé    | 8–14   | —                |
-| [ ]  | —   | [TTW-234](ttw-234-show-private-customer-images-on-shared-designs.md) | 3A  | Montrer les images clients privées sur les designs partagés    | 11.3      | Élevé    | 4–8    | TTW-099          |
-| [ ]  | 21  | [TTW-102](ttw-102-add-delete-undo-and-layers-to-the-workshop.md)     | 3A  | Supprimer un élément, annuler, liste des calques               | 3.3       | Standard | 10–16  | —                |
-| [ ]  | 22  | [TTW-100](ttw-100-validate-design-content-on-the-server.md)          | 3B  | Valider le contenu d'un design côté serveur                    | 3.7       | Élevé    | 10–16  | TTW-099          |
-| [ ]  | 23  | [TTW-103](ttw-103-load-the-fonts-the-workshop-offers.md)             | 3B  | Charger réellement les polices proposées                       | 3.11      | Standard | 4–6    | TTW-102          |
-| [ ]  | 24  | [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)          | 3C  | Ajouter un design au panier et le commander                    | 3.1, 3.8  | Élevé    | 22–33  | TTW-100, TTW-092 |
-| [ ]  | 25  | [TTW-101](ttw-101-give-the-workshop-its-print-files.md)              | 3D  | Donner à l'atelier les fichiers d'impression                   | 3.2       | Élevé    | 20–35  | TTW-058, TTW-099 |
-| [ ]  | 26  | [TTW-104](ttw-104-warn-about-low-resolution-images.md)               | 3D  | Alerter si l'image est trop petite pour bien s'imprimer        | 3.10      | Standard | 4–6    | TTW-103          |
-| [ ]  | 27  | [TTW-105](ttw-105-align-workshop-layout-with-figma.md)               | 3E  | Aligner la mise en page du Workshop sur Figma                  | 3.4       | Standard | 30–45  | TTW-104          |
+| Fait | N°  | Ticket                                                               | Lot | Travail                                                           | Excel     | Risque   | Heures | Attend                   |
+| ---- | --- | -------------------------------------------------------------------- | --- | ----------------------------------------------------------------- | --------- | -------- | ------ | ------------------------ |
+| [ ]  | 20  | [TTW-099](ttw-099-make-customer-uploads-private.md)                  | 3A  | Rendre les fichiers clients privés, avec des liens temporaires    | 11.3, 9.7 | Élevé    | 8–14   | —                        |
+| [ ]  | —   | [TTW-234](ttw-234-show-private-customer-images-on-shared-designs.md) | 3A  | Montrer les images clients privées sur les designs partagés       | 11.3      | Élevé    | 4–8    | TTW-099                  |
+| [ ]  | —   | [TTW-235](ttw-235-delete-expired-private-objects.md)                 | 3A  | Supprimer les fichiers privés rejetés ou orphelins après un délai | 11.3      | Élevé    | 4–8    | TTW-099, décision durées |
+| [ ]  | 21  | [TTW-102](ttw-102-add-delete-undo-and-layers-to-the-workshop.md)     | 3A  | Supprimer un élément, annuler, liste des calques                  | 3.3       | Standard | 10–16  | —                        |
+| [ ]  | 22  | [TTW-100](ttw-100-validate-design-content-on-the-server.md)          | 3B  | Valider le contenu d'un design côté serveur                       | 3.7       | Élevé    | 10–16  | TTW-099                  |
+| [ ]  | 23  | [TTW-103](ttw-103-load-the-fonts-the-workshop-offers.md)             | 3B  | Charger réellement les polices proposées                          | 3.11      | Standard | 4–6    | TTW-102                  |
+| [ ]  | 24  | [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)          | 3C  | Ajouter un design au panier et le commander                       | 3.1, 3.8  | Élevé    | 22–33  | TTW-100, TTW-092         |
+| [ ]  | 25  | [TTW-101](ttw-101-give-the-workshop-its-print-files.md)              | 3D  | Donner à l'atelier les fichiers d'impression                      | 3.2       | Élevé    | 20–35  | TTW-058, TTW-099         |
+| [ ]  | 26  | [TTW-104](ttw-104-warn-about-low-resolution-images.md)               | 3D  | Alerter si l'image est trop petite pour bien s'imprimer           | 3.10      | Standard | 4–6    | TTW-103                  |
+| [ ]  | 27  | [TTW-105](ttw-105-align-workshop-layout-with-figma.md)               | 3E  | Aligner la mise en page du Workshop sur Figma                     | 3.4       | Standard | 30–45  | TTW-104                  |
 
 ## Phase 4 : Produire, expédier, facturer
 
