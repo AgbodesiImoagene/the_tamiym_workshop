@@ -1,7 +1,7 @@
 # TTW-230 — Upgrade Next.js to fix the security advisory that stops `next build`
 
 **Epic:** 8 — Client review delivery  
-**Status:** In progress (implemented locally, reviewed, not pushed)  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -82,8 +82,9 @@ Run in the worktree on 2026-11-20 after `pnpm up -r next@16.4.6 eslint-config-ne
 - A first smoke run (41 passed) is **not** evidence: the ports were held by another session's servers (Next 16.4.4) and the config reuses running servers outside CI.
 - `pnpm audit` and the other dependencies were not looked at (out of scope).
 - CI on the pushed branch `codex/ttw-230-upgrade-next-for-the-security-advisory` (commit `c4a81dd`), run 44775221215: conclusion `success`, all 19 jobs green, including Production Build, Production Audit, Playwright Smoke, the three Next.js container builds, Lint, Type Check, Unit Tests, API Integration and Documentation.
-- **Not verified:** the run on `main` after the merge, which is the final proof. Locally only the `chromium` projects ran.
+- CI on `main` after the merge (`618c683`): `CI` run 44778143508 `success` and `Playwright Comprehensive` run 44778143527 `success`.
+- **Not verified:** nothing left open for this ticket. Locally only the `chromium` projects ran; CI ran the full set.
 
 ## Completion summary
 
-Implemented: Next.js 16.4.6, build unblocked. Independent review: PASS. CI on the branch is green. Remaining: merge into `main` when asked, then the run on `main` is the final proof.
+Implemented: Next.js 16.4.6, build unblocked. Independent review: PASS. Merged into `main` as `618c683`; CI and Playwright Comprehensive are green on `main`. Nothing remaining.
