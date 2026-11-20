@@ -37,6 +37,7 @@ import {
   hashDesignShareToken,
   mintDesignShareToken,
 } from './design-share.crypto';
+import { isShareLinkOpen, isShareTokenShape } from './design-share.policy';
 
 type DesignDataViews = Record<
   string,
@@ -794,7 +795,7 @@ export class DesignsService {
    * Does not return the bearer, owner id, or moderation notes.
    */
   async findByShareToken(token: string) {
-    if (!token || token.length < 16 || token.length > 128) {
+    if (!isShareTokenShape(token)) {
       throw new NotFoundException('Shared design not found');
     }
     const tokenHash = hashDesignShareToken(token);
@@ -826,12 +827,7 @@ export class DesignsService {
       },
     });
 
-    const deny =
-      !link ||
-      !!link.revokedAt ||
-      link.expiresAt.getTime() <= Date.now() ||
-      link.design.moderationStatus !== ModerationStatus.APPROVED;
-    if (deny) {
+    if (!link || !isShareLinkOpen(link)) {
       throw new NotFoundException('Shared design not found');
     }
 

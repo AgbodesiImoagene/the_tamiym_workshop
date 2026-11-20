@@ -82,6 +82,7 @@ export default async function SharedDesignPage({ params }: SharedDesignPageProps
                     templateLayers={view.templateLayers}
                     activeEffects={[]}
                     fabricJson={viewData?.fabricJson ?? null}
+                    shareToken={shareToken}
                     readOnly
                   />
                 </div>

@@ -19554,6 +19554,71 @@
         ]
       }
     },
+    "/v1/public/designs/{shareToken}/assets/{designAssetId}/file": {
+      "get": {
+        "operationId": "PublicDesignsController_sharedAssetFile",
+        "parameters": [
+          {
+            "description": "High-entropy design share bearer token",
+            "in": "path",
+            "name": "shareToken",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Design asset id",
+            "in": "path",
+            "name": "designAssetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which rendition to read. Defaults to the original.",
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "enum": [
+                "display",
+                "original",
+                "thumb"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The image (PNG, JPEG or WebP)."
+          },
+          "400": {
+            "description": "Unknown variant"
+          },
+          "404": {
+            "description": "Unknown, revoked or expired link, design not approved, image not used by this design or owned by someone else, file not usable, or rendition not ready"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "summary": "Read a customer image used by a shared design",
+        "tags": [
+          "Designs (Public)"
+        ]
+      }
+    },
     "/v1/public/fundraisers": {
       "get": {
         "description": "Returns ACTIVE, in-window campaign slugs for sitemap generation. Does not expose private campaign fields.",

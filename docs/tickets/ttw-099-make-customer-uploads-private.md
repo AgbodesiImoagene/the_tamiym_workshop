@@ -103,7 +103,8 @@ Date: 2026-11-20. Scope decided by the user: **everything** of a customer upload
 Independent review (`/code-review high`, 2026-11-20) reported 9 findings:
 
 - Fixed: stale design review in this ticket.
-- Not fixed, recorded under Remaining: shared design page (`apps/app/app/design/shared/[shareToken]/page.tsx`) shows blank customer images to anonymous visitors; `S3_PRIVATE_BUCKET` is not provisioned in OpenTofu or validated at startup; no lifecycle cleanup of rejected, infected or orphaned private objects; streamed S3 body not destroyed on client abort; duplicated bucket code in `S3Service`; type casts caused by duplicate `@smithy/types`; the owner can read the original before the scan completes (needed so the canvas shows the image right after upload); no browser run of the workshop.
+- Handled in [TTW-234](ttw-234-show-private-customer-images-on-shared-designs.md): the shared design page (`apps/app/app/design/shared/[shareToken]/page.tsx`) showed blank customer images to anonymous visitors.
+- Not fixed, recorded under Remaining: `S3_PRIVATE_BUCKET` is not provisioned in OpenTofu or validated at startup; no lifecycle cleanup of rejected, infected or orphaned private objects; streamed S3 body not destroyed on client abort; duplicated bucket code in `S3Service`; type casts caused by duplicate `@smithy/types`; the owner can read the original before the scan completes (needed so the canvas shows the image right after upload); no browser run of the workshop.
 
 A second review pass after the Remaining items are handled is still to do.
 
@@ -125,7 +126,7 @@ Run from the worktree `codex/ttw-099-make-customer-uploads-private`, on 2026-11-
 
 Handled after the first review (second commit):
 
-- Shared designs: TTW-234 (separate branch `codex/shared-design-private-images`).
+- Shared designs: TTW-234 (merged into this branch).
 - Private bucket: the infra already has a private `<prefix>-originals` bucket (ACL private), so no new OpenTofu resource. `S3_PRIVATE_BUCKET` maps to it (documented in `infra/runtime/secrets/README.md`), and `validateEnv` now refuses to start in production when `S3_BUCKET` is set without a distinct, non-placeholder `S3_PRIVATE_BUCKET` (`env-validation.spec.ts`, 4 tests).
 - Infected private files: the processor now deletes the stored object and the ORIGINAL derivative row and clears `originalKey` (`MediaProcessor.purgeInfectedOriginal`, `S3Service.deletePrivateObject`). If the deletion fails the key is kept and the error logged. A scanner outage (scan FAILED) and a moderation rejection are deliberately NOT purged: the first can be rescanned, the second may be appealed.
 

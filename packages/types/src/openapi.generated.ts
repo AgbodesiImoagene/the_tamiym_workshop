@@ -3265,6 +3265,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/designs/{shareToken}/assets/{designAssetId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a customer image used by a shared design */
+        get: operations["PublicDesignsController_sharedAssetFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/fundraisers": {
         parameters: {
             query?: never;
@@ -14805,6 +14822,55 @@ export interface operations {
             };
             /** @description Shared design not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PublicDesignsController_sharedAssetFile: {
+        parameters: {
+            query?: {
+                /** @description Which rendition to read. Defaults to the original. */
+                variant?: "display" | "original" | "thumb";
+            };
+            header?: never;
+            path: {
+                /** @description High-entropy design share bearer token */
+                shareToken: string;
+                /** @description Design asset id */
+                designAssetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image (PNG, JPEG or WebP). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            /** @description Unknown variant */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, revoked or expired link, design not approved, image not used by this design or owned by someone else, file not usable, or rendition not ready */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
