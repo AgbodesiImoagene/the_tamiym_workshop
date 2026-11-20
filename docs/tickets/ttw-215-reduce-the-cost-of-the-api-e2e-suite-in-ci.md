@@ -144,6 +144,8 @@ To verify before this counts as done: `Playwright Smoke` and `Playwright Compreh
 
 Result, on the branch (commit b37ec5e): run 44787237386 (`CI`) success, **345 s (5 min 45 s)**, 19 of 19 jobs successful; in `Playwright Smoke`, `Install Playwright Chromium` took **11 s** (17 to 48 s before when the mirror was fast), `Production build` 52 s, `Run Playwright smoke` 24 s. `Playwright Comprehensive`, started by hand on the branch (workflow_dispatch), run 44787237870: success, **211 s**, **223 passed**, `Install Playwright Chromium` 10 s; the three `chromium-a11y` tests passed without the system fonts. So Chromium starts without `--with-deps` and the accessibility results do not change.
 
+On `main` after the merge (commit f18f091): run 44788571285 (`CI`) success, 19 of 19 jobs successful, **693 s from creation, of which 300 s were waiting for a runner**: every job started 300 s after the run was created, then the longest ran 393 s (`API Integration`). `Install Playwright Chromium` took 11 s. Run 44788571455 (`Playwright Comprehensive`) success, 213 s. The wait for a runner comes from several runs started at the same time by different sessions; it does not depend on this workflow, and compare job durations rather than the run length when it happens.
+
 Not shown by these runs: the gain when the mirror is slow (it did not strike), which needs several runs on `main` to be seen.
 
 ## Completion summary
