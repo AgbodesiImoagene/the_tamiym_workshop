@@ -2,6 +2,7 @@ import { Readable } from 'node:stream';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -157,6 +158,18 @@ export class S3Service {
       return Buffer.from(await body.transformToByteArray());
     } catch {
       throw new InternalServerErrorException('Failed to download image');
+    }
+  }
+
+  /** Delete a private object (an infected upload). */
+  async deletePrivateObject(key: string): Promise<void> {
+    const bucket = this.requirePrivateBucket();
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+      );
+    } catch {
+      throw new InternalServerErrorException('Failed to delete image');
     }
   }
 

@@ -97,6 +97,14 @@ export class MediaProcessor extends WorkerHost {
               scanStatus === VirusScanStatus.INFECTED
                 ? 'Virus scan detected malware'
                 : 'Virus scan failed';
+            // A confirmed-infected customer file has no reason to stay in storage. A
+            // scanner outage (FAILED) keeps it, since the scan can be redone, and so does a
+            // moderation rejection, which may be appealed.
+            const purged =
+              scanStatus === VirusScanStatus.INFECTED &&
+              asset.visibility === MediaVisibility.PRIVATE
+                ? await this.purgeInfectedOriginal(assetId, originalKey)
+                : false;
             await this.prisma.mediaAsset.update({
               where: { id: assetId },
               data: {
@@ -104,6 +112,7 @@ export class MediaProcessor extends WorkerHost {
                 originalBytes: buffer.length,
                 status: MediaAssetStatus.FAILED,
                 errorMessage,
+                ...(purged ? { originalKey: null } : {}),
               },
             });
             return;
@@ -353,6 +362,29 @@ export class MediaProcessor extends WorkerHost {
       originalKey: asset.originalKey,
       originalUrl: isPrivate ? null : asset.originalUrl,
     };
+  }
+
+  /**
+   * Delete the stored object of an infected private upload and its derivative row.
+   * Returns false, and keeps the key, when the storage call fails: the file is already
+   * unusable (FAILED + INFECTED), the failure is logged and the key stays for a later purge.
+   */
+  private async purgeInfectedOriginal(
+    assetId: string,
+    originalKey: string,
+  ): Promise<boolean> {
+    try {
+      await this.s3Service.deletePrivateObject(originalKey);
+      await this.prisma.mediaDerivative.deleteMany({ where: { assetId } });
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete infected object of asset ${assetId}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return false;
+    }
   }
 
   private buildDisplayBuffer(buffer: Buffer): Promise<Buffer> {

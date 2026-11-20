@@ -48,6 +48,7 @@ describe('MediaProcessor, private customer uploads (TTW-099)', () => {
     getPrivateObjectBuffer: jest.Mock;
     uploadObject: jest.Mock;
     uploadPrivateObject: jest.Mock;
+    deletePrivateObject: jest.Mock;
   };
   let virusScanService: { scanBuffer: jest.Mock };
   let moderationService: {
@@ -67,6 +68,7 @@ describe('MediaProcessor, private customer uploads (TTW-099)', () => {
       getObjectBuffer: jest.fn(),
       getPrivateObjectBuffer: jest.fn().mockResolvedValue(Buffer.from('raw')),
       uploadObject: jest.fn(),
+      deletePrivateObject: jest.fn().mockResolvedValue(undefined),
       uploadPrivateObject: jest
         .fn()
         .mockImplementation(({ key }: { key: string }) =>
@@ -180,6 +182,71 @@ describe('MediaProcessor, private customer uploads (TTW-099)', () => {
     });
     expect(moderationService.moderateImageBytes).not.toHaveBeenCalled();
     expect(s3Service.uploadPrivateObject).not.toHaveBeenCalled();
+  });
+
+  describe('cleanup of an infected private file (TTW-099)', () => {
+    beforeEach(() => {
+      s3Service.deletePrivateObject = jest.fn().mockResolvedValue(undefined);
+      (
+        prisma.mediaDerivative as unknown as { deleteMany: jest.Mock }
+      ).deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+      virusScanService.scanBuffer.mockResolvedValue(VirusScanStatus.INFECTED);
+    });
+
+    it('deletes the stored object and forgets its key', async () => {
+      await processor.process({ data: { assetId: 'asset-p1' } } as never);
+
+      expect(s3Service.deletePrivateObject).toHaveBeenCalledWith(
+        'media/asset-p1/original.png',
+      );
+      expect(prisma.mediaAsset.update).toHaveBeenCalledWith({
+        where: { id: 'asset-p1' },
+        data: expect.objectContaining({
+          status: MediaAssetStatus.FAILED,
+          scanStatus: VirusScanStatus.INFECTED,
+          originalKey: null,
+        }),
+      });
+      expect(
+        (prisma.mediaDerivative as unknown as { deleteMany: jest.Mock })
+          .deleteMany,
+      ).toHaveBeenCalledWith({ where: { assetId: 'asset-p1' } });
+    });
+
+    it('still marks the asset infected and keeps its key when the deletion fails, so the object can be purged later', async () => {
+      s3Service.deletePrivateObject.mockRejectedValue(
+        new Error('storage down'),
+      );
+
+      await processor.process({ data: { assetId: 'asset-p1' } } as never);
+
+      const data = (prisma.mediaAsset.update as jest.Mock).mock.calls
+        .map((c) => c[0].data)
+        .find((d) => d.scanStatus === VirusScanStatus.INFECTED);
+      expect(data.status).toBe(MediaAssetStatus.FAILED);
+      expect(data.originalKey).toBeUndefined();
+    });
+
+    it('keeps the object when the scanner is merely unavailable, since the scan can be retried', async () => {
+      virusScanService.scanBuffer.mockResolvedValue(VirusScanStatus.FAILED);
+
+      await processor.process({ data: { assetId: 'asset-p1' } } as never);
+
+      expect(s3Service.deletePrivateObject).not.toHaveBeenCalled();
+    });
+
+    it('does not delete a file that moderation rejected, which may still be appealed', async () => {
+      virusScanService.scanBuffer.mockResolvedValue(VirusScanStatus.CLEAN);
+      moderationService.moderateImageBytes.mockResolvedValue({
+        status: ModerationStatus.REJECTED,
+        notes: 'Categories above threshold: harassment: 0.900',
+        maxScore: 0.9,
+      });
+
+      await processor.process({ data: { assetId: 'asset-p1' } } as never);
+
+      expect(s3Service.deletePrivateObject).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps the file unusable when the scanner is unavailable (fail closed)', async () => {

@@ -40,6 +40,10 @@ export const requiredProductionEnvVars = [
 /** Prefix used by `infra/runtime/secrets/.env.example` for unset secrets. */
 const SECRETS_TEMPLATE_PLACEHOLDER_PREFIX = 'placeholder';
 
+function envString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /**
  * True when `host` names the local machine: `localhost` or `*.localhost`,
  * the IPv4 loopback range `127.0.0.0/8`, the unspecified address `0.0.0.0`,
@@ -213,6 +217,31 @@ export function validateEnv(
       if (value.toLowerCase().startsWith(SECRETS_TEMPLATE_PLACEHOLDER_PREFIX)) {
         throw new Error(
           `Environment variable ${key} must be set to a real value, not a placeholder`,
+        );
+      }
+    }
+    // Object storage (TTW-099): customer uploads need their own private bucket. Without it
+    // every upload would fail at runtime, so refuse to start instead.
+    const publicBucket = envString(config.S3_BUCKET);
+    const privateBucket = envString(config.S3_PRIVATE_BUCKET);
+    if (publicBucket || privateBucket) {
+      if (!privateBucket) {
+        throw new Error(
+          'Missing required production environment variable: S3_PRIVATE_BUCKET',
+        );
+      }
+      if (
+        privateBucket
+          .toLowerCase()
+          .startsWith(SECRETS_TEMPLATE_PLACEHOLDER_PREFIX)
+      ) {
+        throw new Error(
+          'Environment variable S3_PRIVATE_BUCKET must be set to a real value, not a placeholder',
+        );
+      }
+      if (privateBucket === publicBucket) {
+        throw new Error(
+          'Environment variable S3_PRIVATE_BUCKET must be a different bucket from S3_BUCKET',
         );
       }
     }

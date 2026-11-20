@@ -44,6 +44,10 @@ output` do not contain secret values.
 - Application containers must not receive DigitalOcean API tokens or state-backend
   Spaces admin keys — only app data-plane credentials listed in `.env.example`.
 - Distinct Spaces keys for OpenTofu state vs application `S3_*` credentials.
+- Buckets (TTW-099): `S3_BUCKET` is the public `<prefix>-derived` bucket (catalogue images).
+  `S3_PRIVATE_BUCKET` is the private `<prefix>-originals` bucket (customer uploads, ACL
+  private, created by `infra/modules/spaces*`). The API refuses to start in production
+  when `S3_BUCKET` is set without a distinct `S3_PRIVATE_BUCKET`.
 
 ## Local / CI
 

@@ -2,6 +2,7 @@ import { InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'node:stream';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -107,6 +108,27 @@ describe('S3Service private objects (TTW-099)', () => {
     await expect(
       service.createPrivateReadUrl('media/a1/original.png'),
     ).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+
+  it('deletes a private object from the private bucket only', async () => {
+    const service = makeService();
+
+    await service.deletePrivateObject('media/a1/original.png');
+
+    const command = sendSpy.mock.calls[0][0] as DeleteObjectCommand;
+    expect(command.input).toEqual({
+      Bucket: 'private-bucket',
+      Key: 'media/a1/original.png',
+    });
+  });
+
+  it('refuses to delete when no private bucket is configured', async () => {
+    const service = makeService({ S3_PRIVATE_BUCKET: undefined });
+
+    await expect(
+      service.deletePrivateObject('media/a1/original.png'),
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('streams a private object from the private bucket', async () => {

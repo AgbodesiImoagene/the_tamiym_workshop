@@ -162,6 +162,46 @@ describe('env-validation', () => {
         );
       });
 
+      describe('private bucket for customer uploads (TTW-099)', () => {
+        const withStorage = {
+          ...validProductionConfig,
+          S3_BUCKET: 'tamiym-derived',
+          S3_PRIVATE_BUCKET: 'tamiym-originals',
+        };
+
+        it('accepts storage with a distinct private bucket', () => {
+          expect(validateEnv(withStorage)).toEqual(withStorage);
+        });
+
+        it('refuses storage configured without a private bucket', () => {
+          expect(() =>
+            validateEnv(omit(withStorage, 'S3_PRIVATE_BUCKET')),
+          ).toThrow(
+            'Missing required production environment variable: S3_PRIVATE_BUCKET',
+          );
+        });
+
+        it('refuses a private bucket that is the public one', () => {
+          expect(() =>
+            validateEnv({
+              ...withStorage,
+              S3_PRIVATE_BUCKET: 'tamiym-derived',
+            }),
+          ).toThrow(
+            /S3_PRIVATE_BUCKET must be a different bucket from S3_BUCKET/,
+          );
+        });
+
+        it('refuses a secrets-template placeholder as private bucket', () => {
+          expect(() =>
+            validateEnv({
+              ...withStorage,
+              S3_PRIVATE_BUCKET: 'PLACEHOLDER_S3_PRIVATE_BUCKET',
+            }),
+          ).toThrow(/S3_PRIVATE_BUCKET must be set to a real value/);
+        });
+      });
+
       describe('public MFA encryption keys (TTW-180)', () => {
         it.each([
           ['the committed test key', TEST_MFA_KEY],

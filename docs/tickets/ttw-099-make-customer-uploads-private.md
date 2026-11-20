@@ -123,12 +123,18 @@ Run from the worktree `codex/ttw-099-make-customer-uploads-private`, on 2026-11-
 
 ## Remaining
 
-- Shared designs: give anonymous viewers access to customer images through the share token (new ticket, regression of this change).
-- Provision a private bucket in `infra/modules/spaces` and in the runtime secrets, and validate `S3_PRIVATE_BUCKET` at startup in production.
-- Lifecycle cleanup of rejected, infected and orphaned private objects (and TTW-120 for deleted accounts).
-- Play the workshop journey in a browser against MinIO: add an image, save, reload, thumbnail export.
+Handled after the first review (second commit):
+
+- Shared designs: TTW-234 (separate branch `codex/shared-design-private-images`).
+- Private bucket: the infra already has a private `<prefix>-originals` bucket (ACL private), so no new OpenTofu resource. `S3_PRIVATE_BUCKET` maps to it (documented in `infra/runtime/secrets/README.md`), and `validateEnv` now refuses to start in production when `S3_BUCKET` is set without a distinct, non-placeholder `S3_PRIVATE_BUCKET` (`env-validation.spec.ts`, 4 tests).
+- Infected private files: the processor now deletes the stored object and the ORIGINAL derivative row and clears `originalKey` (`MediaProcessor.purgeInfectedOriginal`, `S3Service.deletePrivateObject`). If the deletion fails the key is kept and the error logged. A scanner outage (scan FAILED) and a moderation rejection are deliberately NOT purged: the first can be rescanned, the second may be appealed.
+
+Still open:
+
+- Retention of rejected private files and of orphan objects: needs a business decision (how long a rejected upload is kept for appeals). Deleted accounts: TTW-120.
+- Streamed S3 body is not destroyed when a client aborts (minor).
+- Play the workshop journey in a browser against MinIO: add an image, save, reload, thumbnail export. No Docker or MinIO on this machine.
 - Existing dev design assets stay `PUBLIC` and answer 404 on `/file`; no data migration was done (not in production).
-- Branch ticket CI after the user asks for a push.
 
 ## Completion summary
 
