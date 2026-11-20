@@ -78,7 +78,7 @@ Options to weigh in the design review, cheapest first:
 
 ## Acceptance criteria
 
-- [ ] The trigger that promoted the ticket no longer fires on five consecutive `main` runs. (Two runs measured so far, 6 min 19 s and 5 min 39 s; to be checked on the next three.)
+- [ ] The trigger that promoted the ticket no longer fires on five consecutive `main` runs. (Three runs on `main` measured so far, 6 min 19 s, 5 min 39 s and 5 min 29 s; to be checked on the next two.)
 - [x] No spec was removed, skipped or weakened.
 - [x] Required quality gates pass, with before/after durations recorded below.
 
@@ -107,10 +107,12 @@ On `main` after the fast-forward (commit 3a0719c): run 44767730502 (`CI`) succes
 
 Second run on `main` (commit f87ed5c, documentation only): run 44772343448 (`CI`) success, **339 s (5 min 39 s)**, 19 of 19 jobs successful; `API Integration` 336 s, `API Open Handles` 199 s. Run 44772343628 (`Playwright Comprehensive`) success, 273 s.
 
+Third run on `main` (commit 3e3273e, documentation only): run 44776454790 (`CI`) success, **329 s (5 min 29 s)**, 19 of 19 jobs successful; `API Integration` 325 s, `API Open Handles` 217 s. Run 44776454839 (`Playwright Comprehensive`) success, 225 s.
+
 One more measure, on a ticket branch (not `main`, so it does not count for the five-run criterion below): `codex/ttw-230-upgrade-next-for-the-security-advisory`, run 44775221215 (`CI`), commit "record the independent review of TTW-230": success, **364 s (6 min 4 s)**, 19 of 19 jobs successful; `API Integration` 361 s, `API Open Handles` 252 s. The three runs after the change (379 s, 339 s, 364 s) vary by about 40 s, against 597 s before.
 
 ## Completion summary (provisional)
 
-The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` went from 9 min 57 s to 6 min 19 s (about 37 % shorter), measured on one run before and two after (379 s and 339 s). No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
+The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` went from 9 min 57 s to 6 min 19 s (about 37 % shorter), measured on one run before and three after (379 s, 339 s and 329 s). No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
 
-Left for later, not done here: splitting passes 1 and 2 of `API Integration` across two jobs (about 2 more minutes, more work, and the passes share a database), and running pass 2 only on `main` (not decided: its purpose has not been confirmed). The ticket's acceptance criterion about five consecutive `main` runs is not measured yet: only two runs on `main` after the change exist.
+Left for later, not done here: splitting passes 1 and 2 of `API Integration` across two jobs (about 2 more minutes, more work, and the passes share a database), and running pass 2 only on `main` (not decided: its purpose has not been confirmed). The ticket's acceptance criterion about five consecutive `main` runs is not measured yet: only three runs on `main` after the change exist.
