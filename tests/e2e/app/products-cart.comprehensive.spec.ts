@@ -29,6 +29,42 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
 
+  test('tabs come from the API categories and every product is reachable (TTW-093)', async ({
+    customerPage,
+  }) => {
+    await customerPage.goto('/dashboard/products');
+    await expect(
+      customerPage.getByRole('heading', { name: 'Product List', level: 1 })
+    ).toBeVisible();
+
+    // Tabs are the seeded categories, not a fixed list.
+    await expect(customerPage.getByRole('tab', { name: 'Bulk Catalogue' })).toBeVisible();
+    await expect(customerPage.getByRole('tab', { name: 'Apparel' })).toBeVisible();
+    await expect(customerPage.getByRole('tab', { name: 'Hoodies' })).toHaveCount(0);
+
+    // A category with no product says so instead of showing placeholder cards.
+    await customerPage.getByRole('tab', { name: 'Accessories' }).click();
+    await expect(customerPage.getByText('No products in this category yet.')).toBeVisible();
+
+    // 22 bulk products: 12 on page 1, 10 on page 2.
+    const cards = customerPage.getByRole('link', { name: 'View product' });
+    await customerPage.getByRole('tab', { name: 'Bulk Catalogue' }).click();
+    await expect(cards).toHaveCount(12);
+    await expect(customerPage.getByRole('button', { name: 'Previous page' })).toBeDisabled();
+    await customerPage.getByRole('button', { name: 'Next page' }).click();
+    await expect(customerPage.getByText('Page 2')).toBeVisible();
+    await expect(cards).toHaveCount(10);
+    await expect(customerPage.getByRole('button', { name: 'Next page' })).toBeDisabled();
+    await customerPage.getByRole('button', { name: 'Previous page' }).click();
+    await expect(cards).toHaveCount(12);
+
+    // "All" holds more than the API default of 20, and the last page is reachable.
+    await customerPage.getByRole('tab', { name: 'All' }).click();
+    await expect(customerPage.getByText('Page 1')).toBeVisible();
+    await customerPage.getByRole('button', { name: 'Next page' }).click();
+    await expect(customerPage.getByText('Bulk Item 01')).toBeVisible();
+  });
+
   test('buys several sizes of one product in a single action (TTW-092)', async ({
     customerPage,
   }) => {

@@ -56,8 +56,30 @@ export interface DashboardProductDetail extends DashboardProduct {
   }>;
 }
 
-export async function getDashboardProducts() {
-  return apiClient.get<DashboardProduct[]>('/products');
+export interface DashboardCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface DashboardProductsParams {
+  categorySlug?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getDashboardCategories() {
+  return apiClient.get<DashboardCategory[]>('/categories');
+}
+
+/** With no argument, behaves as before: the API default page (20 products). */
+export async function getDashboardProducts(params: DashboardProductsParams = {}) {
+  const query = new URLSearchParams();
+  if (params.categorySlug) query.set('categorySlug', params.categorySlug);
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+  const qs = query.toString();
+  return apiClient.get<DashboardProduct[]>(qs ? `/products?${qs}` : '/products');
 }
 
 export async function getDashboardProductDetail(productId: string) {

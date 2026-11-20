@@ -84,6 +84,8 @@ const E2E_PASSWORD_RESET_TOKENS = [
 ];
 const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
 
+const BULK_PRODUCT_COUNT = 22;
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -105,6 +107,7 @@ const IDS = {
   categories: {
     apparel: 'e2e-category-apparel',
     accessories: 'e2e-category-accessories',
+    bulk: 'e2e-category-bulk',
   },
   products: {
     tee: 'e2e-product-classic-tee',
@@ -632,6 +635,12 @@ async function main() {
           slug: 'accessories-e2e',
           description: 'E2E accessories fixtures',
         },
+        {
+          id: IDS.categories.bulk,
+          name: 'Bulk Catalogue',
+          slug: 'bulk-catalogue-e2e',
+          description: 'TTW-093: more products than one catalogue page',
+        },
       ],
     });
 
@@ -655,6 +664,19 @@ async function main() {
           status: ProductStatus.ACTIVE,
           weightGrams: 640,
         },
+        // TTW-093: 22 products in one category, so the customer catalogue needs a
+        // second page (page size 12) and "All" holds more than the API default of 20.
+        // Dated well before the other fixtures so they stay at the front of the list.
+        ...Array.from({ length: BULK_PRODUCT_COUNT }, (_, index) => ({
+          id: `e2e-product-bulk-${String(index + 1).padStart(2, '0')}`,
+          categoryId: IDS.categories.bulk,
+          name: `Bulk Item ${String(index + 1).padStart(2, '0')}`,
+          slug: `bulk-item-${String(index + 1).padStart(2, '0')}-e2e`,
+          description: 'Pagination fixture.',
+          status: ProductStatus.ACTIVE,
+          weightGrams: 100,
+          createdAt: new Date(Date.UTC(2020, 0, 1, 0, index)),
+        })),
       ],
     });
 

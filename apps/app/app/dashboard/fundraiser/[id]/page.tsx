@@ -201,7 +201,7 @@ export default function CampaignAuthoringPage() {
 
   const productsQuery = useQuery({
     queryKey: ['campaign-authoring-products'],
-    queryFn: getDashboardProducts,
+    queryFn: () => getDashboardProducts(),
     enabled: !!user,
   });
 

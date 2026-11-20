@@ -63,7 +63,7 @@ function ProductDetailContent({ productId }: { productId: string }) {
   });
   const listQuery = useQuery({
     queryKey: ['dashboard-products'],
-    queryFn: getDashboardProducts,
+    queryFn: () => getDashboardProducts(),
     enabled: !!user,
   });
 

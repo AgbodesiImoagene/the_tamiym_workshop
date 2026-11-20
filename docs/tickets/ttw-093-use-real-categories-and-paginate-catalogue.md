@@ -1,7 +1,7 @@
 # TTW-093 — Use real categories and paginate the customer catalogue
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented, unverified end to end (Playwright and browser journey not run)\
 **Risk:** Standard\
 **Blocked by:** TTW-092\
 **Blocks:** None
@@ -54,16 +54,32 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Design review
 
-Pending.
+Confirmed against `main` at 20c8c33 (TTW-092 is complete, so the blocker is cleared): `apps/app/app/dashboard/products/page.tsx` hard-codes `categoryTabs` and maps a product to a tab by fuzzy name matching (`getCategoryLabel`); `getDashboardProducts` calls `/products` with no parameter, so the API default limit of 20 caps the list.
+
+Design (no API change):
+
+- Tabs: "All" plus the categories from `GET /v1/categories` (already public). The tab value is the category slug, so a new category appears without a code change.
+- Pagination: `GET /v1/products?categorySlug&limit&offset` already exists (max limit 100) but returns no total. The page asks for `pageSize + 1` products (page size 12) and treats the extra item as "there is a next page". No DTO or OpenAPI change.
+- Changing category resets to page 1. Previous and Next are disabled at the bounds. An empty category shows an explicit empty message, not the "Preview" placeholder cards (those stay only for a catalogue with no published product at all).
+- `getDashboardProducts()` keeps working with no argument, so the design, product-detail and fundraiser screens are unchanged.
+- Known limits: offset paging with the default `NEWEST` sort and no tie-breaker can repeat or skip a product if the catalogue changes between two page loads. Acceptable at this stage. Other screens that call `getDashboardProducts()` stay capped at 20: out of scope here (see TTW-204).
+- Figma comparison: not done; no visual redesign, existing styles kept.
 
 ## Implementation reviews
 
-Pending.
+Independent review (`/code-review`, high effort), 8 findings. Fixed: empty page > 0 on "All" now shows a message and a "Back to first page" button; the "All" tab value is the sentinel `__all__` so a real category slug cannot collide; `keepPreviousData` keeps the grid while the next page loads. Not applied, recorded as follow-ups: no tie-breaker on the API sort (`createdAt desc` alone, so offset paging can repeat or skip rows that share a timestamp: fix in `ProductsService.findAll`, API change out of scope here); the pre-existing "Best Seller" badge on the first card now appears on every page; an unknown `categorySlug` makes the API return all products; the design, product-detail and fundraiser screens still read only the first 20 products.
 
 ## Verification evidence
 
-Pending implementation.
+Run in `.claude/worktrees/ttw-093`, 2026-11-20:
+
+- Tests first: `pnpm --filter app test -- __tests__/products/product-list-page.test.tsx` failed 4 of 6 (no category tabs, no pagination controls) before the change.
+- After: `pnpm test` in `apps/app`: 13 suites, 135 tests passed. `pnpm typecheck` and `pnpm lint` in `apps/app`: clean. `pnpm --filter api typecheck`: clean.
+- `pnpm format:check` (root): passed. `pnpm docs:validate`, `pnpm playwright:validate`: passed.
+- `playwright test tests/e2e/app/products-cart.comprehensive.spec.ts --list` lists the new test at three viewports.
+
+Not verified: the Playwright test was not run (no Docker or Postgres on this machine), the seed with 22 extra products was not executed, and the journey was not played in a browser. `docs/tickets/ROADMAP.md` is not ticked for that reason. Needs a CI run or a local run with the test database.
 
 ## Completion summary
 
-Pending implementation.
+Done: tabs come from `GET /v1/categories`; the list pages through `GET /v1/products` with `limit`/`offset` (12 per page, one extra item fetched to detect a next page); empty category message; seed with a 22-product category; unit and Playwright tests. Deviation: three other screens needed `queryFn: () => getDashboardProducts()` because the function now takes an optional argument. Remaining: run the Playwright test and the browser journey, then tick the roadmap.

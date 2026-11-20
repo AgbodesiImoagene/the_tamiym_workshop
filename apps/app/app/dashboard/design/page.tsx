@@ -45,7 +45,7 @@ export default function DashboardDesignPage() {
 
   const productsQuery = useQuery({
     queryKey: ['dashboard-products-design'],
-    queryFn: getDashboardProducts,
+    queryFn: () => getDashboardProducts(),
     enabled: !!user,
   });
 
