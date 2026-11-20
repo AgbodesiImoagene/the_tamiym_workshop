@@ -1,7 +1,7 @@
 # TTW-091 — Remove the fake profile picture and its button
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (prêt à clore après la fusion sur `main` et le CI)\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -78,7 +78,10 @@ Constat confirmé sur `main` (147d5d5) : image de démo + bouton sans action dan
 - `pnpm playwright:validate` → « Playwright manifest validation passed. »
 - Playwright : `pnpm build` (5 tâches OK), `prisma migrate deploy` (aucune migration en attente) et `seed:e2e` sur `tamiym_workshop_test`, puis `pnpm exec playwright test tests/e2e/app/settings.comprehensive.spec.ts --project=setup --project=chromium-app` → `14 passed (28.2s)` (3 tailles d'écran ; « profile page reuses settings form controls » inclut les assertions « pas d'image Profile, pas de bouton Profile Picture »).
 - `pnpm docs:validate` → « Documentation validation passed. »
-- Non lancés : tests API, `pnpm verify`.
+- Après la relecture : Jest `21 passed`, lint et format OK, Playwright `14 passed (24.1s)`.
+- Après fusion avec TTW-229 sur `main` (78a9595) : Jest `settings|can-go-back` `26 passed`, `pnpm build` OK, spec Playwright des réglages `20 passed (20.3s)`.
+- CI sur `main`, commit `78a9595` : run 44754489108 (`CI`) success, tous les jobs ; run 44754489154 (`Playwright Comprehensive`) success.
+- Non lancés en local : tests API, `pnpm verify` (couverts par le CI).
 
 ## Completion summary
 
@@ -86,6 +89,6 @@ Retiré : l'image de démo, le bouton « Upload/Update Profile Picture », l'ent
 
 Écarts au plan : les tests ont été ajoutés au fichier existant `apps/app/__tests__/settings/customer-settings-form.test.tsx` (pas de nouveau fichier).
 
-Reste à faire : la relecture indépendante. Le chevron « retour » sans action est traité dans un ticket séparé (TTW-228).
+Terminé. Relecture indépendante faite et corrigée (voir plus haut), fusionné sur `main`, CI vert. Le chevron « retour » sans action est traité dans un ticket séparé (TTW-229).
 
-À signaler, hors périmètre : le bouton « retour » (chevron) en haut du formulaire n'a pas d'action.
+Signalé hors périmètre puis traité à part : le bouton « retour » (chevron) en haut du formulaire n'avait pas d'action (TTW-229).

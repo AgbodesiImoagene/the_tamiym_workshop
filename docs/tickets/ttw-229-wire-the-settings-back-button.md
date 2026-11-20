@@ -92,4 +92,4 @@ All run from the worktree on `claude/ttw-229-settings-back-button-6561ab`.
 
 ## Completion summary
 
-The chevron on the profile and settings pages now goes back in the history, or to `/dashboard` on a direct visit, with the accessible name "Go back". No design, API or schema change. Not committed to `main`, not pushed. Note: this ticket was first numbered TTW-228. That number went to the state-mismatch e2e ticket, already merged into `main` (`80ffb5b`), so this one was renumbered TTW-229 before being pushed.
+The chevron on the profile and settings pages now goes back in the history, or to `/dashboard` on a direct visit, with the accessible name "Go back". No design, API or schema change. Merged into `main` (`78a9595`) and pushed. CI on `main`, commit `78a9595`: run 44754489108 (`CI`) success, all jobs; run 44754489154 (`Playwright Comprehensive`) success. Note: this ticket was first numbered TTW-228. That number went to the state-mismatch e2e ticket, already merged into `main` (`80ffb5b`), so this one was renumbered TTW-229 before being pushed.
