@@ -10,6 +10,7 @@ import type { Prisma } from '../generated/prisma/client';
 import {
   AuditAction,
   CurrencyCode,
+  ShippingRateBracketBasis,
   ShippingRateProvider,
   ShippingRuleMatchType,
 } from '../generated/prisma/enums';
@@ -41,6 +42,22 @@ type ShippingRateInput = {
   effectiveTo?: string | null;
   minDeliveryDays?: number | null;
   maxDeliveryDays?: number | null;
+  /** TTW-098: what the brackets measure; `null` clears them (flat fee only). */
+  bracketBasis?: ShippingRateBracketBasis | null;
+  /** TTW-098: sent = the full new list; left out = brackets untouched. */
+  brackets?: Array<{ minValue: number; fee: number }>;
+};
+
+const RATE_BRACKETS_INCLUDE = {
+  brackets: { orderBy: { minValue: 'asc' as const } },
+};
+
+type BracketWrite = {
+  bracketBasis?: ShippingRateBracketBasis | null;
+  brackets?: {
+    deleteMany?: Record<string, never>;
+    create?: Array<{ minValue: number; fee: number }>;
+  };
 };
 
 /**
@@ -93,7 +110,10 @@ export class ShippingAdminService {
       include: {
         areas: { include: { state: true, lga: true } },
         rules: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
-        rates: { orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }] },
+        rates: {
+          orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+          include: RATE_BRACKETS_INCLUDE,
+        },
       },
     });
   }
@@ -115,7 +135,10 @@ export class ShippingAdminService {
       include: {
         areas: { include: { state: true, lga: true } },
         rules: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
-        rates: { orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }] },
+        rates: {
+          orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+          include: RATE_BRACKETS_INCLUDE,
+        },
       },
     });
     if (!zone) {
@@ -147,7 +170,10 @@ export class ShippingAdminService {
           include: {
             areas: { include: { state: true, lga: true } },
             rules: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
-            rates: { orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }] },
+            rates: {
+              orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+              include: RATE_BRACKETS_INCLUDE,
+            },
           },
         });
         return {
@@ -408,13 +434,18 @@ export class ShippingAdminService {
     return this.prisma.shippingRate.findMany({
       where: { zoneId },
       orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      include: RATE_BRACKETS_INCLUDE,
     });
   }
 
   async createRate(zoneId: string, dto: ShippingRateInput) {
     await this.assertZoneExists(zoneId);
     return this.prisma.shippingRate.create({
-      data: this.normalizeRateInput(zoneId, dto, true),
+      data: {
+        ...this.normalizeRateInput(zoneId, dto, true),
+        ...this.normalizeBrackets(dto, 'create', null),
+      },
+      include: RATE_BRACKETS_INCLUDE,
     });
   }
 
@@ -435,10 +466,18 @@ export class ShippingAdminService {
       ),
       async (tx) => {
         // Read after the lock: see `updateRule`.
-        const existing = await tx.shippingRate.findUnique({ where: { id } });
+        const existing = await tx.shippingRate.findUnique({
+          where: { id },
+          include: RATE_BRACKETS_INCLUDE,
+        });
         if (!existing) {
           throw new NotFoundException('Shipping rate not found');
         }
+        const brackets = this.normalizeBrackets(
+          dto,
+          'update',
+          existing.bracketBasis,
+        );
         const data = this.normalizeRateInput(existing.zoneId, {
           provider: dto.provider ?? existing.provider,
           serviceLevel: dto.serviceLevel ?? existing.serviceLevel,
@@ -464,7 +503,11 @@ export class ShippingAdminService {
               ? dto.maxDeliveryDays
               : existing.maxDeliveryDays,
         });
-        const updated = await tx.shippingRate.update({ where: { id }, data });
+        const updated = await tx.shippingRate.update({
+          where: { id },
+          data: { ...data, ...brackets },
+          include: RATE_BRACKETS_INCLUDE,
+        });
         return {
           result: updated,
           audit: {
@@ -485,6 +528,7 @@ export class ShippingAdminService {
   async deleteRate(id: string, opts: CoverageOptions = {}) {
     const existing = await this.prisma.shippingRate.findUnique({
       where: { id },
+      include: RATE_BRACKETS_INCLUDE,
     });
     if (!existing) {
       throw new NotFoundException('Shipping rate not found');
@@ -535,8 +579,18 @@ export class ShippingAdminService {
     effectiveTo: Date | null;
     minDeliveryDays: number | null;
     maxDeliveryDays: number | null;
+    bracketBasis?: ShippingRateBracketBasis | null;
+    brackets?: Array<{
+      minValue: number;
+      fee: { toString(): string } | number;
+    }>;
   }) {
     return {
+      bracketBasis: rate.bracketBasis ?? null,
+      brackets: (rate.brackets ?? []).map((b) => ({
+        minValue: b.minValue,
+        fee: Number(b.fee),
+      })),
       provider: rate.provider,
       serviceLevel: rate.serviceLevel,
       currency: rate.currency,
@@ -853,6 +907,72 @@ export class ShippingAdminService {
       minDeliveryDays: dto.minDeliveryDays ?? null,
       maxDeliveryDays: dto.maxDeliveryDays ?? null,
     };
+  }
+
+  /**
+   * TTW-098: what to write for a rate's brackets. Nothing is returned when an
+   * update does not mention them. A basis of `null` clears them. The list sent
+   * replaces the old one. Every minimum is a whole number of at least 1 (0 is
+   * the flat fee) and no two brackets share one.
+   */
+  private normalizeBrackets(
+    dto: ShippingRateInput,
+    mode: 'create' | 'update',
+    currentBasis: ShippingRateBracketBasis | null,
+  ): BracketWrite {
+    const replace = mode === 'update' ? { deleteMany: {} } : {};
+    if (dto.bracketBasis === undefined && dto.brackets === undefined) {
+      return mode === 'create' ? { bracketBasis: null } : {};
+    }
+    const basis =
+      dto.bracketBasis === undefined ? currentBasis : dto.bracketBasis;
+    if (basis === null) {
+      if (dto.brackets && dto.brackets.length > 0) {
+        throw new BadRequestException(
+          'bracketBasis is required when brackets are sent',
+        );
+      }
+      return {
+        bracketBasis: null,
+        ...(mode === 'update' ? { brackets: { deleteMany: {} } } : {}),
+      };
+    }
+    if (dto.brackets === undefined) {
+      if (basis !== currentBasis) {
+        throw new BadRequestException(
+          'Send the brackets again when you change the bracket basis: the old minimums are in another unit',
+        );
+      }
+      return { bracketBasis: basis };
+    }
+    if (dto.brackets.length === 0) {
+      throw new BadRequestException(
+        'Add at least one bracket, or clear the bracket basis',
+      );
+    }
+    const seen = new Set<number>();
+    for (const bracket of dto.brackets) {
+      if (!Number.isInteger(bracket.minValue) || bracket.minValue < 1) {
+        throw new BadRequestException(
+          'Each bracket minimum must be a whole number of 1 or more',
+        );
+      }
+      if (!Number.isFinite(bracket.fee) || bracket.fee < 0) {
+        throw new BadRequestException(
+          'Each bracket fee must be zero or greater',
+        );
+      }
+      if (seen.has(bracket.minValue)) {
+        throw new BadRequestException(
+          'Two brackets cannot have the same minimum',
+        );
+      }
+      seen.add(bracket.minValue);
+    }
+    const create = [...dto.brackets]
+      .sort((a, b) => a.minValue - b.minValue)
+      .map((b) => ({ minValue: b.minValue, fee: b.fee }));
+    return { bracketBasis: basis, brackets: { ...replace, create } };
   }
 
   // No address can name a deactivated state (TTW-194), so a new rule or area

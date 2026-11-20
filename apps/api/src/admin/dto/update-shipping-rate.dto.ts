@@ -1,5 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -8,11 +11,14 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import {
   CurrencyCode,
+  ShippingRateBracketBasis,
   ShippingRateProvider,
 } from '../../generated/prisma/enums';
+import { ShippingRateBracketDto } from './shipping-rate-bracket.dto';
 
 export class UpdateShippingRateDto {
   @ApiPropertyOptional({ enum: ShippingRateProvider })
@@ -68,4 +74,26 @@ export class UpdateShippingRateDto {
   @IsInt()
   @Min(0)
   maxDeliveryDays?: number | null;
+
+  @ApiPropertyOptional({
+    enum: ShippingRateBracketBasis,
+    nullable: true,
+    description:
+      'What the brackets measure. Send null to clear every bracket (flat fee only).',
+  })
+  @IsOptional()
+  @IsEnum(ShippingRateBracketBasis)
+  bracketBasis?: ShippingRateBracketBasis | null;
+
+  @ApiPropertyOptional({
+    type: [ShippingRateBracketDto],
+    description:
+      'The full new list of brackets (replaces the old one). Leave out to keep the current brackets.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ShippingRateBracketDto)
+  brackets?: ShippingRateBracketDto[];
 }

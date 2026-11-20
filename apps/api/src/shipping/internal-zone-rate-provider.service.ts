@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ShippingRateProvider } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { shippingWeightUnknown } from './shipping.errors';
 import type {
+  ShipmentSummary,
   ShippingQuoteBreakdown,
   ShippingQuoteRequest,
   ShippingRateProviderContract,
@@ -45,20 +47,24 @@ export class InternalZoneRateProvider implements ShippingRateProviderContract {
         AND: [{ OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }] }],
       },
       orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      include: { brackets: { orderBy: { minValue: 'asc' } } },
     });
 
     if (!rate) {
       return null;
     }
 
+    const { appliedFee, bracket } = this.resolveFee(rate, request.shipment);
+
     return {
       version: 2,
       provider: ShippingRateProvider.INTERNAL,
-      rateSource: 'ZONE_FLAT_RATE',
+      rateSource: bracket ? 'ZONE_BRACKET_RATE' : 'ZONE_FLAT_RATE',
+      ...(bracket ? { bracket } : {}),
       rateId: rate.id,
       zoneId: request.destination.zoneId,
       zoneName: request.destination.zoneName,
-      appliedFee: Number(rate.flatFee),
+      appliedFee,
       currency: rate.currency,
       serviceLevel: rate.serviceLevel,
       priority: rate.priority,
@@ -77,6 +83,55 @@ export class InternalZoneRateProvider implements ShippingRateProviderContract {
       shipmentSummary: request.shipment,
       metadata: {
         destinationMetadata: request.destination.metadata ?? null,
+      },
+    };
+  }
+
+  /**
+   * TTW-098: the flat fee, unless the rate has a basis and the shipment reaches
+   * one of its brackets. The highest bracket whose minimum is reached wins; a
+   * shipment below the first bracket pays the flat fee. A weight rate with an
+   * unknown product weight is refused, never guessed.
+   */
+  private resolveFee(
+    rate: {
+      flatFee: unknown;
+      bracketBasis: 'WEIGHT_GRAMS' | 'QUANTITY' | null;
+      brackets: Array<{ minValue: number; fee: unknown }>;
+    },
+    shipment: ShipmentSummary,
+  ): { appliedFee: number; bracket?: ShippingQuoteBreakdown['bracket'] } {
+    const flatFee = Number(rate.flatFee);
+    if (!rate.bracketBasis || rate.brackets.length === 0) {
+      return { appliedFee: flatFee };
+    }
+
+    const measuredValue =
+      rate.bracketBasis === 'QUANTITY'
+        ? shipment.totalQuantity
+        : shipment.totalWeightGrams;
+    if (measuredValue == null) {
+      throw shippingWeightUnknown();
+    }
+
+    let reached: { minValue: number; fee: unknown } | null = null;
+    for (const candidate of rate.brackets) {
+      if (
+        candidate.minValue <= measuredValue &&
+        (!reached || candidate.minValue > reached.minValue)
+      ) {
+        reached = candidate;
+      }
+    }
+    if (!reached) {
+      return { appliedFee: flatFee };
+    }
+    return {
+      appliedFee: Number(reached.fee),
+      bracket: {
+        basis: rate.bracketBasis,
+        minValue: reached.minValue,
+        measuredValue,
       },
     };
   }

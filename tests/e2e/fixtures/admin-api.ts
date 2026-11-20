@@ -124,12 +124,24 @@ export async function addZoneRate(
 export async function listZoneRates(
   admin: APIRequestContext,
   zoneId: string
-): Promise<Array<{ id: string; flatFee: string | number }>> {
+): Promise<
+  Array<{
+    id: string;
+    flatFee: string | number;
+    bracketBasis?: string | null;
+    brackets?: Array<{ minValue: number; fee: string | number }>;
+  }>
+> {
   const res = await admin.get(`admin/shipping-zones/${zoneId}/rates`);
   if (!res.ok()) {
     throw new Error(`Listing rates of zone ${zoneId} failed: ${res.status()} ${await res.text()}`);
   }
-  return (await res.json()) as Array<{ id: string; flatFee: string | number }>;
+  return (await res.json()) as Array<{
+    id: string;
+    flatFee: string | number;
+    bracketBasis?: string | null;
+    brackets?: Array<{ minValue: number; fee: string | number }>;
+  }>;
 }
 
 /** The site settings the admin form edits (`GET`/`PATCH /admin/site-settings`). */

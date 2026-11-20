@@ -311,6 +311,14 @@ async function main() {
       update: { name: 'Kebbi', isActive: true },
       create: { code: 'KE', name: 'Kebbi', isActive: true },
     });
+    // TTW-098: a state of its own, with no LGAs, so the shipping brackets spec
+    // can cover it with a throwaway zone and quote a shopper's address there.
+    // Same code and name as prisma/seed.ts.
+    await prisma.geoState.upsert({
+      where: { code: 'YO' },
+      update: { name: 'Yobe', isActive: true },
+      create: { code: 'YO', name: 'Yobe', isActive: true },
+    });
     await prisma.geoLga.upsert({
       where: {
         stateCode_name: {

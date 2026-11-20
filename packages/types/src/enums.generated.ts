@@ -498,3 +498,9 @@ export enum ReconciliationRepairStatus {
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
 }
+
+// What a rate's brackets are measured in (TTW-098).
+export enum ShippingRateBracketBasis {
+  WEIGHT_GRAMS = 'WEIGHT_GRAMS',
+  QUANTITY = 'QUANTITY',
+}

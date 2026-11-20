@@ -247,6 +247,16 @@
       "tags": ["@admin"]
     },
     {
+      "id": "ADMIN-SHIPPING-BRACKETS",
+      "surface": "admin",
+      "feature": "Admin makes a shipping rate depend on the number of items or the weight, and a larger order is quoted a higher fee",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/shipping-rate-brackets.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
       "id": "ADMIN-MFA",
       "surface": "admin",
       "feature": "Privileged admin MFA login",

@@ -1,4 +1,4 @@
-import { CurrencyCode, ShippingRateProvider } from '@tamiym/types';
+import { CurrencyCode, ShippingRateBracketBasis, ShippingRateProvider } from '@tamiym/types';
 import { apiClient } from './api';
 
 export interface GeoState {
@@ -53,6 +53,16 @@ export interface AdminShippingRate {
   effectiveTo: string | null;
   minDeliveryDays: number | null;
   maxDeliveryDays: number | null;
+  /** TTW-098: what the brackets measure; null = flat fee only. */
+  bracketBasis?: ShippingRateBracketBasis | null;
+  brackets?: AdminShippingRateBracket[];
+}
+
+/** TTW-098: from `minValue` (grams or items, inclusive) the rate charges `fee`. */
+export interface AdminShippingRateBracket {
+  id?: string;
+  minValue: number;
+  fee: number | string;
 }
 
 export interface AdminShippingZone {
@@ -167,6 +177,10 @@ export async function updateAdminShippingRate(
     isActive?: boolean;
     minDeliveryDays?: number | null;
     maxDeliveryDays?: number | null;
+    /** TTW-098: null clears every bracket (flat fee only). */
+    bracketBasis?: ShippingRateBracketBasis | null;
+    /** TTW-098: the full new list; left out keeps the current brackets. */
+    brackets?: Array<{ minValue: number; fee: number }>;
   },
   confirmed = false
 ) {

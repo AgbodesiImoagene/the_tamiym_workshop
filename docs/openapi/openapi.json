@@ -1092,6 +1092,38 @@
       },
       "CreateShippingRateDto": {
         "properties": {
+          "bracketBasis": {
+            "description": "What the brackets measure. Leave out (or null) for a flat-fee-only rate.",
+            "enum": [
+              "QUANTITY",
+              "WEIGHT_GRAMS"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "brackets": {
+            "description": "Brackets in addition to the flat fee. Requires `bracketBasis`; minimums must be unique.",
+            "items": {
+              "properties": {
+                "fee": {
+                  "description": "Fee charged from `minValue`",
+                  "example": 4000,
+                  "type": "number"
+                },
+                "minValue": {
+                  "description": "Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.",
+                  "example": 10,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fee",
+                "minValue"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "currency": {
             "default": "NGN",
             "enum": [
@@ -3702,6 +3734,25 @@
         ],
         "type": "object"
       },
+      "ShippingRateBracketDto": {
+        "properties": {
+          "fee": {
+            "description": "Fee charged from `minValue`",
+            "example": 4000,
+            "type": "number"
+          },
+          "minValue": {
+            "description": "Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.",
+            "example": 10,
+            "type": "number"
+          }
+        },
+        "required": [
+          "fee",
+          "minValue"
+        ],
+        "type": "object"
+      },
       "SubmitOrganizerApplicationDto": {
         "properties": {
           "intendedUse": {
@@ -4560,6 +4611,38 @@
       },
       "UpdateShippingRateDto": {
         "properties": {
+          "bracketBasis": {
+            "description": "What the brackets measure. Send null to clear every bracket (flat fee only).",
+            "enum": [
+              "QUANTITY",
+              "WEIGHT_GRAMS"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "brackets": {
+            "description": "The full new list of brackets (replaces the old one). Leave out to keep the current brackets.",
+            "items": {
+              "properties": {
+                "fee": {
+                  "description": "Fee charged from `minValue`",
+                  "example": 4000,
+                  "type": "number"
+                },
+                "minValue": {
+                  "description": "Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.",
+                  "example": 10,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fee",
+                "minValue"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "currency": {
             "default": "NGN",
             "enum": [
@@ -12839,6 +12922,38 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "bracketBasis": {
+                    "description": "What the brackets measure. Send null to clear every bracket (flat fee only).",
+                    "enum": [
+                      "QUANTITY",
+                      "WEIGHT_GRAMS"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "brackets": {
+                    "description": "The full new list of brackets (replaces the old one). Leave out to keep the current brackets.",
+                    "items": {
+                      "properties": {
+                        "fee": {
+                          "description": "Fee charged from `minValue`",
+                          "example": 4000,
+                          "type": "number"
+                        },
+                        "minValue": {
+                          "description": "Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.",
+                          "example": 10,
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "fee",
+                        "minValue"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
                   "currency": {
                     "default": "NGN",
                     "enum": [
@@ -13464,6 +13579,38 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "bracketBasis": {
+                    "description": "What the brackets measure. Leave out (or null) for a flat-fee-only rate.",
+                    "enum": [
+                      "QUANTITY",
+                      "WEIGHT_GRAMS"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "brackets": {
+                    "description": "Brackets in addition to the flat fee. Requires `bracketBasis`; minimums must be unique.",
+                    "items": {
+                      "properties": {
+                        "fee": {
+                          "description": "Fee charged from `minValue`",
+                          "example": 4000,
+                          "type": "number"
+                        },
+                        "minValue": {
+                          "description": "Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.",
+                          "example": 10,
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "fee",
+                        "minValue"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
                   "currency": {
                     "default": "NGN",
                     "enum": [

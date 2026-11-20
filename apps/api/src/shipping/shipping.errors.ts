@@ -21,6 +21,24 @@ export function shippingAddressNotCovered(
 }
 
 /**
+ * TTW-098: the zone's rate is charged by weight, but a product in the cart has
+ * no weight. The quote is refused rather than guessed, so an order never ships
+ * under-charged.
+ */
+export const SHIPPING_WEIGHT_UNKNOWN = 'SHIPPING_WEIGHT_UNKNOWN';
+
+export const SHIPPING_WEIGHT_UNKNOWN_MESSAGE =
+  'We cannot calculate delivery for one of these products yet. Please contact us to complete this order.';
+
+export function shippingWeightUnknown(): BadRequestException {
+  return new BadRequestException({
+    statusCode: 400,
+    code: SHIPPING_WEIGHT_UNKNOWN,
+    message: SHIPPING_WEIGHT_UNKNOWN_MESSAGE,
+  });
+}
+
+/**
  * TTW-087: a Nigerian address names a state the platform does not know. It is
  * refused when saved, so a misspelled state never reaches a shipping quote.
  */

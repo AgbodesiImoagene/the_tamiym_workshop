@@ -66,7 +66,18 @@ export interface ShippingQuoteRequest {
 export interface ShippingQuoteBreakdown {
   version: 2;
   provider: ShippingRateProvider;
-  rateSource: 'ZONE_FLAT_RATE';
+  /**
+   * ZONE_FLAT_RATE: the rate's flat fee. ZONE_BRACKET_RATE (TTW-098): a weight
+   * or quantity bracket of the rate applied. Orders frozen before TTW-098 only
+   * carry ZONE_FLAT_RATE.
+   */
+  rateSource: 'ZONE_FLAT_RATE' | 'ZONE_BRACKET_RATE';
+  /** TTW-098: the bracket applied, only when `rateSource` is ZONE_BRACKET_RATE. */
+  bracket?: {
+    basis: 'WEIGHT_GRAMS' | 'QUANTITY';
+    minValue: number;
+    measuredValue: number;
+  };
   rateId: string;
   zoneId: string;
   zoneName: string;

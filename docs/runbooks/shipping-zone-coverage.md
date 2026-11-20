@@ -15,7 +15,8 @@ The client chose this rule for now (Q22: "for now reject"). A default rate for u
 1. Enter **every** area the workshop delivers to as a shipping zone, with matching rules (state, LGA, city or postal code).
 2. Give each zone at least one **active** rate in NGN for the `STANDARD` service level. Check its effective dates.
 3. Use an explicit ₦0 rate only where delivery really is free. It is accepted as entered.
-4. Test one address per zone with a checkout quote before go-live.
+4. To charge more for bigger orders, edit the rate and choose "By number of items" or "By total weight", then add brackets ("from N, fee X"). The flat fee stays the fee below the first bracket. For a weight rate, every product needs a weight: an order with a product that has none is refused (`SHIPPING_WEIGHT_UNKNOWN`) until the weight is filled in. Orders already placed keep the fee they were charged.
+5. Test one address per zone with a checkout quote before go-live.
 
 ## What the customer sees
 

@@ -19,7 +19,7 @@ import {
   updateAdminShippingRate,
   updateAdminShippingZone,
 } from '@/lib/shipping';
-import { CurrencyCode, ShippingRateProvider } from '@tamiym/types';
+import { CurrencyCode, ShippingRateBracketBasis, ShippingRateProvider } from '@tamiym/types';
 import {
   Button,
   Card,
@@ -48,6 +48,11 @@ type ZoneFormState = {
   isActive: boolean;
 };
 
+/** TTW-098: how a rate's fee grows with the order. FLAT = the flat fee only. */
+type FeeBasis = 'FLAT' | ShippingRateBracketBasis;
+
+type BracketEditRow = { minValue: string; fee: string };
+
 type RateEditState = {
   serviceLevel: string;
   flatFee: string;
@@ -55,7 +60,49 @@ type RateEditState = {
   minDeliveryDays: string;
   maxDeliveryDays: string;
   isActive: boolean;
+  feeBasis: FeeBasis;
+  brackets: BracketEditRow[];
 };
+
+const BASIS_LABEL: Record<FeeBasis, string> = {
+  FLAT: 'Flat fee only',
+  [ShippingRateBracketBasis.QUANTITY]: 'By number of items',
+  [ShippingRateBracketBasis.WEIGHT_GRAMS]: 'By total weight',
+};
+
+const BASIS_UNIT: Record<FeeBasis, string> = {
+  FLAT: '',
+  [ShippingRateBracketBasis.QUANTITY]: 'items',
+  [ShippingRateBracketBasis.WEIGHT_GRAMS]: 'g',
+};
+
+/** The brackets of a rate edit, or the reason they cannot be saved yet. */
+function readBrackets(edit: RateEditState): {
+  brackets: Array<{ minValue: number; fee: number }>;
+  problem: string | null;
+} {
+  if (edit.feeBasis === 'FLAT') return { brackets: [], problem: null };
+  if (edit.brackets.length === 0) {
+    return { brackets: [], problem: 'Add at least one bracket, or choose “Flat fee only”.' };
+  }
+  const brackets = edit.brackets.map((row) => ({
+    minValue: Number(row.minValue),
+    fee: Number(row.fee),
+  }));
+  if (edit.brackets.some((row) => !row.minValue.trim() || !row.fee.trim())) {
+    return { brackets, problem: 'Fill in every bracket.' };
+  }
+  if (brackets.some((b) => !Number.isInteger(b.minValue) || b.minValue < 1)) {
+    return { brackets, problem: 'Each “from” value must be a whole number of 1 or more.' };
+  }
+  if (brackets.some((b) => !Number.isFinite(b.fee) || b.fee < 0)) {
+    return { brackets, problem: 'Each bracket fee must be zero or more.' };
+  }
+  if (new Set(brackets.map((b) => b.minValue)).size !== brackets.length) {
+    return { brackets, problem: 'Two brackets cannot start at the same value.' };
+  }
+  return { brackets, problem: null };
+}
 
 /**
  * TTW-097: a correction or deletion. `run(false)` is tried first; when the API
@@ -169,11 +216,21 @@ export default function AdminShippingZoneDetailPage() {
       minDeliveryDays: rate.minDeliveryDays != null ? String(rate.minDeliveryDays) : '',
       maxDeliveryDays: rate.maxDeliveryDays != null ? String(rate.maxDeliveryDays) : '',
       isActive: rate.isActive,
+      feeBasis: rate.bracketBasis ?? 'FLAT',
+      brackets: (rate.brackets ?? []).map((bracket) => ({
+        minValue: String(bracket.minValue),
+        fee: String(Number(bracket.fee)),
+      })),
     });
   }
 
   function saveRate(rateId: string) {
     if (!rateEdit) return;
+    const { brackets, problem } = readBrackets(rateEdit);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     void execute(
       {
         title: 'Save rate',
@@ -190,6 +247,12 @@ export default function AdminShippingZoneDetailPage() {
               isActive: rateEdit.isActive,
               minDeliveryDays: rateEdit.minDeliveryDays ? Number(rateEdit.minDeliveryDays) : null,
               maxDeliveryDays: rateEdit.maxDeliveryDays ? Number(rateEdit.maxDeliveryDays) : null,
+              // Only touch the brackets when there is something to set or clear.
+              ...(rateEdit.feeBasis !== 'FLAT'
+                ? { bracketBasis: rateEdit.feeBasis, brackets }
+                : zoneQuery.data?.rates.find((rate) => rate.id === rateId)?.bracketBasis
+                  ? { bracketBasis: null }
+                  : {}),
             },
             confirmed
           ),
@@ -452,6 +515,19 @@ export default function AdminShippingZoneDetailPage() {
                             : 'Not specified'}
                           {rate.isActive ? '' : ' · Inactive'}
                         </p>
+                        {rate.bracketBasis && rate.brackets?.length ? (
+                          <ul
+                            className="mt-2 space-y-1 text-xs text-black/55"
+                            aria-label={`${rate.serviceLevel} brackets`}
+                          >
+                            {rate.brackets.map((bracket) => (
+                              <li key={bracket.minValue}>
+                                From {bracket.minValue} {BASIS_UNIT[rate.bracketBasis!]}:{' '}
+                                {formatAdminCurrency(Number(bracket.fee), rate.currency)}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                         {editingRateId === rate.id && rateEdit ? (
                           <div className="mt-4 space-y-4 border-t border-black/8 pt-4">
                             <div className="space-y-2">
@@ -520,6 +596,130 @@ export default function AdminShippingZoneDetailPage() {
                                   }
                                 />
                               </div>
+                            </div>
+                            <div className="space-y-3 rounded-2xl border border-black/8 p-4">
+                              <div className="space-y-2">
+                                <Label htmlFor={`edit-basis-${rate.id}`}>Fee depends on</Label>
+                                <Select
+                                  value={rateEdit.feeBasis}
+                                  onValueChange={(value) =>
+                                    // The old minimums are in another unit: start again.
+                                    setRateEdit({
+                                      ...rateEdit,
+                                      feeBasis: value as FeeBasis,
+                                      brackets: [],
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger
+                                    id={`edit-basis-${rate.id}`}
+                                    className="h-11 w-full rounded-xl"
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(Object.keys(BASIS_LABEL) as FeeBasis[]).map((basis) => (
+                                      <SelectItem key={basis} value={basis}>
+                                        {BASIS_LABEL[basis]}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-black/55">
+                                  The flat fee above is charged until an order reaches the first
+                                  bracket.
+                                </p>
+                                {rateEdit.feeBasis === ShippingRateBracketBasis.WEIGHT_GRAMS ? (
+                                  <p className="text-xs text-black/55">
+                                    Every product in an order needs a weight. Orders with a product
+                                    that has none cannot be quoted for this zone.
+                                  </p>
+                                ) : null}
+                              </div>
+                              {rateEdit.feeBasis !== 'FLAT' ? (
+                                <div className="space-y-3">
+                                  {rateEdit.brackets.map((row, index) => (
+                                    <div
+                                      key={index}
+                                      className="grid gap-3 md:grid-cols-[1fr_1fr_auto]"
+                                    >
+                                      <div className="space-y-2">
+                                        <Label htmlFor={`edit-bracket-min-${rate.id}-${index}`}>
+                                          From ({BASIS_UNIT[rateEdit.feeBasis]})
+                                        </Label>
+                                        <Input
+                                          id={`edit-bracket-min-${rate.id}-${index}`}
+                                          type="number"
+                                          min="1"
+                                          step="1"
+                                          value={row.minValue}
+                                          onChange={(event) =>
+                                            setRateEdit({
+                                              ...rateEdit,
+                                              brackets: rateEdit.brackets.map((r, i) =>
+                                                i === index
+                                                  ? { ...r, minValue: event.target.value }
+                                                  : r
+                                              ),
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label htmlFor={`edit-bracket-fee-${rate.id}-${index}`}>
+                                          Fee from here
+                                        </Label>
+                                        <Input
+                                          id={`edit-bracket-fee-${rate.id}-${index}`}
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={row.fee}
+                                          onChange={(event) =>
+                                            setRateEdit({
+                                              ...rateEdit,
+                                              brackets: rateEdit.brackets.map((r, i) =>
+                                                i === index ? { ...r, fee: event.target.value } : r
+                                              ),
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div className="flex items-end">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={busy}
+                                          onClick={() =>
+                                            setRateEdit({
+                                              ...rateEdit,
+                                              brackets: rateEdit.brackets.filter(
+                                                (_, i) => i !== index
+                                              ),
+                                            })
+                                          }
+                                        >
+                                          Remove
+                                          <span className="sr-only"> bracket {index + 1}</span>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      setRateEdit({
+                                        ...rateEdit,
+                                        brackets: [...rateEdit.brackets, { minValue: '', fee: '' }],
+                                      })
+                                    }
+                                  >
+                                    Add bracket
+                                  </Button>
+                                </div>
+                              ) : null}
                             </div>
                             <label className="flex items-center gap-3 text-sm">
                               <Checkbox

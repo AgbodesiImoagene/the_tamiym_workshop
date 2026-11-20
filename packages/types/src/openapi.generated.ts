@@ -3861,6 +3861,24 @@ export interface components {
         };
         CreateShippingRateDto: {
             /**
+             * @description What the brackets measure. Leave out (or null) for a flat-fee-only rate.
+             * @enum {string|null}
+             */
+            bracketBasis?: "QUANTITY" | "WEIGHT_GRAMS" | null;
+            /** @description Brackets in addition to the flat fee. Requires `bracketBasis`; minimums must be unique. */
+            brackets?: {
+                /**
+                 * @description Fee charged from `minValue`
+                 * @example 4000
+                 */
+                fee: number;
+                /**
+                 * @description Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.
+                 * @example 10
+                 */
+                minValue: number;
+            }[];
+            /**
              * @default NGN
              * @enum {string}
              */
@@ -4856,6 +4874,18 @@ export interface components {
              */
             amount: number;
         };
+        ShippingRateBracketDto: {
+            /**
+             * @description Fee charged from `minValue`
+             * @example 4000
+             */
+            fee: number;
+            /**
+             * @description Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.
+             * @example 10
+             */
+            minValue: number;
+        };
         SubmitOrganizerApplicationDto: {
             intendedUse: string;
             organisationName: string;
@@ -5229,6 +5259,24 @@ export interface components {
             trackingUrl?: string;
         };
         UpdateShippingRateDto: {
+            /**
+             * @description What the brackets measure. Send null to clear every bracket (flat fee only).
+             * @enum {string|null}
+             */
+            bracketBasis?: "QUANTITY" | "WEIGHT_GRAMS" | null;
+            /** @description The full new list of brackets (replaces the old one). Leave out to keep the current brackets. */
+            brackets?: {
+                /**
+                 * @description Fee charged from `minValue`
+                 * @example 4000
+                 */
+                fee: number;
+                /**
+                 * @description Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.
+                 * @example 10
+                 */
+                minValue: number;
+            }[];
             /**
              * @default NGN
              * @enum {string}
@@ -10124,6 +10172,24 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
+                     * @description What the brackets measure. Send null to clear every bracket (flat fee only).
+                     * @enum {string|null}
+                     */
+                    bracketBasis?: "QUANTITY" | "WEIGHT_GRAMS" | null;
+                    /** @description The full new list of brackets (replaces the old one). Leave out to keep the current brackets. */
+                    brackets?: {
+                        /**
+                         * @description Fee charged from `minValue`
+                         * @example 4000
+                         */
+                        fee: number;
+                        /**
+                         * @description Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.
+                         * @example 10
+                         */
+                        minValue: number;
+                    }[];
+                    /**
                      * @default NGN
                      * @enum {string}
                      */
@@ -10564,6 +10630,24 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /**
+                     * @description What the brackets measure. Leave out (or null) for a flat-fee-only rate.
+                     * @enum {string|null}
+                     */
+                    bracketBasis?: "QUANTITY" | "WEIGHT_GRAMS" | null;
+                    /** @description Brackets in addition to the flat fee. Requires `bracketBasis`; minimums must be unique. */
+                    brackets?: {
+                        /**
+                         * @description Fee charged from `minValue`
+                         * @example 4000
+                         */
+                        fee: number;
+                        /**
+                         * @description Smallest total (grams or items) this bracket applies to, inclusive. Whole number, at least 1.
+                         * @example 10
+                         */
+                        minValue: number;
+                    }[];
                     /**
                      * @default NGN
                      * @enum {string}
