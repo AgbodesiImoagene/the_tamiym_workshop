@@ -81,6 +81,8 @@ Not verified: CI (`playwright-matrix.yml`, 2 workers, other browsers), and the a
 
 CI: CI on the pushed branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (commit 5d528b0): every job green, including Unit Tests, Coverage, API Integration and Playwright Smoke. That workflow runs only the `@smoke` Playwright tests; the `@journey` and `@comprehensive` specs added or changed here were run locally only (see above).
 
+CI on `main` after the merge (1fd633c): `CI` run 44786494093 and `Playwright Comprehensive` run 44786494100, both green. The Playwright Matrix workflow was last run on the branch (run 44784488023), before the merge of TTW-090.
+
 ## Completion summary
 
 Done: three seeded customers with their own default address, three saved logins, an option on the `customerPage` fixture (`test.use({ customerAuthState })`), and one line in each of the three checkout specs. No assertion changed. Remaining: CI run of the matrix workflow, then tick the roadmap. Possible follow-up: make the full suite re-runnable on one database (see the finding above).

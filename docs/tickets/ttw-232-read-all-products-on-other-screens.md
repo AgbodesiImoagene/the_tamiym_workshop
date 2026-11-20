@@ -81,6 +81,8 @@ Not verified: the journey was not played by hand in a browser, admin, journeys, 
 
 CI: CI on the pushed branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (commit 5d528b0): every job green, including Unit Tests, Coverage, API Integration and Playwright Smoke. That workflow runs only the `@smoke` Playwright tests; the `@journey` and `@comprehensive` specs added or changed here were run locally only (see above).
 
+CI on `main` after the merge (1fd633c): `CI` run 44786494093 and `Playwright Comprehensive` run 44786494100, both green. The Playwright Matrix workflow was last run on the branch (run 44784488023), before the merge of TTW-090.
+
 ## Completion summary
 
 Done: `getAllDashboardProducts()` feeds the campaign Product list; the product page asks the API for same-category products (limit 5, keeps the category and self filter); the design screen asks for the six products it shows. No API change. Deviation from the plan: the Playwright test creates its own draft campaign. Remaining: CI run on the pushed branch, tick the roadmap, and look at the intermittent checkout failure with several workers (suggest a ticket if CI shows it).
