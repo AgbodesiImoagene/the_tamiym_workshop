@@ -142,7 +142,9 @@ Change (branch `claude/ttw-215-playwright-without-system-fonts`): `ci.yml` (`Pla
 
 To verify before this counts as done: `Playwright Smoke` and `Playwright Comprehensive` must pass without `--with-deps` (Chromium must start, and the a11y project must give the same results as on `main`). The speed gain can only be seen when the slow mirror strikes again, so it cannot be proven by a single run. The result is recorded below once measured.
 
-Result: pending.
+Result, on the branch (commit b37ec5e): run 44787237386 (`CI`) success, **345 s (5 min 45 s)**, 19 of 19 jobs successful; in `Playwright Smoke`, `Install Playwright Chromium` took **11 s** (17 to 48 s before when the mirror was fast), `Production build` 52 s, `Run Playwright smoke` 24 s. `Playwright Comprehensive`, started by hand on the branch (workflow_dispatch), run 44787237870: success, **211 s**, **223 passed**, `Install Playwright Chromium` 10 s; the three `chromium-a11y` tests passed without the system fonts. So Chromium starts without `--with-deps` and the accessibility results do not change.
+
+Not shown by these runs: the gain when the mirror is slow (it did not strike), which needs several runs on `main` to be seen.
 
 ## Completion summary
 
