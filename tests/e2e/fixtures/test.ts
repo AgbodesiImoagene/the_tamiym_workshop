@@ -85,6 +85,11 @@ async function newGuardedPage(
 }
 
 type Fixtures = {
+  /**
+   * Which saved login `customerPage` uses (TTW-231). Journeys that save the customer's
+   * address use their own customer, so parallel runs cannot overwrite each other.
+   */
+  customerAuthState: string;
   api: APIRequestContext;
   customerPage: Page;
   organiserPage: Page;
@@ -104,10 +109,11 @@ export const test = base.extend<Fixtures>({
     await use(api);
     await api.dispose();
   },
-  customerPage: async ({ browser }, use) => {
+  customerAuthState: ['customer', { option: true }],
+  customerPage: async ({ browser, customerAuthState }, use) => {
     const context = await browser.newContext({
       baseURL: urls.app,
-      storageState: path.join(authDir, 'customer.json'),
+      storageState: path.join(authDir, `${customerAuthState}.json`),
     });
     const { page, assertClean } = await newGuardedPage(context);
     await use(page);

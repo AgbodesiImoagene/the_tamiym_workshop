@@ -19,6 +19,9 @@ async function saveRoleState(
     | 'customer'
     | 'customer-undeliverable'
     | 'customer-undeliverable-lga'
+    | 'customer-checkout-idempotency'
+    | 'customer-checkout-instructions'
+    | 'customer-checkout-note'
     | 'organiser'
     | 'admin',
   email: string,
@@ -56,6 +59,16 @@ setup('authenticate customer with a deactivated LGA', async () => {
     e2eUsers.customerUndeliverableLga.password
   );
 });
+
+for (const [role, user] of [
+  ['customer-checkout-idempotency', e2eUsers.checkoutIdempotency],
+  ['customer-checkout-instructions', e2eUsers.checkoutInstructions],
+  ['customer-checkout-note', e2eUsers.checkoutNote],
+] as const) {
+  setup(`authenticate ${role}`, async () => {
+    await saveRoleState(role, user.email, user.password);
+  });
+}
 
 setup('authenticate organiser @smoke', async () => {
   await saveRoleState('organiser', e2eUsers.organiser.email, e2eUsers.organiser.password);

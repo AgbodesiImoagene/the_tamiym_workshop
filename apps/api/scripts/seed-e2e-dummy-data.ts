@@ -86,6 +86,13 @@ const E2E_EXPIRED_PASSWORD_RESET_TOKEN = 'e2e-reset-token-expired';
 
 const BULK_PRODUCT_COUNT = 22;
 
+/** TTW-231: one customer per checkout journey that saves the address. */
+const CHECKOUT_CUSTOMERS = [
+  ['checkoutIdempotency', 'checkout-idempotency', '+2348000000011'],
+  ['checkoutInstructions', 'checkout-instructions', '+2348000000012'],
+  ['checkoutNote', 'checkout-note', '+2348000000013'],
+] as const;
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -99,6 +106,10 @@ const IDS = {
     customerUndeliverable: 'e2e-user-customer-undeliverable',
     // TTW-217: owns an address in an active state, linked to a deactivated LGA.
     customerUndeliverableLga: 'e2e-user-customer-undeliverable-lga',
+    // TTW-231: one customer per checkout journey that saves the address.
+    checkoutIdempotency: 'e2e-user-checkout-idempotency',
+    checkoutInstructions: 'e2e-user-checkout-instructions',
+    checkoutNote: 'e2e-user-checkout-note',
   },
   address: 'e2e-address-customer-main',
   addressUndeliverable: 'e2e-address-customer-undeliverable',
@@ -492,6 +503,18 @@ async function main() {
           phone: '+2348000000009',
           emailVerifiedAt: daysAgo(10),
         },
+        ...CHECKOUT_CUSTOMERS.map(([key, emailName, phone]) => ({
+          // TTW-231: same profile as the main customer, own address.
+          id: IDS.users[key],
+          email: `${emailName}.e2e@tamiym.test`,
+          passwordHash: hashedPassword,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+          firstName: 'Kemi',
+          lastName: 'Checkout',
+          phone,
+          emailVerifiedAt: daysAgo(10),
+        })),
       ],
     });
 
@@ -578,6 +601,26 @@ async function main() {
         isDefault: true,
       },
     });
+
+    // TTW-231: the checkout journeys each save their own address copy.
+    for (const [key, , phone] of CHECKOUT_CUSTOMERS) {
+      await prisma.address.create({
+        data: {
+          id: `e2e-address-${IDS.users[key].replace('e2e-user-', '')}`,
+          userId: IDS.users[key],
+          recipientName: 'Kemi Checkout',
+          phone,
+          addressLine1: '12 Allen Avenue',
+          city: 'Ikeja',
+          state: 'Lagos',
+          stateCode: 'LA',
+          lgaId: ikeja.id,
+          country: 'Nigeria',
+          countryCode: 'NG',
+          isDefault: true,
+        },
+      });
+    }
 
     // TTW-217: saved while the state was active, deactivated since (the state
     // is seeded inactive above; no admin route deactivates a state).

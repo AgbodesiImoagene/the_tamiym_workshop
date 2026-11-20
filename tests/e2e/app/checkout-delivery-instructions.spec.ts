@@ -8,6 +8,9 @@ import { test } from '../fixtures/test';
  * Order creation and quoting hit the real API. Only payment initiation is replaced by a
  * simulated Paystack session (ordinary CI never calls live Paystack).
  */
+// TTW-231: its own customer, because checkout saves the address and parallel journeys must not share it.
+test.use({ customerAuthState: 'customer-checkout-instructions' });
+
 test.describe('Delivery instructions at checkout @app @admin @journey', () => {
   test('the customer types them at checkout and the admin reads them on the order', async ({
     customerPage,

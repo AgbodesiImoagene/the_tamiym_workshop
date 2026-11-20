@@ -12,6 +12,9 @@ import { test } from '../fixtures/test';
  */
 const NOTE = 'Pack the hoodies apart <img src=x onerror="window.__noteXss=1">';
 
+// TTW-231: its own customer, because checkout saves the address and parallel journeys must not share it.
+test.use({ customerAuthState: 'customer-checkout-note' });
+
 test.describe('Checkout order note @app @journey', () => {
   test('a note typed at checkout is seen by the customer and by the admin', async ({
     customerPage,

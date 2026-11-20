@@ -84,6 +84,26 @@ export const e2eUsers = {
     password: E2E_PASSWORD,
     role: 'CUSTOMER' as const,
   },
+  /**
+   * TTW-231: one customer per checkout journey that saves the address at "Review quote".
+   * The order fingerprint covers that address, so journeys sharing the main customer's
+   * address overwrote each other when they ran in parallel.
+   */
+  checkoutIdempotency: {
+    email: 'checkout-idempotency.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
+  checkoutInstructions: {
+    email: 'checkout-instructions.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
+  checkoutNote: {
+    email: 'checkout-note.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
 } as const;
 
 /**
