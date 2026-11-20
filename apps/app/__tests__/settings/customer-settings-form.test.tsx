@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomerSettingsForm } from '@/components/customer-settings-form';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import {
   changePassword,
@@ -13,6 +14,14 @@ import {
   updateUserProfile,
   upsertPrimaryAddress,
 } from '@/lib/profile';
+
+const back = jest.fn();
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ back, push, replace: jest.fn() }),
+}));
+
+jest.mock('@/lib/can-go-back', () => ({ canGoBack: jest.fn() }));
 
 jest.mock('@/lib/geo', () => ({
   ...jest.requireActual('@/lib/geo'),
@@ -76,12 +85,12 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-function renderForm() {
+function renderForm(pageTitle = 'Settings') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <CustomerSettingsForm
-        pageTitle="Settings"
+        pageTitle={pageTitle}
         personalTitle="Personal"
         passwordTitle="Password"
         shippingTitle="Shipping"
@@ -319,6 +328,28 @@ describe('CustomerSettingsForm shipping address', () => {
   });
 });
 
+// TTW-091: the demo photo and the inactive upload button are gone, on both pages that
+// use this form (Profile and Settings).
+describe.each(['Profile', 'Settings'])('CustomerSettingsForm on the %s page', (pageTitle) => {
+  it('shows no profile picture and no picture button', async () => {
+    renderForm(pageTitle);
+    await loaded();
+
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /profile picture/i })).not.toBeInTheDocument();
+  });
+
+  it('still shows the personal details fields', async () => {
+    renderForm(pageTitle);
+    await loaded();
+
+    expect(screen.getByLabelText('First Name')).toHaveValue('Ada');
+    expect(screen.getByLabelText('Surname')).toHaveValue('Obi');
+    expect(screen.getByLabelText('Email')).toBeDisabled();
+    expect(screen.getByLabelText('Phone')).toBeInTheDocument();
+  });
+});
+
 // TTW-198: optional delivery instructions, plain text, 500 characters at most.
 describe('CustomerSettingsForm delivery instructions', () => {
   it('prefills the saved instructions', async () => {
@@ -381,5 +412,34 @@ describe('CustomerSettingsForm delivery instructions', () => {
 
     await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
     expect(sentPayloads()[0]).toEqual(expect.objectContaining({ instructions: null }));
+  });
+});
+
+// TTW-229: the chevron at the top of the page goes back. Whether there is a page to go
+// back to is decided by `canGoBack` (see __tests__/lib/can-go-back.test.ts).
+describe('CustomerSettingsForm back button', () => {
+  it('has an accessible name', () => {
+    renderForm();
+    expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
+  });
+
+  it('goes back in the history when there is a previous page of the site', () => {
+    (canGoBack as jest.Mock).mockReturnValue(true);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('goes to the dashboard when the page was opened directly', () => {
+    (canGoBack as jest.Mock).mockReturnValue(false);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(push).toHaveBeenCalledWith('/dashboard');
+    expect(back).not.toHaveBeenCalled();
   });
 });

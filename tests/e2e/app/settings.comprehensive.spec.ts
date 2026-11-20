@@ -17,6 +17,13 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await expect(customerPage.getByLabel('State')).not.toHaveJSProperty('tagName', 'INPUT');
     await expect(customerPage.getByLabel('LGA')).not.toHaveJSProperty('tagName', 'INPUT');
 
+    // TTW-091: no demo photo and no inactive picture button on this page either.
+    const personalForm = customerPage
+      .locator('form')
+      .filter({ has: customerPage.getByLabel('First Name') });
+    await expect(personalForm.getByRole('img')).toHaveCount(0);
+    await expect(customerPage.getByRole('button', { name: /profile picture/i })).toHaveCount(0);
+
     const saveButtons = customerPage.getByRole('button', { name: 'Save' });
     expect(await saveButtons.count()).toBeGreaterThanOrEqual(1);
     await assertVisibleControlsEnabled(customerPage.locator('main'));
@@ -80,6 +87,37 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await customerPage.goto('/dashboard/profile');
     await expect(customerPage.getByRole('heading', { name: /Profile/i })).toBeVisible();
     await expect(customerPage.getByLabel('First Name')).toBeVisible();
+    // TTW-091: no demo photo and no inactive picture button.
+    await expect(customerPage.getByRole('img', { name: 'Profile', exact: true })).toHaveCount(0);
+    await expect(customerPage.getByRole('button', { name: /profile picture/i })).toHaveCount(0);
     await assertVisibleControlsEnabled(customerPage.locator('main'));
+  });
+
+  // TTW-229: the chevron at the top of the page goes back in this site's history.
+  test('back button returns to the page the customer came from', async ({ customerPage }) => {
+    await customerPage.goto('/dashboard');
+    await customerPage.locator('main a[href$="/dashboard/settings"]').first().click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/settings/);
+
+    await customerPage.getByRole('button', { name: 'Go back' }).click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
+
+    // It stepped back (no new history entry): the settings page is still ahead.
+    await customerPage.goForward();
+    await expect(customerPage).toHaveURL(/\/dashboard\/settings/);
+  });
+
+  test('back button goes to the dashboard when the page was opened directly', async ({
+    customerPage,
+  }) => {
+    // A direct visit has no earlier page of this site: going back would leave the app.
+    // Each path gets a fresh tab (same login) so that no earlier page of the site exists.
+    for (const path of ['/dashboard/settings', '/dashboard/profile']) {
+      const page = await customerPage.context().newPage();
+      await page.goto(path);
+      await page.getByRole('button', { name: 'Go back' }).click();
+      await expect(page).toHaveURL(/\/dashboard\/?$/);
+      await page.close();
+    }
   });
 });

@@ -1,6 +1,5 @@
 'use client';
 
-import { customerAssets } from '@/lib/assets';
 import {
   Card,
   CardContent,
@@ -17,12 +16,13 @@ import {
   Textarea,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
   changePassword,
@@ -227,6 +227,15 @@ export function CustomerSettingsForm({
     },
   });
 
+  const router = useRouter();
+
+  // TTW-229: go back in the history; a page opened directly has no previous page of this
+  // site, so fall back to the dashboard.
+  const goBack = () => {
+    if (canGoBack()) router.back();
+    else router.push('/dashboard');
+  };
+
   const addressMutation = useMutation({
     mutationFn: upsertPrimaryAddress,
     onSuccess: async () => {
@@ -237,7 +246,12 @@ export function CustomerSettingsForm({
   return (
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
-        <button type="button" className="rounded-full p-1 text-black">
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={goBack}
+          className="rounded-full p-1 text-black"
+        >
           <svg
             viewBox="0 0 24 24"
             className="h-6 w-6"
@@ -264,22 +278,6 @@ export function CustomerSettingsForm({
               });
             })}
           >
-            <div className="flex flex-col items-center gap-4">
-              <Image
-                src={customerAssets.settingsProfilePhoto}
-                alt="Profile"
-                width={220}
-                height={220}
-                className="h-[220px] w-[220px] rounded-full object-cover"
-              />
-              <button
-                type="button"
-                className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
-              >
-                {pageTitle === 'Profile' ? 'Upload Profile Picture' : 'Update Profile Picture'}
-              </button>
-            </div>
-
             <div className="grid gap-6 lg:grid-cols-2">
               <FormField
                 control={profileForm.control}
