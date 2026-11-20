@@ -1,5 +1,6 @@
 'use client';
 
+import { EmailVerificationBanner } from '@/components/email-verification-banner';
 import { authApi } from '@/lib/auth';
 import { customerAssets } from '@/lib/assets';
 import {
@@ -139,6 +140,7 @@ export function CustomerDashboardShell({
         </aside>
 
         <section className="min-h-screen flex-1">
+          <EmailVerificationBanner />
           <div className="mx-auto max-w-[1100px] px-4 pb-20 pt-4 sm:px-6 lg:px-10 lg:pb-24 lg:pt-[48px]">
             <div className="flex items-center justify-between lg:hidden">
               <Image

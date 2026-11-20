@@ -43,6 +43,16 @@
       "tags": ["@web", "@app", "@critical"]
     },
     {
+      "id": "APP-EMAIL-VERIFICATION-BANNER",
+      "surface": "app",
+      "feature": "Unverified email banner after sign-up, with a resend-link action",
+      "prd_ref": "Accounts — email verification",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/email-verification-banner.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@app"]
+    },
+    {
       "id": "WEB-FUNDRAISER-LIST",
       "surface": "web",
       "feature": "Fundraiser listing states",

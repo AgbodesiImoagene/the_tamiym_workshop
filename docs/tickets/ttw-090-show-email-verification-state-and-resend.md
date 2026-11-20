@@ -1,7 +1,7 @@
 # TTW-090 — Show the email-verification state and offer a resend
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** In review (implemented locally, not pushed)\
 **Risk:** High\
 **Blocked by:** TTW-089\
 **Blocks:** None
@@ -45,7 +45,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Acceptance criteria
 
-- [ ] An unverified user understands what to do and can resend the link.
+- [x] An unverified user (component tests; not yet played in a browser) understands what to do and can resend the link.
 - [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
 - [ ] Required quality gates pass, with evidence recorded below.
 
@@ -55,7 +55,18 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Design review
 
-Pending.
+Recorded 2026-11-20, before implementation (High risk: auth).
+
+- Finding confirmed on `main` (20c8c33): `GET /auth/me` returns `emailVerified`, `POST /auth/resend-verification` exists (public, rate-limited, neutral answer), orders answer `403 EMAIL_NOT_VERIFIED`. `apps/app` showed nothing. No API, DTO or OpenAPI change is needed.
+- The API stays the authority: the app only reads `emailVerified` and the error code. A hidden banner never grants anything.
+- No account enumeration: the resend is called with the email of the signed-in user, and the API answer is the same whether or not the account exists. 429 is shown as "wait a few minutes".
+- The banner lives in `CustomerDashboardShell`, so every dashboard page shows it. It reads the user with its own React Query call (`['auth','me']`), so the 12 pages that use the shell did not need changing.
+- No new logs or metrics. Nothing sensitive is logged client-side.
+
+## Deviations from the plan
+
+- Sign-up: no separate screen. After sign-up the user lands on `/dashboard`, where the banner states that the email must be verified before ordering.
+- Playwright covers sign up → message → resend. "Verify, then order" is not played in e2e: the link is only in the email, which e2e cannot read.
 
 ## Implementation reviews
 
@@ -63,8 +74,14 @@ Pending.
 
 ## Verification evidence
 
-Pending implementation.
+Run in the worktree on 2026-11-20:
+
+- Tests written first, failed with "Cannot find module" (components/email-verification-banner and lib/email-verification absent), then passed after implementation (10 tests).
+- `pnpm --filter app typecheck`: pass. `pnpm --filter app lint`: pass.
+- `pnpm --filter app test`: 15 suites, 140 tests, all pass.
+- `pnpm playwright:validate`: passed. `playwright test --list`: the new spec is discovered. Prettier check on touched paths: pass.
+- **Not verified:** the new Playwright spec was not run (no Docker, no `apps/api/.env*` on this machine, so no API/DB). The journey was not played in a browser. Independent review not done yet.
 
 ## Completion summary
 
-Pending implementation.
+Implemented: banner with resend in the dashboard shell, explanation after sign-up, and `EMAIL_NOT_VERIFIED` handling at checkout. Remaining: run the Playwright spec with the full stack, play the journey in a browser, independent review (auth, High risk), then CI after a push when asked.
