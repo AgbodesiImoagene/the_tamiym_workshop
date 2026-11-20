@@ -86,7 +86,7 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
   // TTW-229: the chevron at the top of the page goes back in this site's history.
   test('back button returns to the page the customer came from', async ({ customerPage }) => {
     await customerPage.goto('/dashboard');
-    await customerPage.getByRole('link', { name: 'manage' }).click();
+    await customerPage.locator('main a[href$="/dashboard/settings"]').first().click();
     await expect(customerPage).toHaveURL(/\/dashboard\/settings/);
 
     await customerPage.getByRole('button', { name: 'Go back' }).click();
