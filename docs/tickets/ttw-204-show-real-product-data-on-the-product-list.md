@@ -1,7 +1,7 @@
 # TTW-204 — Show real product data on the customer product list and match the Figma cards
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, unmerged (local commit)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** TTW-093\
 **Blocks:** None
@@ -102,8 +102,9 @@ Run on branch `codex/ttw-204-show-real-product-data-on-the-product-list` from `m
 - `pnpm openapi:generate` then `pnpm openapi:check`: no drift. `pnpm docs:validate`, `pnpm playwright:validate`: pass.
 - `pnpm --filter api test:coverage` then `pnpm coverage:ratchet` (lines 84.75% vs floor 56%) and `pnpm coverage:diff` (2/2 lines, floor 80%): pass.
 - Playwright on a throwaway database `tamiym_workshop_test_ttw204` (REDIS_DB 14, dropped after): `products-cart.comprehensive.spec.ts`, 26 passed over desktop, tablet and mobile, including the new TTW-204 test (tee shows Navy and White swatches and "Medium-Large", hoodie has no colour square and shows "Small-Medium", no "Best Seller", description never replaces "No Minimum", "View product" reachable). Run before the three review fixes; the fixes are covered by unit tests and do not change a selector.
+- CI on the branch: run 44796900449 (`CI`), success. CI on `main` after the merge: run 44797819730 (`CI`) and run 44797819421 (`Playwright Comprehensive`), both success.
 - Not verified: the page was not played by hand in a browser outside Playwright; the Figma match was not compared pixel by pixel; the tier line has no e2e (no tier in the seed).
 
 ## Completion summary
 
-Done: the list API returns `colors`, `sizeRange` and `bulkTier` (no migration, OpenAPI regenerated); the card shows real colours, the size range, a price line from the real tier or the base price, and always "No Minimum" (no minimum order is modelled). Deviations from the ticket: "Best Seller" and "Add to cart" were already gone; the earlier api test that forbade variants in the list was replaced (user approved). Not done: a real minimum order (needs a field and a client decision), "Best Seller" (no rule). Local commit only, not pushed.
+Done: the list API returns `colors`, `sizeRange` and `bulkTier` (no migration, OpenAPI regenerated); the card shows real colours, the size range, a price line from the real tier or the base price, and always "No Minimum" (no minimum order is modelled). Deviations from the ticket: "Best Seller" and "Add to cart" were already gone; the earlier api test that forbade variants in the list was replaced (user approved). Not done: a real minimum order (needs a field and a client decision), "Best Seller" (no rule). Merged into `main` as `0e51d1a` by fast-forward (the session could not use the shared checkout, so `main` was pushed from the ticket branch).
