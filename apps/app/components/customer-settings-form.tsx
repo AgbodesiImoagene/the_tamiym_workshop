@@ -1,6 +1,5 @@
 'use client';
 
-import { customerAssets } from '@/lib/assets';
 import {
   Card,
   CardContent,
@@ -17,7 +16,6 @@ import {
   Textarea,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -264,22 +262,6 @@ export function CustomerSettingsForm({
               });
             })}
           >
-            <div className="flex flex-col items-center gap-4">
-              <Image
-                src={customerAssets.settingsProfilePhoto}
-                alt="Profile"
-                width={220}
-                height={220}
-                className="h-[220px] w-[220px] rounded-full object-cover"
-              />
-              <button
-                type="button"
-                className="h-8 rounded-lg border border-black/50 bg-accent px-4 text-sm font-bold text-[#004385]"
-              >
-                {pageTitle === 'Profile' ? 'Upload Profile Picture' : 'Update Profile Picture'}
-              </button>
-            </div>
-
             <div className="grid gap-6 lg:grid-cols-2">
               <FormField
                 control={profileForm.control}

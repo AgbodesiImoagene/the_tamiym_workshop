@@ -76,12 +76,12 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-function renderForm() {
+function renderForm(pageTitle = 'Settings') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <CustomerSettingsForm
-        pageTitle="Settings"
+        pageTitle={pageTitle}
         personalTitle="Personal"
         passwordTitle="Password"
         shippingTitle="Shipping"
@@ -316,6 +316,28 @@ describe('CustomerSettingsForm shipping address', () => {
 
     await waitFor(() => expect(screen.getByLabelText('State')).toHaveValue('LA'));
     expect(screen.getByLabelText('City')).toHaveValue('Epe');
+  });
+});
+
+// TTW-091: the demo photo and the inactive upload button are gone, on both pages that
+// use this form (Profile and Settings).
+describe.each(['Profile', 'Settings'])('CustomerSettingsForm on the %s page', (pageTitle) => {
+  it('shows no profile picture and no picture button', async () => {
+    renderForm(pageTitle);
+    await loaded();
+
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /profile picture/i })).not.toBeInTheDocument();
+  });
+
+  it('still shows the personal details fields', async () => {
+    renderForm(pageTitle);
+    await loaded();
+
+    expect(screen.getByLabelText('First Name')).toHaveValue('Ada');
+    expect(screen.getByLabelText('Surname')).toHaveValue('Obi');
+    expect(screen.getByLabelText('Email')).toBeDisabled();
+    expect(screen.getByLabelText('Phone')).toBeInTheDocument();
   });
 });
 
