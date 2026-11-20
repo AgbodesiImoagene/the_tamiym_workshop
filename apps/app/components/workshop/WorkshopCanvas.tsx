@@ -46,6 +46,8 @@ interface WorkshopCanvasProps {
   /** Called with the layer id of the selected customer layer, or null. */
   onSelectionChange?: (layerId: string | null) => void;
   onHistoryChange?: (state: WorkshopHistoryState) => void;
+  /** True once the controls can be used (the layers are loaded), false when they are gone. */
+  onReadyChange?: (ready: boolean) => void;
   /** Receives the canvas controls once the canvas is ready (editable canvases only). */
   controlRef?: { current: WorkshopCanvasControls | null };
   readOnly?: boolean;
@@ -105,6 +107,7 @@ export default function WorkshopCanvas({
   onLayersChange,
   onSelectionChange,
   onHistoryChange,
+  onReadyChange,
   controlRef,
   readOnly = false,
 }: WorkshopCanvasProps) {
@@ -124,10 +127,12 @@ export default function WorkshopCanvas({
   const onLayersChangeRef = useRef(onLayersChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onHistoryChangeRef = useRef(onHistoryChange);
+  const onReadyChangeRef = useRef(onReadyChange);
   useEffect(() => {
     onLayersChangeRef.current = onLayersChange;
     onSelectionChangeRef.current = onSelectionChange;
     onHistoryChangeRef.current = onHistoryChange;
+    onReadyChangeRef.current = onReadyChange;
   });
 
   const buildLayerKey = (layerId: string) => `__template_${layerId}`;
@@ -453,6 +458,7 @@ export default function WorkshopCanvas({
     if (!canvasRef.current || typeof window === 'undefined') return;
 
     let mounted = true;
+    let readyReported = false;
 
     import('fabric').then((mod: FabricNS) => {
       if (!mounted || !canvasRef.current) return;
@@ -508,7 +514,11 @@ export default function WorkshopCanvas({
         historyRef.current = createLayerHistory(JSON.stringify(serialiseUserObjects(canvas)));
         emitChange(canvas);
         notifyHistory();
-        if (!readOnly && controlRef) controlRef.current = buildControls(canvas, fabric);
+        if (!readOnly && controlRef) {
+          controlRef.current = buildControls(canvas, fabric);
+          readyReported = true;
+          onReadyChangeRef.current?.(true);
+        }
         if (templateError) throw templateError;
       })();
     });
@@ -517,6 +527,7 @@ export default function WorkshopCanvas({
       mounted = false;
       historyRef.current = null;
       if (controlRef) controlRef.current = null;
+      if (readyReported) onReadyChangeRef.current?.(false);
       if (fabricRef.current) {
         fabricRef.current.dispose();
         fabricRef.current = null;

@@ -70,6 +70,15 @@ describe('LayerList', () => {
     expect(props.onMove).toHaveBeenNthCalledWith(2, 'l2', 'down');
   });
 
+  it('disables every action while the canvas is not ready', () => {
+    const props = renderList({ disabled: true });
+    for (const name of ['Select Logo', 'Delete Logo', 'Move Logo up', 'Move Logo down']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Logo' }));
+    expect(props.onDelete).not.toHaveBeenCalled();
+  });
+
   it('disables "up" on the top layer and "down" on the bottom layer', () => {
     renderList();
     expect(screen.getByRole('button', { name: 'Move Front text up' })).toBeDisabled();

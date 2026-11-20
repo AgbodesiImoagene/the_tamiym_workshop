@@ -14,6 +14,7 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockSeenEffects: unknown[] = [];
+let mockCanvasReady = true;
 
 const mockControls = {
   addText: jest.fn(),
@@ -36,15 +37,19 @@ jest.mock('next/dynamic', () => () => {
     onLayersChange: (json: unknown) => void;
     onSelectionChange: (id: string | null) => void;
     onHistoryChange: (state: { canUndo: boolean; canRedo: boolean }) => void;
+    onReadyChange: (ready: boolean) => void;
   }) {
-    const { controlRef } = props;
+    const { controlRef, onReadyChange } = props;
     mockSeenEffects.push(props.activeEffects);
     useEffect(() => {
       controlRef.current = mockControls;
+      // The real canvas says so once its controls exist; a test can hold that back.
+      if (mockCanvasReady) onReadyChange(true);
       return () => {
         controlRef.current = null;
+        onReadyChange(false);
       };
-    }, [controlRef]);
+    }, [controlRef, onReadyChange]);
     return (
       <>
         <button
@@ -112,6 +117,21 @@ describe('WorkshopEditor layer controls', () => {
   beforeEach(() => {
     Object.values(mockControls).forEach((fn) => fn.mockReset());
     mockControls.deleteSelected.mockReturnValue(true);
+    mockCanvasReady = true;
+  });
+
+  it('keeps the toolbar and the layer list disabled until the canvas is ready', () => {
+    // A reopened design shows its layers at once, before the canvas has loaded them.
+    mockCanvasReady = false;
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Report layers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report selection' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report history' }));
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete Hello' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Select Hello' })).toBeDisabled();
   });
 
   it('hands the canvas the same effects array on every render, so templates are not reloaded', () => {

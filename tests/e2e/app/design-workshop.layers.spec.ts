@@ -3,7 +3,7 @@ import { test } from '../fixtures/test';
 
 /**
  * TTW-102: a customer can remove what they added, undo and redo, reorder layers
- * and save the result.
+ * and save the result, which is then found again after a reload.
  * Uses the seeded Classic Tee (`e2e-product-classic-tee`), which has one designable view.
  */
 const TEE_PRODUCT_ID = 'e2e-product-classic-tee';
@@ -55,7 +55,8 @@ test.describe('Design workshop layers @app @critical', () => {
     await expect(page.getByRole('button', { name: `Select ${second}` })).toHaveCount(0);
 
     // Save: the design sent to the API holds the one layer that is left, and only that one.
-    await page.getByLabel('Design name').fill(`Layers ${Date.now()}`);
+    const designName = `Layers ${Date.now()}`;
+    await page.getByLabel('Design name').fill(designName);
     const created = page.waitForResponse(
       (response) => response.url().endsWith('/v1/designs') && response.request().method() === 'POST'
     );
@@ -71,8 +72,21 @@ test.describe('Design workshop layers @app @critical', () => {
     expect(view.layerCount).toBe(1);
     expect(view.fabricJson.objects.map((o) => o.text)).toEqual([first]);
 
-    // Not covered yet: opening the saved design again. /dashboard/design/<id>/edit answers
-    // 404 on main, for a direct load and for the redirect right after the first save, because
-    // the page fetches the design on the server without the customer's cookies. See the ticket.
+    // The editor moves to the edit route and the layer is still there, then after a reload.
+    await expect(page).toHaveURL(/\/dashboard\/design\/[^/]+\/edit/);
+    await expect(page.getByRole('button', { name: `Select ${first}` })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Select ${second}` })).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByLabel('Design name')).toHaveValue(designName);
+    await expect(page.getByRole('button', { name: `Select ${first}` })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Select ${second}` })).toHaveCount(0);
+
+    // A reopened design can be edited like a new one: its history starts at the saved state.
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    await page.getByRole('button', { name: `Delete ${first}` }).click();
+    await expect(page.getByRole('button', { name: `Select ${first}` })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('button', { name: `Select ${first}` })).toBeVisible();
   });
 });

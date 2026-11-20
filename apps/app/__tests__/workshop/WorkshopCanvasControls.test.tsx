@@ -139,8 +139,9 @@ async function setup(fabricJson: FabricJson | null = { objects: [] }) {
   const onLayersChange = jest.fn();
   const onSelectionChange = jest.fn();
   const onHistoryChange = jest.fn();
+  const onReadyChange = jest.fn();
 
-  render(
+  const { unmount } = render(
     <WorkshopCanvas
       viewKey="front"
       printArea={null}
@@ -150,6 +151,7 @@ async function setup(fabricJson: FabricJson | null = { objects: [] }) {
       onLayersChange={onLayersChange}
       onSelectionChange={onSelectionChange}
       onHistoryChange={onHistoryChange}
+      onReadyChange={onReadyChange}
       controlRef={controlRef}
     />
   );
@@ -162,7 +164,16 @@ async function setup(fabricJson: FabricJson | null = { objects: [] }) {
   const text = (label: string) =>
     act(() => controls.addText({ type: 'i-text', text: label, left: 50, top: 50 }));
 
-  return { controls, onLayersChange, onSelectionChange, lastLayers, lastHistory, text };
+  return {
+    controls,
+    onLayersChange,
+    onSelectionChange,
+    onReadyChange,
+    unmount,
+    lastLayers,
+    lastHistory,
+    text,
+  };
 }
 
 const layerIdOf = (o: Record<string, unknown>) => (o.data as { layerId: string }).layerId;
@@ -170,6 +181,15 @@ const layerIdOf = (o: Record<string, unknown>) => (o.data as { layerId: string }
 describe('WorkshopCanvas controls', () => {
   beforeEach(() => {
     delete (globalThis as { __fakeCanvas?: unknown }).__fakeCanvas;
+  });
+
+  it('tells the editor when the controls are ready, and when they are gone', async () => {
+    const { onReadyChange, unmount } = await setup();
+    expect(onReadyChange).toHaveBeenCalledTimes(1);
+    expect(onReadyChange).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    expect(onReadyChange).toHaveBeenLastCalledWith(false);
   });
 
   it('adds text to the canvas with a layer id, selected and reported to the editor', async () => {

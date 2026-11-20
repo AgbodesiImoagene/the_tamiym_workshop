@@ -78,6 +78,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   // Controls of the active canvas (add, delete, undo, ...), filled in by WorkshopCanvas
   const controlRef = useRef<WorkshopCanvasControls | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [history, setHistory] = useState<WorkshopHistoryState>({ canUndo: false, canRedo: false });
 
   // Auto-save timer
@@ -303,7 +304,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               variant="outline"
               size="sm"
               onClick={handleUndo}
-              disabled={!history.canUndo}
+              disabled={!canvasReady || !history.canUndo}
             >
               Undo
             </Button>
@@ -312,7 +313,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               variant="outline"
               size="sm"
               onClick={handleRedo}
-              disabled={!history.canRedo}
+              disabled={!canvasReady || !history.canRedo}
             >
               Redo
             </Button>
@@ -321,7 +322,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               variant="outline"
               size="sm"
               onClick={handleDelete}
-              disabled={!selectedLayerId}
+              disabled={!canvasReady || !selectedLayerId}
             >
               Delete
             </Button>
@@ -336,6 +337,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               onLayersChange={(json) => handleLayersChange(activeViewKey, json)}
               onSelectionChange={setSelectedLayerId}
               onHistoryChange={setHistory}
+              onReadyChange={setCanvasReady}
               controlRef={controlRef}
             />
           )}
@@ -365,6 +367,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
           <LayerList
             layers={layerItems}
             selectedId={selectedLayerId}
+            disabled={!canvasReady}
             onSelect={(id) => controlRef.current?.selectLayer(id)}
             onDelete={(id) => controlRef.current?.deleteLayer(id)}
             onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
