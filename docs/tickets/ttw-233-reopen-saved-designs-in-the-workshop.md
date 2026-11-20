@@ -1,7 +1,7 @@
 # TTW-233 — Reopen a saved design in the workshop without a 404
 
 **Epic:** 8 — Client review delivery  
-**Status:** Complete (local commit, not pushed)  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -117,4 +117,4 @@ Deviations: (1) the spec does not add the layer through the UI, because on this 
 
 Not verified: no manual run in the in-app browser (the Playwright journeys drive a real Chromium); no run in Firefox/WebKit; thumbnail upload; the 401 path in a browser (unit-tested only).
 
-Follow-ups: dead text/image tools on `main` (covered by TTW-102); once TTW-102 is merged, add the reload step back to `design-workshop.layers.spec.ts`; optional: remember the destination on the 401 redirect.
+Follow-ups: the dead text/image tools were fixed by TTW-102, and the reload step is back in `design-workshop.layers.spec.ts` (done 2026-11-20); optional: remember the destination on the 401 redirect. Merged on `main` at `e3c401c`, with green CI and Playwright Comprehensive runs on `main` (CI 44816703721).

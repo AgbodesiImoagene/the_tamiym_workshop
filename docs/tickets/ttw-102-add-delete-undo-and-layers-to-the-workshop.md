@@ -1,7 +1,7 @@
 # TTW-102 — Add delete, undo and a layer list to the Design Workshop
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-103
@@ -131,4 +131,4 @@ Recorded 2026-11-20, on branch `codex/ttw-102-reload-after-save` cut from `main`
 
 ## Completion summary
 
-The customer can now delete what they added (button, Delete key, layer list), undo and redo (buttons, Ctrl/Cmd+Z), and reorder layers from a layer list, in English and with theme tokens. Template layers are never touched. Adding text and images also works for the first time: the editor never held the canvas before. Merged on `main` with TTW-233 (CI green on `e3c401c`). A follow-up (reload step, canvas-ready state) is committed on `codex/ttw-102-reload-after-save` and not pushed. `ROADMAP.md` is not ticked yet, on purpose, to avoid a merge conflict with TTW-099.
+The customer can now delete what they added (button, Delete key, layer list), undo and redo (buttons, Ctrl/Cmd+Z), and reorder layers from a layer list, in English and with theme tokens. Template layers are never touched. Adding text and images also works for the first time: the editor never held the canvas before. Merged on `main` in three steps: the feature with TTW-233 (`e3c401c`), then the reload step and the canvas-ready state (`9acf962`), then the Add tools disabled until ready (`cd9081a`). Closed 2026-11-20 with the green runs on `main` at `cd9081a`: CI 44823763287 and Playwright Comprehensive 44823763320 (233 tests, including `design-workshop.layers.spec.ts` and the TTW-233 reopen spec). Not verified: Firefox and WebKit (the matrix workflow runs nightly), a manual run in the in-app browser, and a rubber-band selection or image layers played in a browser.
