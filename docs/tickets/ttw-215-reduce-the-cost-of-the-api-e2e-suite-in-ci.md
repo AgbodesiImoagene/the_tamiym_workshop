@@ -1,7 +1,7 @@
 # TTW-215 — Reduce the cost of the API e2e suite in CI
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress — change merged and green on main; five-run check pending\
+**Status:** Complete\
 **Risk:** Low\
 **Blocked by:** None\
 **Blocks:** None
@@ -78,7 +78,7 @@ Options to weigh in the design review, cheapest first:
 
 ## Acceptance criteria
 
-- [ ] The trigger that promoted the ticket no longer fires on five consecutive `main` runs. (Four runs on `main` measured so far, 6 min 19 s, 5 min 39 s, 5 min 29 s and 6 min 42 s; to be checked on the next one.)
+- [x] The trigger that promoted the ticket no longer fires on five consecutive `main` runs (triggers 1 to 3 measured on five runs, see the table; trigger 4 is the owner's judgement).
 - [x] No spec was removed, skipped or weakened.
 - [x] Required quality gates pass, with before/after durations recorded below.
 
@@ -111,12 +111,31 @@ Third run on `main` (commit 3e3273e, documentation only): run 44776454790 (`CI`)
 
 Fourth run on `main` (commit 618c683, merge of TTW-230, a code push): run 44778143508 (`CI`) success, **402 s (6 min 42 s)**, 19 of 19 jobs successful; `API Integration` 394 s, `API Open Handles` 251 s. Run 44778143527 (`Playwright Comprehensive`) success, 247 s.
 
+Fifth run on `main` (commit 26a493e, documentation only): run 44781178070 (`CI`) success, **319 s (5 min 19 s)**.
+
+**Check of the five consecutive `main` runs** (runs 44767730502, 44772343448, 44776454790, 44778143508, 44781178070, all success), against the triggers of this ticket:
+
+| Run         | CI    | Pass 1 | Pass 2 | Proof (own job) |
+| ----------- | ----- | ------ | ------ | --------------- |
+| 44767730502 | 379 s | 165 s  | 159 s  | 135 s           |
+| 44772343448 | 339 s | 139 s  | 131 s  | 133 s           |
+| 44776454790 | 329 s | 138 s  | 132 s  | 161 s           |
+| 44778143508 | 402 s | 170 s  | 164 s  | 191 s           |
+| 44781178070 | 319 s | 134 s  | 133 s  | 140 s           |
+
+1. No failure caused by a step timeout: all five runs are green.
+2. Passes above 150 s on two consecutive runs: never. Runs 1 and 4 are above 150 s, runs 2, 3 and 5 are not. The whole `API Integration` job never exceeds 394 s, against the 10-minute threshold.
+3. Abnormal spike: none (the longest pass, 170 s, is about 23 % above the median of the five, 138 s). There are not yet ten runs after the change to compare with, as the trigger asks.
+4. "It slows development": this is the owner's judgement, not measurable here. The wait fell by about 1 to 2 minutes (see the control below), which the owner should judge sufficient or not.
+
+The passes themselves did not get shorter: this ticket moved the proof, it did not touch passes 1 and 2.
+
 **Control with the old structure, same afternoon (correction of the baseline):** branch `codex/ttw-093-use-real-categories-and-paginate-catalog`, run 44779149860 (`CI`, started 17:01 UTC), cut from `main` before this ticket, so it has 18 jobs and no `API Open Handles`: success, **459 s (7 min 39 s)**, `API Integration` 455 s with the three suites in series. The baseline above (597 s) was therefore a slow runner day, not the typical cost. Against this control, the four runs on `main` after the change (329 s to 402 s, median about 360 s) save roughly 60 to 130 s, about 13 to 28 %, not the 37 % first written. The saving is real but smaller, and each run varies by about 40 s on its own.
 
 One more measure, on a ticket branch (not `main`, so it does not count for the five-run criterion below): `codex/ttw-230-upgrade-next-for-the-security-advisory`, run 44775221215 (`CI`), commit "record the independent review of TTW-230": success, **364 s (6 min 4 s)**, 19 of 19 jobs successful; `API Integration` 361 s, `API Open Handles` 252 s. The three runs after the change (379 s, 339 s, 364 s) vary by about 40 s, against 597 s before.
 
-## Completion summary (provisional)
+## Completion summary
 
 The open-handle proof runs in its own parallel job, `API Open Handles`. The `CI` run on `main` is shorter by roughly 1 to 2 minutes: four runs after the change took 329 s to 402 s, against 459 s for a same-afternoon control with the old structure (the 597 s first measured was a slow runner). No spec was removed, skipped or weakened, and a hung suite or a leaked handle still fails CI.
 
-Left for later, not done here: splitting passes 1 and 2 of `API Integration` across two jobs (about 2 more minutes, more work, and the passes share a database), and running pass 2 only on `main` (not decided: its purpose has not been confirmed). The ticket's acceptance criterion about five consecutive `main` runs is not measured yet: only four runs on `main` after the change exist.
+Left for later, not done here: splitting passes 1 and 2 of `API Integration` across two jobs (about 2 more minutes, more work, and the passes share a database), and running pass 2 only on `main` (not decided: its purpose has not been confirmed). The acceptance criterion about five consecutive `main` runs is measured above (triggers 1 to 3); trigger 4 stays the owner's judgement.
