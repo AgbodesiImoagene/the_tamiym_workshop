@@ -18,6 +18,7 @@ import {
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -227,6 +228,18 @@ export function CustomerSettingsForm({
     },
   });
 
+  const router = useRouter();
+
+  // TTW-229: go back in the history; a page opened directly has no previous page of this
+  // site, so fall back to the dashboard. The Navigation API only counts entries of this
+  // site (a direct visit has none); browsers without it fall back to the history length.
+  const goBack = () => {
+    const navigation = (window as Window & { navigation?: { canGoBack: boolean } }).navigation;
+    const canGoBack = navigation ? navigation.canGoBack : window.history.length > 1;
+    if (canGoBack) router.back();
+    else router.push('/dashboard');
+  };
+
   const addressMutation = useMutation({
     mutationFn: upsertPrimaryAddress,
     onSuccess: async () => {
@@ -237,7 +250,12 @@ export function CustomerSettingsForm({
   return (
     <div className="mt-10 space-y-8 lg:mt-0">
       <div className="flex items-center gap-3">
-        <button type="button" className="rounded-full p-1 text-black">
+        <button
+          type="button"
+          aria-label="Go back"
+          onClick={goBack}
+          className="rounded-full p-1 text-black"
+        >
           <svg
             viewBox="0 0 24 24"
             className="h-6 w-6"

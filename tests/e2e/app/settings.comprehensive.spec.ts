@@ -82,4 +82,21 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await expect(customerPage.getByLabel('First Name')).toBeVisible();
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
+
+  // TTW-229: the chevron at the top of the page goes back.
+  test('back button returns to the previous page, or to the dashboard on a direct visit', async ({
+    customerPage,
+  }) => {
+    await customerPage.goto('/dashboard/settings');
+    await customerPage.getByRole('button', { name: 'Go back' }).click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
+
+    await customerPage.goto('/dashboard/profile');
+    await customerPage.getByRole('button', { name: 'Go back' }).click();
+    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
+    await customerPage.goto('/dashboard/settings');
+    await customerPage.getByRole('button', { name: 'Go back' }).click();
+    // Came from the dashboard: back, not a new entry.
+    await expect(customerPage).toHaveURL(/\/dashboard\/?$/);
+  });
 });

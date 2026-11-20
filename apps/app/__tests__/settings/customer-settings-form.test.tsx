@@ -14,6 +14,12 @@ import {
   upsertPrimaryAddress,
 } from '@/lib/profile';
 
+const back = jest.fn();
+const push = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ back, push, replace: jest.fn() }),
+}));
+
 jest.mock('@/lib/geo', () => ({
   ...jest.requireActual('@/lib/geo'),
   getGeoStates: jest.fn(),
@@ -381,5 +387,55 @@ describe('CustomerSettingsForm delivery instructions', () => {
 
     await waitFor(() => expect(upsertPrimaryAddress).toHaveBeenCalledTimes(1));
     expect(sentPayloads()[0]).toEqual(expect.objectContaining({ instructions: null }));
+  });
+});
+
+// TTW-228: the chevron at the top of the page goes back.
+describe('CustomerSettingsForm back button', () => {
+  function setHistoryLength(length: number) {
+    Object.defineProperty(window.history, 'length', { value: length, configurable: true });
+  }
+
+  afterEach(() => {
+    delete (window as unknown as { navigation?: unknown }).navigation;
+  });
+
+  it('has an accessible name', () => {
+    renderForm();
+    expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
+  });
+
+  it('goes back in the history when there is a previous page', () => {
+    setHistoryLength(3);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('goes to the dashboard when the page was opened directly', () => {
+    setHistoryLength(1);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(push).toHaveBeenCalledWith('/dashboard');
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it('trusts the Navigation API over the history length when the browser has it', () => {
+    // A direct visit still has an earlier entry (another site, a blank tab): length 2.
+    setHistoryLength(2);
+    (window as unknown as { navigation: { canGoBack: boolean } }).navigation = {
+      canGoBack: false,
+    };
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(push).toHaveBeenCalledWith('/dashboard');
+    expect(back).not.toHaveBeenCalled();
   });
 });
