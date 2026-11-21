@@ -40,24 +40,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # MinIO no longer publishes `minio/minio` on Docker Hub and answers 401 on quay.io, so the
+  # image comes from Bitnami's frozen legacy repository (it also ships `mc`). Local development
+  # only, never used in production. Pinned: the tag never changes under us.
   minio:
-    image: minio/minio:latest
+    image: bitnamilegacy/minio:2025.5.24
     container_name: tamiym-minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
     ports:
       - '9000:9000'
       - '9001:9001'
     volumes:
-      - minio_data:/data
+      - minio_data:/bitnami/minio/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   minio-init:
-    image: minio/mc:latest
+    image: bitnamilegacy/minio:2025.5.24
     container_name: tamiym-minio-init
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 minioadmin minioadmin &&
