@@ -1,7 +1,7 @@
 # TTW-103 — Load the fonts the Design Workshop offers
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented on a local branch (not pushed, not merged)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** TTW-102\
 **Blocks:** TTW-104
@@ -98,9 +98,11 @@ Run in the worktree `ttw-103`, 2026-11-21:
 - `pnpm playwright:validate` and `pnpm docs:validate`: passed.
 - `pnpm build`: 5 of 5 tasks succeeded.
 - Playwright, on a throwaway database `tamiym_workshop_test_ttw103` (seeded with `seed:e2e`, dropped afterwards), project `chromium-app`: `design-workshop.*` and `shared-design.canvas` specs, 21 passed (final version), including the extended `design-workshop.fonts.spec.ts`. One earlier run of that spec failed because the editor had already saved by itself before the test waited for the save; the spec now records every save request.
-- Not run: the full Playwright suite, the other browsers of the matrix, and `pnpm verify` (coverage ratchet, audit). The change is in `apps/app` only; the web and admin apps were not touched.
+- CI on `main` at `4d6a0c6` (2026-11-21): `CI` and `Playwright Comprehensive` both green (see Completion summary). Not run: the other browsers of the nightly matrix, and `pnpm verify` locally. The change is in `apps/app` only; the web and admin apps were not touched.
 - Not checked by eye: a visual comparison of the canvas in the browser pane.
 
 ## Completion summary
 
-The text tool offers Montserrat, Oswald, Playfair Display and Roboto, all shipped with the app (latin and latin-ext). The canvas waits for a font and draws the text again. Six machine-dependent fonts are removed from the list. Remaining items are listed under Implementation reviews. Not merged, not pushed.
+The text tool offers Montserrat, Oswald, Playfair Display and Roboto, all shipped with the app (latin and latin-ext). The canvas waits for a font and draws the text again. Six machine-dependent fonts are removed from the list. Remaining items are listed under Implementation reviews.
+
+Merged into `main` by fast-forward at `4d6a0c6` and pushed on 2026-11-21. The runs on `main` for that commit both succeeded: `CI` (run 44911528348) and `Playwright Comprehensive` (run 44911528334). Not run in the nightly browser matrix at the time of writing.
