@@ -178,6 +178,16 @@
       "tags": ["@app"]
     },
     {
+      "id": "APP-WORKSHOP-ORDER",
+      "surface": "app",
+      "feature": "Order saved designs: variant and quantity, server price, two designs on one variant stay two lines and two order items, rejected design refused",
+      "prd_ref": "Design Workshop",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/design-order.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@app"]
+    },
+    {
       "id": "APP-WORKSHOP-SHARED",
       "surface": "app",
       "feature": "Public shared design page shows the design on a canvas for a visitor with no session",

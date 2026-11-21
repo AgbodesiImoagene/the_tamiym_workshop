@@ -19,6 +19,7 @@ import {
   NotificationChannel,
   OrderItemSnapshotSource,
   RefundStatus,
+  ModerationStatus,
 } from '../generated/prisma/enums';
 import { ORDER_PENDING_EXPIRY_MINUTES } from '../constants';
 import { NotificationOutboxDeliveryService } from '../mail/notification-outbox-delivery.service';
@@ -617,7 +618,7 @@ export class OrdersService {
   }
 
   /**
-   * Validate that each item's design (if present) belongs to the user and matches the variant's product.
+   * Validate that each item's design (if present) belongs to the user, matches the variant's product and was not rejected by moderation (TTW-058).
    */
   private async assertDesignOwnershipAndProductMatch(
     userId: string,
@@ -628,7 +629,12 @@ export class OrdersService {
       const [design, variant] = await Promise.all([
         this.prisma.design.findUnique({
           where: { id: item.designId },
-          select: { id: true, userId: true, productId: true },
+          select: {
+            id: true,
+            userId: true,
+            productId: true,
+            moderationStatus: true,
+          },
         }),
         this.prisma.productVariant.findUnique({
           where: { id: item.variantId },
@@ -650,6 +656,15 @@ export class OrdersService {
         throw new BadRequestException(
           `Design does not belong to the same product as variant ${item.variantId}`,
         );
+      }
+      // TTW-058 (client answer Q28): an order does not wait for moderation, but a
+      // design a moderator already rejected is not printed.
+      if (design.moderationStatus === ModerationStatus.REJECTED) {
+        throw new BadRequestException({
+          code: 'DESIGN_REJECTED',
+          message:
+            'This design was rejected by moderation and cannot be ordered',
+        });
       }
     }
   }

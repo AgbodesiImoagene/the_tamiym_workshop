@@ -60,6 +60,10 @@ UI must hide retry when `paymentRetryEligible` is false; client must not invent 
 | `/dashboard/orders/:id` | Renders DTO; retry only when server-eligible                         |
 | `/orders/:id/confirm`   | Shared status banner; links to account detail                        |
 
+## Ordering a saved design (TTW-058)
+
+A line may carry a `designId` (see `POST /orders`). The server checks, in this order, that the design exists, belongs to the caller, matches the variant's product, and is not `REJECTED`. A rejected design is refused with `400` and code `DESIGN_REJECTED`, and nothing is created. An order does not wait for moderation: `PENDING`, `FLAGGED` and `APPROVED` designs can be ordered (client answer Q28). A design rejected after the order was placed is handled by the admin refund flow (`POST /admin/orders/:id/refund` with `reasonCode` and `reason`).
+
 ## Deferred
 
 - Full Playwright matrix (standard/campaign × payment/refund/shipment states)

@@ -378,6 +378,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
           {/* Save */}
           <SavePanel
             designId={designId}
+            productId={product.id}
             designName={designName}
             isSaving={isSaving}
             onNameChange={setDesignName}

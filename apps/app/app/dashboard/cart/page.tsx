@@ -100,6 +100,9 @@ export default function DashboardCartPage() {
                         src={item.imageUrl}
                         alt={item.productName}
                         fill
+                        // A design thumbnail is private: the browser loads it with the session
+                        // cookie, the image optimizer (server side, no cookie) must not.
+                        unoptimized={Boolean(item.designId)}
                         className="object-contain p-4"
                         sizes="120px"
                       />
@@ -112,6 +115,11 @@ export default function DashboardCartPage() {
                         <h2 className="text-lg font-bold text-black">{item.productName}</h2>
                         <p className="text-sm text-black/70">{item.variantName}</p>
                         <p className="text-sm text-black/60">{item.optionSummary}</p>
+                        {item.designId ? (
+                          <p className="text-sm font-semibold text-black/80">
+                            Your design: {item.designName || 'Saved design'}
+                          </p>
+                        ) : null}
                       </div>
                       <button
                         type="button"

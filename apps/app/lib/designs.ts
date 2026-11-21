@@ -160,7 +160,7 @@ export async function getMyDesigns(): Promise<Design[]> {
 
 /** Get a single design by ID (own only). */
 export async function getDesign(id: string): Promise<Design> {
-  return apiClient.get<Design>(`/designs/${id}`);
+  return apiClient.get<Design>(`/designs/${encodeURIComponent(id)}`);
 }
 
 /** Create a new design. */
