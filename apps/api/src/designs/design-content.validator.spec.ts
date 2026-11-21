@@ -407,6 +407,34 @@ describe('inspectDesignContent (TTW-100)', () => {
       );
     });
 
+    it('refuses a design asset id on a text layer, where no ownership check would run', () => {
+      refused(
+        design([
+          { ...editorText, data: { layerId: 'l', designAssetId: 'da_victim' } },
+        ]),
+        DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED,
+      );
+      refused(
+        design([{ ...editorText, designAssetId: 'da_victim' }]),
+        DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED,
+      );
+    });
+
+    it('refuses a design asset id on a legacy text layer too', () => {
+      refused(
+        {
+          views: {
+            front: {
+              layers: [
+                { type: 'text', content: 'x', designAssetId: 'da_victim' },
+              ],
+            },
+          },
+        },
+        DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED,
+      );
+    });
+
     it('refuses a prototype-polluting key without throwing', () => {
       const polluted = JSON.parse('{"__proto__": {"x": 1}, "type": "IText"}');
       refused(design([polluted]), DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED);

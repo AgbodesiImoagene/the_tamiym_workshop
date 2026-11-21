@@ -9,6 +9,7 @@ import {
   MediaAssetStatus,
   MediaSourceType,
   MediaVisibility,
+  ModerationStatus,
   ProductStatus,
   UserRole,
   UserStatus,
@@ -195,6 +196,40 @@ describe('Design content validation (e2e, TTW-100)', () => {
 
     expect(type.body).toMatchObject({ code: 'DESIGN_OBJECT_TYPE_NOT_ALLOWED' });
     expect(field.body).toMatchObject({ code: 'DESIGN_FIELD_NOT_ALLOWED' });
+  });
+
+  it('refuses a victim asset id hidden in a text layer, so a share link cannot expose it', async () => {
+    const { user, token } = await createUser();
+    const victim = await createUser();
+    const victimAsset = await createAsset(victim.user.id);
+
+    const res = await post(
+      token,
+      designData([
+        {
+          ...textLayer,
+          data: { layerId: 'l1', designAssetId: victimAsset.id },
+        },
+      ]),
+    ).expect(400);
+
+    expect(res.body).toMatchObject({ code: 'DESIGN_FIELD_NOT_ALLOWED' });
+    expect(await countDesigns(user.id)).toBe(0);
+  });
+
+  it('refuses an image still under human review (FLAGGED), even though it is READY', async () => {
+    const { user, token } = await createUser();
+    const asset = await createAsset(user.id);
+    await prisma.mediaAsset.update({
+      where: { id: asset.mediaAssetId },
+      data: { moderationStatus: ModerationStatus.FLAGGED },
+    });
+
+    const res = await post(token, designData([imageLayer(asset.id)])).expect(
+      400,
+    );
+
+    expect(res.body).toMatchObject({ code: 'DESIGN_ASSET_NOT_APPROVED' });
   });
 
   describe('update', () => {

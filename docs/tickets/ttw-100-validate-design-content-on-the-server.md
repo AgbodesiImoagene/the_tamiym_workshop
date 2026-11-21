@@ -1,7 +1,7 @@
 # TTW-100 — Validate design content on the server
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not pushed, CI not run)\
+**Status:** Implemented-unverified (local commits, not pushed, CI not run)\
 **Risk:** High\
 **Blocked by:** TTW-099\
 **Blocks:** TTW-058
@@ -68,10 +68,11 @@ Date: 2026-11-21. TTW-099 is already on `main`, so the blocker is lifted.
 
 1. **Allowlist** (`apps/api/src/designs/design-content.validator.ts`, pure, no database). Top level: `version`, `productId`, `views`. View: `productViewId`, `fabricJson`, `isUsed`, `layerCount`, legacy `layers`. `fabricJson`: `version`, `objects`, `background` (so no `backgroundImage`, no `clipPath`). Objects: `IText`/`i-text`, `Textbox`, `Text`, `Image` (type compared without case or dashes), each with the Fabric field list and a type per field. A fill or stroke is a string, never a pattern or gradient object (a pattern carries an image source). `shadow` must be null and `filters` empty. At most 200 layers per view, text at most 5000 characters. Own-property checks, so `__proto__` or `constructor` cannot slip through.
 2. **Images.** An image must name one design asset (`data.designAssetId`, or top-level, never two different ones). Its `src`, if present, must be exactly `<API_PUBLIC_URL>/design-assets/<same id>/file`, optionally `?variant=original|display|thumb`: same origin, no credentials, no fragment, no other query. Anything else is `DESIGN_IMAGE_EXTERNAL`.
-3. **Ownership and readiness** (`DesignsService.assertDesignContent`). One `designAsset.findMany` for all ids with `ownerUserId = the design owner`. A missing id (unknown or someone else's) gives `DESIGN_ASSET_NOT_FOUND`, the same answer for both so ids cannot be probed. Not `READY` gives `DESIGN_ASSET_NOT_READY`.
+3. **Ownership and readiness** (`DesignsService.assertDesignContent`). One `designAsset.findMany` for all ids with `ownerUserId = the design owner`. A missing id (unknown or someone else's) gives `DESIGN_ASSET_NOT_FOUND`, the same answer for both so ids cannot be probed. Not `READY` gives `DESIGN_ASSET_NOT_READY`. A READY asset whose moderation is `FLAGGED` or `REJECTED` gives `DESIGN_ASSET_NOT_APPROVED` (added after the review). `PENDING` is accepted on purpose: a moderation outage leaves it, and the design is moderated itself. Business decision to confirm if the client wants stricter.
+   Only images name a design asset: a text layer carrying `designAssetId` (in `data` or at top level) is refused with `DESIGN_FIELD_NOT_ALLOWED`.
 4. **When.** On `create` and on `update` when `designData` is sent, before moderation and before any write. A name-only update does not re-validate saved content.
-5. **Errors.** HTTP 400 with `{ statusCode, code, message }`. Codes: `DESIGN_TOO_LARGE` (the 2 MB limit is kept), `DESIGN_STRUCTURE_INVALID`, `DESIGN_FIELD_NOT_ALLOWED`, `DESIGN_FIELD_VALUE_INVALID`, `DESIGN_OBJECT_TYPE_NOT_ALLOWED`, `DESIGN_IMAGE_EXTERNAL`, `DESIGN_IMAGE_ASSET_MISSING`, `DESIGN_ASSET_NOT_FOUND`, `DESIGN_ASSET_NOT_READY`. They are listed in the Swagger text of `POST /designs` and `PATCH /designs/:id`.
-6. **Configuration.** The server did not know its own public address. User decision (2026-11-21): new `API_PUBLIC_URL`, required and validated in production (`validateEnv`), defaulting to `http://localhost:3001/v1` elsewhere (the app's own default). Without it in production every design with an image would be refused (fail closed). Documented in `apps/api/.env.example`, `infra/runtime/secrets/.env.example` and its README.
+5. **Errors.** HTTP 400 with `{ statusCode, code, message }`. Codes: `DESIGN_TOO_LARGE` (the 2 MB limit is kept), `DESIGN_STRUCTURE_INVALID`, `DESIGN_FIELD_NOT_ALLOWED`, `DESIGN_FIELD_VALUE_INVALID`, `DESIGN_OBJECT_TYPE_NOT_ALLOWED`, `DESIGN_IMAGE_EXTERNAL`, `DESIGN_IMAGE_ASSET_MISSING`, `DESIGN_ASSET_NOT_FOUND`, `DESIGN_ASSET_NOT_READY`, `DESIGN_ASSET_NOT_APPROVED`. They are listed in the Swagger text of `POST /designs` and `PATCH /designs/:id`.
+6. **Configuration.** The server did not know its own public address. User decision (2026-11-21): new `API_PUBLIC_URL`, required and validated in every deployment (`validateEnv`), with no fallback in any named environment (staging, preview...): `validateEnv` also requires it there. Only `NODE_ENV` unset, `development` or `test` falls back to `http://localhost:3001/v1` (the app's own default), see `isLocalEnvironment` in `env-validation.ts`. Without it in production every design with an image would be refused (fail closed). Documented in `apps/api/.env.example`, `infra/runtime/secrets/.env.example` and its README.
 7. **No migration, no new dependency.**
 
 ### Risks and how they are handled
@@ -89,24 +90,35 @@ Date: 2026-11-21. TTW-099 is already on `main`, so the blocker is lifted.
 
 ## Implementation reviews
 
-Pending: independent review for this risk level (`/code-review high`, then security and integration charter) is still to do.
+`/code-review high`, 2026-11-21, reported 6 findings on the first commit (`acbb95d`). All handled in the second commit:
+
+1. **Fixed, security.** A text layer could carry `data.designAssetId` or a top-level `designAssetId`. The ownership check only covered images, but the shared-design reader (`collectDesignAssetIds`) counts any such key, so a share link could have exposed another user's private image. Text layers (including legacy ones) are now refused when they carry an asset id. Tests: validator spec (2), e2e "victim asset id hidden in a text layer".
+2. **Fixed.** A READY asset still FLAGGED (or REJECTED) was accepted. Now `DESIGN_ASSET_NOT_APPROVED`. PENDING stays accepted (decision above). Tests: service spec, e2e.
+3. **Fixed.** Any `NODE_ENV` other than `production` fell back to localhost, so a staging deployment without `API_PUBLIC_URL` refused every image with no startup error. `validateEnv` now requires it in any named environment, and the service falls back only for unset, `development` or `test`. Tests: env-validation spec (3), service spec.
+4. **Covered.** `apps/app/__tests__/lib/design-image-serialisation.test.ts` serialises a real `FabricImage` with `toObject(['designAssetId','data'])` and checks that `src` is exactly `designAssetFileUrl(id)`, `crossOrigin` is `use-credentials`, `filters` is empty, and every key is on the server allowlist. It passed at once, confirming the assumption. Still not played: an image uploaded and saved in a browser (no MinIO here).
+5. **Fixed.** The e2e seed designs held `{ type: 'image', src: <id> }`, which the allowlist refuses on re-save. They now use the Workshop's shape (`seedImageLayer` in `seed-e2e-dummy-data.ts`). The flagged design stays unsavable until its image is approved, which is the intended rule.
+6. **Process.** The first e2e suite was written after the code. For the fixes the tests were written first: 7 unit tests failed before the fix (2 validator, 2 moderation, 1 staging fallback in the service spec, 2 env). The two new e2e cases were not run against the old code.
+
+A second review pass after these fixes is still to do.
 
 ## Verification evidence
 
-Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 2026-11-21.
+Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 2026-11-21, after the second commit.
 
-- Tests first, failing for the right reason: validator suite "Cannot find module './design-content.validator'"; `designs.service.spec.ts` 10 failed (no validation yet); `env-validation.spec.ts` 4 failed.
-- `pnpm lint`: 0 errors (api 14 warnings, none in touched files; same count as before). `pnpm format:check`: passed. `pnpm typecheck`: 6 of 6 successful.
-- `pnpm test`: api 172 suites, 2033 tests; app 29 suites, 239 tests; web 12 suites, 79 tests; all passed.
-- `pnpm --filter api test:coverage`, `pnpm coverage:ratchet` (statements 84.94% vs floor 55.64%, branches 70.48% vs 48.73%, functions 75.86% vs 54.64%, lines 85.26% vs 56.00%) and `pnpm coverage:diff` (20/20 changed lines, 100%, floor 80%): passed.
-- `pnpm openapi:generate` then `pnpm openapi:check` and `pnpm docs:validate`: passed.
-- API e2e on a throwaway database `tamiym_workshop_test_ttw100` (REDIS_DB=13, dropped afterwards): `design-content-validation` (9 tests: valid save, empty design, external image, foreign and unknown asset with identical body, PENDING asset, unknown type and field, update accepted, update refused with content kept, update with foreign asset), `shared-design-private-images`, `moderation-appeals`, `campaign-authoring`, `view-surcharge-precedence`, `private-customer-uploads`: 6 suites, 41 tests passed.
-- `pnpm build` (5 tasks, passed), then Playwright `design-workshop.layers.spec.ts` and `design-workshop.reopen.spec.ts` with the setup project, on the same seeded throwaway database: 13 passed. The layers journey asserts that the real editor's `POST /v1/designs` answers 201.
-- Not run: `pnpm audit:prod`, `pnpm verify` as a whole, the whole Playwright suite, a journey that uploads an image in the editor (no MinIO on this machine), CI.
+- Tests first, failing for the right reason: validator suite failing to load, `designs.service.spec.ts` 10 failed and `env-validation.spec.ts` 4 failed before the first commit; then 7 failed before the review fixes (see Implementation reviews).
+- `pnpm lint`: 0 errors (api 14 warnings, none in touched files). `pnpm format:check`: passed. `pnpm typecheck`: 6 of 6 successful.
+- `pnpm test`: api 172 suites, 2043 tests; app 30 suites, 242 tests; web 12 suites, 79 tests; all passed.
+- `pnpm --filter api test:coverage`, `pnpm coverage:ratchet` (lines 85.29% vs floor 56.00%, other floors passed) and `pnpm coverage:diff` (191/205 changed lines, 93.17%, floor 80%): passed.
+- `pnpm openapi:generate`, `pnpm openapi:check`, `pnpm docs:validate`: passed.
+- API e2e on a throwaway database `tamiym_workshop_test_ttw100` (REDIS_DB=13, dropped afterwards): `design-content-validation` (11 tests), `shared-design-private-images`, `moderation-appeals`, `campaign-authoring`, `view-surcharge-precedence`, `private-customer-uploads`, `seed-e2e-fixture-owned-rows`: 7 suites, 47 tests passed.
+- `pnpm build`, then Playwright `design-workshop.layers.spec.ts` and `design-workshop.reopen.spec.ts` with the setup project on the freshly seeded throwaway database: 13 passed on the first run. On repeated runs the layers journey failed intermittently with "Unexpected console error: 500". The 500 is `POST /v1/designs/:id/thumbnail` (storage is not available on this machine, the editor treats it as non-fatal and it only shows when the console check catches it before the test ends); the design `POST` itself answered 201 each time. Some later repeats also hit the admin MFA rate limit (429) from repeated setup runs. This is environmental, not caused by the ticket, but it means the journey is not green on every run here: it should be confirmed in CI, where storage exists.
+- Not run: `pnpm audit:prod`, `pnpm verify` as a whole, the whole Playwright suite, a browser journey that uploads an image, CI.
 
 ## Remaining
 
-- Independent implementation review (high risk: security and integration), fix and repeat until PASS.
+- Second review pass on the fixes of the first review (high risk: security and integration), repeat until PASS.
+- Confirm the layers Playwright journey in CI (thumbnail upload needs storage, see evidence).
+- Decide with the client whether an image whose moderation is still PENDING may be used in a design (accepted today).
 - Show the new error codes in the editor: today the save panel shows the message of the API. Mapping each code to its own wording is a UI ticket (not created).
 - Set `API_PUBLIC_URL` in the production secrets before deploying (the API will not start without it).
 - `DESIGN_SHARE_PUBLIC_ORIGIN` is also required in production but missing from `infra/runtime/secrets/.env.example` (seen, not changed here).
@@ -114,4 +126,4 @@ Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 
 
 ## Completion summary
 
-The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Local commit only: nothing pushed, CI not run. See Remaining before closing the ticket.
+The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Local commits only: nothing pushed, CI not run. See Remaining before closing the ticket.

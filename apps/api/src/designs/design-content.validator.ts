@@ -23,6 +23,7 @@ export const DESIGN_CONTENT_ERROR = {
   IMAGE_ASSET_MISSING: 'DESIGN_IMAGE_ASSET_MISSING',
   ASSET_NOT_FOUND: 'DESIGN_ASSET_NOT_FOUND',
   ASSET_NOT_READY: 'DESIGN_ASSET_NOT_READY',
+  ASSET_NOT_APPROVED: 'DESIGN_ASSET_NOT_APPROVED',
 } as const;
 
 export type DesignContentErrorCode =
@@ -383,7 +384,18 @@ function checkObject(
     );
   }
 
-  if (kind === 'text') return null;
+  if (kind === 'text') {
+    // Only images name a design asset. A text layer carrying an id would skip the
+    // ownership check, yet the shared-design reader counts any `designAssetId` key.
+    const dataIds = isPlainObject(data) && 'designAssetId' in data;
+    if (dataIds || 'designAssetId' in object) {
+      return fail(
+        DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED,
+        `${where}: a text layer cannot reference a design asset`,
+      );
+    }
+    return null;
+  }
   return checkImage(object, where, base, assetIds);
 }
 

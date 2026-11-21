@@ -102,6 +102,16 @@ const CHECKOUT_CUSTOMERS = [
   ['checkoutNote', 'checkout-note', '+2348000000016'],
 ] as const;
 
+/** An image layer as the Workshop saves it: the stable API path of a customer upload. */
+function seedImageLayer(designAssetId: string) {
+  const api = process.env.API_PUBLIC_URL ?? 'http://localhost:3001/v1';
+  return {
+    type: 'Image',
+    src: `${api}/design-assets/${designAssetId}/file?variant=original`,
+    data: { designAssetId },
+  };
+}
+
 const IDS = {
   users: {
     adminPrimary: 'e2e-user-admin-primary',
@@ -1192,7 +1202,7 @@ async function main() {
                 fabricJson: {
                   objects: [
                     { type: 'textbox', text: 'Community Day 2026' },
-                    { type: 'image', src: IDS.designAssets.pendingUpload },
+                    seedImageLayer(IDS.designAssets.pendingUpload),
                   ],
                 },
               },
@@ -1218,7 +1228,7 @@ async function main() {
                 fabricJson: {
                   objects: [
                     { type: 'textbox', text: 'Choir Tour 2026' },
-                    { type: 'image', src: IDS.designAssets.flaggedUpload },
+                    seedImageLayer(IDS.designAssets.flaggedUpload),
                   ],
                 },
               },

@@ -971,6 +971,54 @@ describe('DesignsService', () => {
       },
     );
 
+    it.each(['FLAGGED', 'REJECTED'])(
+      'refuses an image whose moderation is %s, even when it is READY',
+      async (moderationStatus) => {
+        (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+          { id: 'da_1', mediaAsset: { status: 'READY', moderationStatus } },
+        ]);
+
+        const body = await codeOf(createWith(withLayers([imageLayer('da_1')])));
+
+        expect(body).toMatchObject({ code: 'DESIGN_ASSET_NOT_APPROVED' });
+        expect(prisma.design.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['APPROVED', 'PENDING'])(
+      'accepts a READY image whose moderation is %s (a moderation outage leaves PENDING)',
+      async (moderationStatus) => {
+        (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+          { id: 'da_1', mediaAsset: { status: 'READY', moderationStatus } },
+        ]);
+
+        await createWith(withLayers([imageLayer('da_1')]));
+
+        expect(prisma.design.create).toHaveBeenCalled();
+      },
+    );
+
+    it('has no local fallback in a named environment such as staging', async () => {
+      const previous = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'staging';
+      try {
+        config.get.mockImplementation(() => undefined);
+        const body = await codeOf(
+          createWith(
+            withLayers([
+              imageLayer(
+                'da_1',
+                'http://localhost:3001/v1/design-assets/da_1/file',
+              ),
+            ]),
+          ),
+        );
+        expect(body).toMatchObject({ code: 'DESIGN_IMAGE_EXTERNAL' });
+      } finally {
+        process.env.NODE_ENV = previous;
+      }
+    });
+
     it('refuses an unknown object type', async () => {
       const body = await codeOf(
         createWith(withLayers([{ type: 'rect', left: 1 }])),

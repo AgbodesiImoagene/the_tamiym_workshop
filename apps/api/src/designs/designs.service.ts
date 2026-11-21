@@ -22,6 +22,10 @@ import {
 } from '../moderation/moderation.constants';
 import { S3Service } from '../storage/s3.service';
 import {
+  isLocalEnvironment,
+  LOCAL_API_PUBLIC_URL,
+} from '../config/env-validation';
+import {
   DESIGN_CONTENT_ERROR,
   inspectDesignContent,
 } from './design-content.validator';
@@ -121,15 +125,13 @@ export class DesignsService {
   }
 
   /**
-   * Public base URL of this API. Required in production (`validateEnv`); elsewhere it
-   * defaults to the local address the app uses by default, so dev and tests need no setup.
+   * Public base URL of this API. Deployments must set it (`validateEnv`); only a developer
+   * machine or a test run falls back to the local address the app uses by default.
    */
   private apiPublicUrl(): string | undefined {
     const configured = this.config.get<string>('API_PUBLIC_URL');
     if (configured) return configured;
-    return process.env.NODE_ENV === 'production'
-      ? undefined
-      : 'http://localhost:3001/v1';
+    return isLocalEnvironment() ? LOCAL_API_PUBLIC_URL : undefined;
   }
 
   /**
@@ -157,9 +159,12 @@ export class DesignsService {
     const ids = [...result.assetIds];
     const assets = await this.prisma.designAsset.findMany({
       where: { id: { in: ids }, ownerUserId },
-      select: { id: true, mediaAsset: { select: { status: true } } },
+      select: {
+        id: true,
+        mediaAsset: { select: { status: true, moderationStatus: true } },
+      },
     });
-    const byId = new Map(assets.map((a) => [a.id, a.mediaAsset.status]));
+    const byId = new Map(assets.map((a) => [a.id, a.mediaAsset]));
     if (ids.some((id) => !byId.has(id))) {
       throw new BadRequestException({
         statusCode: 400,
@@ -167,11 +172,29 @@ export class DesignsService {
         message: 'An image of this design is not one of your uploads',
       });
     }
-    if (ids.some((id) => byId.get(id) !== MediaAssetStatus.READY)) {
+    if (ids.some((id) => byId.get(id)?.status !== MediaAssetStatus.READY)) {
       throw new BadRequestException({
         statusCode: 400,
         code: DESIGN_CONTENT_ERROR.ASSET_NOT_READY,
         message: 'An image of this design is not ready yet, try again shortly',
+      });
+    }
+    // A READY image can still be waiting for, or have failed, a human decision. PENDING is
+    // allowed: it is what a moderation outage leaves, and the design is moderated itself.
+    const blocked: ModerationStatus[] = [
+      ModerationStatus.FLAGGED,
+      ModerationStatus.REJECTED,
+    ];
+    if (
+      ids.some((id) => {
+        const moderation = byId.get(id)?.moderationStatus;
+        return moderation !== undefined && blocked.includes(moderation);
+      })
+    ) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: DESIGN_CONTENT_ERROR.ASSET_NOT_APPROVED,
+        message: 'An image of this design is waiting for a moderation decision',
       });
     }
   }

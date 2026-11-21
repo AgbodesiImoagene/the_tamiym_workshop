@@ -39,8 +39,36 @@ export const requiredProductionEnvVars = [
   ...requiredProductionMailEnvVars,
 ] as const;
 
+/** API address the customer app uses by default, so local development needs no setup. */
+export const LOCAL_API_PUBLIC_URL = 'http://localhost:3001/v1';
+
+/**
+ * True for a developer machine or a test run (`NODE_ENV` unset, `development` or `test`).
+ * Any other value (production, staging, preview...) is a deployment and gets no local
+ * fallback for `API_PUBLIC_URL`.
+ */
+export function isLocalEnvironment(): boolean {
+  const env = process.env.NODE_ENV;
+  return (
+    env === undefined || env === '' || env === 'development' || env === 'test'
+  );
+}
+
 /** Prefix used by `infra/runtime/secrets/.env.example` for unset secrets. */
 const SECRETS_TEMPLATE_PLACEHOLDER_PREFIX = 'placeholder';
+
+function assertHttpUrl(key: string, value: string): void {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('unsupported protocol');
+    }
+  } catch {
+    throw new Error(
+      `Environment variable ${key} must be a valid http(s) absolute URL`,
+    );
+  }
+}
 
 function envString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -180,6 +208,15 @@ export function validateEnv(
     }
   }
 
+  if (process.env.NODE_ENV !== 'production' && !isLocalEnvironment()) {
+    // A named environment such as staging: no local fallback, so name the address (TTW-100).
+    const apiPublicUrl = config.API_PUBLIC_URL;
+    if (typeof apiPublicUrl !== 'string' || apiPublicUrl.trim() === '') {
+      throw new Error('Missing required environment variable: API_PUBLIC_URL');
+    }
+    assertHttpUrl('API_PUBLIC_URL', apiPublicUrl);
+  }
+
   if (process.env.NODE_ENV === 'production') {
     for (const key of requiredProductionEnvVars) {
       const value = config[key];
@@ -196,19 +233,7 @@ export function validateEnv(
         }
       }
       if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN' || key === 'API_PUBLIC_URL') {
-        try {
-          const originUrl = new URL(value.trim());
-          if (
-            originUrl.protocol !== 'http:' &&
-            originUrl.protocol !== 'https:'
-          ) {
-            throw new Error('unsupported protocol');
-          }
-        } catch {
-          throw new Error(
-            `Environment variable ${key} must be a valid http(s) absolute URL`,
-          );
-        }
+        assertHttpUrl(key, value);
       }
     }
 

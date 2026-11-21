@@ -52,7 +52,8 @@ output` do not contain secret values.
   `https://api.example.com/v1`. A saved design may only load images from
   `<API_PUBLIC_URL>/design-assets/<id>/file`. Keep it equal to the `NEXT_PUBLIC_API_URL` the
   customer app is built with, or every design with an image is refused. The API refuses to
-  start in production when it is missing or not an http(s) URL.
+  start in production, or in any named environment such as staging, when it is missing or
+  not an http(s) URL.
 
 ## Local / CI
 

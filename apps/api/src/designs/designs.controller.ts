@@ -51,7 +51,7 @@ export class DesignsController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input, product not found, or design content refused (TTW-100). Content errors carry a stable `code`: DESIGN_TOO_LARGE, DESIGN_STRUCTURE_INVALID, DESIGN_FIELD_NOT_ALLOWED, DESIGN_FIELD_VALUE_INVALID, DESIGN_OBJECT_TYPE_NOT_ALLOWED, DESIGN_IMAGE_EXTERNAL, DESIGN_IMAGE_ASSET_MISSING, DESIGN_ASSET_NOT_FOUND, DESIGN_ASSET_NOT_READY.',
+      'Invalid input, product not found, or design content refused (TTW-100). Content errors carry a stable `code`: DESIGN_TOO_LARGE, DESIGN_STRUCTURE_INVALID, DESIGN_FIELD_NOT_ALLOWED, DESIGN_FIELD_VALUE_INVALID, DESIGN_OBJECT_TYPE_NOT_ALLOWED, DESIGN_IMAGE_EXTERNAL, DESIGN_IMAGE_ASSET_MISSING, DESIGN_ASSET_NOT_FOUND, DESIGN_ASSET_NOT_READY, DESIGN_ASSET_NOT_APPROVED.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(

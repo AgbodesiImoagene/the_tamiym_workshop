@@ -75,6 +75,34 @@ describe('env-validation', () => {
       expect(validateEnv({})).toEqual({});
     });
 
+    describe('named environments such as staging (TTW-100)', () => {
+      beforeEach(() => {
+        process.env.NODE_ENV = 'staging';
+      });
+
+      it('requires API_PUBLIC_URL, there is no local fallback there', () => {
+        expect(() => validateEnv(validBaseConfig)).toThrow(
+          'Missing required environment variable: API_PUBLIC_URL',
+        );
+      });
+
+      it('passes with a valid API_PUBLIC_URL', () => {
+        const config = {
+          ...validBaseConfig,
+          API_PUBLIC_URL: 'https://api.staging.example.com/v1',
+        };
+        expect(validateEnv(config)).toEqual(config);
+      });
+
+      it('rejects an API_PUBLIC_URL that is not an http(s) URL', () => {
+        expect(() =>
+          validateEnv({ ...validBaseConfig, API_PUBLIC_URL: 'nope' }),
+        ).toThrow(
+          'Environment variable API_PUBLIC_URL must be a valid http(s) absolute URL',
+        );
+      });
+    });
+
     describe('non-test, non-production (e.g. development)', () => {
       beforeEach(() => {
         process.env.NODE_ENV = 'development';
