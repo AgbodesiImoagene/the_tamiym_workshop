@@ -1,7 +1,7 @@
 # TTW-058 — Let customers order their saved designs from the Design Workshop
 
 **Epic:** 3 — Complete customer and fundraiser revenue journeys\
-**Status:** Implemented, committed locally on `codex/ttw-058-order-saved-designs-from-the-workshop` (not pushed). Independent review: PASS (fresh reviewer, 2026-11-21).\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-100 (design content validation), TTW-092 (variant picker)\
 **Blocks:** TTW-037 acceptance criterion "Two saved designs on the same variant remain two cart lines and two order items"
@@ -119,4 +119,6 @@ All run in the worktree on 2026-11-21 (Node 24.22.1).
 
 Customers can order a saved design: "Order" on each card of "My Designs" (not for a rejected design) and "Order this design" in the editor lead to the product page, which shows the design, quotes the chosen sizes with "Get price" and adds one cart line per size with `designId` and `designName`. Cart and checkout show "Your design: ...". The API refuses a `REJECTED` design with `DESIGN_REJECTED` and lets pending and flagged ones through (Q28). Two designs on one variant stay two lines and two order items (Playwright and API e2e).
 
-Remaining: independent review; the client's confirmation of the Q28 reading; the left-over review points above. Update/clone already exist ("Duplicate" and the editor), so no gap was added there. Nothing pushed, no PR.
+Remaining: the client's confirmation of the Q28 reading; the left-over review points above (checkout message after a late rejection, merged cart line keeping the old price and name, unsaved-edits warning). Update/clone already exist ("Duplicate" and the editor), so no gap was added there. The quote check found by the review is TTW-239.
+
+Merged into `main` on 2026-11-21 (TTW-239 at `4a0e5c5`, TTW-058 at `dc9820d`) and pushed. The runs on `main` for `dc9820d` both succeeded: `CI` (run 44914037368) and `Playwright Comprehensive` (run 44914037422). The two branches conflicted in `orders.service.ts` and the interim policy doc, as TTW-239 predicted; the unused `ModerationStatus` import was removed. Not run: the other browsers of the nightly matrix, `pnpm verify` and `audit:prod` as one command.
