@@ -99,24 +99,28 @@ Date: 2026-11-21. TTW-099 is already on `main`, so the blocker is lifted.
 5. **Fixed.** The e2e seed designs held `{ type: 'image', src: <id> }`, which the allowlist refuses on re-save. They now use the Workshop's shape (`seedImageLayer` in `seed-e2e-dummy-data.ts`). The flagged design stays unsavable until its image is approved, which is the intended rule.
 6. **Process.** The first e2e suite was written after the code. For the fixes the tests were written first: 7 unit tests failed before the fix (2 validator, 2 moderation, 1 staging fallback in the service spec, 2 env). The two new e2e cases were not run against the old code.
 
-A second review pass after these fixes is still to do.
+Second review pass (`/code-review high`, 2026-11-21) found 1 issue in the fixes, handled in the third commit:
+
+7. **Fixed, security.** The text-layer rule only looked at `data` and the top-level key, but `styles` (per-character text style) accepted any nested key except `src`. A `designAssetId` hidden there skipped the ownership check while `collectDesignAssetIds` still counted it. `styles` is now validated structurally: only the two shapes Fabric writes (`[{ start, end, style }]` or `{ line: { character: style } }`), and only known style properties (fill, stroke, strokeWidth, fontSize, fontFamily, fontWeight, fontStyle, underline, overline, linethrough, deltaY, textBackgroundColor, textDecorationThickness) with their types. Tests written first and shown failing (2 failed), plus a test that both Fabric shapes are still accepted.
+
+Another review pass after this fix is still to do.
 
 ## Verification evidence
 
-Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 2026-11-21, after the second commit.
+Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 2026-11-21. The figures below are from the run after the third commit, except Playwright (run after the second).
 
 - Tests first, failing for the right reason: validator suite failing to load, `designs.service.spec.ts` 10 failed and `env-validation.spec.ts` 4 failed before the first commit; then 7 failed before the review fixes (see Implementation reviews).
 - `pnpm lint`: 0 errors (api 14 warnings, none in touched files). `pnpm format:check`: passed. `pnpm typecheck`: 6 of 6 successful.
-- `pnpm test`: api 172 suites, 2043 tests; app 30 suites, 242 tests; web 12 suites, 79 tests; all passed.
-- `pnpm --filter api test:coverage`, `pnpm coverage:ratchet` (lines 85.29% vs floor 56.00%, other floors passed) and `pnpm coverage:diff` (191/205 changed lines, 93.17%, floor 80%): passed.
+- `pnpm test`: api 172 suites, 2046 tests; app 30 suites, 242 tests; web 12 suites, 79 tests; all passed.
+- `pnpm --filter api test:coverage`, `pnpm coverage:ratchet` (lines 85.29% vs floor 56.00%, other floors passed) and `pnpm coverage:diff` (202/213 changed lines, 94.84%, floor 80%): passed.
 - `pnpm openapi:generate`, `pnpm openapi:check`, `pnpm docs:validate`: passed.
-- API e2e on a throwaway database `tamiym_workshop_test_ttw100` (REDIS_DB=13, dropped afterwards): `design-content-validation` (11 tests), `shared-design-private-images`, `moderation-appeals`, `campaign-authoring`, `view-surcharge-precedence`, `private-customer-uploads`, `seed-e2e-fixture-owned-rows`: 7 suites, 47 tests passed.
+- API e2e on a throwaway database `tamiym_workshop_test_ttw100` (REDIS_DB=13, dropped afterwards): `design-content-validation` (11 tests), `shared-design-private-images`, `moderation-appeals`, `campaign-authoring`, `private-customer-uploads`: 5 suites, 38 tests passed (an earlier 47-test run of 7 suites, which also had `view-surcharge-precedence` and `seed-e2e-fixture-owned-rows`, was before the third commit).
 - `pnpm build`, then Playwright `design-workshop.layers.spec.ts` and `design-workshop.reopen.spec.ts` with the setup project on the freshly seeded throwaway database: 13 passed on the first run. On repeated runs the layers journey failed intermittently with "Unexpected console error: 500". The 500 is `POST /v1/designs/:id/thumbnail` (storage is not available on this machine, the editor treats it as non-fatal and it only shows when the console check catches it before the test ends); the design `POST` itself answered 201 each time. Some later repeats also hit the admin MFA rate limit (429) from repeated setup runs. This is environmental, not caused by the ticket, but it means the journey is not green on every run here: it should be confirmed in CI, where storage exists.
 - Not run: `pnpm audit:prod`, `pnpm verify` as a whole, the whole Playwright suite, a browser journey that uploads an image, CI.
 
 ## Remaining
 
-- Second review pass on the fixes of the first review (high risk: security and integration), repeat until PASS.
+- Third review pass on the `styles` fix (high risk: security and integration), repeat until PASS.
 - Confirm the layers Playwright journey in CI (thumbnail upload needs storage, see evidence).
 - Decide with the client whether an image whose moderation is still PENDING may be used in a design (accepted today).
 - Show the new error codes in the editor: today the save panel shows the message of the API. Mapping each code to its own wording is a UI ticket (not created).

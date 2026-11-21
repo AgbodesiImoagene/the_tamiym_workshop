@@ -175,15 +175,63 @@ function colourOk(value: unknown): boolean {
   );
 }
 
-function stylesOk(value: unknown, depth = 0): boolean {
-  if (depth > 6) return false;
-  if (value === null) return true;
-  if (['number', 'boolean'].includes(typeof value)) return true;
-  if (typeof value === 'string') return value.length <= MAX_STRING_LENGTH;
-  if (Array.isArray(value)) return value.every((v) => stylesOk(v, depth + 1));
+/** Properties Fabric writes in a per-character text style, with the type of each. */
+const CHARACTER_STYLE_FIELDS: Record<string, 'number' | 'string' | 'boolean'> =
+  {
+    fill: 'string',
+    stroke: 'string',
+    strokeWidth: 'number',
+    fontSize: 'number',
+    fontFamily: 'string',
+    fontWeight: 'string',
+    fontStyle: 'string',
+    underline: 'boolean',
+    overline: 'boolean',
+    linethrough: 'boolean',
+    deltaY: 'number',
+    textBackgroundColor: 'string',
+    textDecorationThickness: 'number',
+  };
+
+function characterStyleOk(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  return Object.keys(value).every((key) => {
+    if (!hasOwn(CHARACTER_STYLE_FIELDS, key)) return false;
+    const item = value[key];
+    switch (CHARACTER_STYLE_FIELDS[key]) {
+      case 'number':
+        return typeof item === 'number' && Number.isFinite(item);
+      case 'boolean':
+        return typeof item === 'boolean';
+      case 'string':
+        return typeof item === 'string' && item.length <= MAX_STRING_LENGTH;
+    }
+  });
+}
+
+/**
+ * `styles` of a text layer, in the two shapes Fabric writes: a list of
+ * `{ start, end, style }` ranges, or `{ line: { character: style } }`. Only known style
+ * properties are allowed at the leaves, so no other key (an asset id, a URL) can ride in
+ * a free-form object that other readers of the design walk.
+ */
+function stylesOk(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.every(
+      (range) =>
+        isPlainObject(range) &&
+        Object.keys(range).every((k) =>
+          ['start', 'end', 'style'].includes(k),
+        ) &&
+        typeof range['start'] === 'number' &&
+        typeof range['end'] === 'number' &&
+        characterStyleOk(range['style']),
+    );
+  }
   if (isPlainObject(value)) {
-    return Object.keys(value).every(
-      (k) => k !== 'src' && stylesOk(value[k], depth + 1),
+    return Object.values(value).every(
+      (line) =>
+        isPlainObject(line) && Object.values(line).every(characterStyleOk),
     );
   }
   return false;

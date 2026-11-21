@@ -435,6 +435,74 @@ describe('inspectDesignContent (TTW-100)', () => {
       );
     });
 
+    it('refuses a design asset id hidden at any depth of a text layer styles', () => {
+      refused(
+        design([
+          {
+            ...editorText,
+            styles: { '0': { '0': { designAssetId: 'da_victim' } } },
+          },
+        ]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+      refused(
+        design([
+          {
+            ...editorText,
+            styles: [
+              { start: 0, end: 1, style: { designAssetId: 'da_victim' } },
+            ],
+          },
+        ]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+    });
+
+    it('refuses any style property or shape that Fabric does not write', () => {
+      refused(
+        design([{ ...editorText, styles: { '0': { '0': { url: 'x' } } } }]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+      refused(
+        design([
+          { ...editorText, styles: { '0': { '0': { fill: { a: 1 } } } } },
+        ]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+      refused(
+        design([{ ...editorText, styles: { '0': 'x' } }]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+      refused(
+        design([{ ...editorText, styles: [{ start: 0, end: 1 }] }]),
+        DESIGN_CONTENT_ERROR.FIELD_VALUE_INVALID,
+      );
+    });
+
+    it('accepts per-character styles in both shapes Fabric writes', () => {
+      const style = {
+        fill: '#ff0000',
+        fontWeight: 'bold',
+        fontSize: 20,
+        underline: true,
+        deltaY: 0,
+      };
+      expect(
+        inspectDesignContent(
+          design([
+            { ...editorText, styles: { '0': { '0': style, '3': style } } },
+          ]),
+          opts,
+        ).ok,
+      ).toBe(true);
+      expect(
+        inspectDesignContent(
+          design([{ ...editorText, styles: [{ start: 0, end: 4, style }] }]),
+          opts,
+        ).ok,
+      ).toBe(true);
+    });
+
     it('refuses a prototype-polluting key without throwing', () => {
       const polluted = JSON.parse('{"__proto__": {"x": 1}, "type": "IText"}');
       refused(design([polluted]), DESIGN_CONTENT_ERROR.FIELD_NOT_ALLOWED);
