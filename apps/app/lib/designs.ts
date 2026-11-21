@@ -30,6 +30,21 @@ export interface Design {
   views?: DesignView[];
 }
 
+/**
+ * What the public share endpoint returns (`DesignsService.findByShareToken`): an
+ * allowlist. There is no `productId` (use `product.id`), no owner id and no moderation
+ * status. Not the owner's `Design` (TTW-236).
+ */
+export interface SharedDesign {
+  id: string;
+  name: string;
+  designData: DesignData;
+  thumbnailUrl?: string | null;
+  createdAt: string;
+  product: { id: string; name: string; slug: string };
+  views?: DesignView[];
+}
+
 export interface FabricJson {
   version?: string;
   objects: Record<string, unknown>[];
@@ -300,7 +315,7 @@ export async function uploadDesignAsset(
 }
 
 /** Read a shared design by share token (public — no auth). */
-export async function getSharedDesign(shareToken: string): Promise<Design> {
+export async function getSharedDesign(shareToken: string): Promise<SharedDesign> {
   const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1'}/public/designs/${shareToken}`;
   const response = await fetch(url, { credentials: 'omit' });
 

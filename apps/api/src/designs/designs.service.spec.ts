@@ -797,6 +797,42 @@ describe('DesignsService', () => {
       expect(result).not.toHaveProperty('moderationStatus');
     });
 
+    it('pins the public response contract: product.id is the only product id (TTW-236)', async () => {
+      (prisma.designShareLink.findUnique as jest.Mock).mockResolvedValue({
+        id: 'link-1',
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+        design: {
+          ...mockDesign,
+          product: { id: 'prod-1', name: 'Tee', slug: 'tee' },
+          views: [],
+        },
+      });
+      (prisma.designShareLink.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.findByShareToken(
+        'abcdefghijklmnopqrstuvwxyz0123456789',
+      );
+
+      // The mock ignores `select`, so pin what the database is asked for: the shared
+      // page reads `product.id`; owner id and a duplicate `productId` are never selected.
+      const args = (prisma.designShareLink.findUnique as jest.Mock).mock
+        .calls[0][0] as {
+        select: {
+          design: { select: Record<string, unknown> & { product: unknown } };
+        };
+      };
+      const selected = args.select.design.select;
+      expect(selected.product).toEqual({
+        select: { id: true, name: true, slug: true },
+      });
+      expect(selected).not.toHaveProperty('productId');
+      expect(selected).not.toHaveProperty('userId');
+      expect(selected).not.toHaveProperty('shareToken');
+      expect(result.product.id).toBe('prod-1');
+      expect(result).not.toHaveProperty('moderationStatus');
+    });
+
     it('throws NotFoundException for short tokens', async () => {
       await expect(service.findByShareToken('short')).rejects.toThrow(
         NotFoundException,

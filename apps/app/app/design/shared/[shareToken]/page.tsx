@@ -26,7 +26,7 @@ export default async function SharedDesignPage({ params }: SharedDesignPageProps
 
   let workshopContext;
   try {
-    workshopContext = await getProductWorkshop(design.productId);
+    workshopContext = await getProductWorkshop(design.product.id);
   } catch {
     workshopContext = null;
   }
