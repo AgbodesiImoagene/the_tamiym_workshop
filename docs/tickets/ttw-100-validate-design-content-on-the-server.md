@@ -1,7 +1,7 @@
 # TTW-100 — Validate design content on the server
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (pushed, CI green on `aaaf66f`, not merged, third review pass done)\
+**Status:** Done, with open points (merged into `main` at `d3ede8d`, CI green on the branch and on `main`, third review pass done; see Remaining)\
 **Risk:** High\
 **Blocked by:** TTW-099\
 **Blocks:** TTW-058
@@ -118,7 +118,9 @@ Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 
 - `pnpm build`, then Playwright `design-workshop.layers.spec.ts` and `design-workshop.reopen.spec.ts` with the setup project on the freshly seeded throwaway database: 13 passed on the first run. On repeated runs the layers journey failed intermittently with "Unexpected console error: 500". The 500 is `POST /v1/designs/:id/thumbnail` (storage is not available on this machine, the editor treats it as non-fatal and it only shows when the console check catches it before the test ends); the design `POST` itself answered 201 each time. Some later repeats also hit the admin MFA rate limit (429) from repeated setup runs. This is environmental, not caused by the ticket, but it means the journey is not green on every run here: it should be confirmed in CI, where storage exists.
 - CI, run 44890509726 on the branch (`aaaf66f`), 2026-11-21: all 19 jobs succeeded, including Unit Tests, Coverage, API Integration, API Open Handles, Production Audit, OpenAPI Contracts, Documentation, Migration Baseline, Production Build, the container builds and Playwright Smoke. Playwright Smoke runs the `@smoke` tests only, so it does not confirm the layers journey.
 - Third review pass (`/code-review high`, 2026-11-21) on the `styles` fix: no finding.
-- Not run: `pnpm verify` as a whole, the whole Playwright suite, a browser journey that uploads an image.
+- Merge into `main` (2026-11-21). `main` had moved by 11 commits (TTW-099, 235, 236, 237 and the MinIO CI fix), so it was merged into the branch first (`d3ede8d`). One conflict, the imports of `designs.service.ts` (both sides kept); the auto-merged `create` and `update` still call `assertDesignContent` (checked by grep). After the merge, locally: `pnpm --filter api typecheck` passed, `jest src/designs src/config` 9 suites and 249 tests passed, `pnpm --filter api lint` 0 errors, `pnpm openapi:check` passed. The merge commit was not covered by a new full local run of `pnpm test` or of the API e2e suites; CI covered them.
+- CI, run 44900063564 on the branch at `d3ede8d`: all 19 jobs succeeded. `origin/main` was then moved to `d3ede8d` by a fast-forward push; CI run 44900637762 on `main`: 19 of 19 jobs succeeded, and Playwright Comprehensive run 44900637712 on `main` succeeded.
+- Not run: `pnpm verify` as a whole, a browser journey that uploads an image.
 
 ## Remaining
 
@@ -127,8 +129,8 @@ Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 
 - Show the new error codes in the editor: today the save panel shows the message of the API. Mapping each code to its own wording is a UI ticket (not created).
 - Set `API_PUBLIC_URL` in the production secrets before deploying (the API will not start without it).
 - `DESIGN_SHARE_PUBLIC_ORIGIN` is also required in production but missing from `infra/runtime/secrets/.env.example` (seen, not changed here).
-- `thumbnailUrl` is still accepted as any string and only fetched by moderation when it is on our storage: out of scope here.
+- `thumbnailUrl` point of the first reviews is now moot: after the merge of TTW-237 neither design DTO accepts a client `thumbnailUrl` (the server sets the thumbnail path itself, checked with grep on both DTOs).
 
 ## Completion summary
 
-The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Branch pushed, CI green, not merged. See Remaining before closing the ticket.
+The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Merged into `main` at `d3ede8d` on 2026-11-21, CI green on the branch and on `main`. The branch is kept. What stays open is in Remaining: set `API_PUBLIC_URL` before deploying, the client decision on PENDING images, and a browser journey with a real upload.
