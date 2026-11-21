@@ -183,6 +183,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | ---- | --- | -------------------------------------------------------------------- | --- | -------------------------------------------------------------- | --------- | -------- | ------ | ---------------- |
 | [ ]  | 20  | [TTW-099](ttw-099-make-customer-uploads-private.md)                  | 3A  | Rendre les fichiers clients privés, avec des liens temporaires | 11.3, 9.7 | Élevé    | 8–14   | —                |
 | [ ]  | —   | [TTW-234](ttw-234-show-private-customer-images-on-shared-designs.md) | 3A  | Montrer les images clients privées sur les designs partagés    | 11.3      | Élevé    | 4–8    | TTW-099          |
+| [ ]  | —   | [TTW-237](ttw-237-make-design-thumbnails-private.md)                 | 3A  | Rendre privées les vignettes des designs                       | 11.3      | Élevé    | 6–10   | TTW-099          |
 | [x]  | 21  | [TTW-102](ttw-102-add-delete-undo-and-layers-to-the-workshop.md)     | 3A  | Supprimer un élément, annuler, liste des calques               | 3.3       | Standard | 10–16  | —                |
 | [x]  | —   | [TTW-233](ttw-233-reopen-saved-designs-in-the-workshop.md)           | 3A  | Rouvrir un design sauvegardé dans l'atelier (404 sur /edit)    | —         | Standard | —      | —                |
 | [ ]  | 22  | [TTW-100](ttw-100-validate-design-content-on-the-server.md)          | 3B  | Valider le contenu d'un design côté serveur                    | 3.7       | Élevé    | 10–16  | TTW-099          |

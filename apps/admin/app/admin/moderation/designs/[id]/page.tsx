@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdminShell } from '@/components/admin-shell';
 import { ModerationQueueNav } from '@/components/moderation-queue-nav';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import {
   getAdminDesign,
   moderateDesign,
@@ -264,10 +265,10 @@ export default function AdminModerationDesignDetailPage({
                 <CardTitle>Preview</CardTitle>
               </CardHeader>
               <CardContent>
-                {design.thumbnailUrl ? (
+                {designThumbnailSrc(design.thumbnailUrl) ? (
                   <div className="flex justify-center rounded-xl bg-gray-100 p-6">
                     <img
-                      src={design.thumbnailUrl}
+                      src={designThumbnailSrc(design.thumbnailUrl) as string}
                       alt={design.name}
                       className="max-h-80 w-auto object-contain"
                     />

@@ -76,4 +76,22 @@ describe('social preview helpers', () => {
 
     expect(preview).toBe('https://cdn.example.test/badge.jpg');
   });
+
+  it('uses the full API address of a private design thumbnail path for social previews (TTW-237)', () => {
+    const preview = pickFundraiserPreviewImage([
+      {
+        campaignProductId: 'cp-2',
+        productId: 'p-2',
+        product: { id: 'p-2', name: 'Hoodie', slug: 'hoodie' },
+        design: { id: 'd-2', name: 'Badge', thumbnailUrl: '/designs/d-2/thumbnail' },
+        baseAmountMinor: 800000,
+        currency: 'NGN',
+        priceDisclosure: 'before VAT',
+        options: [],
+        variants: [],
+      },
+    ]);
+
+    expect(preview).toBe('http://localhost:3001/v1/designs/d-2/thumbnail');
+  });
 });

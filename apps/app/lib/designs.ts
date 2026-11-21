@@ -122,13 +122,11 @@ export interface CreateDesignDto {
   name: string;
   productId: string;
   designData: DesignData;
-  thumbnailUrl?: string;
 }
 
 export interface UpdateDesignDto {
   name?: string;
   designData?: DesignData;
-  thumbnailUrl?: string;
 }
 
 // ---------------------------------------------------------------------------

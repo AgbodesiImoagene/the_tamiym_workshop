@@ -523,10 +523,6 @@
           "productId": {
             "example": "prod-1",
             "type": "string"
-          },
-          "thumbnailUrl": {
-            "example": "https://cdn.example.com/thumb.png",
-            "type": "string"
           }
         },
         "required": [
@@ -4130,10 +4126,6 @@
           },
           "name": {
             "example": "My Tee Design",
-            "type": "string"
-          },
-          "thumbnailUrl": {
-            "example": "https://cdn.example.com/thumb.png",
             "type": "string"
           }
         },
@@ -16770,10 +16762,6 @@
                   "productId": {
                     "example": "prod-1",
                     "type": "string"
-                  },
-                  "thumbnailUrl": {
-                    "example": "https://cdn.example.com/thumb.png",
-                    "type": "string"
                   }
                 },
                 "required": [
@@ -16917,10 +16905,6 @@
                   },
                   "name": {
                     "example": "My Tee Design",
-                    "type": "string"
-                  },
-                  "thumbnailUrl": {
-                    "example": "https://cdn.example.com/thumb.png",
                     "type": "string"
                   }
                 },
@@ -17143,6 +17127,48 @@
       }
     },
     "/v1/designs/{id}/thumbnail": {
+      "get": {
+        "operationId": "DesignsController_thumbnail",
+        "parameters": [
+          {
+            "description": "Design ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The thumbnail (WebP)."
+          },
+          "404": {
+            "description": "Unknown design, no thumbnail, or a design that is not APPROVED for a reader who is neither its owner nor an admin"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Read a design thumbnail (image bytes)",
+        "tags": [
+          "Designs"
+        ]
+      },
       "post": {
         "operationId": "DesignsController_uploadThumbnail",
         "parameters": [
@@ -17179,6 +17205,8 @@
                 "schema": {
                   "properties": {
                     "thumbnailUrl": {
+                      "description": "API path (relative to the API base) of the thumbnail",
+                      "example": "/designs/design-id/thumbnail",
                       "type": "string"
                     }
                   },
