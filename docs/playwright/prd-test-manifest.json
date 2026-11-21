@@ -198,6 +198,16 @@
       "tags": ["@app", "@critical"]
     },
     {
+      "id": "APP-WORKSHOP-FONTS",
+      "surface": "app",
+      "feature": "Design workshop offers only fonts it ships and renders them as themselves",
+      "prd_ref": "Design Workshop",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/design-workshop.fonts.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@app"]
+    },
+    {
       "id": "APP-CHECKOUT",
       "surface": "app",
       "feature": "Customer checkout address, quote and payment",

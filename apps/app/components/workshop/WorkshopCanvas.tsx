@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { imageCrossOrigin } from '@/lib/designs';
 import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
+import { isWorkshopFont, loadFontsForObjects } from '@/lib/workshop-fonts';
 import { createLayerHistory, type LayerHistory } from './layer-history';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,6 +26,11 @@ export interface WorkshopCanvasControls {
   moveLayer: (layerId: string, direction: 'up' | 'down') => boolean;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
+  /**
+   * Resolves once every font a text on the canvas is waiting for has arrived and the text
+   * has been measured and drawn again. The thumbnail waits for it.
+   */
+  fontsReady: () => Promise<void>;
   /** The canvas picture, for the thumbnail. */
   toDataURL: (options?: Record<string, unknown>) => string | null;
 }
@@ -122,6 +128,8 @@ export default function WorkshopCanvas({
   const restoringRef = useRef(false);
   const restoreQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingRestoresRef = useRef(0);
+  /** Fonts being waited for (TTW-103): the thumbnail waits for them via `fontsReady`. */
+  const pendingFontsRef = useRef<Set<Promise<void>>>(new Set());
 
   // The Fabric listeners live as long as the canvas: they read the latest callbacks here.
   const onLayersChangeRef = useRef(onLayersChange);
@@ -272,6 +280,44 @@ export default function WorkshopCanvas({
     [emitChange]
   );
 
+  /**
+   * TTW-103: a font downloads the first time a text uses it, so a text is first measured and
+   * drawn in the fallback font. When the font has arrived, forget the old measurements and
+   * draw the text again, so the screen, the thumbnail and what is saved use the same font.
+   * The new size is reported to the editor (so the saved width and height are the real ones)
+   * but is not an undo step; nothing is reported when the size did not change.
+   */
+  const redrawAfterFonts = useCallback(
+    (canvas: FabricCanvas, objects: FabricCanvas[]): Promise<void> => {
+      const work = (async () => {
+        try {
+          const texts = objects.filter((o) => isWorkshopFont(o.fontFamily));
+          if (!(await loadFontsForObjects(texts))) return;
+          if (fabricRef.current !== canvas) return; // the canvas was rebuilt while loading
+          const cache = fabricModuleRef.current?.cache;
+          applyBatch(
+            canvas,
+            () => {
+              texts.forEach((o) => {
+                cache?.clearFontCache?.(o.fontFamily);
+                o.initDimensions?.();
+                o.setCoords?.();
+                o.dirty = true;
+              });
+            },
+            false
+          );
+        } catch {
+          // A text that cannot be measured again keeps what it had; the editor goes on.
+        }
+      })();
+      pendingFontsRef.current.add(work);
+      void work.then(() => pendingFontsRef.current.delete(work));
+      return work;
+    },
+    [applyBatch]
+  );
+
   const addUserObjects = useCallback(
     (canvas: FabricCanvas, objects: FabricCanvas[]) => {
       objects.forEach((o) => {
@@ -296,8 +342,9 @@ export default function WorkshopCanvas({
       }
       canvas.requestRenderAll?.();
       canvas.renderAll?.();
+      void redrawAfterFonts(canvas, objects);
     },
-    [addUserObjects]
+    [addUserObjects, redrawAfterFonts]
   );
 
   const restoreSnapshot = useCallback(
@@ -317,9 +364,10 @@ export default function WorkshopCanvas({
         },
         false
       );
+      void redrawAfterFonts(canvas, objects);
       return true;
     },
-    [applyBatch, addUserObjects]
+    [applyBatch, addUserObjects, redrawAfterFonts]
   );
 
   const buildControls = useCallback(
@@ -379,6 +427,7 @@ export default function WorkshopCanvas({
           canvas.add(itext);
           canvas.setActiveObject(itext);
           canvas.requestRenderAll?.();
+          void redrawAfterFonts(canvas, [itext]);
         },
 
         async addImage(descriptor) {
@@ -438,6 +487,13 @@ export default function WorkshopCanvas({
           return true;
         },
 
+        async fontsReady() {
+          // A redraw can start another load, so look again until nothing is pending.
+          while (pendingFontsRef.current.size > 0) {
+            await Promise.all([...pendingFontsRef.current]);
+          }
+        },
+
         undo: () => step('undo'),
         redo: () => step('redo'),
 
@@ -450,7 +506,7 @@ export default function WorkshopCanvas({
         },
       };
     },
-    [applyBatch, emitChange, notifyHistory, restoreSnapshot]
+    [applyBatch, emitChange, notifyHistory, redrawAfterFonts, restoreSnapshot]
   );
 
   // Initialise and tear down Fabric canvas

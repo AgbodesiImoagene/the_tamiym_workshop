@@ -23,6 +23,9 @@ import {
   type FabricJson,
 } from '@/lib/designs';
 
+/** How long a thumbnail waits for fonts before it is taken anyway (TTW-103). */
+const FONTS_WAIT_MS = 3000;
+
 // Load WorkshopCanvas client-side only (Fabric.js requires a DOM)
 const WorkshopCanvas = dynamic(() => import('./WorkshopCanvas'), { ssr: false });
 
@@ -131,6 +134,16 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
 
   const captureThumbnail = useCallback(async (): Promise<Blob | null> => {
     try {
+      // TTW-103: the picture must show the fonts, not the fallback while they download.
+      // A font request that never answers must not block saving: wait a few seconds at most.
+      let giveUp: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        Promise.all([controlRef.current?.fontsReady?.(), document.fonts?.ready]),
+        new Promise((resolve) => {
+          giveUp = setTimeout(resolve, FONTS_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(giveUp);
       const dataUrl = controlRef.current?.toDataURL({
         format: 'webp',
         quality: 0.8,

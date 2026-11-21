@@ -12,19 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@tamiym/ui';
-
-const FONT_FAMILIES = [
-  'Arial',
-  'Georgia',
-  'Helvetica',
-  'Impact',
-  'Montserrat',
-  'Oswald',
-  'Playfair Display',
-  'Roboto',
-  'Times New Roman',
-  'Trebuchet MS',
-];
+import { DEFAULT_FONT_FAMILY, WORKSHOP_FONTS } from '@/lib/workshop-fonts';
 
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
 
@@ -47,7 +35,7 @@ interface TextToolProps {
  */
 export default function TextTool({ onAddText, disabled = false }: TextToolProps) {
   const [text, setText] = useState('Your text here');
-  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontFamily, setFontFamily] = useState(DEFAULT_FONT_FAMILY);
   const [fontSize, setFontSize] = useState(24);
   const [bold, setBold] = useState(false);
   const [italic, setItalic] = useState(false);
@@ -93,9 +81,9 @@ export default function TextTool({ onAddText, disabled = false }: TextToolProps)
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FONT_FAMILIES.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
+            {WORKSHOP_FONTS.map((f) => (
+              <SelectItem key={f.family} value={f.family} style={{ fontFamily: `"${f.family}"` }}>
+                {f.family}
               </SelectItem>
             ))}
           </SelectContent>
