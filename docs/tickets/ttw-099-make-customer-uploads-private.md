@@ -132,7 +132,7 @@ Handled after the first review (second commit):
 
 Still open:
 
-- Retention of rejected private files and of orphan objects: needs a business decision (how long a rejected upload is kept for appeals). Deleted accounts: TTW-120.
+- Retention of rejected private files and of orphan objects: done in TTW-235 (14 days after the latest moderation decision, kept while an appeal is open; 7 days for never-attached or stalled uploads). Deleted accounts: TTW-120.
 - Streamed S3 body is not destroyed when a client aborts (minor).
 - Play the workshop journey in a browser against MinIO: add an image, save, reload, thumbnail export. No Docker or MinIO on this machine.
 - Existing dev design assets stay `PUBLIC` and answer 404 on `/file`; no data migration was done (not in production).
