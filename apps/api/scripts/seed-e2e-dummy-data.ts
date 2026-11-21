@@ -100,6 +100,8 @@ const CHECKOUT_CUSTOMERS = [
   ['checkoutIdempotency', 'checkout-idempotency', '+2348000000014'],
   ['checkoutInstructions', 'checkout-instructions', '+2348000000015'],
   ['checkoutNote', 'checkout-note', '+2348000000016'],
+  // TTW-058: orders saved designs, then checks out.
+  ['designOrder', 'design-order', '+2348000000017'],
 ] as const;
 
 /** An image layer as the Workshop saves it: the stable API path of a customer upload. */
@@ -129,6 +131,7 @@ const IDS = {
     checkoutIdempotency: 'e2e-user-checkout-idempotency',
     checkoutInstructions: 'e2e-user-checkout-instructions',
     checkoutNote: 'e2e-user-checkout-note',
+    designOrder: 'e2e-user-design-order',
   },
   address: 'e2e-address-customer-main',
   addressUndeliverable: 'e2e-address-customer-undeliverable',

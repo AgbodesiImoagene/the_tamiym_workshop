@@ -4,13 +4,17 @@ import { CustomerDashboardShell, formatCurrency } from '@/components/customer-da
 import { customerAssets } from '@/lib/assets';
 import { ApiError, User, authApi } from '@/lib/auth';
 import { addCartItem } from '@/lib/cart-store';
+import { quoteOrder, type OrderQuote } from '@/lib/checkout';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
+import { getDesign } from '@/lib/designs';
+import { getUserAddresses } from '@/lib/profile';
 import { groupVariantsByColor, imagesForColor } from '@/lib/product-variants';
 import { getDashboardProductDetail, getDashboardProducts } from '@/lib/products';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 const MAX_UNTRACKED_QUANTITY = 999;
 const MAX_RELATED_PRODUCTS = 4;
@@ -25,11 +29,19 @@ function clampQuantity(raw: string, max: number | null) {
 /** Remounts per product so a related-product link starts with a clean selection. */
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
-  return <ProductDetailContent key={params.id} productId={params.id} />;
+  return (
+    <Suspense fallback={null}>
+      <ProductDetailContent key={params.id} productId={params.id} />
+    </Suspense>
+  );
 }
+
+type QuoteStatus = 'idle' | 'loading' | 'error' | 'no-address';
 
 function ProductDetailContent({ productId }: { productId: string }) {
   const router = useRouter();
+  // TTW-058: opened from a saved design, the page orders that design.
+  const designId = useSearchParams().get('designId');
 
   const [user, setUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -37,6 +49,10 @@ function ProductDetailContent({ productId }: { productId: string }) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [cartMessage, setCartMessage] = useState<string | null>(null);
+  const [quote, setQuote] = useState<OrderQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>('idle');
+  // A quote that comes back after the quantities changed must not be shown.
+  const quoteRequestId = useRef(0);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -61,6 +77,14 @@ function ProductDetailContent({ productId }: { productId: string }) {
     enabled: !!user && !!productId,
     retry: false,
   });
+
+  const designQuery = useQuery({
+    queryKey: ['dashboard-design', designId],
+    queryFn: () => getDesign(designId as string),
+    enabled: !!user && !!designId,
+    retry: false,
+  });
+  const design = designQuery.data;
 
   const product = productQuery.data;
   const categorySlug = product?.category?.slug;
@@ -94,6 +118,56 @@ function ProductDetailContent({ productId }: { productId: string }) {
   );
   const totalQuantity = chosen.reduce((sum, entry) => sum + entry.quantity, 0);
 
+  // Why the design cannot be ordered here, or null when it can (or when there is none).
+  const designError = designId
+    ? designQuery.isError
+      ? (designQuery.error as ApiError | null)?.statusCode === 404
+        ? 'This design could not be found.'
+        : 'We could not load this design.'
+      : design && product && design.productId !== product.id
+        ? `"${design.name}" is not a design of this product.`
+        : design?.moderationStatus === 'REJECTED'
+          ? `"${design.name}" was rejected and cannot be ordered.`
+          : null
+    : null;
+  const designPending = !!designId && !designError && !design;
+
+  const changeQuantities = () => {
+    quoteRequestId.current += 1;
+    setCartMessage(null);
+    setQuote(null);
+    setQuoteStatus('idle');
+  };
+
+  const getPrice = async () => {
+    if (!designId || totalQuantity === 0) return;
+    const requestId = ++quoteRequestId.current;
+    setQuote(null);
+    setQuoteStatus('loading');
+    try {
+      const addresses = await getUserAddresses();
+      if (requestId !== quoteRequestId.current) return;
+      const address = addresses.find((entry) => entry.isDefault) ?? addresses[0];
+      if (!address) {
+        setQuoteStatus('no-address');
+        return;
+      }
+      const result = await quoteOrder({
+        shippingAddressId: address.id,
+        items: chosen.map(({ choice, quantity }) => ({
+          variantId: choice.variantId,
+          quantity,
+          designId,
+        })),
+      });
+      if (requestId !== quoteRequestId.current) return;
+      setQuote(result);
+      setQuoteStatus('idle');
+    } catch {
+      if (requestId === quoteRequestId.current) setQuoteStatus('error');
+    }
+  };
+
   const related = (listQuery.data ?? [])
     .filter(
       (entry) =>
@@ -105,7 +179,10 @@ function ProductDetailContent({ productId }: { productId: string }) {
 
   const addToCart = () => {
     if (!product || totalQuantity === 0) return;
+    const designImage = designThumbnailSrc(design?.thumbnailUrl);
     for (const { group, choice, quantity } of chosen) {
+      // The quote (when asked for) includes the design's view surcharge. Display only: checkout quotes again.
+      const quoted = quote?.items.find((line) => line.variantId === choice.variantId);
       addCartItem({
         productId: product.id,
         productName: product.name,
@@ -113,12 +190,14 @@ function ProductDetailContent({ productId }: { productId: string }) {
         variantName: choice.variantName,
         optionSummary: choice.optionSummary,
         quantity,
-        unitPrice: choice.unitPrice,
+        unitPrice: quoted?.unitFinalPrice ?? choice.unitPrice,
         currency: choice.currency,
-        imageUrl: imagesForColor(product, group)[0]?.url ?? null,
+        imageUrl: designImage ?? imagesForColor(product, group)[0]?.url ?? null,
+        ...(design ? { designId: design.id, designName: design.name } : {}),
       });
     }
     setQuantities({});
+    changeQuantities();
     setCartMessage(
       totalQuantity === 1
         ? '1 item was added to your cart.'
@@ -215,7 +294,43 @@ function ProductDetailContent({ productId }: { productId: string }) {
                   ) : null}
                 </div>
 
-                {!canBuy ? (
+                {designId ? (
+                  <div className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3">
+                    {design?.thumbnailUrl && designThumbnailSrc(design.thumbnailUrl) ? (
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                        <Image
+                          src={designThumbnailSrc(design.thumbnailUrl) as string}
+                          alt={design.name}
+                          fill
+                          // Private picture: loaded by the browser with the session cookie.
+                          unoptimized
+                          className="object-contain"
+                          sizes="56px"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Ordering your design</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {design && !designError ? design.name : designPending ? 'Loading…' : ''}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {designError ? (
+                  <div className="space-y-3">
+                    <p role="alert" className="text-sm text-destructive">
+                      {designError}
+                    </p>
+                    <Link
+                      href="/dashboard/design"
+                      className="text-sm font-semibold text-primary hover:underline"
+                    >
+                      Back to my designs
+                    </Link>
+                  </div>
+                ) : designPending ? null : !canBuy ? (
                   <p className="rounded-2xl border border-dashed border-border px-5 py-4 text-sm text-muted-foreground">
                     This product is not available to order yet.
                   </p>
@@ -270,7 +385,7 @@ function ProductDetailContent({ productId }: { productId: string }) {
                               disabled={!choice.purchasable}
                               value={quantities[choice.variantId] ?? 0}
                               onChange={(event) => {
-                                setCartMessage(null);
+                                changeQuantities();
                                 setQuantities((current) => ({
                                   ...current,
                                   [choice.variantId]: clampQuantity(
@@ -300,6 +415,62 @@ function ProductDetailContent({ productId }: { productId: string }) {
                       <p className="text-sm text-muted-foreground">
                         Choose a quantity for at least one size.
                       </p>
+                    ) : null}
+                    {designId ? (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => void getPrice()}
+                          disabled={totalQuantity === 0 || quoteStatus === 'loading'}
+                          className="rounded-full border border-border px-6 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+                        >
+                          Get price
+                        </button>
+                        {quote ? (
+                          <div className="space-y-1 text-sm text-foreground">
+                            <ul className="space-y-1">
+                              {chosen.map(({ choice }) => {
+                                const line = quote.items.find(
+                                  (entry) => entry.variantId === choice.variantId
+                                );
+                                return line ? (
+                                  <li key={choice.variantId} className="flex justify-between gap-4">
+                                    <span>
+                                      {choice.sizeLabel} × {line.quantity}
+                                    </span>
+                                    <span>
+                                      {formatCurrency(line.unitFinalPrice, quote.currency)} each
+                                    </span>
+                                  </li>
+                                ) : null;
+                              })}
+                            </ul>
+                            <p className="font-semibold">
+                              Subtotal: {formatCurrency(quote.subtotalAmount, quote.currency)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Delivery and tax are added at checkout.
+                            </p>
+                          </div>
+                        ) : null}
+                        {quoteStatus === 'no-address' ? (
+                          <p role="status" className="text-sm text-muted-foreground">
+                            Add a{' '}
+                            <Link
+                              href="/dashboard/settings"
+                              className="font-semibold text-primary hover:underline"
+                            >
+                              delivery address
+                            </Link>{' '}
+                            to see the price.
+                          </p>
+                        ) : null}
+                        {quoteStatus === 'error' ? (
+                          <p role="alert" className="text-sm text-destructive">
+                            We could not get the price. Try again.
+                          </p>
+                        ) : null}
+                      </div>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-4">
                       <button

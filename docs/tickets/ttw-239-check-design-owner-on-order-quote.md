@@ -1,7 +1,7 @@
 # TTW-239 — Check the design owner on the standard order quote
 
 **Epic:** 3 — Order and print the customer's design\
-**Status:** Implemented, independently reviewed (PASS), committed locally, not pushed\
+**Status:** Complete\
 **Risk:** High (authorization)\
 **Blocked by:** None\
 **Blocks:** None
@@ -124,4 +124,4 @@ After the fix:
 
 Deviations: the `POST /orders` Swagger text was left alone (the TTW-058 branch edits it); the `DESIGN_REJECTED` check did not exist on `main` (it is in TTW-058, commit 22ea4dc), so this ticket adds it to both paths. When TTW-058 is merged (checked by the reviewer with `git merge-tree`, no real merge yet), two files conflict: `orders.service.ts` (delete the old method: the `DESIGN_REJECTED` rule of TTW-058 is identical, same status, code and message) and `docs/orders/ttw-033-interim-policy.md` (keep both sections). The controller, the specs and the OpenAPI files merge without conflict, and the `POST /orders` 400 text is already written by TTW-058, so nothing to add. After the merge, remove the `ModerationStatus` import that TTW-058 adds to `orders.service.ts`: it is unused once the method is gone, and lint fails on it.
 
-Remaining: the merge with TTW-058 as described above; not pushed.
+Merged into `main` on 2026-11-21 (TTW-239 at `4a0e5c5`, TTW-058 at `dc9820d`) and pushed. The runs on `main` for `dc9820d` both succeeded: `CI` (run 44914037368) and `Playwright Comprehensive` (run 44914037422). The merge with TTW-058 was done as described above (two conflicts, one unused import removed). Remaining: `organizerCostBasis` in the campaign quote (see Implementation reviews), if it is not wanted.

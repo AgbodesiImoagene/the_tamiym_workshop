@@ -585,6 +585,11 @@ export default function DashboardCheckoutPage() {
                       <p className="text-black/60">
                         {item.variantName} x {item.quantity}
                       </p>
+                      {item.designId ? (
+                        <p className="text-black/60">
+                          Your design: {item.designName || 'Saved design'}
+                        </p>
+                      ) : null}
                     </div>
                     <span className="font-semibold text-black">
                       {formatCurrency(item.unitPrice * item.quantity, item.currency)}

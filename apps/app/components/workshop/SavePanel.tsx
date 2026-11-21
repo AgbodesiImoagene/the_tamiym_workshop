@@ -1,10 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { Input, Label, Skeleton } from '@tamiym/ui';
 import { Button } from '@tamiym/ui';
 
 interface SavePanelProps {
   designId?: string;
+  /** Product of the design: where "Order this design" leads. */
+  productId?: string;
   designName: string;
   isSaving: boolean;
   onNameChange: (name: string) => void;
@@ -16,7 +19,14 @@ interface SavePanelProps {
  * Panel with a design name input and Save / Auto-save indicator.
  * The parent component owns saving state; this is a pure UI shell.
  */
-export default function SavePanel({ designName, isSaving, onNameChange, onSave }: SavePanelProps) {
+export default function SavePanel({
+  designId,
+  productId,
+  designName,
+  isSaving,
+  onNameChange,
+  onSave,
+}: SavePanelProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-zinc-900">Save Design</h3>
@@ -42,6 +52,15 @@ export default function SavePanel({ designName, isSaving, onNameChange, onSave }
       <Button size="sm" onClick={onSave} disabled={isSaving || !designName.trim()}>
         {isSaving ? 'Saving…' : 'Save'}
       </Button>
+
+      {designId && productId && !isSaving ? (
+        <Link
+          href={`/dashboard/products/${productId}?designId=${designId}`}
+          className="text-center text-sm font-semibold text-primary hover:underline"
+        >
+          Order this design
+        </Link>
+      ) : null}
     </div>
   );
 }

@@ -149,6 +149,14 @@ export default function DashboardDesignPage() {
                           >
                             Edit
                           </Link>
+                          {design.moderationStatus !== 'REJECTED' ? (
+                            <Link
+                              href={`/dashboard/products/${design.productId}?designId=${design.id}`}
+                              className="rounded-lg border border-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50"
+                            >
+                              Order
+                            </Link>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => duplicateMutation.mutate(design.id)}
