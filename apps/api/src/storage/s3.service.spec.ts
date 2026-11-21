@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -173,5 +174,69 @@ describe('S3Service private objects (TTW-099)', () => {
     );
     const command = sendSpy.mock.calls[0][0] as PutObjectCommand;
     expect(command.input.Bucket).toBe('public-bucket');
+  });
+});
+
+describe('S3Service public bucket clean-up (TTW-237)', () => {
+  let sendSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    sendSpy = jest.spyOn(S3Client.prototype, 'send');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('lists every key under a prefix of the public bucket, following pages', async () => {
+    sendSpy
+      .mockResolvedValueOnce({
+        Contents: [{ Key: 'thumbnails/a/thumb.webp' }, {}],
+        IsTruncated: true,
+        NextContinuationToken: 'next',
+      } as never)
+      .mockResolvedValueOnce({
+        Contents: [{ Key: 'thumbnails/b/thumb.png' }],
+        IsTruncated: false,
+      } as never);
+
+    const keys = await makeService().listObjectKeys('thumbnails/');
+
+    expect(keys).toEqual(['thumbnails/a/thumb.webp', 'thumbnails/b/thumb.png']);
+    const first = sendSpy.mock.calls[0][0] as ListObjectsV2Command;
+    const second = sendSpy.mock.calls[1][0] as ListObjectsV2Command;
+    expect(first.input).toMatchObject({
+      Bucket: 'public-bucket',
+      Prefix: 'thumbnails/',
+    });
+    expect(second.input.ContinuationToken).toBe('next');
+  });
+
+  it('fails when the listing fails, and when no public bucket is configured', async () => {
+    sendSpy.mockRejectedValue(new Error('down'));
+    await expect(makeService().listObjectKeys('thumbnails/')).rejects.toThrow(
+      InternalServerErrorException,
+    );
+    await expect(
+      makeService({ S3_BUCKET: undefined }).listObjectKeys('thumbnails/'),
+    ).rejects.toThrow(InternalServerErrorException);
+  });
+
+  it('deletes one object of the public bucket, and fails closed otherwise', async () => {
+    sendSpy.mockResolvedValue({} as never);
+    await makeService().deleteObject('thumbnails/a/thumb.webp');
+    const command = sendSpy.mock.calls[0][0] as DeleteObjectCommand;
+    expect(command.input).toEqual({
+      Bucket: 'public-bucket',
+      Key: 'thumbnails/a/thumb.webp',
+    });
+
+    sendSpy.mockRejectedValue(new Error('down'));
+    await expect(makeService().deleteObject('k')).rejects.toThrow(
+      InternalServerErrorException,
+    );
+    await expect(
+      makeService({ S3_BUCKET: undefined }).deleteObject('k'),
+    ).rejects.toThrow(InternalServerErrorException);
   });
 });

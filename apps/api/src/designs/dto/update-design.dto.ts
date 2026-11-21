@@ -15,12 +15,4 @@ export class UpdateDesignDto {
   @IsOptional()
   @IsObject()
   designData?: Record<string, unknown>;
-
-  @ApiProperty({
-    example: 'https://cdn.example.com/thumb.png',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  thumbnailUrl?: string;
 }

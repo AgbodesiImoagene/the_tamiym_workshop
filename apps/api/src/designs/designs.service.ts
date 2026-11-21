@@ -13,6 +13,7 @@ import {
   ModerationActorKind,
   ModerationStatus,
   ModerationSubjectType,
+  UserRole,
 } from '../generated/prisma/enums';
 import {
   aiReasonCodesForOutcome,
@@ -20,6 +21,16 @@ import {
   MODERATION_REASON,
 } from '../moderation/moderation.constants';
 import { S3Service } from '../storage/s3.service';
+import sharp from 'sharp';
+import { createHash } from 'node:crypto';
+import type { Readable } from 'node:stream';
+import { identifyImageBuffer } from '../media/image-identify';
+import { MEDIA_SHARP_LIMIT_INPUT_PIXELS } from '../media/media.constants';
+import {
+  DESIGN_THUMBNAIL_CONTENT_TYPE,
+  designThumbnailKey,
+  designThumbnailPath,
+} from './design-thumbnail';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
@@ -49,6 +60,23 @@ type DesignDataViews = Record<
   }
 >;
 
+const STATUS_SEVERITY: Record<ModerationStatus, number> = {
+  [ModerationStatus.APPROVED]: 0,
+  [ModerationStatus.PENDING]: 1,
+  [ModerationStatus.FLAGGED]: 2,
+  [ModerationStatus.REJECTED]: 3,
+};
+
+/** The stricter of two moderation statuses (APPROVED < PENDING < FLAGGED < REJECTED). */
+function stricterStatus(
+  current: ModerationStatus,
+  incoming: ModerationStatus,
+): ModerationStatus {
+  return STATUS_SEVERITY[incoming] > STATUS_SEVERITY[current]
+    ? incoming
+    : current;
+}
+
 @Injectable()
 export class DesignsService {
   private readonly logger = new Logger(DesignsService.name);
@@ -61,32 +89,6 @@ export class DesignsService {
     private adminNotify: AdminNotifyService,
     private config: ConfigService,
   ) {}
-
-  /**
-   * Return true if `url` originates from our own S3 storage.
-   * Any other URL must not be fetched by the moderation service (SSRF risk).
-   */
-  private isTrustedMediaUrl(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      const publicUrl = this.config.get<string>('S3_PUBLIC_URL') ?? '';
-      if (publicUrl) {
-        const base = new URL(publicUrl);
-        if (parsed.hostname === base.hostname) return true;
-      }
-      const bucket = this.config.get<string>('S3_BUCKET') ?? '';
-      if (
-        bucket &&
-        (parsed.hostname === `${bucket}.s3.amazonaws.com` ||
-          parsed.hostname.endsWith('.amazonaws.com'))
-      ) {
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
 
   /**
    * Validate designData is a non-null object (optional: version, views).
@@ -212,30 +214,22 @@ export class DesignsService {
   }
 
   /**
-   * Run AI moderation on a design's text layers and thumbnail.
-   * Returns the moderation status and notes to store on the Design record.
+   * Run AI moderation on a design's text layers and, when given, its thumbnail.
+   * The picture is sent inline as a data URL: no link, public or signed, leaves the
+   * system (TTW-099, TTW-237). Returns the status and notes to store on the Design.
    */
   private async moderateDesign(
     designData: Record<string, unknown>,
-    thumbnailUrl?: string | null,
+    thumbnail?: Buffer | null,
   ): Promise<{
     moderationStatus: ModerationStatus;
     moderationNotes: string;
     maxScore: number;
   }> {
     const text = this.extractTextFromDesignData(designData);
-
-    // Only pass the imageUrl to moderation when it originates from our own
-    // S3 bucket. Accepting arbitrary caller-supplied URLs would let users
-    // trigger SSRF from the moderation worker.
-    let imageUrl: string | undefined;
-    if (thumbnailUrl && this.isTrustedMediaUrl(thumbnailUrl)) {
-      imageUrl = thumbnailUrl;
-    } else if (thumbnailUrl) {
-      this.logger.warn(
-        `Skipping thumbnail moderation: URL "${thumbnailUrl}" is not from a trusted host`,
-      );
-    }
+    const imageUrl = thumbnail
+      ? `data:${DESIGN_THUMBNAIL_CONTENT_TYPE};base64,${thumbnail.toString('base64')}`
+      : undefined;
 
     if (!text && !imageUrl) {
       // Nothing to screen — leave at PENDING for human review.
@@ -289,7 +283,7 @@ export class DesignsService {
     }
 
     const { moderationStatus, moderationNotes, maxScore } =
-      await this.moderateDesign(dto.designData, dto.thumbnailUrl);
+      await this.moderateDesign(dto.designData);
 
     const productInclude = {
       product: { select: { id: true, name: true, slug: true } },
@@ -302,7 +296,6 @@ export class DesignsService {
           productId: dto.productId,
           name: dto.name,
           designData: dto.designData as object,
-          thumbnailUrl: dto.thumbnailUrl,
           moderationStatus,
         },
         include: productInclude,
@@ -316,7 +309,7 @@ export class DesignsService {
         maxScore,
         revisionHash: hashRevision({
           designData: dto.designData,
-          thumbnailUrl: dto.thumbnailUrl ?? null,
+          thumbnailUrl: null,
         }),
         reasonCodes: aiReasonCodesForOutcome(moderationStatus, moderationNotes),
         withdrawPendingAppeals: false,
@@ -404,7 +397,7 @@ export class DesignsService {
 
   /**
    * Update a design (customer, own only). Re-runs AI moderation if designData
-   * or thumbnailUrl changes.
+   * changes. The thumbnail is never set here: only `uploadThumbnail` writes it (TTW-237).
    */
   async update(userId: string, id: string, dto: UpdateDesignDto) {
     const existing = await this.findOne(userId, id);
@@ -415,8 +408,7 @@ export class DesignsService {
       throw new BadRequestException('designData must be a valid object');
     }
 
-    const contentChanged =
-      dto.designData !== undefined || dto.thumbnailUrl !== undefined;
+    const contentChanged = dto.designData !== undefined;
 
     const productInclude = {
       product: { select: { id: true, name: true, slug: true } },
@@ -427,12 +419,8 @@ export class DesignsService {
         string,
         unknown
       >;
-      const newThumb =
-        dto.thumbnailUrl !== undefined
-          ? dto.thumbnailUrl
-          : existing.thumbnailUrl;
       const { moderationStatus, moderationNotes, maxScore } =
-        await this.moderateDesign(newData, newThumb);
+        await this.moderateDesign(newData);
 
       const updated = await this.prisma.$transaction(async (tx) => {
         await tx.design.update({
@@ -441,9 +429,6 @@ export class DesignsService {
             ...(dto.name && { name: dto.name }),
             ...(dto.designData !== undefined && {
               designData: dto.designData as object,
-            }),
-            ...(dto.thumbnailUrl !== undefined && {
-              thumbnailUrl: dto.thumbnailUrl,
             }),
           },
         });
@@ -456,10 +441,7 @@ export class DesignsService {
           maxScore,
           revisionHash: hashRevision({
             designData: dto.designData ?? existing.designData,
-            thumbnailUrl:
-              dto.thumbnailUrl !== undefined
-                ? dto.thumbnailUrl
-                : existing.thumbnailUrl,
+            thumbnailUrl: existing.thumbnailUrl,
           }),
           reasonCodes: aiReasonCodesForOutcome(
             moderationStatus,
@@ -575,16 +557,19 @@ export class DesignsService {
   }
 
   /**
-   * Upload a thumbnail image for a design. The file is stored directly in S3
-   * under `thumbnails/{designId}/thumb.webp`. No MediaAsset record is created —
-   * this is a system-generated derivative, not user artwork.
+   * Upload the thumbnail of a design (TTW-237). The picture is verified from its bytes,
+   * re-encoded as WebP (which also drops any metadata) and written to the PRIVATE bucket
+   * under one fixed key per design: a new upload replaces the old one. The design keeps
+   * only the stable API path. The new picture is moderated from its bytes together with
+   * the text of the design, and the decision is recorded, so a replaced picture can never
+   * inherit an earlier APPROVED.
    */
   async uploadThumbnail(
     userId: string,
     id: string,
     file: { buffer: Buffer; mimetype: string },
   ): Promise<{ thumbnailUrl: string }> {
-    await this.findOne(userId, id);
+    const design = await this.findOne(userId, id);
 
     const allowed = ['image/webp', 'image/png', 'image/jpeg'];
     if (!allowed.includes(file.mimetype)) {
@@ -593,30 +578,119 @@ export class DesignsService {
       );
     }
 
-    const ext =
-      file.mimetype === 'image/webp'
-        ? 'webp'
-        : file.mimetype === 'image/jpeg'
-          ? 'jpg'
-          : 'png';
-    const key = `thumbnails/${id}/thumb.${ext}`;
-    const { url } = await this.s3.uploadObject({
-      key,
-      buffer: file.buffer,
-      contentType: file.mimetype,
+    // The client's content type is only a hint: the bytes decide.
+    let webp: Buffer;
+    try {
+      const identified = await identifyImageBuffer(file.buffer);
+      if (!allowed.includes(identified.mimeType)) {
+        throw new Error('unsupported');
+      }
+      webp = await sharp(file.buffer, {
+        failOn: 'error',
+        limitInputPixels: MEDIA_SHARP_LIMIT_INPUT_PIXELS,
+      })
+        .rotate()
+        .webp({ quality: 85 })
+        .toBuffer();
+    } catch {
+      throw new BadRequestException(
+        'Thumbnail must be a PNG, JPEG, or WebP image',
+      );
+    }
+
+    const ai = await this.moderateDesign(
+      design.designData as Record<string, unknown>,
+      webp,
+    );
+    // A new picture can only tighten the status, never lift it: an admin's REJECTED or a
+    // pending/flagged review is not undone by the AI scoring a replacement picture.
+    const outcome = stricterStatus(
+      design.moderationStatus,
+      ai.moderationStatus,
+    );
+
+    const thumbnailUrl = designThumbnailPath(id);
+    // The status is committed BEFORE the picture replaces the old object, so a visitor can
+    // never read a new, unscreened picture of a design that still shows as APPROVED.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.design.update({ where: { id }, data: { thumbnailUrl } });
+      if (outcome !== design.moderationStatus) {
+        await this.moderationDecisions.recordAiDecisionInTx(tx, {
+          subjectType: ModerationSubjectType.DESIGN,
+          subjectId: id,
+          outcome,
+          notes: ai.moderationNotes,
+          maxScore: ai.maxScore,
+          revisionHash: hashRevision({
+            designData: design.designData,
+            thumbnailUrl: `sha256:${createHash('sha256').update(webp).digest('hex')}`,
+          }),
+          reasonCodes: aiReasonCodesForOutcome(outcome, ai.moderationNotes),
+          withdrawPendingAppeals: true,
+        });
+      }
     });
 
-    await this.prisma.design.update({
-      where: { id },
-      data: { thumbnailUrl: url },
+    await this.s3.uploadPrivateObject({
+      key: designThumbnailKey(id),
+      buffer: webp,
+      contentType: DESIGN_THUMBNAIL_CONTENT_TYPE,
     });
 
-    return { thumbnailUrl: url };
+    return { thumbnailUrl };
   }
 
   /**
-   * Clone a design (own only). The new design shares the same designData and
-   * thumbnailUrl; all DesignView rows are cloned; moderation resets to PENDING.
+   * Bytes of a design thumbnail (TTW-237). The owner and admins always read it; anyone
+   * else, signed in or not, only while the design is APPROVED. The rule runs on every
+   * request, so rejecting a design closes its picture at once. Every denial is the same
+   * 404 (unknown design, no thumbnail, not allowed, storage failure): nothing to enumerate.
+   */
+  async openThumbnail(
+    actor: { id: string; role: UserRole } | null,
+    id: string,
+  ): Promise<{
+    stream: Readable;
+    contentLength?: number;
+    contentType: string;
+  }> {
+    const design = await this.prisma.design.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        moderationStatus: true,
+        thumbnailUrl: true,
+      },
+    });
+    const privileged =
+      actor !== null &&
+      (actor.role === UserRole.ADMIN || actor.id === design?.userId);
+    if (
+      !design ||
+      !design.thumbnailUrl ||
+      (!privileged && design.moderationStatus !== ModerationStatus.APPROVED)
+    ) {
+      throw new NotFoundException('Thumbnail not found');
+    }
+    try {
+      const { stream, contentLength } = await this.s3.getPrivateObjectStream(
+        designThumbnailKey(id),
+      );
+      return {
+        stream,
+        contentLength,
+        contentType: DESIGN_THUMBNAIL_CONTENT_TYPE,
+      };
+    } catch {
+      this.logger.warn(`Thumbnail object unavailable for design ${id}`);
+      throw new NotFoundException('Thumbnail not found');
+    }
+  }
+
+  /**
+   * Clone a design (own only). The new design shares the same designData and a
+   * copy of the thumbnail picture; all DesignView rows are cloned; moderation resets to PENDING.
    * DesignAsset refs inside fabricJson are shared — no re-upload needed.
    */
   async duplicate(userId: string, id: string) {
@@ -639,7 +713,6 @@ export class DesignsService {
           productId: original.productId,
           name: `Copy of ${original.name}`,
           designData: original.designData as object,
-          thumbnailUrl: original.thumbnailUrl,
           moderationStatus: ModerationStatus.PENDING,
         },
         include: productInclude,
@@ -678,6 +751,35 @@ export class DesignsService {
         include: productInclude,
       });
     });
+
+    // The copy gets its own picture and its own path (the key is per design).
+    if (original.thumbnailUrl) {
+      try {
+        const bytes = await this.s3.getPrivateObjectBuffer(
+          designThumbnailKey(id),
+        );
+        await this.s3.uploadPrivateObject({
+          key: designThumbnailKey(cloned.id),
+          buffer: bytes,
+          contentType: DESIGN_THUMBNAIL_CONTENT_TYPE,
+        });
+        const withThumbnail = await this.prisma.design.update({
+          where: { id: cloned.id },
+          data: { thumbnailUrl: designThumbnailPath(cloned.id) },
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+          },
+        });
+        return this.toOwnerDesign(withThumbnail);
+      } catch (error) {
+        // A missing picture never blocks the copy: the editor uploads a new one at save.
+        this.logger.warn(
+          `Thumbnail of design ${id} not copied to ${cloned.id}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
 
     return this.toOwnerDesign(cloned);
   }

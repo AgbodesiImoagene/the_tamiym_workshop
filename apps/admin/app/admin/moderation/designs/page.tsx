@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdminShell } from '@/components/admin-shell';
 import { ModerationQueueNav } from '@/components/moderation-queue-nav';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import {
   getAdminDesigns,
   moderateDesign,
@@ -122,7 +123,7 @@ function QuickActions({ design, onDone }: { design: AdminDesign; onDone: () => v
 function DesignRow({ design, onRefresh }: { design: AdminDesign; onRefresh: () => void }) {
   const badge = MODERATION_STATUS_BADGE[design.moderationStatus];
   const thumbUrl =
-    design.thumbnailUrl ??
+    designThumbnailSrc(design.thumbnailUrl) ??
     `https://placehold.co/56x56/f3f4f6/9ca3af?text=${encodeURIComponent(design.name[0] ?? '?')}`;
 
   return (

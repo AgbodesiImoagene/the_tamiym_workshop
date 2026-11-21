@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { PublicFundraiserProduct } from '@/lib/fundraisers';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import { absoluteWebUrl } from '@/lib/site';
 import { getDefaultOgAsset } from './registry';
 
@@ -18,7 +19,7 @@ export function pickFundraiserPreviewImage(
   products: readonly PublicFundraiserProduct[]
 ): string | null {
   for (const product of products) {
-    const url = product.design?.thumbnailUrl?.trim();
+    const url = designThumbnailSrc(product.design?.thumbnailUrl);
     if (url) {
       return url;
     }
