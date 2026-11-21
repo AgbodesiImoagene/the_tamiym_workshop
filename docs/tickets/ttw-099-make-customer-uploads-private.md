@@ -1,7 +1,7 @@
 # TTW-099 — Make customer uploads private with signed links
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not pushed, CI not run)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-100, TTW-101, TTW-120
@@ -130,12 +130,20 @@ Handled after the first review (second commit):
 - Private bucket: the infra already has a private `<prefix>-originals` bucket (ACL private), so no new OpenTofu resource. `S3_PRIVATE_BUCKET` maps to it (documented in `infra/runtime/secrets/README.md`), and `validateEnv` now refuses to start in production when `S3_BUCKET` is set without a distinct, non-placeholder `S3_PRIVATE_BUCKET` (`env-validation.spec.ts`, 4 tests).
 - Infected private files: the processor now deletes the stored object and the ORIGINAL derivative row and clears `originalKey` (`MediaProcessor.purgeInfectedOriginal`, `S3Service.deletePrivateObject`). If the deletion fails the key is kept and the error logged. A scanner outage (scan FAILED) and a moderation rejection are deliberately NOT purged: the first can be rescanned, the second may be appealed.
 
-Still open:
+Still open (none blocks closing this ticket):
 
-- Retention of rejected private files and of orphan objects: done in TTW-235 (14 days after the latest moderation decision, kept while an appeal is open; 7 days for never-attached or stalled uploads). Deleted accounts: TTW-120.
 - Streamed S3 body is not destroyed when a client aborts (minor).
-- Play the workshop journey in a browser against MinIO: add an image, save, reload, thumbnail export. No Docker or MinIO on this machine.
 - Existing dev design assets stay `PUBLIC` and answer 404 on `/file`; no data migration was done (not in production).
+- Done since: retention of rejected and orphan files (TTW-235), the shared page (TTW-234, TTW-236), design thumbnails (TTW-237), the browser run with MinIO (see "Merged into main"). Deleted accounts: TTW-120.
+
+## Merged into main
+
+- Branch CI, commit `bb52451`: run [44818250392](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44818250392), success. The first run, [44817377710](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44817377710), failed only on the 3-minute limit of "Run API e2e (pass 1)" (58 suites, 331 tests passed, 177 s); the limit was raised to 5 minutes in `.github/workflows/ci.yml`.
+- Branch CI after merging `main` (TTW-102, TTW-233), commit `e281060`: run [44819634486](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44819634486), success.
+- Merged into `main` by fast-forward (`git push origin HEAD:main`), commit `dc97ce7`: run [44820798891](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44820798891), success.
+- Browser run on 2026-11-20 against MinIO (`bitnamilegacy/minio`, a public and a private bucket) and a throwaway database: image added in the workshop (upload 201, read through `/file` 200), design saved (thumbnail export 200), page reloaded (image back). Bucket check: original, display and thumb only in the private bucket; the direct bucket address answered 403 and the API without a session 401. `/link` returned a signed link (300 s, 200) and a tampered signature gave 403. The 5-minute expiry itself was not waited for.
+- Found in that run and handled elsewhere: the shared page (TTW-236), the public design thumbnail (TTW-237), `docker-compose.yml` pulls `minio/minio`, which is no longer on Docker Hub (not changed here).
+- CI on `main` at `f5a70db` (all 19 jobs, including `Playwright Comprehensive UAT`): run [44894303993](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44894303993), success. That commit contains this ticket.
 
 ## Completion summary
 

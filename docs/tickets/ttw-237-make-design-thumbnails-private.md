@@ -1,7 +1,7 @@
 # TTW-237 — Make design thumbnails private
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not pushed, CI not run, no browser run against a real object store)\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-099 (merged on `main`). Policy confirmation by the client: see "Décisions à obtenir" below.\
 **Blocks:** None
@@ -166,6 +166,14 @@ Not verified: browser run with a real object store (no MinIO on this machine); t
 ## Fix after merge (2026-11-21)
 
 The CI of `main` (run 44893074471, commit `0699870`) failed on `Playwright Comprehensive UAT`, a job that runs only on `main`: `GET /v1/designs/<id>/thumbnail` answered an error and Chrome blocked it (`net::ERR_BLOCKED_BY_ORB`) on the admin moderation pages. Cause: `DesignsService.uploadThumbnail` wrote `thumbnailUrl` in the database before the storage write. When the write failed (the CI has no object store) the row kept a path to a picture that does not exist; a real storage outage would do the same. Fix: the path is now written only after the picture is stored. Tests first: two new cases in `designs.service.spec.ts` (no path when the storage write fails; path set after the upload), failing before the fix.
+
+## Merged into main
+
+- Branch CI on the integration branch `codex/ttw-236-237-integration`, commit `1f97e4f`: run [44889303898](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889303898), success.
+- Merged into `main` by fast-forward, commit `1f97e4f`: run [44889795916](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889795916), success.
+- CI on `main` at `0699870`: run [44893074471](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44893074471) failed on `Playwright Comprehensive UAT` (see "Fix after merge" above). Fixed in `f5a70db`.
+- CI on `main` at `f5a70db` (all 19 jobs, including `Playwright Comprehensive UAT`): run [44894303993](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44894303993), success. That commit contains this ticket.
+- Not verified: a browser run of the private thumbnail against a real object store.
 
 ## Completion summary
 

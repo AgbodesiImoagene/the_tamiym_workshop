@@ -1,7 +1,7 @@
 # TTW-236 — Render the canvas on shared designs
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not pushed, CI not run)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
@@ -85,6 +85,12 @@ Deviation from plan: a Playwright spec was added (`tests/e2e/app/shared-design.c
 - `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`: exit 0.
 - `pnpm test`: web 79, app 241, api 1971 tests passed.
 - `pnpm --filter api test:coverage` then `pnpm coverage:ratchet`: passed; `pnpm coverage:diff`: skipped, no changed executable file under `apps/api/src`.
+
+## Merged into main
+
+- Branch CI on the integration branch `codex/ttw-236-237-integration`, commit `1f97e4f`: run [44889303898](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889303898), success.
+- Merged into `main` by fast-forward, commit `1f97e4f`: run [44889795916](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889795916), success.
+- CI on `main` at `f5a70db` (all 19 jobs, including `Playwright Comprehensive UAT`): run [44894303993](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44894303993), success. That commit contains this ticket.
 
 ## Completion summary
 

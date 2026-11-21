@@ -1,7 +1,7 @@
 # TTW-235 — Delete expired private objects (retention of rejected and orphan uploads)
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commit, not pushed, CI not run)\
+**Status:** Complete\
 **Risk:** High (irreversible data deletion)\
 **Blocked by:** None. TTW-099 is merged. The durations were confirmed on 2026-11-20 (see Design review).\
 **Blocks:** None
@@ -72,7 +72,7 @@ Design points:
 - [x] Files with a pending appeal are kept, then deleted 14 days after the answer.
 - [x] Orphan and stalled private objects are deleted after 7 days.
 - [x] The job is idempotent, bounded per run, and logs no PII or link.
-- [ ] Required quality gates pass with evidence recorded below.
+- [x] Required quality gates pass with evidence recorded below.
 - [x] Data inventory and TTW-099 "Remaining" are updated.
 
 ## Out of scope
@@ -119,6 +119,13 @@ Run in the worktree `codex/ttw-235-private-object-retention`, 2026-11-20.
 - `pnpm lint` (0 errors), `pnpm format:check`, `pnpm typecheck` (6 of 6), `pnpm test` (api 172 suites 1977 tests, app 234, web 79), `pnpm openapi:check`, `pnpm docs:validate`, `pnpm coverage:ratchet` (lines 85.14%): passed.
 - `pnpm coverage:diff`: see the completion summary (run again after the commit, because the new file is untracked before it).
 - Not run: Playwright, `pnpm build`, `pnpm audit:prod`, `pnpm verify` as a whole, a run against real S3/MinIO (storage is an in-memory double in e2e), the cron trigger itself (the method is tested, not the schedule).
+
+## Merged into main
+
+- Branch CI on the integration branch `codex/ttw-235-integration`, commit `0699870`: run [44889800024](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889800024), success.
+- CI on `main` at `0699870`: run [44893074471](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44893074471) FAILED on `Playwright Comprehensive UAT` (a job that runs only on `main`). The cause was in TTW-237 (a thumbnail path saved before the picture), not in this ticket; fixed in `f5a70db`.
+- CI on `main` at `f5a70db` (all 19 jobs, including `Playwright Comprehensive UAT`): run [44894303993](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44894303993), success. That commit contains this ticket.
+- Not verified: a run against real S3/MinIO and the cron trigger itself (the method is tested, not the schedule).
 
 ## Completion summary
 
