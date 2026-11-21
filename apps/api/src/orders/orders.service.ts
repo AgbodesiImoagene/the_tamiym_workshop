@@ -52,6 +52,13 @@ import { assertResolutionAllowed } from './resolution-policy.assert';
 import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import type { PricingLineItemOutput } from '../pricing/pricing.types';
 import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
+import {
+  buildDesignSnapshot,
+  designAssetIdsOf,
+  toAdminPrintFiles,
+  type DesignSnapshot,
+  type PrintFileFacts,
+} from './order-item-design-snapshot';
 import { ShipmentDirection, ShipmentStatus } from '../generated/prisma/enums';
 
 import {
@@ -70,6 +77,8 @@ type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
 
 const ORDER_INCLUDE = {
   items: {
+    // The frozen design is for the print shop only (TTW-101): never in a customer response.
+    omit: { designSnapshot: true },
     include: {
       product: { select: { id: true, name: true, slug: true } },
       variant: { select: { id: true, name: true, sku: true } },
@@ -169,6 +178,10 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          const designSnapshots = await this.snapshotDesigns(
+            tx,
+            quote.items.map((item) => item.designId),
+          );
           const created = await tx.order.create({
             data: {
               userId,
@@ -203,7 +216,11 @@ export class OrdersService {
               idempotencyFingerprint: fingerprint,
               items: {
                 create: quote.items.map((item) =>
-                  this.toOrderItemCreateData(item as QuoteLineForCreate),
+                  this.toOrderItemCreateData(
+                    item as QuoteLineForCreate,
+                    undefined,
+                    designSnapshots,
+                  ),
                 ),
               },
             },
@@ -348,6 +365,10 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          const designSnapshots = await this.snapshotDesigns(
+            tx,
+            quote.items.map((item) => item.designId),
+          );
           const created = await tx.order.create({
             data: {
               userId,
@@ -386,6 +407,7 @@ export class OrdersService {
                   this.toOrderItemCreateData(
                     item as QuoteLineForCreate,
                     campaignId,
+                    designSnapshots,
                   ),
                 ),
               },
@@ -569,8 +591,12 @@ export class OrdersService {
   private toOrderItemCreateData(
     item: QuoteLineForCreate,
     campaignIdOverride?: string,
+    designSnapshots?: ReadonlyMap<string, DesignSnapshot>,
   ) {
     return {
+      designSnapshot: (item.designId
+        ? (designSnapshots?.get(item.designId) ?? undefined)
+        : undefined) as Prisma.InputJsonValue | undefined,
       productId: item.productId,
       variantId: item.variantId,
       designId: item.designId,
@@ -589,6 +615,63 @@ export class OrdersService {
       pricingBreakdown: item.pricingBreakdown as object,
       organizerCostBasis: item.organizerCostBasis,
     };
+  }
+
+  /**
+   * Freeze the designs of an order (TTW-101). Read with the order's own transaction so a
+   * save racing with checkout gives the old or the new design of that row, never a mix.
+   * One read per design and one per product's views, however many items share them.
+   */
+  private async snapshotDesigns(
+    tx: Prisma.TransactionClient,
+    designIds: Array<string | null | undefined>,
+  ): Promise<Map<string, DesignSnapshot>> {
+    const ids = [...new Set(designIds.filter((id): id is string => !!id))];
+    const snapshots = new Map<string, DesignSnapshot>();
+    if (ids.length === 0) return snapshots;
+
+    const designs = await tx.design.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        name: true,
+        productId: true,
+        designData: true,
+        product: {
+          select: {
+            views: {
+              select: {
+                id: true,
+                key: true,
+                displayName: true,
+                sortOrder: true,
+                printAreas: {
+                  select: { x: true, y: true, width: true, height: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const now = new Date();
+    for (const design of designs) {
+      snapshots.set(
+        design.id,
+        buildDesignSnapshot(
+          design,
+          design.product.views.map((view) => ({
+            id: view.id,
+            key: view.key,
+            displayName: view.displayName,
+            sortOrder: view.sortOrder,
+            printArea: view.printAreas[0] ?? null,
+          })),
+          now,
+        ),
+      );
+    }
+    return snapshots;
   }
 
   private decimalToNumber(value: unknown): number {
@@ -962,6 +1045,8 @@ export class OrdersService {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
         items: {
+          // The list does not need the frozen design: the detail returns it as `printFiles`.
+          omit: { designSnapshot: true },
           include: {
             product: { select: { id: true, name: true, slug: true } },
             variant: { select: { id: true, name: true, sku: true } },
@@ -1013,7 +1098,56 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+    return this.withPrintFiles(order);
+  }
+
+  /**
+   * TTW-101: replace each item's raw frozen design with `printFiles`, built from the frozen
+   * copy only (never the live design) plus the facts of the uploads it uses, read in one
+   * query. Items without a copy get `printFiles: null`.
+   */
+  private async withPrintFiles<
+    T extends { items: Array<{ designSnapshot: Prisma.JsonValue | null }> },
+  >(order: T) {
+    const assetIds = [
+      ...new Set(
+        order.items.flatMap((item) => designAssetIdsOf(item.designSnapshot)),
+      ),
+    ];
+    const facts = new Map<string, PrintFileFacts>();
+    if (assetIds.length > 0) {
+      const rows = await this.prisma.designAsset.findMany({
+        where: { id: { in: assetIds } },
+        select: {
+          id: true,
+          mediaAsset: {
+            select: {
+              status: true,
+              originalMime: true,
+              originalBytes: true,
+              originalWidth: true,
+              originalHeight: true,
+            },
+          },
+        },
+      });
+      for (const row of rows) {
+        facts.set(row.id, {
+          mimeType: row.mediaAsset.originalMime,
+          bytes: row.mediaAsset.originalBytes,
+          width: row.mediaAsset.originalWidth,
+          height: row.mediaAsset.originalHeight,
+          status: row.mediaAsset.status,
+        });
+      }
+    }
+    return {
+      ...order,
+      items: order.items.map(({ designSnapshot, ...item }) => ({
+        ...item,
+        printFiles: toAdminPrintFiles(designSnapshot, facts),
+      })),
+    };
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   UserRole,
 } from '@tamiym/types';
 import { apiClient } from './api';
+import type { PrintFiles } from './print-files';
 
 export type AdminCampaignStatus = CampaignStatus | 'REVIEW';
 
@@ -92,6 +93,8 @@ export interface AdminOrderDetail extends AdminOrder {
       id: string;
       name: string;
     } | null;
+    /** TTW-101: the design frozen when the order was placed. Null when none was recorded. */
+    printFiles?: PrintFiles | null;
   }>;
   refunds?: Array<{
     id: string;

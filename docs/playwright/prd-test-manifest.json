@@ -342,7 +342,10 @@
       "feature": "Order search, detail and refund operations",
       "prd_ref": "Admin Dashboard — orders",
       "automation": "automated",
-      "tests": ["tests/e2e/admin/orders-workspace.comprehensive.spec.ts"],
+      "tests": [
+        "tests/e2e/admin/orders-workspace.comprehensive.spec.ts",
+        "tests/e2e/admin/order-print-files.comprehensive.spec.ts"
+      ],
       "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@admin", "@critical"]
     },

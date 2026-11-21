@@ -2,6 +2,7 @@
 
 import { AdminShell, formatAdminCurrency, formatAdminDate } from '@/components/admin-shell';
 import { AdminStatusBadge } from '@/components/admin-status-badge';
+import { OrderPrintFiles } from '@/components/order-print-files';
 import { createAdminRefund, getAdminOrder, updateAdminOrderStatus } from '@/lib/dashboard';
 import { OrderStatus } from '@tamiym/types';
 import {
@@ -215,6 +216,9 @@ export default function AdminOrderDetailPage() {
                         Qty {item.quantity}
                       </span>
                     </div>
+                    {item.design || item.printFiles ? (
+                      <OrderPrintFiles printFiles={item.printFiles} />
+                    ) : null}
                   </div>
                 ))}
               </CardContent>

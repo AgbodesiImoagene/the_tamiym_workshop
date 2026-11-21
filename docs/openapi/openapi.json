@@ -8742,7 +8742,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later."
+            "description": "Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. Each item carries `printFiles` (TTW-101): the design as it was when the order was placed (designName, capturedAt, and per side the print area and the layers with position, size and turn), or null when none was recorded. It never follows later edits of the design. Each image layer has `previewPath` (on-screen rendition, admin session) and `originalLinkPath` (GET it to receive a fresh short-lived signed link to the original), plus `file` (mime type, bytes, pixel size, status; null if the file is gone). Admin only: customer order responses never include it."
           },
           "401": {
             "description": "Unauthorized"
