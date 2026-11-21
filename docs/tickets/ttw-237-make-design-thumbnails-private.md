@@ -163,6 +163,10 @@ Run on branch `codex/ttw-237-private-design-thumbnails` from `origin/main` `fa07
 
 Not verified: browser run with a real object store (no MinIO on this machine); the migration script against real storage (core tested with fakes, `S3Service` list/delete tested with a mocked client); the admin helper has no unit test (admin has no test runner), only typecheck; Playwright suites were not run.
 
+## Fix after merge (2026-11-21)
+
+The CI of `main` (run 44893074471, commit `0699870`) failed on `Playwright Comprehensive UAT`, a job that runs only on `main`: `GET /v1/designs/<id>/thumbnail` answered an error and Chrome blocked it (`net::ERR_BLOCKED_BY_ORB`) on the admin moderation pages. Cause: `DesignsService.uploadThumbnail` wrote `thumbnailUrl` in the database before the storage write. When the write failed (the CI has no object store) the row kept a path to a picture that does not exist; a real storage outage would do the same. Fix: the path is now written only after the picture is stored. Tests first: two new cases in `designs.service.spec.ts` (no path when the storage write fails; path set after the upload), failing before the fix.
+
 ## Completion summary
 
 Thumbnails are private, served by `GET /v1/designs/:id/thumbnail` (owner and admins always; others only if APPROVED; uniform 404), stored at `design-thumbnails/<designId>` as WebP, moderated from bytes, status can only tighten. `thumbnailUrl` is an API path set by the server; the DTO fields are removed. Frontends use `designThumbnailSrc` (app, web, admin); the Open Graph image is an absolute API URL. `apps/api/scripts/migrate-design-thumbnails.ts` clears legacy values and empties `thumbnails/` in the public bucket (to run once per environment, `--dry-run` available). No schema change. Follow-ups: shared page fallback image (other session) must use `designThumbnailSrc`; TTW-120 and TTW-235 must include `design-thumbnails/`; cache policy for approved thumbnails.

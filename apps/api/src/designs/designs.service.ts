@@ -613,7 +613,6 @@ export class DesignsService {
     // The status is committed BEFORE the picture replaces the old object, so a visitor can
     // never read a new, unscreened picture of a design that still shows as APPROVED.
     await this.prisma.$transaction(async (tx) => {
-      await tx.design.update({ where: { id }, data: { thumbnailUrl } });
       if (outcome !== design.moderationStatus) {
         await this.moderationDecisions.recordAiDecisionInTx(tx, {
           subjectType: ModerationSubjectType.DESIGN,
@@ -636,6 +635,9 @@ export class DesignsService {
       buffer: webp,
       contentType: DESIGN_THUMBNAIL_CONTENT_TYPE,
     });
+    // The path is written only once the picture exists: if the storage write fails, no
+    // path points to a missing object (the admin and owner lists would request it).
+    await this.prisma.design.update({ where: { id }, data: { thumbnailUrl } });
 
     return { thumbnailUrl };
   }

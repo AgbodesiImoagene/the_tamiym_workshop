@@ -681,6 +681,47 @@ describe('DesignsService', () => {
       );
     });
 
+    it('sets no thumbnail path when the storage write fails, so nothing points to a missing picture (TTW-237)', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+      (s3.uploadPrivateObject as jest.Mock).mockRejectedValueOnce(
+        new Error('storage down'),
+      );
+
+      await expect(
+        service.uploadThumbnail('user-1', 'design-1', {
+          buffer: png,
+          mimetype: 'image/png',
+        }),
+      ).rejects.toThrow('storage down');
+
+      expect(prisma.design.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { thumbnailUrl: '/designs/design-1/thumbnail' },
+        }),
+      );
+    });
+
+    it('sets the thumbnail path only after the picture is stored (TTW-237)', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
+
+      await service.uploadThumbnail('user-1', 'design-1', {
+        buffer: png,
+        mimetype: 'image/png',
+      });
+
+      const updateCall = (
+        prisma.design.update as jest.Mock
+      ).mock.calls.findIndex(
+        ([arg]) => arg?.data?.thumbnailUrl === '/designs/design-1/thumbnail',
+      );
+      expect(updateCall).toBeGreaterThanOrEqual(0);
+      const updateOrder = (prisma.design.update as jest.Mock).mock
+        .invocationCallOrder[updateCall];
+      const uploadOrder = (s3.uploadPrivateObject as jest.Mock).mock
+        .invocationCallOrder[0];
+      expect(updateOrder).toBeGreaterThan(uploadOrder);
+    });
+
     it('commits the status change before the new picture replaces the old object', async () => {
       (prisma.design.findUnique as jest.Mock).mockResolvedValue(mockDesign);
       moderationService.moderate.mockResolvedValue({
