@@ -17,6 +17,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 - Implement the deferred `object_store.media` purge, so that a deletion completes only when files are gone.
 - Keep files tied to orders within the legal retention period, as a recorded exception.
 - Make the purge retry-safe through a bounded queue job.
+- Include the design thumbnails, private objects at `design-thumbnails/<designId>` (TTW-237), for every design of the account.
 
 ## Invariants
 

@@ -2734,7 +2734,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read a design thumbnail (image bytes) */
+        get: operations["DesignsController_thumbnail"];
         put?: never;
         /** Upload design thumbnail */
         post: operations["DesignsController_uploadThumbnail"];
@@ -3664,8 +3665,6 @@ export interface components {
             name: string;
             /** @example prod-1 */
             productId: string;
-            /** @example https://cdn.example.com/thumb.png */
-            thumbnailUrl?: string;
         };
         CreateDesignShareDto: {
             /**
@@ -5107,8 +5106,6 @@ export interface components {
             designData?: Record<string, never>;
             /** @example My Tee Design */
             name?: string;
-            /** @example https://cdn.example.com/thumb.png */
-            thumbnailUrl?: string;
         };
         UpdateDiscountDto: {
             /** @description Campaign IDs when scope is CAMPAIGN */
@@ -13053,8 +13050,6 @@ export interface operations {
                     name: string;
                     /** @example prod-1 */
                     productId: string;
-                    /** @example https://cdn.example.com/thumb.png */
-                    thumbnailUrl?: string;
                 };
             };
         };
@@ -13183,8 +13178,6 @@ export interface operations {
                     designData?: Record<string, never>;
                     /** @example My Tee Design */
                     name?: string;
-                    /** @example https://cdn.example.com/thumb.png */
-                    thumbnailUrl?: string;
                 };
             };
         };
@@ -13367,6 +13360,36 @@ export interface operations {
             };
         };
     };
+    DesignsController_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Design ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thumbnail (WebP). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                };
+            };
+            /** @description Unknown design, no thumbnail, or a design that is not APPROVED for a reader who is neither its owner nor an admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     DesignsController_uploadThumbnail: {
         parameters: {
             query?: never;
@@ -13393,6 +13416,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /**
+                         * @description API path (relative to the API base) of the thumbnail
+                         * @example /designs/design-id/thumbnail
+                         */
                         thumbnailUrl?: string;
                     };
                 };

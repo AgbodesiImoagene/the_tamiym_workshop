@@ -11,6 +11,7 @@ import {
 } from './media-providers';
 import { MediaProcessor } from './media.processor';
 import { MediaService } from './media.service';
+import { PrivateObjectRetentionService } from './private-object-retention.service';
 import { SafeRemoteMediaFetcher } from './safe-remote-fetch';
 import { VirusScanService } from './virus-scan.service';
 import { VIRUS_SCANNER } from './virus-scanner.types';
@@ -24,6 +25,7 @@ import { VIRUS_SCANNER } from './virus-scanner.types';
   providers: [
     MediaService,
     MediaProcessor,
+    PrivateObjectRetentionService,
     VirusScanService,
     S3Service,
     {

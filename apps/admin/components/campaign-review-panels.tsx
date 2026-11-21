@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@tamiym/ui';
 import type { AdminCampaignDetail } from '@/lib/dashboard';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 
 const DESIGN_MODERATION_BADGE: Record<
   string,
@@ -55,17 +56,18 @@ export function CampaignReviewDesignsPanel({
                   label: entry.design.moderationStatus,
                 })
               : null;
+            const thumbnailSrc = designThumbnailSrc(entry.design?.thumbnailUrl);
 
             return (
               <div
                 key={entry.id}
                 className="flex items-center gap-4 rounded-2xl border border-black/8 bg-[#f7f9fc] px-4 py-3"
               >
-                {entry.design?.thumbnailUrl ? (
+                {thumbnailSrc ? (
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gray-100">
                     <img
-                      src={entry.design.thumbnailUrl}
-                      alt={entry.design.name}
+                      src={thumbnailSrc}
+                      alt={entry.design?.name ?? ''}
                       className="h-full w-full object-cover"
                     />
                   </div>

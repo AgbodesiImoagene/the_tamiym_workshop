@@ -9,6 +9,7 @@ import { CustomerDashboardShell } from '@/components/customer-dashboard-shell';
 import { authApi, type ApiError, type User } from '@/lib/auth';
 import { getMyDesigns, deleteDesign, duplicateDesign, type Design } from '@/lib/designs';
 import { getDashboardProducts } from '@/lib/products';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import { Badge, Button, ConfirmDialog } from '@tamiym/ui';
 
 type BadgeVariant = 'brand' | 'accent' | 'neutral' | 'danger';
@@ -115,11 +116,14 @@ export default function DashboardDesignPage() {
                     >
                       {/* Thumbnail */}
                       <div className="relative h-48 bg-zinc-100">
-                        {design.thumbnailUrl ? (
+                        {designThumbnailSrc(design.thumbnailUrl) ? (
                           <Image
-                            src={design.thumbnailUrl}
+                            src={designThumbnailSrc(design.thumbnailUrl) as string}
                             alt={design.name}
                             fill
+                            // Private picture: the browser loads it with the session cookie,
+                            // the image optimizer (server side, no cookie) must not.
+                            unoptimized
                             className="object-cover"
                           />
                         ) : (

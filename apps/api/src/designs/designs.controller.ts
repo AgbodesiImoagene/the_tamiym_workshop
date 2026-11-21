@@ -1,7 +1,9 @@
 import {
   Controller,
   Get,
+  Header,
   Post,
+  StreamableFile,
   Body,
   Patch,
   Param,
@@ -29,6 +31,8 @@ import { CreateDesignDto } from './dto/create-design.dto';
 import { CreateDesignShareDto } from './dto/create-design-share.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt/jwt.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/jwt/optional-jwt.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { RequestUser } from '../auth/strategies/jwt.strategy';
 
@@ -135,7 +139,8 @@ export class DesignsController {
   }
 
   /**
-   * Upload a thumbnail for a design (PNG/WebP, ≤ 2 MB). Updates Design.thumbnailUrl.
+   * Upload a thumbnail for a design (PNG/JPEG/WebP, ≤ 2 MB). The picture is stored privately
+   * and moderated; Design.thumbnailUrl becomes the stable API path of `GET :id/thumbnail`.
    */
   @Post(':id/thumbnail')
   @HttpCode(HttpStatus.OK)
@@ -158,7 +163,13 @@ export class DesignsController {
     description: 'Thumbnail uploaded',
     schema: {
       type: 'object',
-      properties: { thumbnailUrl: { type: 'string' } },
+      properties: {
+        thumbnailUrl: {
+          type: 'string',
+          example: '/designs/design-id/thumbnail',
+          description: 'API path (relative to the API base) of the thumbnail',
+        },
+      },
     },
   })
   @ApiResponse({ status: 400, description: 'Invalid file or missing' })
@@ -174,6 +185,45 @@ export class DesignsController {
     return this.designsService.uploadThumbnail(user.id, id, {
       buffer: file.buffer,
       mimetype: file.mimetype,
+    });
+  }
+
+  /**
+   * Bytes of a design thumbnail (TTW-237). Stable path: `Design.thumbnailUrl` holds it.
+   * The owner and admins always read it; anyone else, with or without a session, only while
+   * the design is APPROVED. Every denial is the same 404.
+   */
+  @Get(':id/thumbnail')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('X-Robots-Tag', 'noindex, nofollow')
+  @Header('Referrer-Policy', 'no-referrer')
+  @ApiOperation({ summary: 'Read a design thumbnail (image bytes)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Design ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'The thumbnail (WebP).',
+    content: { 'image/webp': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Unknown design, no thumbnail, or a design that is not APPROVED for a reader who is neither its owner nor an admin',
+  })
+  async thumbnail(
+    @CurrentUser() user: RequestUser | null,
+    @Param('id') id: string,
+  ) {
+    const { stream, contentType, contentLength } =
+      await this.designsService.openThumbnail(user, id);
+    return new StreamableFile(stream, {
+      type: contentType,
+      disposition: 'inline',
+      length: contentLength,
     });
   }
 

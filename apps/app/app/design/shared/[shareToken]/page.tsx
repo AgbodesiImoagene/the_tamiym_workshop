@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { SharedWorkshopCanvas } from '@/components/workshop/SharedWorkshopCanvas';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import {
   getSharedDesign,
   getProductWorkshop,
@@ -26,13 +27,14 @@ export default async function SharedDesignPage({ params }: SharedDesignPageProps
 
   let workshopContext;
   try {
-    workshopContext = await getProductWorkshop(design.productId);
+    workshopContext = await getProductWorkshop(design.product.id);
   } catch {
     workshopContext = null;
   }
 
   const views: WorkshopView[] = workshopContext?.views ?? [];
   const designableViews = views.filter((v) => v.isDesignable);
+  const thumbnailSrc = designThumbnailSrc(design.thumbnailUrl);
   const designData = design.designData as DesignData;
 
   return (
@@ -60,10 +62,10 @@ export default async function SharedDesignPage({ params }: SharedDesignPageProps
         <div className="flex flex-wrap gap-8">
           {designableViews.length === 0 ? (
             /* Fallback: no workshop context, show raw thumbnail */
-            design.thumbnailUrl ? (
+            thumbnailSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={design.thumbnailUrl}
+                src={thumbnailSrc}
                 alt={design.name}
                 className="max-w-md rounded-2xl border border-zinc-200 shadow"
               />

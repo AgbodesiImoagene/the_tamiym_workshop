@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNotEmpty, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject } from 'class-validator';
 
 export class CreateDesignDto {
   @ApiProperty({ example: 'My Tee Design' })
@@ -18,12 +18,4 @@ export class CreateDesignDto {
   })
   @IsObject()
   designData!: Record<string, unknown>;
-
-  @ApiProperty({
-    example: 'https://cdn.example.com/thumb.png',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  thumbnailUrl?: string;
 }

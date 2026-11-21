@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -96,6 +97,47 @@ export class S3Service {
       ? `${this.publicUrl}/${params.key}`
       : this.buildDefaultUrl(params.key);
     return { key: params.key, url };
+  }
+
+  /** Keys under a prefix of the PUBLIC bucket (TTW-237 clean-up of legacy thumbnails). */
+  async listObjectKeys(prefix: string): Promise<string[]> {
+    if (!this.bucket) {
+      throw new InternalServerErrorException('S3 bucket not configured');
+    }
+    const keys: string[] = [];
+    let token: string | undefined;
+    try {
+      do {
+        const page = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+            ContinuationToken: token,
+          }),
+        );
+        for (const object of page.Contents ?? []) {
+          if (object.Key) keys.push(object.Key);
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (token);
+    } catch {
+      throw new InternalServerErrorException('Failed to list objects');
+    }
+    return keys;
+  }
+
+  /** Delete one object of the PUBLIC bucket. */
+  async deleteObject(key: string): Promise<void> {
+    if (!this.bucket) {
+      throw new InternalServerErrorException('S3 bucket not configured');
+    }
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+    } catch {
+      throw new InternalServerErrorException('Failed to delete image');
+    }
   }
 
   async getObjectBuffer(key: string): Promise<Buffer> {

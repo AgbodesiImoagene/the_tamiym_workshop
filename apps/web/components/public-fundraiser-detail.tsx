@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { marketingAssets } from '@/lib/assets';
+import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import { Progress } from '@tamiym/ui';
 import { customerAppPath, webLoginWithNext, webRegisterWithNext } from '@/lib/site';
 import type { FundraiserSelection, PublicFundraiser } from '@/lib/fundraisers';
@@ -72,7 +73,8 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
         }
       : null;
 
-  const imageUrl = selected?.design?.thumbnailUrl || marketingAssets.fundraiserDetailFallback;
+  const thumbnailSrc = designThumbnailSrc(selected?.design?.thumbnailUrl);
+  const imageUrl = thumbnailSrc || marketingAssets.fundraiserDetailFallback;
   const unitAmountMinor = resolvedVariant?.unitAmountMinor ?? selected?.baseAmountMinor ?? 0;
   const displayCurrency = resolvedVariant?.currency ?? selected?.currency ?? currency;
   const displayPriceMajor = minorToMajor(unitAmountMinor, displayCurrency);
@@ -272,6 +274,8 @@ export function PublicFundraiserDetail({ fundraiser }: PublicFundraiserDetailPro
                         : fundraiser.title
                     }
                     fill
+                    // Design thumbnails are served by the API (TTW-237), not by a storage host.
+                    unoptimized={Boolean(thumbnailSrc)}
                     className="object-cover"
                     sizes="(min-width: 1024px) 540px, 100vw"
                     priority
