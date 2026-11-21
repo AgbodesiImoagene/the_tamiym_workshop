@@ -418,6 +418,44 @@ describe('OrdersService', () => {
       expect(pricingService.quoteStandard).not.toHaveBeenCalled();
     });
 
+    it("refuses another customer's design before quoting (TTW-239)", async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        id: 'design-1',
+        userId: 'other-user',
+        productId: 'prod-1',
+        moderationStatus: 'APPROVED',
+      });
+      (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(pricingService.quoteStandard).not.toHaveBeenCalled();
+    });
+
+    it('refuses a REJECTED design before quoting (TTW-239)', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        id: 'design-1',
+        userId: 'user-1',
+        productId: 'prod-1',
+        moderationStatus: 'REJECTED',
+      });
+      (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+      await expect(
+        service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 1 }],
+        }),
+      ).rejects.toMatchObject({ response: { code: 'DESIGN_REJECTED' } });
+      expect(pricingService.quoteStandard).not.toHaveBeenCalled();
+    });
+
     it('rejects unverified campaign order create', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         emailVerifiedAt: null,
