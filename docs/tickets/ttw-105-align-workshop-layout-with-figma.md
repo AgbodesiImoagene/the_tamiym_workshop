@@ -106,8 +106,8 @@ Found and fixed on 2026-11-21, with the product owner's approval (third commit):
 - Fix: `originX: 'left'` and `originY: 'top'` on the photo and on the clip. Tests first: two assertions in `WorkshopCanvas.test.tsx` (failed on the missing origin), and the e2e photo check now requires more than 99 % of the canvas painted (it measured 25 % before the fix).
 - Checked in the running app afterwards, with a real product photo and a print area added to the local database only: the painted window is exactly 180 to 420 on both axes.
 
-Still open, a product question: the print-area clip is set on the whole canvas, so it also hides the product photo outside the print area (only the print-area window of the photo is visible). If the photo should stay fully visible and only the customer's layers should be limited to the print area, the clip has to move to the customer's layers. Not decided; not changed.
+Decided by the product owner on 2026-11-21: only the print area must be visible. The print-area clip stays on the whole canvas, so the product photo and the customer's layers both show only inside the print area. No change.
 
 ## Completion summary
 
-Implemented locally in three commits, not pushed. Awaiting the second independent review, the product decision on the photo outside the print area, and the client's visual check.
+Implemented locally in three commits, not pushed. Awaiting the second independent review and the client's visual check.
