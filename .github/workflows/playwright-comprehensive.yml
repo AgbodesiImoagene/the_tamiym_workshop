@@ -44,6 +44,23 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # TTW-099: customer uploads and design thumbnails live in a private bucket, so the
+      # browser journeys that save a design need a real object store. MinIO no longer
+      # publishes `minio/minio` on Docker Hub; the Bitnami legacy image (pinned) creates the
+      # two buckets itself through MINIO_DEFAULT_BUCKETS.
+      minio:
+        image: bitnamilegacy/minio:2025.5.24
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+          MINIO_DEFAULT_BUCKETS: tamiym-assets,tamiym-private
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       CI: true
       NODE_ENV: test
@@ -63,6 +80,7 @@ jobs:
       S3_ENDPOINT: http://localhost:9000
       S3_PUBLIC_URL: http://localhost:9000/tamiym-assets
       S3_BUCKET: tamiym-assets
+      S3_PRIVATE_BUCKET: tamiym-private
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_REGION: us-east-1

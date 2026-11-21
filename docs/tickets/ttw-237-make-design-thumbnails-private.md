@@ -167,6 +167,10 @@ Not verified: browser run with a real object store (no MinIO on this machine); t
 
 The CI of `main` (run 44893074471, commit `0699870`) failed on `Playwright Comprehensive UAT`, a job that runs only on `main`: `GET /v1/designs/<id>/thumbnail` answered an error and Chrome blocked it (`net::ERR_BLOCKED_BY_ORB`) on the admin moderation pages. Cause: `DesignsService.uploadThumbnail` wrote `thumbnailUrl` in the database before the storage write. When the write failed (the CI has no object store) the row kept a path to a picture that does not exist; a real storage outage would do the same. Fix: the path is now written only after the picture is stored. Tests first: two new cases in `designs.service.spec.ts` (no path when the storage write fails; path set after the upload), failing before the fix.
 
+## CI: real object storage for the browser journeys (2026-11-21)
+
+After that fix, `Playwright Comprehensive` and `Playwright Matrix` still failed on `design-workshop.layers.spec.ts` ("Unexpected console error: … 500") on `015c18c`. Probable cause (the failing request is not in the CI log): saving a design uploads its thumbnail, the CI had no object store and no `S3_PRIVATE_BUCKET`, so the API answered 500 at once. Before TTW-237 the upload went to a missing public store and failed only after several seconds of SDK retries, after the test had ended, which hid it. Fix: both workflows now start a pinned MinIO service (`bitnamilegacy/minio:2025.5.24`, buckets `tamiym-assets` and `tamiym-private` created by `MINIO_DEFAULT_BUCKETS`) and set `S3_PRIVATE_BUCKET`. The test and its console-error guard are unchanged.
+
 ## Merged into main
 
 - Branch CI on the integration branch `codex/ttw-236-237-integration`, commit `1f97e4f`: run [44889303898](https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/44889303898), success.
