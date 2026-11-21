@@ -10,6 +10,7 @@ import ImageTool from './ImageTool';
 import OptionPicker from './OptionPicker';
 import SavePanel from './SavePanel';
 import SharePanel from './SharePanel';
+import { isLowResolutionImage } from '@/lib/image-resolution';
 import LayerList, { type LayerItem } from './LayerList';
 import type { WorkshopCanvasControls, WorkshopHistoryState } from './WorkshopCanvas';
 import {
@@ -280,11 +281,24 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         ];
       }
       if (type.includes('image')) {
-        return [{ id: layerId, label: 'Image', kind: 'image' as const }];
+        return [
+          {
+            id: layerId,
+            label: 'Image',
+            kind: 'image' as const,
+            lowResolution: isLowResolutionImage(
+              o as { scaleX?: unknown; scaleY?: unknown },
+              activeView?.printArea ?? null
+            ),
+          },
+        ];
       }
       return [{ id: layerId, label: 'Layer', kind: 'other' as const }];
     });
-  }, [designData, activeViewKey]);
+  }, [designData, activeViewKey, activeView]);
+
+  // The explanation next to the canvas is for the selected image only.
+  const selectedLowResolution = layerItems.some((l) => l.id === selectedLayerId && l.lowResolution);
 
   return (
     <div className="flex h-full min-h-screen flex-col bg-zinc-50">
@@ -353,6 +367,11 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               onReadyChange={setCanvasReady}
               controlRef={controlRef}
             />
+          )}
+          {selectedLowResolution && (
+            <p role="status" className="mt-3 text-sm text-warning">
+              This image may print blurry. Make it smaller or upload a larger image.
+            </p>
           )}
         </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { imageCrossOrigin } from '@/lib/designs';
 import type { FabricJson, PrintArea, TemplateLayer, TemplateEffect } from '@/lib/designs';
+import { DEFAULT_CANVAS_SIZE } from '@/lib/image-resolution';
 import { isWorkshopFont, loadFontsForObjects } from '@/lib/workshop-fonts';
 import { createLayerHistory, type LayerHistory } from './layer-history';
 
@@ -59,7 +60,7 @@ interface WorkshopCanvasProps {
   readOnly?: boolean;
 }
 
-const DEFAULT_SIZE = 600;
+const DEFAULT_SIZE = DEFAULT_CANVAS_SIZE;
 const SERIALISED_PROPS = ['designAssetId', 'data'];
 
 let layerCounter = 0;

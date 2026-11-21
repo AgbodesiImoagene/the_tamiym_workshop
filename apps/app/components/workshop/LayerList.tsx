@@ -6,6 +6,8 @@ export interface LayerItem {
   id: string;
   label: string;
   kind: 'text' | 'image' | 'other';
+  /** An image that may print blurry (TTW-104). Informs, never blocks. */
+  lowResolution?: boolean;
 }
 
 export type LayerMoveDirection = 'up' | 'down';
@@ -65,12 +67,18 @@ export default function LayerList({
                   type="button"
                   aria-label={`Select ${layer.label}`}
                   aria-pressed={selected}
+                  aria-describedby={layer.lowResolution ? `${layer.id}-low-resolution` : undefined}
                   disabled={disabled}
                   onClick={() => onSelect(layer.id)}
                   className="flex min-w-0 flex-1 flex-col items-start rounded px-1 py-0.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="w-full truncate">{layer.label}</span>
                   <span className="text-xs text-muted-foreground">{KIND_LABEL[layer.kind]}</span>
+                  {layer.lowResolution && (
+                    <span id={`${layer.id}-low-resolution`} className="text-xs text-warning">
+                      May print blurry
+                    </span>
+                  )}
                 </button>
                 <Button
                   type="button"
