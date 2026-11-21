@@ -49,6 +49,8 @@ test.describe('Design workshop low-resolution warning @app', () => {
 
     // Upload a small image: at its default size it is dense enough, so no warning yet.
     // The image tool stays disabled until the canvas is ready; a file sent before would be lost.
+    // TTW-105: the image tool is behind "Upload" in the tool rail.
+    await page.getByRole('button', { name: 'Upload' }).click();
     await expect(page.getByRole('button', { name: 'Choose image' })).toBeEnabled();
     await page.locator('#image-tool-input').setInputFiles({
       name: 'small-logo.png',

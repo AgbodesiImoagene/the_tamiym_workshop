@@ -138,6 +138,8 @@ describe('WorkshopEditor layer controls', () => {
     mockCanvasReady = false;
     const { unmount } = renderEditor();
     expect(screen.getByRole('button', { name: 'Add to canvas' })).toBeDisabled();
+    // TTW-105: the image tool is behind "Upload" in the tool rail.
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
     expect(screen.getByRole('button', { name: 'Choose image' })).toBeDisabled();
     unmount();
 

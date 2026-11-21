@@ -3,8 +3,10 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@tamiym/ui';
 import ViewTabs from './ViewTabs';
+import WorkshopToolRail, { type WorkshopTool } from './WorkshopToolRail';
 import TextTool from './TextTool';
 import ImageTool from './ImageTool';
 import OptionPicker from './OptionPicker';
@@ -61,6 +63,9 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activeEffects, setActiveEffects] = useState<TemplateEffect[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [activeTool, setActiveTool] = useState<WorkshopTool>('text');
+  const tools: WorkshopTool[] =
+    product.options.length > 0 ? ['upload', 'text', 'colors'] : ['upload', 'text'];
 
   // Initialise designData from existing design or empty
   const [designData, setDesignData] = useState<DesignData>(() => {
@@ -301,30 +306,53 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   const selectedLowResolution = layerItems.some((l) => l.id === selectedLayerId && l.lowResolution);
 
   return (
-    <div className="flex h-full min-h-screen flex-col bg-zinc-50">
+    <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-3">
+      <div className="flex items-center gap-3">
+        <Link
+          href="/dashboard/design"
+          aria-label="Back to Design Workshop"
+          className="rounded-full px-2 text-2xl leading-none text-foreground hover:bg-muted"
+        >
+          ‹
+        </Link>
         <div>
-          <h1 className="text-base font-semibold text-zinc-900">
-            {designId ? 'Edit Design' : 'New Design'}
-          </h1>
-          <p className="text-xs text-zinc-500">{product.name}</p>
+          <h1 className="text-2xl font-semibold text-foreground">Design Workshop</h1>
+          <p className="text-xs text-muted-foreground">
+            {designId ? 'Edit Design' : 'New Design'} · {product.name}
+          </p>
         </div>
-        {saveError && <p className="text-xs font-medium text-red-600">{saveError}</p>}
+        {saveError && <p className="ml-auto text-xs font-medium text-destructive">{saveError}</p>}
       </div>
 
-      {/* View tabs */}
-      <ViewTabs
-        views={designableViews}
-        activeViewKey={activeViewKey}
-        designData={designData}
-        onViewChange={handleViewChange}
-      />
+      {/* One card: tool rail, open tool, canvas (Figma) */}
+      <div className="flex flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-sm md:flex-row">
+        <WorkshopToolRail tools={tools} activeTool={activeTool} onSelectTool={setActiveTool}>
+          <ViewTabs
+            views={designableViews}
+            activeViewKey={activeViewKey}
+            designData={designData}
+            onViewChange={handleViewChange}
+          />
+        </WorkshopToolRail>
 
-      {/* Main editor area */}
-      <div className="flex flex-1 gap-0">
-        {/* Canvas */}
-        <div className="flex flex-1 flex-col items-center gap-3 p-6">
+        {/* The open tool, then the parts that do not depend on the tool */}
+        <div className="flex w-full flex-col gap-4 overflow-y-auto border-b border-border bg-background p-4 md:w-72 md:shrink-0 md:border-b-0 md:border-r">
+          {activeTool === 'upload' && (
+            <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
+          )}
+          {activeTool === 'text' && <TextTool onAddText={handleAddText} disabled={!canvasReady} />}
+          {activeTool === 'colors' && product.options.length > 0 && (
+            <OptionPicker
+              options={product.options}
+              allEffects={views.flatMap((v) => v.effects)}
+              selectedOptions={selectedOptions}
+              onChange={handleOptionChange}
+            />
+          )}
+
+          <hr className="border-border" />
+
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -354,6 +382,33 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               Delete
             </Button>
           </div>
+
+          <LayerList
+            layers={layerItems}
+            selectedId={selectedLayerId}
+            disabled={!canvasReady}
+            onSelect={(id) => controlRef.current?.selectLayer(id)}
+            onDelete={(id) => controlRef.current?.deleteLayer(id)}
+            onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
+          />
+
+          <hr className="border-border" />
+
+          <SavePanel
+            designId={designId}
+            productId={product.id}
+            designName={designName}
+            isSaving={isSaving}
+            onNameChange={setDesignName}
+            onSave={() => handleSave(true)}
+          />
+
+          {/* Share (only after first save) */}
+          {designId && <SharePanel designId={designId} />}
+        </div>
+
+        {/* Canvas: the product photo (the template layers) sits behind the customer's layers */}
+        <div className="flex flex-1 flex-col items-center gap-3 overflow-x-auto bg-background p-4">
           {activeView && (
             <WorkshopCanvas
               viewKey={activeViewKey}
@@ -373,52 +428,6 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
               This image may print blurry. Make it smaller or upload a larger image.
             </p>
           )}
-        </div>
-
-        {/* Right sidebar */}
-        <div className="flex w-72 flex-col gap-4 overflow-y-auto border-l border-zinc-200 bg-white p-4">
-          {/* Options */}
-          {product.options.length > 0 && (
-            <OptionPicker
-              options={product.options}
-              allEffects={views.flatMap((v) => v.effects)}
-              selectedOptions={selectedOptions}
-              onChange={handleOptionChange}
-            />
-          )}
-
-          <hr className="border-zinc-100" />
-
-          {/* Text tool */}
-          <TextTool onAddText={handleAddText} disabled={!canvasReady} />
-
-          {/* Image tool */}
-          <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
-
-          {/* Layers */}
-          <LayerList
-            layers={layerItems}
-            selectedId={selectedLayerId}
-            disabled={!canvasReady}
-            onSelect={(id) => controlRef.current?.selectLayer(id)}
-            onDelete={(id) => controlRef.current?.deleteLayer(id)}
-            onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
-          />
-
-          <hr className="border-zinc-100" />
-
-          {/* Save */}
-          <SavePanel
-            designId={designId}
-            productId={product.id}
-            designName={designName}
-            isSaving={isSaving}
-            onNameChange={setDesignName}
-            onSave={() => handleSave(true)}
-          />
-
-          {/* Share (only after first save) */}
-          {designId && <SharePanel designId={designId} />}
         </div>
       </div>
     </div>

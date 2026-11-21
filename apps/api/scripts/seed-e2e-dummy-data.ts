@@ -815,6 +815,59 @@ async function main() {
       ],
     });
 
+    // TTW-105: the Campus Hoodie front has a product photo (a workshop template layer), so
+    // the editor test can see it behind the canvas. A one-pixel PNG as a data URL keeps the
+    // fixture free of any network or storage dependency (opaque, so the test can tell it is drawn).
+    const hoodiePhoto =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAA8CAYAAAA6/NlyAAAAV0lEQVR42u3PQQEAMAgEIF3/YNdKM+wtNKCTTB3y6hhhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYeE/Cx7aA88h5tqzAAAAAElFTkSuQmCC';
+    await prisma.mediaAsset.create({
+      data: {
+        id: 'e2e-media-asset-hoodie-photo',
+        sourceType: MediaSourceType.UPLOAD,
+        status: MediaAssetStatus.READY,
+        scanStatus: VirusScanStatus.CLEAN,
+        moderationStatus: ModerationStatus.APPROVED,
+        originalKey: 'e2e/media/hoodie-photo/original.png',
+        originalUrl: hoodiePhoto,
+        originalMime: 'image/png',
+        originalBytes: 144,
+        originalWidth: 60,
+        originalHeight: 60,
+        checksum: 'checksum-e2e-hoodie-photo',
+        derivatives: {
+          create: {
+            id: 'e2e-media-derivative-hoodie-photo-display',
+            type: MediaDerivativeType.DISPLAY,
+            key: 'e2e/media/hoodie-photo/display.png',
+            url: hoodiePhoto,
+            mimeType: 'image/png',
+            sizeBytes: 144,
+            width: 60,
+            height: 60,
+          },
+        },
+      },
+    });
+    await prisma.productImage.create({
+      data: {
+        id: 'e2e-product-image-hoodie-photo',
+        productId: IDS.products.hoodie,
+        mediaAssetId: 'e2e-media-asset-hoodie-photo',
+        altText: 'Campus Hoodie photo',
+        templateLayers: {
+          create: {
+            id: 'e2e-template-layer-hoodie-front-photo',
+            productId: IDS.products.hoodie,
+            productViewId: IDS.productViews.hoodieFront,
+            key: 'photo',
+            displayName: 'Product photo',
+            layerType: 'BASE',
+            zIndex: 0,
+          },
+        },
+      },
+    });
+
     await prisma.productOption.createMany({
       data: [
         {

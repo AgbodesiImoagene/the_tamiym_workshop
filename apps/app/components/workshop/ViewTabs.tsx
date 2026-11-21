@@ -28,20 +28,27 @@ export default function ViewTabs({
     <Tabs value={activeViewKey} onValueChange={onViewChange}>
       <TabsList
         variant="line"
-        className="h-auto w-full justify-start rounded-none border-b border-zinc-200 bg-white px-4 pb-0"
+        className="h-auto w-full flex-row justify-start gap-2 rounded-none bg-transparent p-0 md:flex-col"
       >
         {designableViews.map((view) => {
           const viewData = designData.views[view.key];
           const hasLayers = viewData ? (viewData.fabricJson?.objects?.length ?? 0) > 0 : false;
+          const photo = view.templateLayers.find((layer) => layer.imageUrl)?.imageUrl ?? null;
 
           return (
             <TabsTrigger
               key={view.key}
               value={view.key}
               className={cn(
-                'rounded-none border-x-0 border-t-0 py-3 text-sm data-active:border-b-2 data-active:border-zinc-900 data-active:bg-transparent data-active:shadow-none'
+                'h-auto w-20 flex-col gap-1 rounded-lg border border-transparent px-1 py-2 text-xs data-active:border-foreground data-active:bg-background data-active:shadow-none'
               )}
             >
+              {photo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a small preview of the product photo
+                <img src={photo} alt="" className="h-12 w-12 rounded-md object-cover" />
+              ) : (
+                <span className="h-12 w-12 rounded-md bg-border" aria-hidden="true" />
+              )}
               {view.displayName}
               {hasLayers && (
                 <span

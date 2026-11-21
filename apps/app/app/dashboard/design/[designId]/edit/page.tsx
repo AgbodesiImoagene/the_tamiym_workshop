@@ -1,4 +1,5 @@
 import EditDesignLoader from '@/components/workshop/EditDesignLoader';
+import WorkshopPageShell from '@/components/workshop/WorkshopPageShell';
 
 interface EditDesignPageProps {
   params: Promise<{ designId: string }>;
@@ -11,5 +12,9 @@ interface EditDesignPageProps {
 export default async function EditDesignPage({ params }: EditDesignPageProps) {
   const { designId } = await params;
 
-  return <EditDesignLoader designId={designId} />;
+  return (
+    <WorkshopPageShell>
+      <EditDesignLoader designId={designId} />
+    </WorkshopPageShell>
+  );
 }

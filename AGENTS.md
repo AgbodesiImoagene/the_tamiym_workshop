@@ -58,6 +58,7 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 ### Source of truth
 
 - The PRD, approved designs, and current code define product behaviour.
+- Figma screenshots: `revue-client/screenshots/` (in the main checkout only: the folder is never committed, so it is absent from worktrees; read it by its absolute path under the main checkout). It holds about 54 captures of the Figma pages, desktop and some mobile, named by capture time. A page's name is written above it (for example "Dashboard/Homepage"); a capture with no name continues the previous page. Look there when a ticket says "match Figma" and the Figma canvas cannot be read.
 - `AGENTS.md` is the canonical workflow. `.cursor/rules/` adds scoped technical rules; do not duplicate this workflow elsewhere.
 - Work from a clean tree. Preserve user changes and stop if unrelated changes overlap the ticket.
 
