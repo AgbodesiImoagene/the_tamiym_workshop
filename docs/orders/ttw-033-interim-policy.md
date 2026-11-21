@@ -64,6 +64,10 @@ UI must hide retry when `paymentRetryEligible` is false; client must not invent 
 
 `POST /orders/quote` applies the same design rule as order creation (one shared function, `assertDesignsOrderableBy`). For each line with a `designId`, in this order: the design exists (else `400`), belongs to the caller (else `403`), the variant exists (else `400`), the design is for the variant's product (else `400`), and is not `REJECTED` (else `400`, code `DESIGN_REJECTED`). A quote never reads the views of a design the caller does not own, so it cannot be used to learn another customer's surcharge. `PENDING`, `FLAGGED` and `APPROVED` designs are quoted (client answer Q28). Campaign quotes keep their own rule (the design must be one of the campaign's products).
 
+## Ordering a saved design (TTW-058)
+
+A line may carry a `designId` (see `POST /orders`). The server checks, in this order, that the design exists, belongs to the caller, matches the variant's product, and is not `REJECTED`. A rejected design is refused with `400` and code `DESIGN_REJECTED`, and nothing is created. An order does not wait for moderation: `PENDING`, `FLAGGED` and `APPROVED` designs can be ordered (client answer Q28). A design rejected after the order was placed is handled by the admin refund flow (`POST /admin/orders/:id/refund` with `reasonCode` and `reason`).
+
 ## Deferred
 
 - Full Playwright matrix (standard/campaign × payment/refund/shipment states)

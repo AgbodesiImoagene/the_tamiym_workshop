@@ -27,6 +27,8 @@ export interface CartItem {
   imageUrl?: string | null;
   /** Saved design printed on this line; two designs on one variant are two lines. */
   designId?: string | null;
+  /** Name of that design, shown on the cart and checkout lines (TTW-058). */
+  designName?: string | null;
 }
 
 export interface CustomerCart {
@@ -74,7 +76,8 @@ function isCartItem(value: unknown): value is CartItem {
     line.quantity >= 1 &&
     Number.isFinite(toPrice(line.unitPrice)) &&
     typeof line.currency === 'string' &&
-    (line.designId == null || isNonEmptyString(line.designId))
+    (line.designId == null || isNonEmptyString(line.designId)) &&
+    (line.designName == null || typeof line.designName === 'string')
   );
 }
 
@@ -90,6 +93,7 @@ function toCartItem(line: CartItem): CartItem {
     currency: line.currency,
     imageUrl: line.imageUrl ?? null,
     designId: line.designId ?? null,
+    designName: line.designName ?? null,
   };
 }
 

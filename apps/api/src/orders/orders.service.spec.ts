@@ -575,6 +575,49 @@ describe('OrdersService', () => {
       });
     });
 
+    describe('saved designs (TTW-058)', () => {
+      const dto: CreateOrderDto = {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', designId: 'design-1', quantity: 1 }],
+      };
+
+      function mockDesign(moderationStatus: string) {
+        (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+          id: 'design-1',
+          userId: 'user-1',
+          productId: 'prod-1',
+          moderationStatus,
+        });
+        (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+          productId: 'prod-1',
+        });
+      }
+
+      it('refuses a design rejected by moderation, before any quote', async () => {
+        mockDesign('REJECTED');
+
+        await expect(service.create('user-1', dto)).rejects.toMatchObject({
+          response: { code: 'DESIGN_REJECTED' },
+        });
+        expect(pricingService.quoteStandard).not.toHaveBeenCalled();
+      });
+
+      it.each(['PENDING', 'FLAGGED', 'APPROVED'])(
+        'does not wait for moderation: a %s design goes on to the quote',
+        async (status) => {
+          mockDesign(status);
+          (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
+            new Error('quote reached'),
+          );
+
+          await expect(service.create('user-1', dto)).rejects.toThrow(
+            'quote reached',
+          );
+          expect(pricingService.quoteStandard).toHaveBeenCalled();
+        },
+      );
+    });
+
     it('should throw ForbiddenException when address belongs to another user', async () => {
       (pricingService.quoteStandard as jest.Mock).mockRejectedValue(
         new ForbiddenException('Access denied to this address'),

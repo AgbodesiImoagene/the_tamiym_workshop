@@ -104,6 +104,12 @@ export const e2eUsers = {
     password: E2E_PASSWORD,
     role: 'CUSTOMER' as const,
   },
+  /** TTW-058: orders saved designs, then checks out (saves the address). */
+  designOrder: {
+    email: 'design-order.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
 } as const;
 
 /**

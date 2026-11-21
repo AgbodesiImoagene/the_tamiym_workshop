@@ -15,6 +15,14 @@ export interface OrderQuote {
   shippingFee: number;
   vatAmount: number;
   totalAmount: number;
+  /** One entry per quoted line: the server unit price, view surcharge included (TTW-058). */
+  items: Array<{
+    variantId: string;
+    designId?: string | null;
+    quantity: number;
+    unitFinalPrice: number;
+    lineTotal: number;
+  }>;
 }
 
 export interface CustomerOrderOptionPresentation {

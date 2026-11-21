@@ -165,6 +165,21 @@ describe('cart storage', () => {
     });
   });
 
+  it('still loads a cart saved before designs had a name (TTW-058)', () => {
+    window.localStorage.setItem(
+      CUSTOMER_CART_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 2,
+        lines: [line({ designId: 'des-1' })],
+        idempotencyKey: 'key-1',
+        pendingOrderId: null,
+        updatedAt: '2026-11-01T00:00:00Z',
+      })
+    );
+
+    expect(requireCart().lines[0]).toMatchObject({ designId: 'des-1', designName: null });
+  });
+
   it('migrates a legacy cart array without losing lines', () => {
     window.localStorage.setItem(
       LEGACY_CUSTOMER_CART_STORAGE_KEY,

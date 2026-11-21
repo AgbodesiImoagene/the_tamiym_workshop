@@ -19,6 +19,8 @@ let mockProductId = 'p1';
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
   useParams: () => ({ id: mockProductId }),
+  // TTW-058: the page reads `?designId=`; these tests open it without one.
+  useSearchParams: () => ({ get: () => null }),
 }));
 
 jest.mock('next/image', () => ({

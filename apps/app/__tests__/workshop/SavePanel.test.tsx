@@ -59,3 +59,52 @@ describe('SavePanel', () => {
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
   });
 });
+
+describe('SavePanel, ordering the design (TTW-058)', () => {
+  it('offers to order the design once it is saved', () => {
+    render(
+      <SavePanel
+        designId="d1"
+        productId="p1"
+        designName="My Design"
+        isSaving={false}
+        onNameChange={jest.fn()}
+        onSave={jest.fn()}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Order this design' })).toHaveAttribute(
+      'href',
+      '/dashboard/products/p1?designId=d1'
+    );
+  });
+
+  it('offers nothing to order before the first save', () => {
+    render(
+      <SavePanel
+        productId="p1"
+        designName="My Design"
+        isSaving={false}
+        onNameChange={jest.fn()}
+        onSave={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('link', { name: 'Order this design' })).not.toBeInTheDocument();
+  });
+
+  it('hides the link while the design is being saved', () => {
+    render(
+      <SavePanel
+        designId="d1"
+        productId="p1"
+        designName="My Design"
+        isSaving
+        onNameChange={jest.fn()}
+        onSave={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('link', { name: 'Order this design' })).not.toBeInTheDocument();
+  });
+});
