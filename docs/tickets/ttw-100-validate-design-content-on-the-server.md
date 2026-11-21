@@ -1,7 +1,7 @@
 # TTW-100 — Validate design content on the server
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented-unverified (local commits, not pushed, CI not run)\
+**Status:** Implemented-unverified (pushed, CI green on `aaaf66f`, not merged, third review pass done)\
 **Risk:** High\
 **Blocked by:** TTW-099\
 **Blocks:** TTW-058
@@ -103,7 +103,7 @@ Second review pass (`/code-review high`, 2026-11-21) found 1 issue in the fixes,
 
 7. **Fixed, security.** The text-layer rule only looked at `data` and the top-level key, but `styles` (per-character text style) accepted any nested key except `src`. A `designAssetId` hidden there skipped the ownership check while `collectDesignAssetIds` still counted it. `styles` is now validated structurally: only the two shapes Fabric writes (`[{ start, end, style }]` or `{ line: { character: style } }`), and only known style properties (fill, stroke, strokeWidth, fontSize, fontFamily, fontWeight, fontStyle, underline, overline, linethrough, deltaY, textBackgroundColor, textDecorationThickness) with their types. Tests written first and shown failing (2 failed), plus a test that both Fabric shapes are still accepted.
 
-Another review pass after this fix is still to do.
+Third review pass (`/code-review high`, 2026-11-21) on this fix: no finding. The review loop is closed.
 
 ## Verification evidence
 
@@ -116,12 +116,13 @@ Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 
 - `pnpm openapi:generate`, `pnpm openapi:check`, `pnpm docs:validate`: passed.
 - API e2e on a throwaway database `tamiym_workshop_test_ttw100` (REDIS_DB=13, dropped afterwards): `design-content-validation` (11 tests), `shared-design-private-images`, `moderation-appeals`, `campaign-authoring`, `private-customer-uploads`: 5 suites, 38 tests passed (an earlier 47-test run of 7 suites, which also had `view-surcharge-precedence` and `seed-e2e-fixture-owned-rows`, was before the third commit).
 - `pnpm build`, then Playwright `design-workshop.layers.spec.ts` and `design-workshop.reopen.spec.ts` with the setup project on the freshly seeded throwaway database: 13 passed on the first run. On repeated runs the layers journey failed intermittently with "Unexpected console error: 500". The 500 is `POST /v1/designs/:id/thumbnail` (storage is not available on this machine, the editor treats it as non-fatal and it only shows when the console check catches it before the test ends); the design `POST` itself answered 201 each time. Some later repeats also hit the admin MFA rate limit (429) from repeated setup runs. This is environmental, not caused by the ticket, but it means the journey is not green on every run here: it should be confirmed in CI, where storage exists.
-- Not run: `pnpm audit:prod`, `pnpm verify` as a whole, the whole Playwright suite, a browser journey that uploads an image, CI.
+- CI, run 44890509726 on the branch (`aaaf66f`), 2026-11-21: all 19 jobs succeeded, including Unit Tests, Coverage, API Integration, API Open Handles, Production Audit, OpenAPI Contracts, Documentation, Migration Baseline, Production Build, the container builds and Playwright Smoke. Playwright Smoke runs the `@smoke` tests only, so it does not confirm the layers journey.
+- Third review pass (`/code-review high`, 2026-11-21) on the `styles` fix: no finding.
+- Not run: `pnpm verify` as a whole, the whole Playwright suite, a browser journey that uploads an image.
 
 ## Remaining
 
-- Third review pass on the `styles` fix (high risk: security and integration), repeat until PASS.
-- Confirm the layers Playwright journey in CI (thumbnail upload needs storage, see evidence).
+- Confirm the layers Playwright journey (thumbnail upload needs storage, see evidence): CI runs the smoke subset only, so run the `@critical` journeys in an environment with storage.
 - Decide with the client whether an image whose moderation is still PENDING may be used in a design (accepted today).
 - Show the new error codes in the editor: today the save panel shows the message of the API. Mapping each code to its own wording is a UI ticket (not created).
 - Set `API_PUBLIC_URL` in the production secrets before deploying (the API will not start without it).
@@ -130,4 +131,4 @@ Run from the worktree `codex/ttw-100-validate-design-content-on-the-server`, on 
 
 ## Completion summary
 
-The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Local commits only: nothing pushed, CI not run. See Remaining before closing the ticket.
+The server now refuses a saved design that is not made of the editor's text and image layers, with an allowlist of objects and fields. Every image must be one of the design owner's READY uploads, served from `API_PUBLIC_URL`; external images and other users' assets are refused with stable codes, before moderation and before any write. The editor's designs still save (Playwright journeys, e2e). Branch pushed, CI green, not merged. See Remaining before closing the ticket.
