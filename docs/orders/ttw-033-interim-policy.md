@@ -60,6 +60,10 @@ UI must hide retry when `paymentRetryEligible` is false; client must not invent 
 | `/dashboard/orders/:id` | Renders DTO; retry only when server-eligible                         |
 | `/orders/:id/confirm`   | Shared status banner; links to account detail                        |
 
+## Quoting with a design (TTW-239)
+
+`POST /orders/quote` applies the same design rule as order creation (one shared function, `assertDesignsOrderableBy`). For each line with a `designId`, in this order: the design exists (else `400`), belongs to the caller (else `403`), the variant exists (else `400`), the design is for the variant's product (else `400`), and is not `REJECTED` (else `400`, code `DESIGN_REJECTED`). A quote never reads the views of a design the caller does not own, so it cannot be used to learn another customer's surcharge. `PENDING`, `FLAGGED` and `APPROVED` designs are quoted (client answer Q28). Campaign quotes keep their own rule (the design must be one of the campaign's products).
+
 ## Deferred
 
 - Full Playwright matrix (standard/campaign × payment/refund/shipment states)

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ForbiddenException,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
@@ -145,6 +146,7 @@ describe('PricingService', () => {
         }),
       },
       campaignProduct: { findFirst: jest.fn().mockResolvedValue(null) },
+      design: { findUnique: jest.fn().mockResolvedValue(null) },
       designView: { findMany: jest.fn().mockResolvedValue([]) },
       productViewPricing: { findMany: jest.fn().mockResolvedValue([]) },
       discountCampaign: { findMany: jest.fn().mockResolvedValue([]) },
@@ -254,6 +256,63 @@ describe('PricingService', () => {
       expect(result.items[0].optionPresentationSnapshot).toEqual(
         result.items[0].variantSnapshot,
       );
+    });
+  });
+
+  describe('quoteStandard design check (TTW-239)', () => {
+    const quoteWithDesign = () =>
+      service.quoteStandard('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', designId: 'design-1', quantity: 1 }],
+      });
+    const ownDesign = (over: Record<string, unknown> = {}) =>
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        id: 'design-1',
+        userId: 'user-1',
+        productId: 'prod-1',
+        moderationStatus: 'APPROVED',
+        ...over,
+      });
+
+    it("refuses another customer's design before reading its views", async () => {
+      ownDesign({ userId: 'other-user' });
+      await expect(quoteWithDesign()).rejects.toThrow(ForbiddenException);
+      expect(prisma.designView.findMany).not.toHaveBeenCalled();
+    });
+
+    it('refuses a design that does not exist', async () => {
+      await expect(quoteWithDesign()).rejects.toThrow(BadRequestException);
+      expect(prisma.designView.findMany).not.toHaveBeenCalled();
+    });
+
+    it('refuses a design of another product', async () => {
+      ownDesign({ productId: 'prod-2' });
+      await expect(quoteWithDesign()).rejects.toThrow(BadRequestException);
+    });
+
+    it('refuses a REJECTED design with DESIGN_REJECTED', async () => {
+      ownDesign({ moderationStatus: 'REJECTED' });
+      await expect(quoteWithDesign()).rejects.toMatchObject({
+        response: { code: 'DESIGN_REJECTED' },
+      });
+    });
+
+    it.each(['PENDING', 'FLAGGED', 'APPROVED'])(
+      'quotes a %s design of the caller',
+      async (moderationStatus) => {
+        ownDesign({ moderationStatus });
+        const result = await quoteWithDesign();
+        expect(result.items[0].variantId).toBe('var-1');
+        expect(prisma.designView.findMany).toHaveBeenCalled();
+      },
+    );
+
+    it('does not look at designs when no line has one', async () => {
+      await service.quoteStandard('user-1', {
+        shippingAddressId: 'addr-1',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+      expect(prisma.design.findUnique).not.toHaveBeenCalled();
     });
   });
 

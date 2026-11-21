@@ -43,6 +43,7 @@ import type {
   ShipmentSummaryLine,
 } from '../shipping/shipping.types';
 import { formatVariantDisplaySnapshot } from '../orders/order-item-snapshot';
+import { assertDesignsOrderableBy } from './design-order-eligibility';
 
 /** Sellable public campaign product offer (TTW-031). */
 export type PublicCampaignOffer = {
@@ -178,6 +179,8 @@ export class PricingService {
       dto.shippingAddressId,
       userId,
     );
+    // TTW-239: the same design rule as order creation, before any design is read.
+    await assertDesignsOrderableBy(this.prisma, userId, dto.items);
     const items: PricingLineItemInput[] = dto.items.map((i) => ({
       variantId: i.variantId,
       designId: i.designId ?? null,

@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PricingService } from '../pricing/pricing.service';
+import { assertDesignsOrderableBy } from '../pricing/design-order-eligibility';
 import { CreateOrderDto } from './dto/create-order.dto';
 import {
   OrderStatus,
@@ -136,7 +137,7 @@ export class OrdersService {
       null,
       fingerprint,
       async () => {
-        await this.assertDesignOwnershipAndProductMatch(userId, dto.items);
+        await assertDesignsOrderableBy(this.prisma, userId, dto.items);
 
         const quoteDto = {
           shippingAddressId: dto.shippingAddressId,
@@ -614,44 +615,6 @@ export class OrdersService {
     now?: Date;
   }): boolean {
     return computePaymentRetryEligible(input);
-  }
-
-  /**
-   * Validate that each item's design (if present) belongs to the user and matches the variant's product.
-   */
-  private async assertDesignOwnershipAndProductMatch(
-    userId: string,
-    items: Array<{ variantId: string; designId?: string | null }>,
-  ): Promise<void> {
-    for (const item of items) {
-      if (!item.designId) continue;
-      const [design, variant] = await Promise.all([
-        this.prisma.design.findUnique({
-          where: { id: item.designId },
-          select: { id: true, userId: true, productId: true },
-        }),
-        this.prisma.productVariant.findUnique({
-          where: { id: item.variantId },
-          select: { productId: true },
-        }),
-      ]);
-      if (!design) {
-        throw new BadRequestException(`Design ${item.designId} not found`);
-      }
-      if (design.userId !== userId) {
-        throw new ForbiddenException(
-          'Access denied: design does not belong to you',
-        );
-      }
-      if (!variant) {
-        throw new BadRequestException(`Variant ${item.variantId} not found`);
-      }
-      if (design.productId !== variant.productId) {
-        throw new BadRequestException(
-          `Design does not belong to the same product as variant ${item.variantId}`,
-        );
-      }
-    }
   }
 
   private async assertInventoryAvailable(
