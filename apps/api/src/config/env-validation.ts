@@ -33,6 +33,8 @@ export const requiredProductionEnvVars = [
   'AUTH_CUSTOMER_ORIGINS',
   'CLAMAV_HOST',
   'DESIGN_SHARE_PUBLIC_ORIGIN',
+  // Public base URL of this API: the only origin a saved design may load images from (TTW-100).
+  'API_PUBLIC_URL',
   'NOTIFICATION_UNSUBSCRIBE_SECRET',
   ...requiredProductionMailEnvVars,
 ] as const;
@@ -193,7 +195,7 @@ export function validateEnv(
           );
         }
       }
-      if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN') {
+      if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN' || key === 'API_PUBLIC_URL') {
         try {
           const originUrl = new URL(value.trim());
           if (
@@ -204,7 +206,7 @@ export function validateEnv(
           }
         } catch {
           throw new Error(
-            'Environment variable DESIGN_SHARE_PUBLIC_ORIGIN must be a valid http(s) absolute URL',
+            `Environment variable ${key} must be a valid http(s) absolute URL`,
           );
         }
       }

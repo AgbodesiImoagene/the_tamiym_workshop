@@ -145,6 +145,7 @@ describe('env-validation', () => {
         AUTH_CUSTOMER_ORIGINS: 'https://shop.example.com',
         CLAMAV_HOST: 'clamav.internal',
         DESIGN_SHARE_PUBLIC_ORIGIN: 'https://app.example.com',
+        API_PUBLIC_URL: 'https://api.example.com/v1',
         NOTIFICATION_UNSUBSCRIBE_SECRET: 'dedicated-unsubscribe-secret',
         MAIL_HOST: 'smtp.example.com',
         MAIL_USER: 'apikey',
@@ -273,6 +274,25 @@ describe('env-validation', () => {
           'Environment variable DESIGN_SHARE_PUBLIC_ORIGIN must be a valid http(s) absolute URL',
         );
       });
+
+      it('throws when API_PUBLIC_URL is missing (TTW-100)', () => {
+        expect(() =>
+          validateEnv(omit(validProductionConfig, 'API_PUBLIC_URL')),
+        ).toThrow(
+          'Missing required production environment variable: API_PUBLIC_URL',
+        );
+      });
+
+      it.each(['not-a-url', 'ftp://api.example.com/v1', '/v1'])(
+        'throws when API_PUBLIC_URL is %s (TTW-100)',
+        (value) => {
+          expect(() =>
+            validateEnv({ ...validProductionConfig, API_PUBLIC_URL: value }),
+          ).toThrow(
+            'Environment variable API_PUBLIC_URL must be a valid http(s) absolute URL',
+          );
+        },
+      );
 
       it('throws when VIRUS_SCANNER=deterministic in production', () => {
         expect(() =>

@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
+  MediaAssetStatus,
   ModerationActorKind,
   ModerationStatus,
   ModerationSubjectType,
@@ -20,6 +21,10 @@ import {
   MODERATION_REASON,
 } from '../moderation/moderation.constants';
 import { S3Service } from '../storage/s3.service';
+import {
+  DESIGN_CONTENT_ERROR,
+  inspectDesignContent,
+} from './design-content.validator';
 import { CreateDesignDto } from './dto/create-design.dto';
 import { UpdateDesignDto } from './dto/update-design.dto';
 import { AdminNotifyService } from '../admin-notifications/admin-notify.service';
@@ -106,11 +111,69 @@ export class DesignsService {
     // Guard against excessively large payloads (>= 2 MB serialised)
     const serialised = JSON.stringify(designData);
     if (serialised.length > 2_000_000) {
-      throw new BadRequestException(
-        'designData exceeds the maximum allowed size (2 MB)',
-      );
+      throw new BadRequestException({
+        statusCode: 400,
+        code: DESIGN_CONTENT_ERROR.TOO_LARGE,
+        message: 'designData exceeds the maximum allowed size (2 MB)',
+      });
     }
     return true;
+  }
+
+  /**
+   * Public base URL of this API. Required in production (`validateEnv`); elsewhere it
+   * defaults to the local address the app uses by default, so dev and tests need no setup.
+   */
+  private apiPublicUrl(): string | undefined {
+    const configured = this.config.get<string>('API_PUBLIC_URL');
+    if (configured) return configured;
+    return process.env.NODE_ENV === 'production'
+      ? undefined
+      : 'http://localhost:3001/v1';
+  }
+
+  /**
+   * Refuse a design whose content is not what the editor produces (TTW-100): see
+   * `design-content.validator.ts` for the allowlist. Every image must be a READY upload of
+   * the design owner. An asset of someone else and an unknown one get the same answer, so
+   * the endpoint cannot be used to probe which ids exist.
+   */
+  private async assertDesignContent(
+    ownerUserId: string,
+    designData: Record<string, unknown>,
+  ): Promise<void> {
+    const result = inspectDesignContent(designData, {
+      apiPublicUrl: this.apiPublicUrl(),
+    });
+    if (!result.ok) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: result.code,
+        message: result.message,
+      });
+    }
+    if (result.assetIds.size === 0) return;
+
+    const ids = [...result.assetIds];
+    const assets = await this.prisma.designAsset.findMany({
+      where: { id: { in: ids }, ownerUserId },
+      select: { id: true, mediaAsset: { select: { status: true } } },
+    });
+    const byId = new Map(assets.map((a) => [a.id, a.mediaAsset.status]));
+    if (ids.some((id) => !byId.has(id))) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: DESIGN_CONTENT_ERROR.ASSET_NOT_FOUND,
+        message: 'An image of this design is not one of your uploads',
+      });
+    }
+    if (ids.some((id) => byId.get(id) !== MediaAssetStatus.READY)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: DESIGN_CONTENT_ERROR.ASSET_NOT_READY,
+        message: 'An image of this design is not ready yet, try again shortly',
+      });
+    }
   }
 
   /**
@@ -276,6 +339,7 @@ export class DesignsService {
     if (!this.validateDesignData(dto.designData)) {
       throw new BadRequestException('designData must be a valid object');
     }
+    await this.assertDesignContent(userId, dto.designData);
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
     });
@@ -413,6 +477,9 @@ export class DesignsService {
       !this.validateDesignData(dto.designData)
     ) {
       throw new BadRequestException('designData must be a valid object');
+    }
+    if (dto.designData !== undefined) {
+      await this.assertDesignContent(userId, dto.designData);
     }
 
     const contentChanged =

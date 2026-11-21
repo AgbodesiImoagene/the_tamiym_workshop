@@ -88,6 +88,9 @@ describe('DesignsService', () => {
     mockPrisma.productView = {
       findMany: jest.fn().mockResolvedValue([]),
     };
+    mockPrisma.designAsset = {
+      findMany: jest.fn().mockResolvedValue([]),
+    };
 
     const mockModeration = {
       moderate: jest.fn().mockResolvedValue(APPROVED_RESULT),
@@ -115,6 +118,7 @@ describe('DesignsService', () => {
         if (key === 'S3_BUCKET') return 'test-bucket';
         if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN')
           return 'https://app.example.com';
+        if (key === 'API_PUBLIC_URL') return 'https://api.example.com/v1';
         return undefined;
       }),
     };
@@ -266,6 +270,10 @@ describe('DesignsService', () => {
         { id: 'pv-1' },
       ]);
 
+      // TTW-100: the image of this design must now be a READY asset of the owner.
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+        { id: 'da-1', mediaAsset: { status: 'READY' } },
+      ]);
       const designData = {
         version: 1,
         views: {
@@ -841,6 +849,197 @@ describe('DesignsService', () => {
       await expect(
         service.findByShareToken('abcdefghijklmnopqrstuvwxyz0123456789'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // design content validation (TTW-100)
+  // -------------------------------------------------------------------------
+
+  describe('design content validation (TTW-100)', () => {
+    const API = 'https://api.example.com/v1';
+    const imageLayer = (id: string, src?: string) => ({
+      type: 'Image',
+      src: src ?? `${API}/design-assets/${id}/file?variant=original`,
+      data: { designAssetId: id, layerId: `layer-${id}` },
+    });
+    const withLayers = (objects: unknown[]) => ({
+      version: 1,
+      productId: 'prod-1',
+      views: {
+        front: {
+          productViewId: 'pv-1',
+          isUsed: true,
+          layerCount: objects.length,
+          fabricJson: { objects },
+        },
+      },
+    });
+    const createWith = (designData: Record<string, unknown>) =>
+      service.create('user-1', { name: 'D', productId: 'prod-1', designData });
+    const codeOf = async (promise: Promise<unknown>) => {
+      try {
+        await promise;
+      } catch (error) {
+        return (error as BadRequestException).getResponse() as {
+          code?: string;
+          statusCode?: number;
+        };
+      }
+      return undefined;
+    };
+
+    beforeEach(() => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prod-1',
+        status: 'ACTIVE',
+      });
+      (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        designData: { version: 1, views: {} },
+      });
+      (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
+    });
+
+    it('creates a design whose images are READY assets of the owner, asking the database once', async () => {
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+        { id: 'da_1', mediaAsset: { status: 'READY' } },
+        { id: 'da_2', mediaAsset: { status: 'READY' } },
+      ]);
+
+      await createWith(withLayers([imageLayer('da_1'), imageLayer('da_2')]));
+
+      expect(prisma.designAsset.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.designAsset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['da_1', 'da_2'] }, ownerUserId: 'user-1' },
+        }),
+      );
+      expect(prisma.design.create).toHaveBeenCalled();
+    });
+
+    it('does not query assets for a design without images', async () => {
+      await createWith(withLayers([{ type: 'IText', text: 'Hi' }]));
+      expect(prisma.designAsset.findMany).not.toHaveBeenCalled();
+    });
+
+    it('refuses an external image with a stable code, before moderation and before saving', async () => {
+      const body = await codeOf(
+        createWith(
+          withLayers([imageLayer('da_1', 'https://evil.example.com/a.png')]),
+        ),
+      );
+
+      expect(body).toMatchObject({
+        statusCode: 400,
+        code: 'DESIGN_IMAGE_EXTERNAL',
+      });
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+      expect(prisma.design.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses another user's asset with the same answer as an unknown one", async () => {
+      // The owner filter returns nothing for an asset that belongs to someone else.
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([]);
+
+      const foreign = await codeOf(
+        createWith(withLayers([imageLayer('da_x')])),
+      );
+
+      expect(foreign).toMatchObject({
+        statusCode: 400,
+        code: 'DESIGN_ASSET_NOT_FOUND',
+      });
+      expect(prisma.design.create).not.toHaveBeenCalled();
+    });
+
+    it.each(['PENDING', 'PROCESSING', 'FAILED'])(
+      'refuses an asset that is %s, not READY',
+      async (status) => {
+        (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+          { id: 'da_1', mediaAsset: { status } },
+        ]);
+
+        const body = await codeOf(createWith(withLayers([imageLayer('da_1')])));
+
+        expect(body).toMatchObject({ code: 'DESIGN_ASSET_NOT_READY' });
+        expect(prisma.design.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses an unknown object type', async () => {
+      const body = await codeOf(
+        createWith(withLayers([{ type: 'rect', left: 1 }])),
+      );
+      expect(body).toMatchObject({ code: 'DESIGN_OBJECT_TYPE_NOT_ALLOWED' });
+    });
+
+    it('gives the size limit a stable code too, and keeps the 2 MB limit', async () => {
+      const body = await codeOf(
+        createWith(
+          withLayers([{ type: 'IText', text: 'a'.repeat(2_000_001) }]),
+        ),
+      );
+      expect(body).toMatchObject({ code: 'DESIGN_TOO_LARGE' });
+    });
+
+    it('applies the same rules on update, with the design owner as the asset owner', async () => {
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([]);
+
+      const body = await codeOf(
+        service.update('user-1', 'design-1', {
+          designData: withLayers([imageLayer('da_x')]),
+        }),
+      );
+
+      expect(body).toMatchObject({ code: 'DESIGN_ASSET_NOT_FOUND' });
+      expect(prisma.designAsset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['da_x'] }, ownerUserId: 'user-1' },
+        }),
+      );
+      expect(prisma.design.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses an external image on update before moderation', async () => {
+      const body = await codeOf(
+        service.update('user-1', 'design-1', {
+          designData: withLayers([
+            imageLayer('da_1', 'https://evil.example.com/a.png'),
+          ]),
+        }),
+      );
+
+      expect(body).toMatchObject({ code: 'DESIGN_IMAGE_EXTERNAL' });
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+      expect(prisma.design.update).not.toHaveBeenCalled();
+    });
+
+    it('outside production, falls back to the local API address the app uses by default', async () => {
+      config.get.mockImplementation(() => undefined);
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+        { id: 'da_1', mediaAsset: { status: 'READY' } },
+      ]);
+
+      await createWith(
+        withLayers([
+          imageLayer(
+            'da_1',
+            'http://localhost:3001/v1/design-assets/da_1/file?variant=original',
+          ),
+        ]),
+      );
+
+      expect(prisma.design.create).toHaveBeenCalled();
+    });
+
+    it('does not re-validate saved content when only the name changes', async () => {
+      await service.update('user-1', 'design-1', { name: 'Renamed' });
+      expect(prisma.designAsset.findMany).not.toHaveBeenCalled();
     });
   });
 });

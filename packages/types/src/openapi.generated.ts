@@ -13066,7 +13066,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input or product not found */
+            /** @description Invalid input, product not found, or design content refused (TTW-100). Content errors carry a stable `code`: DESIGN_TOO_LARGE, DESIGN_STRUCTURE_INVALID, DESIGN_FIELD_NOT_ALLOWED, DESIGN_FIELD_VALUE_INVALID, DESIGN_OBJECT_TYPE_NOT_ALLOWED, DESIGN_IMAGE_EXTERNAL, DESIGN_IMAGE_ASSET_MISSING, DESIGN_ASSET_NOT_FOUND, DESIGN_ASSET_NOT_READY. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -13196,7 +13196,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Invalid input */
+            /** @description Invalid input or design content refused (TTW-100). Content errors carry a stable `code`, the same as on create. */
             400: {
                 headers: {
                     [name: string]: unknown;
