@@ -94,19 +94,20 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 
 ## Phase 0 : Fiabiliser la base et la CI
 
-| Fait | N°  | Ticket                                                             | Lot | Travail                                                                      | Excel | Risque   | Heures | Attend |
-| ---- | --- | ------------------------------------------------------------------ | --- | ---------------------------------------------------------------------------- | ----- | -------- | ------ | ------ |
-| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)      | 0A  | Aligner le schéma de la base et les migrations                               | —     | Élevé    | —      | —      |
-| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)             | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué               | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                   | 0A  | Refuser les quantités de palier que la base ne peut pas stocker              | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)       | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés            | —     | Faible   | —      | —      |
-| [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)         | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite            | —     | Standard | —      | —      |
-| [x]  | —   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)           | 0A  | Interdire deux remboursements pour un même identifiant Paystack              | —     | Critique | —      | —      |
-| [x]  | —   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                     | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI                         | —     | Standard | —      | —      |
-| [x]  | —   | [TTW-181](ttw-181-seed-the-real-vat-rate-in-e2e-data.md)           | 0A  | Données de test : TVA à 7,5 % au lieu de 7 %                                 | —     | Faible   | 1      | —      |
-| [x]  | —   | [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | 0A  | Tests de l'app client qui échouent au hasard quand tout tourne en même temps | —     | Faible   | 1–3    | —      |
-| [ ]  | —   | [TTW-187](ttw-187-make-infra-validate-survive-network-errors.md)   | 0A  | CI : l'étape « Infra Validate » ne doit plus échouer sur une panne réseau    | —     | Standard | 2–4    | —      |
-| [x]  | —   | [TTW-188](ttw-188-ignore-cancelled-prefetches-in-firefox.md)       | 0A  | Matrice de nuit instable sous Firefox : préchargements annulés comptés       | —     | Faible   | 1      | —      |
+| Fait | N°  | Ticket                                                             | Lot | Travail                                                                                               | Excel | Risque   | Heures | Attend               |
+| ---- | --- | ------------------------------------------------------------------ | --- | ----------------------------------------------------------------------------------------------------- | ----- | -------- | ------ | -------------------- |
+| [x]  | —   | [TTW-005](ttw-005-reconcile-prisma-schema-with-migrations.md)      | 0A  | Aligner le schéma de la base et les migrations                                                        | —     | Élevé    | —      | —                    |
+| [x]  | —   | [TTW-080](ttw-080-make-open-handle-proof-fail-fast.md)             | 0A  | Faire échouer vite le contrôle de la CI qui peut rester bloqué                                        | —     | Faible   | —      | —                    |
+| [x]  | —   | [TTW-163](ttw-163-bound-bulk-tier-quantities.md)                   | 0A  | Refuser les quantités de palier que la base ne peut pas stocker                                       | —     | Faible   | —      | —                    |
+| [x]  | —   | [TTW-164](ttw-164-ignore-generated-files-in-format-check.md)       | 0A  | Empêcher le contrôle de format d'échouer sur les fichiers générés                                     | —     | Faible   | —      | —                    |
+| [x]  | —   | [TTW-170](ttw-170-align-playwright-gates-with-strategy.md)         | 0A  | Aligner les contrôles Playwright de la CI sur la stratégie écrite                                     | —     | Standard | —      | —                    |
+| [x]  | —   | [TTW-081](ttw-081-enforce-unique-refund-provider-ref.md)           | 0A  | Interdire deux remboursements pour un même identifiant Paystack                                       | —     | Critique | —      | —                    |
+| [x]  | —   | [TTW-176](ttw-176-run-browser-matrix-in-ci.md)                     | 0A  | Tester aussi Safari, Firefox et le mobile dans la CI                                                  | —     | Standard | —      | —                    |
+| [x]  | —   | [TTW-181](ttw-181-seed-the-real-vat-rate-in-e2e-data.md)           | 0A  | Données de test : TVA à 7,5 % au lieu de 7 %                                                          | —     | Faible   | 1      | —                    |
+| [x]  | —   | [TTW-182](ttw-182-stabilise-customer-app-unit-tests-under-load.md) | 0A  | Tests de l'app client qui échouent au hasard quand tout tourne en même temps                          | —     | Faible   | 1–3    | —                    |
+| [ ]  | —   | [TTW-187](ttw-187-make-infra-validate-survive-network-errors.md)   | 0A  | CI : l'étape « Infra Validate » ne doit plus échouer sur une panne réseau                             | —     | Standard | 2–4    | —                    |
+| [x]  | —   | [TTW-188](ttw-188-ignore-cancelled-prefetches-in-firefox.md)       | 0A  | Matrice de nuit instable sous Firefox : préchargements annulés comptés                                | —     | Faible   | 1      | —                    |
+| [ ]  | —   | [TTW-238](ttw-238-fix-flaky-tests-of-the-browser-matrix.md)        | 0A  | Matrice de nuit : deux tests instables (Safari mobile, checkout de collecte). Reporté, livrer d'abord | —     | Faible   | —      | Reporté (2026-11-21) |
 
 ## Phase 1 : Fermer les failles sécurité et argent
 
