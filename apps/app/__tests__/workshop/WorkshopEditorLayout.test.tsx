@@ -72,7 +72,7 @@ function renderEditor(context: WorkshopContext = workshopContext) {
 describe('WorkshopEditor layout (Figma)', () => {
   it('has a left tool rail with Upload, Add Text and Product Colors', () => {
     renderEditor();
-    const rail = screen.getByRole('toolbar', { name: 'Workshop tools' });
+    const rail = screen.getByRole('group', { name: 'Workshop tools' });
     for (const name of ['Upload', 'Add Text', 'Product Colors']) {
       expect(within(rail).getByRole('button', { name })).toBeInTheDocument();
     }
@@ -80,29 +80,61 @@ describe('WorkshopEditor layout (Figma)', () => {
 
   it('puts a thumbnail for each view in the rail', () => {
     renderEditor();
-    const rail = screen.getByRole('toolbar', { name: 'Workshop tools' });
+    const rail = screen.getByRole('group', { name: 'Workshop tools' });
     expect(within(rail).getByRole('tab', { name: /Front/ })).toBeInTheDocument();
     expect(within(rail).getByRole('tab', { name: /Back/ })).toBeInTheDocument();
   });
 
   it('opens Add Text first and switches tool from the rail', () => {
     renderEditor();
-    expect(screen.getByPlaceholderText('Enter text…')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter text…')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Choose image' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
-    expect(screen.getByRole('button', { name: 'Choose image' })).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Enter text…')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose image' })).toBeVisible();
+    expect(screen.getByPlaceholderText('Enter text…')).not.toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Product Colors' }));
-    expect(screen.getByRole('button', { name: 'M' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'M' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Choose image' })).not.toBeInTheDocument();
+  });
+
+  it('keeps what was typed in Add Text when another tool is opened and closed', () => {
+    renderEditor();
+    fireEvent.change(screen.getByPlaceholderText('Enter text…'), { target: { value: 'Keep me' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Product Colors' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
+
+    expect(screen.getByPlaceholderText('Enter text…')).toHaveValue('Keep me');
+  });
+
+  it('keeps the image tool mounted, so an upload in progress can still report its error', () => {
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
+    expect(screen.getByRole('button', { name: 'Choose image', hidden: true })).toBeInTheDocument();
+  });
+
+  it('marks the open tool and does not claim a vertical layout', () => {
+    renderEditor();
+    const rail = screen.getByRole('group', { name: 'Workshop tools' });
+    expect(within(rail).getByRole('button', { name: 'Add Text' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(within(rail).getByRole('button', { name: 'Upload' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(rail).not.toHaveAttribute('aria-orientation');
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
   });
 
   it('says what the upload really accepts, not what Figma lists', () => {
     renderEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
-    expect(screen.getByText('PNG, JPEG or WebP · max 10 MB')).toBeInTheDocument();
+    expect(screen.getByText('PNG, JPEG or WebP · max 10 MB')).toBeVisible();
     expect(screen.queryByText(/EPS|\bAI\b|PDF|5 MB/)).not.toBeInTheDocument();
   });
 

@@ -71,9 +71,10 @@ From `revue-client/screenshots/` (frames "Dashboard/Products/Product Info/Tamiym
 Decided with the product owner on 2026-11-21 (standard risk: no API, schema or contract change).
 
 - Both workshop routes (`/dashboard/design/new/<product>` and `/dashboard/design/<id>/edit`) are wrapped in the existing `CustomerDashboardShell` through a small `WorkshopPageShell`, so the editor and its loading and error screens sit beside the sidebar. `WorkshopEditor` itself does not depend on the user, which keeps its unit tests unchanged.
-- Layout only. `TextTool`, `ImageTool`, `OptionPicker`, `LayerList`, `SavePanel`, `SharePanel` and the canvas are reused as they are. A new `WorkshopToolRail` only chooses which tool is open (Add Text first). `ViewTabs` keeps its API and tab roles but becomes vertical thumbnails inside the rail.
+- Layout only. `TextTool`, `ImageTool`, `OptionPicker`, `LayerList`, `SavePanel`, `SharePanel` and the canvas are reused as they are. A new `WorkshopToolRail` only chooses which tool is open (Add Text first). The three tools stay mounted and the closed ones are hidden, so what was typed in Add Text, or an upload in progress, survives a visit to another tool (found by the first review). The rail is a labelled group, not a toolbar, because it holds the view tabs. `ViewTabs` keeps its API and tab roles but becomes vertical thumbnails inside the rail.
 - Placement chosen for what Figma does not draw: undo, redo, delete, the layers list and the design name with Save stay in the tool panel, under the open tool (option A). The "Save | Share" row below the card is not copied, because Save and Share already exist in that panel and a second pair would be a duplicate control.
 - Not added: Add, Remove and Duplicate Product (row 3.5), and "Get Price" (no behaviour is defined for it; a button with no action is incomplete).
+- On a phone the canvas comes right after the rail and the tool panel comes after the canvas, so the result of a tool is visible without scrolling past every panel (found by the first review).
 - Product Colors is offered only when the product has options, so the rail has no empty tool.
 - The product photo is the existing workshop template layer drawn behind the customer's layers. No API change. To prove it, the e2e seed gives the Campus Hoodie front a template layer (a small PNG data URL).
 - Upload text stays "PNG, JPEG or WebP · max 10 MB": it follows what the app accepts, not Figma.
@@ -81,24 +82,31 @@ Decided with the product owner on 2026-11-21 (standard risk: no API, schema or c
 
 ## Implementation reviews
 
-Pending: independent review not done yet.
+First review (independent subagent, 2026-11-21): FAIL (conditional). No security finding. To fix: (1) typed text lost when another tool was opened, (2) an upload error lost if the tool was left during the upload, (3) the canvas below every panel on a phone, (4) toolbar role containing tabs and a wrong vertical orientation on a phone, (5) an inaccurate seed comment and an incomplete ticket. All five are fixed in the second commit, with tests written first (`WorkshopEditorLayout.test.tsx`: typed text kept, image tool kept mounted, group role; `design-workshop.layout.spec.ts`: canvas in the viewport on a phone). The reviewer's claim that `originalBytes: 144` was wrong is itself wrong: the PNG is 144 bytes.
+
+Second review: pending.
 
 ## Verification evidence
 
 2026-11-21, in the worktree, Node 24.22.1:
 
-- Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing).
-- `pnpm --filter app test`: 42 suites, 312 tests passed.
-- `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`: no error. `pnpm --filter api lint`: 0 errors, 14 warnings (none in files of this ticket).
-- `pnpm format:check`, `pnpm playwright:validate`, `pnpm docs:validate`: passed.
-- Playwright (chromium-app, throwaway database `tamiym_workshop_test_ttw105`, built apps): `design-workshop.layout.spec.ts` 3/3 (sidebar and rail, product photo painted on the hoodie and not on the tee, phone width with no horizontal scroll). Run together with the other workshop, shared-design and design-order specs: 27 passed (9 of them the login setup), 1 failed (the low-resolution spec, below).
-- Not verified here: `design-workshop.low-resolution.spec.ts` fails at the image upload with an API 500, because no object storage (MinIO) runs on this Mac. It is not run against `main` either; CI must confirm it. One run of `design-workshop.layers.spec.ts` also hit a 500 on the thumbnail upload for the same reason, then passed on rerun.
-- Not done: mobile Playwright project, Firefox and WebKit, a visual comparison by the client.
+- Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing); then for the review fixes, six assertions of `WorkshopEditorLayout.test.tsx` failed before the code change (no group role, typed text lost, image tool unmounted).
+- `pnpm --filter app test`: 42 suites, 315 tests passed.
+- `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`, `pnpm format:check`, `pnpm playwright:validate`: exit 0. `pnpm docs:validate` passed at the first commit.
+- Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main`; CI must confirm it.
+- Risks of the seed change (a product photo on the Campus Hoodie), checked: the specs above that use the hoodie pass on a fresh seed, and the full API e2e suite gives 377 of 378 passed. The one failure (`address-country-and-text-hardening`, over-long state) passes alone, 20 of 20, and concerns addresses, not products. One earlier run of `products-cart` failed ("Bulk Item 01" missing) on a database already used by several runs; it passed on a fresh seed, and it also failed with the hoodie photo rows deleted, so the cause is not the seed change.
+- Not done: Playwright mobile project, Firefox and WebKit, a visual comparison by the client.
 
 ## Findings outside this ticket
 
-- The template layer (product photo) painted only a 300 x 300 area at the top left of the 600 x 600 canvas in the e2e run, with two different seed images (1 px and 60 px). It looks like a scaling problem in `WorkshopCanvas.tsx` (`loadTemplateLayers`), which this ticket does not touch. It needs its own check with a real product photo.
+Verified on 2026-11-21 in the running app (hoodie with a real product photo and a print area added to the local database only, not to the seed):
+
+- Fabric 7 centres an object on its `left` and `top` unless `originX` and `originY` say otherwise (checked with Fabric 7.4.0 alone: a 200 px square placed at 100, 100 covers 0 to 200).
+- `WorkshopCanvas.tsx` places the product photo at `left: 0, top: 0` with no origin, so only its bottom-right quarter shows at the canvas top-left. Seen with the real photo: a quarter of the shirt.
+- The print-area clip (`buildClipPath`) has the same flaw: with an area of 0.3, 0.3, 0.4, 0.4 of a 600 px canvas, the visible window was 60 to 300 instead of 180 to 420. A text added at 50, 50 was almost entirely cut.
+- The clip is set on the whole canvas, so it also cuts the product photo to the print area. Whether the photo should stay visible outside the print area is a product question, to settle with the fix.
+- Not fixed here: it is outside "layout only". The first commit's acceptance criterion "product photo as background" is therefore only partly met until it is fixed.
 
 ## Completion summary
 
-Implemented locally, not committed to any shared branch and not pushed. Awaiting the independent review and the client's visual check.
+Implemented locally in two commits, not pushed. Awaiting the second independent review, the fix of the canvas origin (decision pending) and the client's visual check.

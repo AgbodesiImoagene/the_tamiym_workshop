@@ -32,10 +32,9 @@ export default function WorkshopToolRail({
 }: WorkshopToolRailProps) {
   return (
     <div
-      role="toolbar"
+      role="group"
       aria-label="Workshop tools"
-      aria-orientation="vertical"
-      className="flex shrink-0 flex-row gap-2 overflow-x-auto border-b border-border bg-muted p-2 md:w-24 md:flex-col md:overflow-visible md:border-b-0 md:border-r"
+      className="order-1 flex shrink-0 flex-row gap-2 overflow-x-auto border-b border-border bg-muted p-2 md:w-24 md:flex-col md:overflow-visible md:border-b-0 md:border-r"
     >
       {tools.map((tool) => (
         <button

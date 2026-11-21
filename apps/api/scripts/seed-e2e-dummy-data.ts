@@ -816,7 +816,7 @@ async function main() {
     });
 
     // TTW-105: the Campus Hoodie front has a product photo (a workshop template layer), so
-    // the editor test can see it behind the canvas. A one-pixel PNG as a data URL keeps the
+    // the editor test can see it behind the canvas. A 60 x 60 px grey PNG (144 bytes) as a data URL keeps the
     // fixture free of any network or storage dependency (opaque, so the test can tell it is drawn).
     const hoodiePhoto =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAA8CAYAAAA6/NlyAAAAV0lEQVR42u3PQQEAMAgEIF3/YNdKM+wtNKCTTB3y6hhhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYeE/Cx7aA88h5tqzAAAAAElFTkSuQmCC';

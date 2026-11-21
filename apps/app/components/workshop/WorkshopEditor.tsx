@@ -337,18 +337,24 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         </WorkshopToolRail>
 
         {/* The open tool, then the parts that do not depend on the tool */}
-        <div className="flex w-full flex-col gap-4 overflow-y-auto border-b border-border bg-background p-4 md:w-72 md:shrink-0 md:border-b-0 md:border-r">
-          {activeTool === 'upload' && (
+        <div className="order-3 flex w-full flex-col gap-4 overflow-y-auto border-t border-border bg-background p-4 md:order-2 md:w-72 md:shrink-0 md:border-t-0 md:border-r">
+          {/* The tools stay mounted and are only hidden: what the customer typed or uploaded
+              must survive a visit to another tool. */}
+          <div hidden={activeTool !== 'upload'}>
             <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
-          )}
-          {activeTool === 'text' && <TextTool onAddText={handleAddText} disabled={!canvasReady} />}
-          {activeTool === 'colors' && product.options.length > 0 && (
-            <OptionPicker
-              options={product.options}
-              allEffects={views.flatMap((v) => v.effects)}
-              selectedOptions={selectedOptions}
-              onChange={handleOptionChange}
-            />
+          </div>
+          <div hidden={activeTool !== 'text'}>
+            <TextTool onAddText={handleAddText} disabled={!canvasReady} />
+          </div>
+          {product.options.length > 0 && (
+            <div hidden={activeTool !== 'colors'}>
+              <OptionPicker
+                options={product.options}
+                allEffects={views.flatMap((v) => v.effects)}
+                selectedOptions={selectedOptions}
+                onChange={handleOptionChange}
+              />
+            </div>
           )}
 
           <hr className="border-border" />
@@ -408,7 +414,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
         </div>
 
         {/* Canvas: the product photo (the template layers) sits behind the customer's layers */}
-        <div className="flex flex-1 flex-col items-center gap-3 overflow-x-auto bg-background p-4">
+        <div className="order-2 flex flex-1 flex-col items-center gap-3 overflow-x-auto bg-background p-4 md:order-3">
           {activeView && (
             <WorkshopCanvas
               viewKey={activeViewKey}

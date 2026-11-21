@@ -21,7 +21,7 @@ test.describe('Design workshop layout @app', () => {
       await expect(page.getByRole('link', { name, exact: true })).toBeVisible();
     }
 
-    const rail = page.getByRole('toolbar', { name: 'Workshop tools' });
+    const rail = page.getByRole('group', { name: 'Workshop tools' });
     await expect(rail.getByRole('button', { name: 'Upload' })).toBeVisible();
     await expect(rail.getByRole('button', { name: 'Add Text' })).toBeVisible();
     await expect(rail.getByRole('button', { name: 'Product Colors' })).toBeVisible();
@@ -39,7 +39,7 @@ test.describe('Design workshop layout @app', () => {
 
     // Product Colors shows the product options.
     await rail.getByRole('button', { name: 'Product Colors' }).click();
-    await expect(page.getByRole('button', { name: 'Choose image' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Choose image' })).toBeHidden();
 
     // Layers, undo, redo and the design name stay in reach whichever tool is open.
     await expect(page.getByRole('button', { name: `Select ${label}` })).toBeVisible();
@@ -79,9 +79,12 @@ test.describe('Design workshop layout @app', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/dashboard/design/new/${TEE_PRODUCT_ID}`);
 
-    const rail = page.getByRole('toolbar', { name: 'Workshop tools' });
+    const rail = page.getByRole('group', { name: 'Workshop tools' });
     await expect(rail.getByRole('button', { name: 'Add Text' })).toBeVisible();
     await expect(page.getByPlaceholder('Enter text…')).toBeVisible();
+
+    // The canvas is reachable without scrolling past every panel.
+    await expect(page.locator('canvas.lower-canvas')).toBeInViewport();
 
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
