@@ -1,7 +1,7 @@
 # TTW-104 — Warn about low-resolution images in the workshop
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented in a worktree, uncommitted (independent review PASS)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** TTW-103\
 **Blocks:** TTW-105
@@ -108,9 +108,16 @@ Run in the worktree `ttw-104`, 2026-11-21 (the first `main` checkout had stale d
 - `pnpm --filter app typecheck` and `pnpm --filter app lint`: no errors.
 - `pnpm --filter app build`, `pnpm docs:validate`, `pnpm playwright:validate`: passed. `prettier --check` reports only `apps/app/app/globals.css`, which this ticket did not touch.
 - Playwright on a throwaway database `tamiym_workshop_test_ttw104` (seeded, dropped afterwards) with MinIO from `docker-compose.yml`: `design-workshop.*` and `shared-design.canvas` specs, 22 passed; the first version of `design-workshop.low-resolution.spec.ts` passed 25 times out of 25 locally, but failed in CI (see Deviations). The corrected version passed locally without the API `.env` files (closer to CI).
-- CI on `main`, merge commit `53f0f5f`: `CI` green; `Playwright Comprehensive` red on that one spec only (235 other tests passed, 3 did not run). Corrective commit follows; its CI result is recorded in the Completion summary.
-- Not run: the full Playwright suite, the other browsers of the matrix, `pnpm verify`, CI. Not looked at by eye in the browser pane beyond the test screenshots.
+- CI on `main`, merge commit `53f0f5f`: `CI` green; `Playwright Comprehensive` red on that one spec only (235 other tests passed, 3 did not run). Corrected in `1a5fd3a`, whose CI is green (see Completion summary).
+- Not run: the other browsers of the nightly matrix and `pnpm verify` locally. Not looked at by eye in the browser pane beyond the test screenshots.
 
 ## Completion summary
 
-Pending implementation.
+Images that may print blurry are flagged in the workshop, without blocking anything: a "May print blurry" note under the layer in the layer list, and an explanation next to the canvas for the selected image. The measure is the number of source pixels across the width of the print area (print-area width on the canvas divided by the image scale), threshold 1200 (user decision), computed from the design JSON, so it follows add, resize and reopen. No schema or API change.
+
+Merged into `main` on 2026-11-21 after merging `main` (TTW-058) into the branch, and pushed:
+
+- `53f0f5f` (merge commit): `CI` green (run 44917067615); `Playwright Comprehensive` red (run 44917067578) on this ticket's new browser test only. Cause: the CI API runs with `NODE_ENV=test`, where the media worker does not start, so a design holding an uploaded image cannot be saved.
+- `1a5fd3a` (the browser test no longer saves or reloads): `CI` green (run 44918192907) and `Playwright Comprehensive` green (run 44918192833).
+
+Open items, none blocking: no browser journey can save a design with an uploaded image on the CI API until a worker runs there (possible ticket); an always-present `aria-live` region and the contrast of `text-warning` (about 3:1); a new image appears at the canvas origin instead of (50, 50); noise on freshly added images when the print area is 0.64 of the canvas; real print sizes per print area (schema change) only if the client asks.

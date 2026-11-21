@@ -194,7 +194,7 @@ Ces questions restent ouvertes : le client doit répondre ou demande d'abord du 
 | [x]  | 24  | [TTW-058](ttw-058-order-saved-designs-from-the-workshop.md)          | 3C  | Ajouter un design au panier et le commander                       | 3.1, 3.8  | Élevé    | 22–33  | TTW-100, TTW-092 |
 | [x]  | —   | [TTW-239](ttw-239-check-design-owner-on-order-quote.md)              | 3C  | Vérifier le propriétaire du design sur le devis de commande       | —         | Élevé    | 2–4    | —                |
 | [ ]  | 25  | [TTW-101](ttw-101-give-the-workshop-its-print-files.md)              | 3D  | Donner à l'atelier les fichiers d'impression                      | 3.2       | Élevé    | 20–35  | TTW-058, TTW-099 |
-| [ ]  | 26  | [TTW-104](ttw-104-warn-about-low-resolution-images.md)               | 3D  | Alerter si l'image est trop petite pour bien s'imprimer           | 3.10      | Standard | 4–6    | TTW-103          |
+| [x]  | 26  | [TTW-104](ttw-104-warn-about-low-resolution-images.md)               | 3D  | Alerter si l'image est trop petite pour bien s'imprimer           | 3.10      | Standard | 4–6    | TTW-103          |
 | [ ]  | 27  | [TTW-105](ttw-105-align-workshop-layout-with-figma.md)               | 3E  | Aligner la mise en page du Workshop sur Figma                     | 3.4       | Standard | 30–45  | TTW-104          |
 
 ## Phase 4 : Produire, expédier, facturer
