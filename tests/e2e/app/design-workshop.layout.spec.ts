@@ -55,24 +55,26 @@ test.describe('Design workshop layout @app', () => {
   test('the product photo shows behind the canvas when the view has one', async ({
     customerPage: page,
   }) => {
-    // Whether anything is painted on the canvas (some pixel has an alpha above zero).
-    const paintedAtCenter = () =>
+    // The share of the canvas that is painted (pixels with an alpha above zero). The photo
+    // fills the canvas, so a photo drawn off-centre (a quarter of it) shows up here.
+    const paintedShare = () =>
       page.evaluate(() => {
         const canvas = document.querySelector<HTMLCanvasElement>('canvas.lower-canvas');
         const context = canvas?.getContext('2d');
-        if (!canvas || !context) return false;
+        if (!canvas || !context) return 0;
         const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
-        return false;
+        let painted = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) painted++;
+        return painted / (canvas.width * canvas.height);
       });
 
     await page.goto(`/dashboard/design/new/${HOODIE_PRODUCT_ID}`);
     await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
-    await expect.poll(paintedAtCenter).toBe(true);
+    await expect.poll(paintedShare).toBeGreaterThan(0.99);
 
     await page.goto(`/dashboard/design/new/${TEE_PRODUCT_ID}`);
     await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
-    await expect.poll(paintedAtCenter).toBe(false);
+    await expect.poll(paintedShare).toBe(0);
   });
 
   test('fits a phone screen', async ({ customerPage: page }) => {

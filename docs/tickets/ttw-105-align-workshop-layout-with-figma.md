@@ -91,7 +91,7 @@ Second review: pending.
 2026-11-21, in the worktree, Node 24.22.1:
 
 - Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing); then for the review fixes, six assertions of `WorkshopEditorLayout.test.tsx` failed before the code change (no group role, typed text lost, image tool unmounted).
-- `pnpm --filter app test`: 42 suites, 315 tests passed.
+- `pnpm --filter app test`: 42 suites, 317 tests passed (after the canvas origin fix).
 - `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`, `pnpm format:check`, `pnpm playwright:validate`: exit 0. `pnpm docs:validate` passed at the first commit.
 - Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main`; CI must confirm it.
 - Risks of the seed change (a product photo on the Campus Hoodie), checked: the specs above that use the hoodie pass on a fresh seed, and the full API e2e suite gives 377 of 378 passed. The one failure (`address-country-and-text-hardening`, over-long state) passes alone, 20 of 20, and concerns addresses, not products. One earlier run of `products-cart` failed ("Bulk Item 01" missing) on a database already used by several runs; it passed on a fresh seed, and it also failed with the hoodie photo rows deleted, so the cause is not the seed change.
@@ -99,14 +99,15 @@ Second review: pending.
 
 ## Findings outside this ticket
 
-Verified on 2026-11-21 in the running app (hoodie with a real product photo and a print area added to the local database only, not to the seed):
+Found and fixed on 2026-11-21, with the product owner's approval (third commit):
 
 - Fabric 7 centres an object on its `left` and `top` unless `originX` and `originY` say otherwise (checked with Fabric 7.4.0 alone: a 200 px square placed at 100, 100 covers 0 to 200).
-- `WorkshopCanvas.tsx` places the product photo at `left: 0, top: 0` with no origin, so only its bottom-right quarter shows at the canvas top-left. Seen with the real photo: a quarter of the shirt.
-- The print-area clip (`buildClipPath`) has the same flaw: with an area of 0.3, 0.3, 0.4, 0.4 of a 600 px canvas, the visible window was 60 to 300 instead of 180 to 420. A text added at 50, 50 was almost entirely cut.
-- The clip is set on the whole canvas, so it also cuts the product photo to the print area. Whether the photo should stay visible outside the print area is a product question, to settle with the fix.
-- Not fixed here: it is outside "layout only". The first commit's acceptance criterion "product photo as background" is therefore only partly met until it is fixed.
+- `WorkshopCanvas.tsx` placed the product photo at `left: 0, top: 0` with no origin, so only its bottom-right quarter showed at the canvas top-left (seen with a real photo and with the seed image: 25 % of the canvas painted). The print-area clip (`buildClipPath`) had the same flaw: for an area of 0.3, 0.3, 0.4, 0.4 of a 600 px canvas the visible window was 60 to 300 instead of 180 to 420, and a text added at 50, 50 was almost entirely cut.
+- Fix: `originX: 'left'` and `originY: 'top'` on the photo and on the clip. Tests first: two assertions in `WorkshopCanvas.test.tsx` (failed on the missing origin), and the e2e photo check now requires more than 99 % of the canvas painted (it measured 25 % before the fix).
+- Checked in the running app afterwards, with a real product photo and a print area added to the local database only: the painted window is exactly 180 to 420 on both axes.
+
+Still open, a product question: the print-area clip is set on the whole canvas, so it also hides the product photo outside the print area (only the print-area window of the photo is visible). If the photo should stay fully visible and only the customer's layers should be limited to the print area, the clip has to move to the customer's layers. Not decided; not changed.
 
 ## Completion summary
 
-Implemented locally in two commits, not pushed. Awaiting the second independent review, the fix of the canvas origin (decision pending) and the client's visual check.
+Implemented locally in three commits, not pushed. Awaiting the second independent review, the product decision on the photo outside the print area, and the client's visual check.

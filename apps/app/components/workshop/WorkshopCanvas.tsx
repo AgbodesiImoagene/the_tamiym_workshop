@@ -176,6 +176,9 @@ export default function WorkshopCanvas({
         img.set({
           left: 0,
           top: 0,
+          // Fabric 7 centres an object on left/top by default: the photo hangs from its corner.
+          originX: 'left',
+          originY: 'top',
           scaleX: width / (img.width || width),
           scaleY: height / (img.height || height),
           selectable: false,
@@ -218,6 +221,9 @@ export default function WorkshopCanvas({
       const rect = new Rect({
         left: printArea.x * width,
         top: printArea.y * height,
+        // The print area is stored by its top-left corner, not its centre.
+        originX: 'left',
+        originY: 'top',
         width: printArea.width * width,
         height: printArea.height * height,
         absolutePositioned: true,
