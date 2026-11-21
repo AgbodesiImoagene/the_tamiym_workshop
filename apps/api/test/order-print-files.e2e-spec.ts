@@ -470,4 +470,23 @@ describe('Order print files (e2e)', () => {
       });
     }
   });
+
+  // Today the originals of a paid order cannot disappear with the account: the order keeps
+  // its owner, and the owner keeps his uploads. TTW-120 (erase the files of deleted accounts)
+  // is the change that could break this, and must keep the uploads of frozen designs.
+  it('keeps the originals of an ordered design: the buyer cannot be deleted, nor the file', async () => {
+    const s = await orderTwoSidedDesign('keep');
+
+    await expect(
+      prisma.user.delete({ where: { id: s.customer.user.id } }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.mediaAsset.delete({ where: { id: s.designAsset.mediaAssetId } }),
+    ).rejects.toThrow();
+
+    const stillThere = await prisma.designAsset.findUnique({
+      where: { id: s.designAsset.id },
+    });
+    expect(stillThere).not.toBeNull();
+  });
 });

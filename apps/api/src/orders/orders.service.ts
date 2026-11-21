@@ -178,6 +178,10 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          // TTW-101: the copy must not outlive a check made before the quote. A design
+          // rejected, or no longer the buyer's, since then is refused here with the same
+          // codes as the first check. Campaign orders have their own design rule.
+          await assertDesignsOrderableBy(tx, userId, quote.items);
           const designSnapshots = await this.snapshotDesigns(
             tx,
             quote.items.map((item) => item.designId),

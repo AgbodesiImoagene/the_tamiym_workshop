@@ -170,7 +170,16 @@ describe('OrdersService', () => {
           order: {
             create: orderCreateMock,
           },
-          design: { findMany: txDesignFindMany },
+          // The orderable check is made again inside the transaction (TTW-101): same rows.
+          design: {
+            findMany: txDesignFindMany,
+            findUnique: (...args: unknown[]) =>
+              mockPrisma.design.findUnique(...args),
+          },
+          productVariant: {
+            findUnique: (...args: unknown[]) =>
+              mockPrisma.productVariant.findUnique(...args),
+          },
           orderDiscount: { create: jest.fn() },
           inventoryItem: {
             findUnique: jest.fn().mockResolvedValue({
@@ -443,7 +452,67 @@ describe('OrdersService', () => {
         expect(line.designSnapshot).toBeUndefined();
       });
 
-      it('stores no copy when the design row vanished before the read', async () => {
+      describe('checks again inside the transaction, so the copy never outlives the first check', () => {
+        const dto = {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 2 }],
+        };
+        /** Passes the first check (before the quote), then fails the second one. */
+        function changeAfterFirstCheck(row: Record<string, unknown> | null) {
+          (prisma.design.findUnique as jest.Mock)
+            .mockReset()
+            .mockResolvedValueOnce({
+              id: 'design-1',
+              userId: 'user-1',
+              productId: 'prod-1',
+              moderationStatus: 'APPROVED',
+            })
+            .mockResolvedValue(row);
+          (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
+            quoteWithDesign('design-1'),
+          );
+        }
+
+        it('refuses a design rejected by a moderator between the two checks, and writes no order', async () => {
+          changeAfterFirstCheck({
+            id: 'design-1',
+            userId: 'user-1',
+            productId: 'prod-1',
+            moderationStatus: 'REJECTED',
+          });
+
+          await expect(service.create('user-1', dto)).rejects.toMatchObject({
+            response: { code: 'DESIGN_REJECTED' },
+          });
+          expect(orderCreateMock).not.toHaveBeenCalled();
+          expect(txDesignFindMany).not.toHaveBeenCalled();
+        });
+
+        it('refuses a design that is no longer the buyer’s', async () => {
+          changeAfterFirstCheck({
+            id: 'design-1',
+            userId: 'someone-else',
+            productId: 'prod-1',
+            moderationStatus: 'APPROVED',
+          });
+
+          await expect(service.create('user-1', dto)).rejects.toThrow(
+            ForbiddenException,
+          );
+          expect(orderCreateMock).not.toHaveBeenCalled();
+        });
+
+        it('refuses a design that vanished', async () => {
+          changeAfterFirstCheck(null);
+
+          await expect(service.create('user-1', dto)).rejects.toThrow(
+            BadRequestException,
+          );
+          expect(orderCreateMock).not.toHaveBeenCalled();
+        });
+      });
+
+      it('stores no copy for a design row missing at the read, rather than fail the order', async () => {
         txDesignFindMany.mockResolvedValue([]);
         (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
           quoteWithDesign('design-1'),

@@ -6,8 +6,8 @@ import { E2E_ORDER_PAID_ID, E2E_ORDER_PROCESSING_ID } from '../fixtures/seed-dat
 
 /**
  * The local seed has no object in storage, so the on-screen rendition of the seeded upload
- * would answer 404. A 1 px PNG stands in for the stored file; the order, the layers and the
- * link request still come from the real API.
+ * would answer 404. A 1 px PNG stands in for the stored bytes of that preview only; the
+ * order, the layers and the signed-link request come from the real API.
  */
 const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -53,36 +53,36 @@ describeViewportMatrix('Admin order print files @comprehensive @admin @critical'
 
   test('the original file opens through a fresh signed link', async ({ adminPage }) => {
     await standInForStoredPreview(adminPage);
-    await adminPage.route('**/design-assets/*/link*', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          url: 'https://storage.example.test/signed-original.png',
-          expiresInSeconds: 300,
-        }),
-      })
-    );
-    // The link is opened in a new tab: stop it, we only check that it was asked for.
+    // The link comes from the real API. The new tab is replaced by a stub window, so we can
+    // read where it was sent without leaving the page.
     await adminPage.addInitScript(() => {
-      (window as unknown as { __opened: string[] }).__opened = [];
-      HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement) {
-        (window as unknown as { __opened: string[] }).__opened.push(this.href);
-      };
+      const stub = { opener: 'unset', closed: false, location: { href: '' }, close() {} };
+      (window as unknown as { __tab: typeof stub }).__tab = stub;
+      window.open = () => stub as unknown as Window;
     });
     await adminPage.goto(`/admin/orders/${E2E_ORDER_PROCESSING_ID}`);
 
-    const linkRequest = adminPage.waitForRequest(
-      (request) =>
-        /\/design-assets\/[^/]+\/link\?variant=original/.test(request.url()) &&
-        request.method() === 'GET'
+    const linkResponse = adminPage.waitForResponse(
+      (response) =>
+        /\/design-assets\/[^/]+\/link\?variant=original/.test(response.url()) &&
+        response.request().method() === 'GET'
     );
     await adminPage.getByRole('button', { name: 'Open original file' }).click();
-    await linkRequest;
+    expect((await linkResponse).status()).toBe(200);
 
-    await expect
-      .poll(() => adminPage.evaluate(() => (window as unknown as { __opened: string[] }).__opened))
-      .toEqual(['https://storage.example.test/signed-original.png']);
+    const sentTo = await adminPage.evaluate(
+      () => (window as unknown as { __tab: { location: { href: string } } }).__tab.location.href
+    );
+    const link = new URL(sentTo);
+    // Signed for the private bucket and the stored object of the seeded upload.
+    expect(link.pathname).toContain('e2e/media/print/original.png');
+    expect(link.searchParams.get('X-Amz-Signature')).toBeTruthy();
+    expect(Number(link.searchParams.get('X-Amz-Expires'))).toBeLessThanOrEqual(900);
+    expect(
+      await adminPage.evaluate(
+        () => (window as unknown as { __tab: { opener: unknown } }).__tab.opener
+      )
+    ).toBeNull();
   });
 
   test('an item with no recorded design says so', async ({ adminPage }) => {

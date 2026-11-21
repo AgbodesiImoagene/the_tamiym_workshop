@@ -18,6 +18,7 @@ import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
+  MediaVisibility,
   ModerationStatus,
   OrderItemSnapshotSource,
   PaymentProvider,
@@ -182,6 +183,8 @@ const IDS = {
   mediaAssets: {
     pendingUpload: 'e2e-media-asset-pending-upload',
     flaggedUpload: 'e2e-media-asset-flagged-upload',
+    // TTW-101: a private upload (like a real customer file) behind the frozen print design.
+    printUpload: 'e2e-media-asset-print-upload',
   },
   mediaDerivatives: {
     pendingOriginal: 'e2e-media-derivative-pending-original',
@@ -194,6 +197,7 @@ const IDS = {
   designAssets: {
     pendingUpload: 'e2e-design-asset-pending-upload',
     flaggedUpload: 'e2e-design-asset-flagged-upload',
+    printUpload: 'e2e-design-asset-print-upload',
   },
   designs: {
     pending: 'e2e-design-pending-community-tee',
@@ -1126,6 +1130,20 @@ async function main() {
           originalHeight: 1200,
           checksum: 'checksum-e2e-flagged-upload',
         },
+        {
+          id: IDS.mediaAssets.printUpload,
+          sourceType: MediaSourceType.UPLOAD,
+          status: MediaAssetStatus.READY,
+          scanStatus: VirusScanStatus.CLEAN,
+          moderationStatus: ModerationStatus.APPROVED,
+          visibility: MediaVisibility.PRIVATE,
+          originalKey: 'e2e/media/print/original.png',
+          originalMime: 'image/png',
+          originalBytes: 2400000,
+          originalWidth: 3000,
+          originalHeight: 2000,
+          checksum: 'checksum-e2e-print-upload',
+        },
       ],
     });
 
@@ -1328,6 +1346,11 @@ async function main() {
           id: IDS.designAssets.flaggedUpload,
           ownerUserId: IDS.users.organizer,
           mediaAssetId: IDS.mediaAssets.flaggedUpload,
+        },
+        {
+          id: IDS.designAssets.printUpload,
+          ownerUserId: IDS.users.customer,
+          mediaAssetId: IDS.mediaAssets.printUpload,
         },
       ],
     });
@@ -1578,7 +1601,7 @@ async function main() {
                 layers: [
                   {
                     kind: 'image',
-                    designAssetId: IDS.designAssets.flaggedUpload,
+                    designAssetId: IDS.designAssets.printUpload,
                     left: 40,
                     top: 30,
                     width: 400,

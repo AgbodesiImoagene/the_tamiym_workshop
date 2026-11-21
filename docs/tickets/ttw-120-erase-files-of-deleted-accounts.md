@@ -16,6 +16,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 - Implement the deferred `object_store.media` purge, so that a deletion completes only when files are gone.
 - Keep files tied to orders within the legal retention period, as a recorded exception.
+- Files tied to orders include the uploads named by `OrderItem.designSnapshot` (TTW-101): the print shop reads them from the admin order. Keep them with the order; `apps/api/test/order-print-files.e2e-spec.ts` pins today's protection and must stay green.
 - Make the purge retry-safe through a bounded queue job.
 - Include the design thumbnails, private objects at `design-thumbnails/<designId>` (TTW-237), for every design of the account.
 

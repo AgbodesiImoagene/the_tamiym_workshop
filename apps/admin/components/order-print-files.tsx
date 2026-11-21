@@ -16,6 +16,10 @@ import {
 import { Button } from '@tamiym/ui';
 import { useState } from 'react';
 
+function toTextAlign(value: string | undefined): 'left' | 'center' | 'right' | 'justify' {
+  return value === 'center' || value === 'right' || value === 'justify' ? value : 'left';
+}
+
 /** One side of the design, drawn from the frozen layers: a layout preview, not a render. */
 function SidePreview({ view }: { view: PrintView }) {
   const area = printAreaInCanvas(view.printArea);
@@ -73,23 +77,33 @@ function SidePreview({ view }: { view: PrintView }) {
           );
         }
         const fontSize = (layer.fontSize ?? 24) * (layer.scaleY ?? 1);
+        // The browser wraps the text inside the stored width, like the editor did, and
+        // honours the alignment; a text with no width grows to its content.
         return (
-          <text
+          <foreignObject
             key={`text-${index}`}
             transform={transform}
             x={box.x}
-            y={box.y + fontSize}
-            fontSize={fontSize}
-            fontFamily={layer.fontFamily}
-            fontWeight={layer.fontWeight}
-            fill={layer.fill ?? 'currentColor'}
+            y={box.y}
+            width={box.width > 0 ? box.width : PRINT_CANVAS_SIZE}
+            height={Math.max(box.height, fontSize * 1.3)}
+            overflow="visible"
           >
-            {layer.text.split('\n').map((line, lineIndex) => (
-              <tspan key={lineIndex} x={box.x} dy={lineIndex === 0 ? 0 : fontSize * 1.16}>
-                {line}
-              </tspan>
-            ))}
-          </text>
+            <div
+              style={{
+                fontSize,
+                lineHeight: 1.16,
+                fontFamily: layer.fontFamily,
+                fontWeight: layer.fontWeight,
+                color: layer.fill ?? 'inherit',
+                textAlign: toTextAlign(layer.textAlign),
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {layer.text}
+            </div>
+          </foreignObject>
         );
       })}
     </svg>
@@ -103,14 +117,24 @@ function OriginalFile({ layer }: { layer: PrintImageLayer }) {
   async function download() {
     setBusy(true);
     setError(null);
+    // The tab is opened while the click is still fresh: some browsers (Safari) block a tab
+    // opened after an await. It is pointed at the signed link once we have it.
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
     try {
       const { url } = await getOriginalFileLink(layer.originalLinkPath);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.click();
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        // Tab blocked up front: fall back to a link click.
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.click();
+      }
     } catch (cause) {
+      tab?.close();
       setError(
         cause instanceof Error && cause.message
           ? cause.message
