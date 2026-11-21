@@ -1,7 +1,7 @@
 # TTW-105 — Align the Design Workshop layout with Figma
 
 **Epic:** 8 — Client review delivery\
-**Status:** Scoped\
+**Status:** Implemented locally (not pushed, not merged)\
 **Risk:** Standard\
 **Blocked by:** TTW-104\
 **Blocks:** None
@@ -84,7 +84,12 @@ Decided with the product owner on 2026-11-21 (standard risk: no API, schema or c
 
 First review (independent subagent, 2026-11-21): FAIL (conditional). No security finding. To fix: (1) typed text lost when another tool was opened, (2) an upload error lost if the tool was left during the upload, (3) the canvas below every panel on a phone, (4) toolbar role containing tabs and a wrong vertical orientation on a phone, (5) an inaccurate seed comment and an incomplete ticket. All five are fixed in the second commit, with tests written first (`WorkshopEditorLayout.test.tsx`: typed text kept, image tool kept mounted, group role; `design-workshop.layout.spec.ts`: canvas in the viewport on a phone). The reviewer's claim that `originalBytes: 144` was wrong is itself wrong: the PNG is 144 bytes.
 
-Second review: pending.
+Second review (independent subagent, 2026-11-21): PASS, no blocking finding. It re-ran the app tests (42 suites, 317 tests), typecheck and lint, and read the code of the two fix commits. Remarks kept for the product owner, none blocking:
+
+- On a phone the visual order (rail, canvas, tool panel) differs from the keyboard order (rail, tool panel, canvas), because only CSS `order` changes it. Minor for a touch screen.
+- A text or image is added at 50, 50, so with a print area such as 0.3, 0.3, 0.4, 0.4 of a 600 px canvas (window 180 to 420) it lands outside the visible window and cannot be seen when added. This already happened before this ticket (with the shifted clip); with "only the print area is visible" it may surprise the customer. Placing new layers at the centre of the print area would fix it: not done, outside this ticket.
+- The clip is covered by a unit test on the parameters given to Fabric and by the manual check above; the e2e photo test uses a product with no print area.
+- Not re-checked by the reviewer: Playwright, the API gates, `format:check`, `docs:validate`, `playwright:validate` (run by the author, see the evidence).
 
 ## Verification evidence
 
@@ -99,7 +104,7 @@ Second review: pending.
 
 ## Findings outside this ticket
 
-Found and fixed on 2026-11-21, with the product owner's approval (third commit):
+Found and fixed on 2026-11-21, with the product owner's approval (commit `1582b01`):
 
 - Fabric 7 centres an object on its `left` and `top` unless `originX` and `originY` say otherwise (checked with Fabric 7.4.0 alone: a 200 px square placed at 100, 100 covers 0 to 200).
 - `WorkshopCanvas.tsx` placed the product photo at `left: 0, top: 0` with no origin, so only its bottom-right quarter showed at the canvas top-left (seen with a real photo and with the seed image: 25 % of the canvas painted). The print-area clip (`buildClipPath`) had the same flaw: for an area of 0.3, 0.3, 0.4, 0.4 of a 600 px canvas the visible window was 60 to 300 instead of 180 to 420, and a text added at 50, 50 was almost entirely cut.
@@ -110,4 +115,4 @@ Decided by the product owner on 2026-11-21: only the print area must be visible.
 
 ## Completion summary
 
-Implemented locally in three commits, not pushed. Awaiting the second independent review and the client's visual check.
+Implemented locally in four commits (three of code, one of documentation), not pushed. Both independent reviews are done (the second one PASS). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.

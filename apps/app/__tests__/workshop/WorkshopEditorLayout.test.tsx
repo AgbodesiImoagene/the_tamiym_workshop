@@ -110,7 +110,7 @@ describe('WorkshopEditor layout (Figma)', () => {
     expect(screen.getByPlaceholderText('Enter text…')).toHaveValue('Keep me');
   });
 
-  it('keeps the image tool mounted, so an upload in progress can still report its error', () => {
+  it('keeps the image tool mounted (hidden) when another tool is open', () => {
     renderEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
     expect(screen.getByRole('button', { name: 'Choose image', hidden: true })).toBeInTheDocument();
