@@ -86,4 +86,29 @@ describe('SharedDesignPage (TTW-236)', () => {
     expect(screen.queryByTestId('shared-canvas')).toBeNull();
     expect(screen.getByRole('img', { name: 'My tee' })).toBeInTheDocument();
   });
+
+  it('shows a private thumbnail through the API path, not a raw stored value (TTW-237)', async () => {
+    workshopMock.mockRejectedValue(new Error('boom'));
+    sharedMock.mockResolvedValue({
+      ...publicDesign,
+      thumbnailUrl: '/designs/design-1/thumbnail',
+    } as never);
+
+    await renderPage();
+
+    expect(screen.getByRole('img', { name: 'My tee' })).toHaveAttribute(
+      'src',
+      'http://localhost:3001/v1/designs/design-1/thumbnail'
+    );
+  });
+
+  it('shows no preview when the stored thumbnail value is not an accepted address (TTW-237)', async () => {
+    workshopMock.mockRejectedValue(new Error('boom'));
+    sharedMock.mockResolvedValue({ ...publicDesign, thumbnailUrl: 'javascript:alert(1)' } as never);
+
+    await renderPage();
+
+    expect(screen.queryByRole('img', { name: 'My tee' })).toBeNull();
+    expect(screen.getByText('No preview available.')).toBeInTheDocument();
+  });
 });
