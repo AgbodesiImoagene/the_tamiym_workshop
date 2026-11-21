@@ -3,8 +3,8 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-094; client answer Q38 (default in Proposal)\
-**Blocks:** TTW-096
+**Blocked by:** TTW-094\
+**Blocks:** TTW-240, TTW-096
 
 ## Background
 
@@ -16,12 +16,14 @@ Client answers:
 
 - **Q38, Bulk tiers: computed on a product's total quantity across sizes and colours? Do larger sizes keep a surcharge?** Answer: "Context please."
 
-Q38 asks for more context. Show the client the 20 + 20 + 20 example, then confirm.
+Q38 asked for more context. Decision by the user, 2026-11-21: **no need to consult the client again.** The default below is the rule, and Q38 was removed from the client message.
 
 ## Proposal
 
-- Default until Q38 is answered: compute the tier on the total quantity of a product across sizes and colours, and keep size surcharges on top.
-- Also stop a product-level tier from replacing a dearer variant price, as the review notes.
+- Compute the tier on the total quantity of a product across sizes and colours, and keep size surcharges on top. A tier price replaces the base price; the size upcharge and the view surcharge are added after it.
+- Example: 20 S + 20 M + 20 L at tiers "1–19 = ₦5,000, 20–49 = ₦4,500, 50+ = ₦4,000" and L +₦300: S and M cost ₦4,000, L costs ₦4,300.
+- Two products in one cart stay separate: each reads its own total.
+- Not in this ticket: a variant's own price difference on top of the tier → TTW-240 (decided 2026-11-21).
 - Update `docs/pricing-strategy.md`.
 
 ## Invariants
@@ -58,6 +60,7 @@ Q38 asks for more context. Show the client the 20 + 20 + 20 example, then confir
 
 ## Out of scope
 
+- A product-level tier replacing a dearer variant price → TTW-240.
 - Other rows of the client review: each has its own ticket in `docs/tickets/ROADMAP.md`.
 
 ## Design review

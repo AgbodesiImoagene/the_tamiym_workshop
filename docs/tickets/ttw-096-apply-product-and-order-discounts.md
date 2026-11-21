@@ -3,7 +3,7 @@
 **Epic:** 8 — Client review delivery\
 **Status:** Scoped\
 **Risk:** High\
-**Blocked by:** TTW-095\
+**Blocked by:** TTW-095, TTW-240\
 **Blocks:** None
 
 ## Background

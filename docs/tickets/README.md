@@ -11,7 +11,7 @@ From 2026-11-04, new work starts from the client review workbook `revue-client/T
 - `Not in review`: the review does not cover this ticket (CI, tooling, infrastructure handled by the client, or deferred post-v1 work), so the ticket stays the only record;
 - `—`: complete, nothing left in the review.
 
-The working order for this review lives in [ROADMAP.md](ROADMAP.md).
+The working order for this review lives in `ROADMAP.md`, a local file that is not kept in the repository.
 
 ## Priority model
 
@@ -147,7 +147,7 @@ See [the epic contract](../epics/07-organic-discovery-seo-aeo-geo.md).
 
 ## Epic 8 — Client review delivery
 
-One ticket per piece of work from the client review, in the order of [ROADMAP.md](ROADMAP.md).
+One ticket per piece of work from the client review, in the order of `ROADMAP.md` (local file, not in the repository).
 
 | Ticket                                                                             | Priority | Risk     | State    | Outcome                                                                                                    | Review                    |
 | ---------------------------------------------------------------------------------- | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------- | ------------------------- |
