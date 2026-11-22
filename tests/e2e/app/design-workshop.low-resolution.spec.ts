@@ -89,6 +89,8 @@ test.describe('Design workshop low-resolution warning @app', () => {
       'This image may print blurry. Make it smaller or upload a larger image.'
     );
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+    // TTW-105: the text tool is behind "Add Text" in the tool rail (Upload is open here).
+    await page.getByRole('button', { name: 'Add Text' }).click();
     await expect(page.getByRole('button', { name: 'Add to canvas' })).toBeEnabled();
   });
 });
