@@ -5,8 +5,13 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  aiScreeningOffResult,
+  isAiScreeningEnabled,
+} from '../moderation/ai-screening';
 import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
   aiReasonCodesForOutcome,
@@ -109,6 +114,7 @@ export class CampaignsService {
     private readiness: CampaignReadinessService,
     private outboxDelivery: NotificationOutboxDeliveryService,
     private notificationDispatch: NotificationDispatchService,
+    private config: ConfigService,
   ) {}
 
   private async enqueueOrganiserCampaignMail(
@@ -1301,8 +1307,12 @@ export class CampaignsService {
       .filter(Boolean)
       .join('\n\n');
 
-    const moderationResult =
-      await this.moderationService.moderateText(textParts);
+    // TTW-252: while the AI screening is off, the text is not sent to the AI and the
+    // campaign goes to an admin; there is no automatic rejection.
+    const aiScreening = isAiScreeningEnabled(this.config);
+    const moderationResult = aiScreening
+      ? await this.moderationService.moderateText(textParts)
+      : aiScreeningOffResult();
 
     this.logger.log(
       `Campaign ${id} AI moderation: status=${moderationResult.status} score=${moderationResult.maxScore.toFixed(3)}`,
@@ -1422,7 +1432,9 @@ export class CampaignsService {
         status: CampaignStatus.REVIEW,
         moderationStatus: moderationResult.status,
       },
-      note: `Organiser submitted campaign for review. AI pre-screen: ${moderationResult.status}`,
+      note: aiScreening
+        ? `Organiser submitted campaign for review. AI pre-screen: ${moderationResult.status}`
+        : 'Organiser submitted campaign for review. AI pre-screen skipped (turned off).',
     });
     await this.adminNotify.emit(ADMIN_NOTIF_CAMPAIGN_SUBMITTED_FOR_REVIEW, {
       campaignId: id,

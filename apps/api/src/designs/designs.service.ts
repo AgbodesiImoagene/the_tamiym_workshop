@@ -8,6 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  aiScreeningOffResult,
+  isAiScreeningEnabled,
+} from '../moderation/ai-screening';
 import { ModerationDecisionService } from '../moderation/moderation-decision.service';
 import {
   MediaAssetStatus,
@@ -312,6 +316,20 @@ export class DesignsService {
     moderationNotes: string;
     maxScore: number;
   }> {
+    // TTW-252: while the AI screening is off, nothing leaves the system and the design
+    // waits for an admin, as when the AI is unavailable.
+    if (!isAiScreeningEnabled(this.config)) {
+      this.logger.debug(
+        'Design moderation skipped: AI screening is turned off',
+      );
+      const off = aiScreeningOffResult();
+      return {
+        moderationStatus: off.status,
+        moderationNotes: off.notes,
+        maxScore: off.maxScore,
+      };
+    }
+
     const text = this.extractTextFromDesignData(designData);
     const imageUrl = thumbnail
       ? `data:${DESIGN_THUMBNAIL_CONTENT_TYPE};base64,${thumbnail.toString('base64')}`
