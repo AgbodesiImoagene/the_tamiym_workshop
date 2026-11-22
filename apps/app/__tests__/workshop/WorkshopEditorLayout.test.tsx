@@ -161,4 +161,42 @@ describe('WorkshopEditor layout (Figma)', () => {
     renderEditor({ ...workshopContext, product: { ...workshopContext.product, options: [] } });
     expect(screen.queryByRole('button', { name: 'Product Colors' })).not.toBeInTheDocument();
   });
+
+  describe('keyboard order follows the visual order', () => {
+    const realMatchMedia = window.matchMedia;
+    function setScreen(isMd: boolean) {
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes('min-width') ? isMd : false,
+        media: query,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        onchange: null,
+        dispatchEvent: jest.fn(),
+      })) as unknown as typeof window.matchMedia;
+    }
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+    });
+
+    const isBefore = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    it('on a phone, the canvas comes before the tool panel in the page, not only on screen', () => {
+      setScreen(false);
+      renderEditor();
+      expect(
+        isBefore(screen.getByTestId('canvas'), screen.getByPlaceholderText('Enter text…'))
+      ).toBe(true);
+    });
+
+    it('from a tablet up, the tool panel comes before the canvas', () => {
+      setScreen(true);
+      renderEditor();
+      expect(
+        isBefore(screen.getByPlaceholderText('Enter text…'), screen.getByTestId('canvas'))
+      ).toBe(true);
+    });
+  });
 });

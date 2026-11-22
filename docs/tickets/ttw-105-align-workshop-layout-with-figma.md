@@ -75,6 +75,8 @@ Decided with the product owner on 2026-11-21 (standard risk: no API, schema or c
 - Placement chosen for what Figma does not draw: undo, redo, delete, the layers list and the design name with Save stay in the tool panel, under the open tool (option A). The "Save | Share" row below the card is not copied, because Save and Share already exist in that panel and a second pair would be a duplicate control.
 - Not added: Add, Remove and Duplicate Product (row 3.5), and "Get Price" (no behaviour is defined for it; a button with no action is incomplete).
 - On a phone the canvas comes right after the rail and the tool panel comes after the canvas, so the result of a tool is visible without scrolling past every panel (found by the first review).
+- A new text or image starts at the centre of the print area (the canvas shows only the print area, and a layer is positioned by its centre). Without a print area the tool's own start position (50, 50) is kept. Decided with the product owner after the second review.
+- Keyboard order follows the screen: below the `md` breakpoint the canvas is rendered before the tool panel in the page itself (a small `useMediaQuery` hook decides the order), not only moved with CSS `order`. Decided with the product owner after the second review.
 - Product Colors is offered only when the product has options, so the rail has no empty tool.
 - The product photo is the existing workshop template layer drawn behind the customer's layers. No API change. To prove it, the e2e seed gives the Campus Hoodie front a template layer (a small PNG data URL).
 - Upload text stays "PNG, JPEG or WebP · max 10 MB": it follows what the app accepts, not Figma.
@@ -86,8 +88,8 @@ First review (independent subagent, 2026-11-21): FAIL (conditional). No security
 
 Second review (independent subagent, 2026-11-21): PASS, no blocking finding. It re-ran the app tests (42 suites, 317 tests), typecheck and lint, and read the code of the two fix commits. Remarks kept for the product owner, none blocking:
 
-- On a phone the visual order (rail, canvas, tool panel) differs from the keyboard order (rail, tool panel, canvas), because only CSS `order` changes it. Minor for a touch screen.
-- A text or image is added at 50, 50, so with a print area such as 0.3, 0.3, 0.4, 0.4 of a 600 px canvas (window 180 to 420) it lands outside the visible window and cannot be seen when added. This already happened before this ticket (with the shifted clip); with "only the print area is visible" it may surprise the customer. Placing new layers at the centre of the print area would fix it: not done, outside this ticket.
+- On a phone the visual order (rail, canvas, tool panel) differed from the keyboard order (rail, tool panel, canvas), because only CSS `order` changed it. Fixed afterwards (see the design review).
+- A text or image was added at 50, 50, so with a print area such as 0.3, 0.3, 0.4, 0.4 of a 600 px canvas (window 180 to 420) it landed outside the visible window and could not be seen when added. Fixed afterwards: new layers start at the centre of the print area (see the design review).
 - The clip is covered by a unit test on the parameters given to Fabric and by the manual check above; the e2e photo test uses a product with no print area.
 - Not re-checked by the reviewer: Playwright, the API gates, `format:check`, `docs:validate`, `playwright:validate` (run by the author, see the evidence).
 
@@ -96,11 +98,13 @@ Second review (independent subagent, 2026-11-21): PASS, no blocking finding. It 
 2026-11-21, in the worktree, Node 24.22.1:
 
 - Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing); then for the review fixes, six assertions of `WorkshopEditorLayout.test.tsx` failed before the code change (no group role, typed text lost, image tool unmounted).
-- `pnpm --filter app test`: 42 suites, 317 tests passed (after the canvas origin fix).
+- `pnpm --filter app test`: 43 suites, 322 tests passed (after the canvas origin fix, the centred placement and the DOM order). `pnpm --filter app typecheck` and `lint`: exit 0.
 - `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`, `pnpm format:check`, `pnpm playwright:validate`: exit 0. `pnpm docs:validate` passed at the first commit.
 - Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main`; CI must confirm it.
 - Risks of the seed change (a product photo on the Campus Hoodie), checked: the specs above that use the hoodie pass on a fresh seed, and the full API e2e suite gives 377 of 378 passed. The one failure (`address-country-and-text-hardening`, over-long state) passes alone, 20 of 20, and concerns addresses, not products. One earlier run of `products-cart` failed ("Bulk Item 01" missing) on a database already used by several runs; it passed on a fresh seed, and it also failed with the hoodie photo rows deleted, so the cause is not the seed change.
 - Not done: Playwright mobile project, Firefox and WebKit, a visual comparison by the client.
+
+Follow-ups after the second review (the product owner asked for both), tests first: three assertions failed before the code change (text and image placement in `WorkshopEditorPlacement.test.tsx`, canvas before the tool panel in the DOM on a phone in `WorkshopEditorLayout.test.tsx`). Checked in the running app with a print area added to the local database only: a new text centred at 299.5, 299 on a 600 px canvas (print-area centre 300, 300), visible at once; at a 390 px width the canvas comes before the tool panel in the DOM and on screen (top 120 px against 803 px). Playwright (clean seed): `design-workshop*`, `shared-design*`, `design-order*`, `products-cart`: 45 passed, 1 failed (the image upload spec, no MinIO). These follow-up commits have not had a third independent review.
 
 ## Findings outside this ticket
 
@@ -115,4 +119,4 @@ Decided by the product owner on 2026-11-21: only the print area must be visible.
 
 ## Completion summary
 
-Implemented locally in four commits (three of code, one of documentation), not pushed. Both independent reviews are done (the second one PASS). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.
+Implemented locally, not pushed. Both independent reviews are done (the second one PASS, before the last follow-up commit). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.

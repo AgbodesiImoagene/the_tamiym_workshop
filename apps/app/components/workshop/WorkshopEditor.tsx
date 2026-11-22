@@ -12,7 +12,8 @@ import ImageTool from './ImageTool';
 import OptionPicker from './OptionPicker';
 import SavePanel from './SavePanel';
 import SharePanel from './SharePanel';
-import { isLowResolutionImage } from '@/lib/image-resolution';
+import { isLowResolutionImage, DEFAULT_CANVAS_SIZE } from '@/lib/image-resolution';
+import { useMediaQuery } from '@/lib/use-media-query';
 import LayerList, { type LayerItem } from './LayerList';
 import type { WorkshopCanvasControls, WorkshopHistoryState } from './WorkshopCanvas';
 import {
@@ -50,6 +51,8 @@ const AUTOSAVE_DELAY_MS = 3000;
  */
 export default function WorkshopEditor({ workshopContext, existingDesign }: WorkshopEditorProps) {
   const router = useRouter();
+  // Tailwind `md`: below it the card is one column and the canvas comes first.
+  const isMdUp = useMediaQuery('(min-width: 768px)', true);
   const { product, views } = workshopContext;
   const designableViews = views.filter((v) => v.isDesignable);
 
@@ -213,13 +216,34 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
     handleSaveRef.current = handleSave;
   }, [handleSave]);
 
-  const handleAddText = useCallback((textObject: Record<string, unknown>) => {
-    void controlRef.current?.addText(textObject);
-  }, []);
+  // The canvas shows only the print area, so a new layer starts at its centre (a layer is
+  // positioned by its centre). Without a print area the tool's own start position is kept.
+  const placeAtPrintAreaCentre = useCallback(
+    (layer: Record<string, unknown>): Record<string, unknown> => {
+      const printArea = views.find((v) => v.key === activeViewKey)?.printArea;
+      if (!printArea) return layer;
+      return {
+        ...layer,
+        left: Math.round((printArea.x + printArea.width / 2) * DEFAULT_CANVAS_SIZE),
+        top: Math.round((printArea.y + printArea.height / 2) * DEFAULT_CANVAS_SIZE),
+      };
+    },
+    [views, activeViewKey]
+  );
 
-  const handleAddImage = useCallback((imageObject: Record<string, unknown>) => {
-    void controlRef.current?.addImage(imageObject);
-  }, []);
+  const handleAddText = useCallback(
+    (textObject: Record<string, unknown>) => {
+      void controlRef.current?.addText(placeAtPrintAreaCentre(textObject));
+    },
+    [placeAtPrintAreaCentre]
+  );
+
+  const handleAddImage = useCallback(
+    (imageObject: Record<string, unknown>) => {
+      void controlRef.current?.addImage(placeAtPrintAreaCentre(imageObject));
+    },
+    [placeAtPrintAreaCentre]
+  );
 
   const handleDelete = useCallback(() => {
     controlRef.current?.deleteSelected();
@@ -305,6 +329,120 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   // The explanation next to the canvas is for the selected image only.
   const selectedLowResolution = layerItems.some((l) => l.id === selectedLayerId && l.lowResolution);
 
+  {
+    /* The open tool, then the parts that do not depend on the tool */
+  }
+  const toolPanel = (
+    <div
+      key="tools"
+      className="flex w-full flex-col gap-4 overflow-y-auto border-t border-border bg-background p-4 md:w-72 md:shrink-0 md:border-t-0 md:border-r"
+    >
+      {/* The tools stay mounted and are only hidden: what the customer typed or uploaded
+            must survive a visit to another tool. */}
+      <div hidden={activeTool !== 'upload'}>
+        <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
+      </div>
+      <div hidden={activeTool !== 'text'}>
+        <TextTool onAddText={handleAddText} disabled={!canvasReady} />
+      </div>
+      {product.options.length > 0 && (
+        <div hidden={activeTool !== 'colors'}>
+          <OptionPicker
+            options={product.options}
+            allEffects={views.flatMap((v) => v.effects)}
+            selectedOptions={selectedOptions}
+            onChange={handleOptionChange}
+          />
+        </div>
+      )}
+
+      <hr className="border-border" />
+
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleUndo}
+          disabled={!canvasReady || !history.canUndo}
+        >
+          Undo
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleRedo}
+          disabled={!canvasReady || !history.canRedo}
+        >
+          Redo
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleDelete}
+          disabled={!canvasReady || !selectedLayerId}
+        >
+          Delete
+        </Button>
+      </div>
+
+      <LayerList
+        layers={layerItems}
+        selectedId={selectedLayerId}
+        disabled={!canvasReady}
+        onSelect={(id) => controlRef.current?.selectLayer(id)}
+        onDelete={(id) => controlRef.current?.deleteLayer(id)}
+        onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
+      />
+
+      <hr className="border-border" />
+
+      <SavePanel
+        designId={designId}
+        productId={product.id}
+        designName={designName}
+        isSaving={isSaving}
+        onNameChange={setDesignName}
+        onSave={() => handleSave(true)}
+      />
+
+      {/* Share (only after first save) */}
+      {designId && <SharePanel designId={designId} />}
+    </div>
+  );
+
+  {
+    /* Canvas: the product photo (the template layers) sits behind the customer's layers */
+  }
+  const canvasPane = (
+    <div
+      key="canvas"
+      className="flex flex-1 flex-col items-center gap-3 overflow-x-auto bg-background p-4"
+    >
+      {activeView && (
+        <WorkshopCanvas
+          viewKey={activeViewKey}
+          printArea={activeView.printArea}
+          templateLayers={activeView.templateLayers}
+          activeEffects={activeViewEffects}
+          fabricJson={designData.views[activeViewKey]?.fabricJson ?? null}
+          onLayersChange={(json) => handleLayersChange(activeViewKey, json)}
+          onSelectionChange={setSelectedLayerId}
+          onHistoryChange={setHistory}
+          onReadyChange={setCanvasReady}
+          controlRef={controlRef}
+        />
+      )}
+      {selectedLowResolution && (
+        <p role="status" className="mt-3 text-sm text-warning">
+          This image may print blurry. Make it smaller or upload a larger image.
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -336,105 +474,9 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
           />
         </WorkshopToolRail>
 
-        {/* The open tool, then the parts that do not depend on the tool */}
-        <div className="order-3 flex w-full flex-col gap-4 overflow-y-auto border-t border-border bg-background p-4 md:order-2 md:w-72 md:shrink-0 md:border-t-0 md:border-r">
-          {/* The tools stay mounted and are only hidden: what the customer typed or uploaded
-              must survive a visit to another tool. */}
-          <div hidden={activeTool !== 'upload'}>
-            <ImageTool onAddImage={handleAddImage} disabled={!canvasReady} />
-          </div>
-          <div hidden={activeTool !== 'text'}>
-            <TextTool onAddText={handleAddText} disabled={!canvasReady} />
-          </div>
-          {product.options.length > 0 && (
-            <div hidden={activeTool !== 'colors'}>
-              <OptionPicker
-                options={product.options}
-                allEffects={views.flatMap((v) => v.effects)}
-                selectedOptions={selectedOptions}
-                onChange={handleOptionChange}
-              />
-            </div>
-          )}
-
-          <hr className="border-border" />
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleUndo}
-              disabled={!canvasReady || !history.canUndo}
-            >
-              Undo
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleRedo}
-              disabled={!canvasReady || !history.canRedo}
-            >
-              Redo
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              disabled={!canvasReady || !selectedLayerId}
-            >
-              Delete
-            </Button>
-          </div>
-
-          <LayerList
-            layers={layerItems}
-            selectedId={selectedLayerId}
-            disabled={!canvasReady}
-            onSelect={(id) => controlRef.current?.selectLayer(id)}
-            onDelete={(id) => controlRef.current?.deleteLayer(id)}
-            onMove={(id, direction) => controlRef.current?.moveLayer(id, direction)}
-          />
-
-          <hr className="border-border" />
-
-          <SavePanel
-            designId={designId}
-            productId={product.id}
-            designName={designName}
-            isSaving={isSaving}
-            onNameChange={setDesignName}
-            onSave={() => handleSave(true)}
-          />
-
-          {/* Share (only after first save) */}
-          {designId && <SharePanel designId={designId} />}
-        </div>
-
-        {/* Canvas: the product photo (the template layers) sits behind the customer's layers */}
-        <div className="order-2 flex flex-1 flex-col items-center gap-3 overflow-x-auto bg-background p-4 md:order-3">
-          {activeView && (
-            <WorkshopCanvas
-              viewKey={activeViewKey}
-              printArea={activeView.printArea}
-              templateLayers={activeView.templateLayers}
-              activeEffects={activeViewEffects}
-              fabricJson={designData.views[activeViewKey]?.fabricJson ?? null}
-              onLayersChange={(json) => handleLayersChange(activeViewKey, json)}
-              onSelectionChange={setSelectedLayerId}
-              onHistoryChange={setHistory}
-              onReadyChange={setCanvasReady}
-              controlRef={controlRef}
-            />
-          )}
-          {selectedLowResolution && (
-            <p role="status" className="mt-3 text-sm text-warning">
-              This image may print blurry. Make it smaller or upload a larger image.
-            </p>
-          )}
-        </div>
+        {/* Keyboard order follows the screen: tool panel then canvas from a tablet up,
+            canvas then tool panel on a phone. */}
+        {isMdUp ? [toolPanel, canvasPane] : [canvasPane, toolPanel]}
       </div>
     </div>
   );
