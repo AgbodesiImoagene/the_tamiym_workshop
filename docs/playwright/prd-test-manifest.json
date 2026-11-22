@@ -347,6 +347,16 @@
       "tags": ["@admin", "@critical"]
     },
     {
+      "id": "ADMIN-SHIPMENT",
+      "surface": "admin",
+      "feature": "Create a shipment, mark it shipped and delivered, customer timeline",
+      "prd_ref": "Admin Dashboard — orders and fulfilment",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/admin-shipment.journey.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@journey", "@admin", "@critical"]
+    },
+    {
       "id": "JOURNEY-SESSION-BOUND",
       "surface": "journey",
       "feature": "Admin/customer session isolation and cross-surface denial",

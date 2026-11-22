@@ -99,6 +99,7 @@ export class ShipmentsService {
     }
 
     let derivedOrderStatus: OrderStatus | null = null;
+    let emailNotificationId: string | null = null;
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -139,6 +140,12 @@ export class ShipmentsService {
             );
           }
           derivedOrderStatus = OrderStatus.FULFILLED;
+          emailNotificationId = await this.createOrderStatusEmailRow(
+            tx,
+            orderId,
+            order.user,
+            OrderStatus.FULFILLED,
+          );
         }
 
         await this.audit.log(
@@ -166,11 +173,7 @@ export class ShipmentsService {
       });
 
       if (derivedOrderStatus === OrderStatus.FULFILLED) {
-        await this.queueOrderStatusEmail(
-          orderId,
-          order.user,
-          OrderStatus.FULFILLED,
-        );
+        await this.enqueueOrderStatusEmail(emailNotificationId);
         await this.adminNotify.emit(ADMIN_NOTIF_ORDER_STATUS_CHANGED, {
           orderId,
           previousStatus: OrderStatus.PROCESSING,
@@ -357,6 +360,7 @@ export class ShipmentsService {
     }
 
     let derivedOrderStatus: OrderStatus | null = null;
+    let emailNotificationId: string | null = null;
     const previousOrderStatus = existing.order.status;
 
     try {
@@ -410,6 +414,12 @@ export class ShipmentsService {
             );
           }
           derivedOrderStatus = OrderStatus.DELIVERED;
+          emailNotificationId = await this.createOrderStatusEmailRow(
+            tx,
+            existing.orderId,
+            existing.order.user,
+            OrderStatus.DELIVERED,
+          );
         }
 
         await this.audit.log(
@@ -460,11 +470,7 @@ export class ShipmentsService {
     }
 
     if (derivedOrderStatus === OrderStatus.DELIVERED) {
-      await this.queueOrderStatusEmail(
-        existing.orderId,
-        existing.order.user,
-        OrderStatus.DELIVERED,
-      );
+      await this.enqueueOrderStatusEmail(emailNotificationId);
       await this.adminNotify.emit(ADMIN_NOTIF_ORDER_STATUS_CHANGED, {
         orderId: existing.orderId,
         previousStatus: previousOrderStatus,
@@ -576,28 +582,44 @@ export class ShipmentsService {
     };
   }
 
-  private async queueOrderStatusEmail(
+  /**
+   * Writes the status email row in the same transaction as the order status
+   * change, so a crash cannot lose it. The unique `dedupeKey` (one row per
+   * order and event) is a second guard: the order transition is already a
+   * conditional update, and a duplicate would roll the transaction back.
+   */
+  private async createOrderStatusEmailRow(
+    tx: Prisma.TransactionClient,
     orderId: string,
     user: { id: string; email: string; firstName: string } | null | undefined,
     newStatus: OrderStatus,
-  ): Promise<void> {
-    if (!user?.email) return;
+  ): Promise<string | null> {
+    if (!user?.email) return null;
     const eventName =
       newStatus === OrderStatus.FULFILLED
         ? OUTBOX_EVENT_ORDER_FULFILLED
         : newStatus === OrderStatus.DELIVERED
           ? OUTBOX_EVENT_ORDER_DELIVERED
           : null;
-    if (!eventName) return;
-    const notification = await this.prisma.notificationOutbox.create({
+    if (!eventName) return null;
+    const notification = await tx.notificationOutbox.create({
       data: {
         eventName,
         channel: NotificationChannel.EMAIL,
         recipient: user.email,
         recipientUserId: user.id,
+        dedupeKey: `${eventName}:${orderId}`,
         payload: { orderId, firstName: user.firstName },
       },
     });
-    await this.notificationOutboxDelivery.enqueueDelivery(notification.id);
+    return notification.id;
+  }
+
+  /** Hands the committed outbox row to the delivery queue (after commit). */
+  private async enqueueOrderStatusEmail(
+    notificationId: string | null,
+  ): Promise<void> {
+    if (!notificationId) return;
+    await this.notificationOutboxDelivery.enqueueDelivery(notificationId);
   }
 }

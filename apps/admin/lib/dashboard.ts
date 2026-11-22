@@ -57,7 +57,34 @@ export interface AdminOrder {
   };
 }
 
+export interface AdminShipmentEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  customerMessage?: string | null;
+  privateNotes?: string | null;
+  exceptionCode?: string | null;
+}
+
+export interface AdminShipment {
+  id: string;
+  orderId: string;
+  status: string;
+  direction: string;
+  carrierCode: string;
+  carrierName?: string | null;
+  serviceCode?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  estimatedDeliveryAt?: string | null;
+  exceptionCode?: string | null;
+  privateNotes?: string | null;
+  createdAt: string;
+  events: AdminShipmentEvent[];
+}
+
 export interface AdminOrderDetail extends AdminOrder {
+  shipments?: AdminShipment[];
   /** Plain text typed by the customer at checkout (TTW-197); show it as text, never as HTML. */
   customerNote?: string | null;
   subtotalAmount: number;
@@ -328,6 +355,35 @@ export async function getAdminOrder(id: string) {
 
 export async function updateAdminOrderStatus(id: string, status: string) {
   return apiClient.patch<AdminOrderDetail>(`/admin/orders/${id}`, { status });
+}
+
+export interface CreateAdminShipmentInput {
+  carrierCode: string;
+  serviceCode?: string;
+  estimatedDeliveryAt?: string;
+  privateNotes?: string;
+  idempotencyKey: string;
+}
+
+export async function createAdminShipment(orderId: string, input: CreateAdminShipmentInput) {
+  return apiClient.post<AdminShipment>(`/admin/orders/${orderId}/shipments`, input);
+}
+
+export interface UpdateAdminShipmentInput {
+  status: string;
+  idempotencyKey: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  exceptionCode?: string;
+  customerMessage?: string;
+  privateNotes?: string;
+}
+
+export async function updateAdminShipmentStatus(
+  shipmentId: string,
+  input: UpdateAdminShipmentInput
+) {
+  return apiClient.patch<AdminShipment>(`/admin/shipments/${shipmentId}`, input);
 }
 
 export async function createAdminRefund(

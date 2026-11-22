@@ -113,7 +113,7 @@ Exceptions never silently cancel the order, issue a refund, or restore stock (TT
 
 ## Notifications (slice 1)
 
-Slice 1 reuses existing order status emails when derivation sets `FULFILLED` / `DELIVERED`. Dedicated shipment milestone/exception templates and overdue monitors are deferred (later TTW-040 slices / TTW-043).
+Slice 1 reuses existing order status emails when derivation sets `FULFILLED` / `DELIVERED`. The email row is written in the same transaction as the order change, with the unique `dedupeKey` `OrderFulfilled:<orderId>` or `OrderDelivered:<orderId>` (TTW-106), so each email exists once per order; the queue hand-off happens after commit. There is no separate "shipped" email: the customer is told when the order is processed and when it is delivered. Dedicated shipment milestone/exception templates and overdue monitors are deferred (later TTW-040 slices / TTW-043).
 
 ## Promised delivery
 
@@ -129,5 +129,5 @@ Slice 1 reuses existing order status emails when derivation sets `FULFILLED` / `
 - Multi-package UX (TTW-045)
 - Organiser redacted shipment projection
 - Outbox milestone/exception templates + overdue scheduler
-- Admin console safe-next-action UI polish / Playwright matrix
+- Admin console polish and the full Playwright matrix (the basic shipment panel and its journey shipped in TTW-106; corrections of a recorded event have no screen yet)
 - Formal product/ops/legal sign-off of SLAs and vocabulary

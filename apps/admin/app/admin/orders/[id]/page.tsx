@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminShell, formatAdminCurrency, formatAdminDate } from '@/components/admin-shell';
+import { AdminOrderShipments } from '@/components/admin-order-shipments';
 import { AdminStatusBadge } from '@/components/admin-status-badge';
 import { createAdminRefund, getAdminOrder, updateAdminOrderStatus } from '@/lib/dashboard';
 import { OrderStatus } from '@tamiym/types';
@@ -19,12 +20,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
-const statusOptions = [
-  OrderStatus.PROCESSING,
-  OrderStatus.FULFILLED,
-  OrderStatus.DELIVERED,
-  OrderStatus.CANCELLED,
-];
+// FULFILLED and DELIVERED are not choices here: only the shipment panel moves an order
+// there (TTW-040), and the API refuses them on this route.
+const statusOptions = [OrderStatus.PROCESSING, OrderStatus.CANCELLED];
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -360,14 +358,24 @@ export default function AdminOrderDetailPage() {
               </CardContent>
             </Card>
 
+            <AdminOrderShipments
+              orderId={orderId}
+              orderStatus={order.status}
+              shipments={order.shipments ?? []}
+              onChanged={async () => {
+                await queryClient.invalidateQueries({ queryKey: ['admin-order', orderId] });
+                await queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+              }}
+            />
+
             <Card className="rounded-[1.75rem] border-black/8 shadow-none">
               <CardHeader>
                 <CardTitle>Status guide</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm leading-6 text-black/65">
                 <p>`PROCESSING` after payment verification and production handoff.</p>
-                <p>`FULFILLED` when the order is ready to leave the workshop.</p>
-                <p>`DELIVERED` once the shipment has completed.</p>
+                <p>`FULFILLED` is set automatically when you create the shipment.</p>
+                <p>`DELIVERED` is set automatically when the shipment is marked as delivered.</p>
                 <p>`PARTIALLY_REFUNDED` after a provider-confirmed partial refund.</p>
                 <p>`REFUNDED` only when confirmed refunds cover the full capture.</p>
                 <p>`CANCELLED` is only safe for orders that have not progressed.</p>
