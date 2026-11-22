@@ -1,7 +1,7 @@
 # TTW-252 — Turn off the AI screening of designs and campaigns
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** Implemented on branch `codex/ttw-252-turn-off-ai-screening`, not merged\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -121,4 +121,4 @@ To tell the client:
 - A new thumbnail returns an APPROVED design to PENDING. The workshop uploads one on each save, so an approved design that its owner saves again waits for a new approval, and its public picture is closed until then. This includes designs of live campaigns. If that is too strict, the next step is a product decision (for example, no demotion when only the picture changes).
 - The default admin e-mail template for "campaign submitted" still prints "AI pre-screen: PENDING".
 
-Not done here: ROADMAP and README (the ticket has no row in either yet), push, merge.
+Merged into `main` on 2026-11-22 (merge commit `64e0c56`). CI on the ticket branch passed (run 45079661415). CI on `main` after the merge passed: `CI` run 45080638253 and `Playwright Comprehensive` run 45080638241, both green. The ticket has no row in ROADMAP or in the tickets README (neither lists TTW-246 to TTW-251 either).
