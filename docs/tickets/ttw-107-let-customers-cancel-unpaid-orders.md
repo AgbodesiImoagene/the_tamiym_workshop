@@ -1,7 +1,7 @@
 # TTW-107 — Let customers cancel their unpaid orders
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, awaiting merge\
+**Status:** Complete\
 **Risk:** Critical\
 **Blocked by:** None\
 **Blocks:** None
@@ -115,3 +115,7 @@ Not verified: other browsers or mobile widths for the new button, and the full P
 - Dedicated e2e customer `orderCancel` added to the seed, identities and auth setup; manifest entry `APP-ORDER-CANCEL`; policy doc and OpenAPI updated.
 - Deviation from the plan: a second cancel returns 400 `CANCEL_NOT_ALLOWED_TERMINAL` (the existing convention), not 409.
 - Left for later: see B1, B3 and B4 above.
+
+## Merge
+
+Merged into `main` as `8216f5a` (merge commit, on top of TTW-101). Checked on the merged tree before the push: `openapi:check`, `docs:validate`, `playwright:validate`, `format:check`, `typecheck`, `lint` and `pnpm test` (api 2169, app 334, web 84). CI run 45020232260 on `main`: green. On the branch, the first CI run failed only the `API Open Handles` job (240 s budget exceeded, 62 of 64 suites done); the rerun was green. That budget is tight (main runs take 163-218 s) and may need raising in a separate ticket.
