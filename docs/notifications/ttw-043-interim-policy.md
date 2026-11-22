@@ -28,6 +28,13 @@ This matrix is the working source of truth for event taxonomy, preference/consen
 | `admin.operational` (+ admin route fan-out)                                                               | `ORGANISER_OPERATIONAL` | Yes      | EMAIL/SMS/SLACK | Ops/on-call; no user preference gate  |
 | Unmapped `eventName`                                                                                      | —                       | —        | —               | Suppress with `TAXONOMY_UNMAPPED`     |
 
+### Design moderation emails (TTW-109)
+
+- `DesignModerationApproved` / `DesignModerationRejected` are queued by `ModerationDecisionService` in the same transaction as the decision, only for a **human** decision on a **design**: an admin decision or an appeal resolution, with outcome `APPROVED` or `REJECTED`. Automatic (AI/system) decisions, `FLAGGED`, `PENDING`, media and campaign decisions send nothing.
+- One decision, one email: `dedupeKey = <eventName>:<decisionId>`. An admin repeating what an earlier human decision already said (checked under a row lock on the design) sends nothing; an earlier automatic decision does not count. An appeal resolved to APPROVED or REJECTED always answers the appellant.
+- The payload holds `designId`, `designName`, `productName` and `firstName` only. Moderation notes and internal evidence are never copied into it.
+- The row is delivered by the outbox sweep (every 2 minutes) because the decision's transaction cannot enqueue the job itself.
+
 Security-specific events (password reset, MFA) are not yet on the outbox; when added they map to `SECURITY` and are always required.
 
 ## Preference & consent

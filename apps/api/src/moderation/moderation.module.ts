@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ModerationService } from './moderation.service';
 import { ModerationDecisionService } from './moderation-decision.service';
 import { ModerationAppealsController } from './moderation-appeals.controller';
@@ -10,7 +11,7 @@ import { ModerationAppealsController } from './moderation-appeals.controller';
  * immutable decision/appeal workflow is needed.
  */
 @Module({
-  imports: [ConfigModule, PrismaModule],
+  imports: [ConfigModule, PrismaModule, NotificationsModule],
   controllers: [ModerationAppealsController],
   providers: [ModerationService, ModerationDecisionService],
   exports: [ModerationService, ModerationDecisionService],
