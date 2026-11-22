@@ -43,7 +43,7 @@ Startup validation in `apps/api/src/app.module.ts` rejects missing values and kn
 
 ### Paystack
 
-- `PAYSTACK_SECRET_KEY`
+- `PAYSTACK_SECRET_KEY` (required in production: the API refuses to start without a real value, not a `PLACEHOLDER_*` one)
 - `PAYSTACK_PUBLIC_KEY`
 
 ### S3-compatible storage
