@@ -75,6 +75,12 @@ describe('env-validation', () => {
       expect(validateEnv({})).toEqual({});
     });
 
+    it('still skips validation under NODE_ENV=test with a placeholder Paystack key (TTW-248)', () => {
+      process.env.NODE_ENV = 'test';
+      const config = { PAYSTACK_SECRET_KEY: 'your-paystack-secret-key' };
+      expect(validateEnv(config)).toEqual(config);
+    });
+
     describe('named environments such as staging (TTW-100)', () => {
       beforeEach(() => {
         process.env.NODE_ENV = 'staging';
@@ -94,6 +100,19 @@ describe('env-validation', () => {
         expect(validateEnv(config)).toEqual(config);
       });
 
+      it('does not require PAYSTACK_SECRET_KEY, nor reject a placeholder one (TTW-248)', () => {
+        const config = {
+          ...validBaseConfig,
+          API_PUBLIC_URL: 'https://api.staging.example.com/v1',
+        };
+        expect(validateEnv(config)).toEqual(config);
+        const withPlaceholder = {
+          ...config,
+          PAYSTACK_SECRET_KEY: 'PLACEHOLDER_PAYSTACK_SECRET_KEY',
+        };
+        expect(validateEnv(withPlaceholder)).toEqual(withPlaceholder);
+      });
+
       it('rejects an API_PUBLIC_URL that is not an http(s) URL', () => {
         expect(() =>
           validateEnv({ ...validBaseConfig, API_PUBLIC_URL: 'nope' }),
@@ -110,6 +129,15 @@ describe('env-validation', () => {
 
       it('passes through a config with all required vars present', () => {
         expect(validateEnv(validBaseConfig)).toEqual(validBaseConfig);
+      });
+
+      it('does not require PAYSTACK_SECRET_KEY, nor reject a placeholder one (TTW-248)', () => {
+        expect(validateEnv(validBaseConfig)).toEqual(validBaseConfig);
+        const withPlaceholder = {
+          ...validBaseConfig,
+          PAYSTACK_SECRET_KEY: 'your-paystack-secret-key',
+        };
+        expect(validateEnv(withPlaceholder)).toEqual(withPlaceholder);
       });
 
       it('throws when a required var is missing', () => {
@@ -179,6 +207,7 @@ describe('env-validation', () => {
         MAIL_USER: 'apikey',
         MAIL_PASSWORD: 'a-real-mail-password',
         MAIL_FROM: '"Tamiym" <noreply@mail.example.com>',
+        PAYSTACK_SECRET_KEY: 'sk_live_a_real_paystack_secret',
       };
 
       beforeEach(() => {
@@ -282,6 +311,67 @@ describe('env-validation', () => {
         ).toThrow(
           'Missing required production environment variable: NOTIFICATION_UNSUBSCRIBE_SECRET',
         );
+      });
+
+      describe('Paystack secret key (TTW-248)', () => {
+        it('throws when PAYSTACK_SECRET_KEY is missing', () => {
+          expect(() =>
+            validateEnv(omit(validProductionConfig, 'PAYSTACK_SECRET_KEY')),
+          ).toThrow(
+            'Missing required production environment variable: PAYSTACK_SECRET_KEY',
+          );
+        });
+
+        it.each(['', '   '])(
+          'throws when PAYSTACK_SECRET_KEY is blank (%j)',
+          (blank) => {
+            expect(() =>
+              validateEnv({
+                ...validProductionConfig,
+                PAYSTACK_SECRET_KEY: blank,
+              }),
+            ).toThrow(
+              'Missing required production environment variable: PAYSTACK_SECRET_KEY',
+            );
+          },
+        );
+
+        it.each([
+          'PLACEHOLDER_PAYSTACK_SECRET_KEY',
+          ' placeholder_paystack_secret_key ',
+          'your-paystack-secret-key',
+          'Your-Paystack-Secret-Key',
+          'secret',
+        ])('throws when PAYSTACK_SECRET_KEY is the placeholder %j', (value) => {
+          expect(() =>
+            validateEnv({
+              ...validProductionConfig,
+              PAYSTACK_SECRET_KEY: value,
+            }),
+          ).toThrow(
+            'Environment variable PAYSTACK_SECRET_KEY must be set to a real value, not a placeholder',
+          );
+        });
+
+        it('never echoes the key value in the error message', () => {
+          let message = '';
+          try {
+            validateEnv({
+              ...validProductionConfig,
+              PAYSTACK_SECRET_KEY: 'PLACEHOLDER_PAYSTACK_SECRET_KEY',
+            });
+          } catch (error) {
+            message = (error as Error).message;
+          }
+          expect(message).not.toBe('');
+          expect(message).not.toContain('PLACEHOLDER_PAYSTACK_SECRET_KEY');
+        });
+
+        it('accepts a real-looking key', () => {
+          expect(validateEnv(validProductionConfig)).toEqual(
+            validProductionConfig,
+          );
+        });
       });
 
       it('throws when CLAMAV_HOST is missing', () => {

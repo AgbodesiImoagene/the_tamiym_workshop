@@ -36,6 +36,8 @@ export const requiredProductionEnvVars = [
   // Public base URL of this API: the only origin a saved design may load images from (TTW-100).
   'API_PUBLIC_URL',
   'NOTIFICATION_UNSUBSCRIBE_SECRET',
+  // Signs and authenticates every Paystack call and webhook; without it no order can be paid (TTW-248).
+  'PAYSTACK_SECRET_KEY',
   ...requiredProductionMailEnvVars,
 ] as const;
 
@@ -103,6 +105,9 @@ export function isLocalMailHost(host: string): boolean {
   );
 }
 
+/** Template value shipped in `apps/api/.env.example` for `PAYSTACK_SECRET_KEY`. */
+const PAYSTACK_EXAMPLE_PLACEHOLDER = 'your-paystack-secret-key';
+
 export const forbiddenPlaceholders = new Set([
   'secret',
   'your-access-secret-key-change-in-production',
@@ -158,6 +163,8 @@ export function parseOriginEntries(raw: string): string[] {
  * Production also requires usable mail settings (TTW-085): `MAIL_HOST`,
  * `MAIL_USER`, `MAIL_PASSWORD` and `MAIL_FROM` set, none left as a secrets
  * template `PLACEHOLDER_*` value, and `MAIL_HOST` not the local machine.
+ * Production also requires a real `PAYSTACK_SECRET_KEY` (TTW-248): set, and not
+ * a `PLACEHOLDER_*` value, the `.env.example` value or another known placeholder.
  */
 export function validateEnv(
   config: Record<string, unknown>,
@@ -235,6 +242,18 @@ export function validateEnv(
       if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN' || key === 'API_PUBLIC_URL') {
         assertHttpUrl(key, value);
       }
+    }
+
+    // Presence is checked by the loop above; never echo the value (TTW-248).
+    const paystackKey = String(config.PAYSTACK_SECRET_KEY).trim().toLowerCase();
+    if (
+      paystackKey.startsWith(SECRETS_TEMPLATE_PLACEHOLDER_PREFIX) ||
+      paystackKey === PAYSTACK_EXAMPLE_PLACEHOLDER ||
+      forbiddenPlaceholders.has(paystackKey)
+    ) {
+      throw new Error(
+        'Environment variable PAYSTACK_SECRET_KEY must be set to a real value, not a placeholder',
+      );
     }
 
     for (const key of requiredProductionMailEnvVars) {

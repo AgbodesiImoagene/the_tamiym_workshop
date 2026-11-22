@@ -48,6 +48,9 @@ output` do not contain secret values.
   `S3_PRIVATE_BUCKET` is the private `<prefix>-originals` bucket (customer uploads, ACL
   private, created by `infra/modules/spaces*`). The API refuses to start in production
   when `S3_BUCKET` is set without a distinct `S3_PRIVATE_BUCKET`.
+- `PAYSTACK_SECRET_KEY` (TTW-248): the API, worker and scheduler refuse to start in
+  production while it is missing or still a `PLACEHOLDER_*` value. Set the real key in
+  `secrets.env` before deploying.
 - `API_PUBLIC_URL` (TTW-100): the public base URL of the API including `/v1`, for example
   `https://api.example.com/v1`. A saved design may only load images from
   `<API_PUBLIC_URL>/design-assets/<id>/file`. Keep it equal to the `NEXT_PUBLIC_API_URL` the
