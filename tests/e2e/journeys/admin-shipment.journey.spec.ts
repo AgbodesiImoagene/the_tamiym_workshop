@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures/test';
 
 /**
@@ -9,10 +10,28 @@ import { test, expect } from '../fixtures/test';
  */
 const ORDER_ID = 'e2e-order-processing';
 
+/**
+ * That seeded order also shows its print files (another ticket). The seed has no object
+ * in storage, so the on-screen preview of its upload would answer an error and trip the
+ * clean-page guard. A 1 px PNG stands in for that preview only, as the print-files spec
+ * does; the shipment calls under test all go to the real API.
+ */
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+async function standInForStoredPreview(page: Page) {
+  await page.route('**/design-assets/*/file*', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: ONE_PIXEL_PNG })
+  );
+}
+
 test.describe('Admin shipment journey @journey @admin @critical', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('the status list no longer offers fulfilled or delivered', async ({ adminPage }) => {
+    await standInForStoredPreview(adminPage);
     await adminPage.goto(`/admin/orders/${ORDER_ID}`);
     await expect(adminPage.getByRole('heading', { name: /Order detail/i })).toBeVisible();
     // The heading shows before the order loads: wait for the select itself.
@@ -22,6 +41,7 @@ test.describe('Admin shipment journey @journey @admin @critical', () => {
   });
 
   test('create a shipment, mark it shipped, then delivered', async ({ adminPage }) => {
+    await standInForStoredPreview(adminPage);
     await adminPage.goto(`/admin/orders/${ORDER_ID}`);
     const panel = adminPage.getByTestId('admin-shipments');
 
