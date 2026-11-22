@@ -3,9 +3,9 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { OrderStatusBanner } from '@/components/order-status-banner';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
-import { PaymentStatus } from '@tamiym/types';
-import { useQuery } from '@tanstack/react-query';
+import { cancelCustomerOrder, getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
+import { OrderStatus, PaymentStatus } from '@tamiym/types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,6 +17,10 @@ export default function DashboardOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const queryClient = useQueryClient();
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -40,6 +44,10 @@ export default function DashboardOrderDetailPage() {
     queryFn: () => getCustomerOrderDetail(params.id),
     enabled: !!user && typeof params.id === 'string',
     refetchInterval: (query) => {
+      // A cancelled order keeps its pending payment status but nothing can settle on it any more.
+      if (query.state.data?.status === OrderStatus.CANCELLED) {
+        return false;
+      }
       const paymentStatus = query.state.data?.paymentStatus;
       return paymentStatus === PaymentStatus.PENDING || paymentStatus === PaymentStatus.INITIATED
         ? 5000
@@ -62,6 +70,26 @@ export default function DashboardOrderDetailPage() {
       setRetryMessage(apiError.message || 'We could not restart payment for this order.');
     } finally {
       setIsRetrying(false);
+    }
+  }
+
+  async function handleCancelOrder() {
+    if (isCancelling) {
+      return;
+    }
+    setCancelError(null);
+    setIsCancelling(true);
+    try {
+      const cancelled = await cancelCustomerOrder(params.id);
+      queryClient.setQueryData(['customer-order-detail', params.id], cancelled);
+      setIsConfirmingCancel(false);
+    } catch (err) {
+      const apiError = err as ApiError;
+      setCancelError(apiError.message || 'We could not cancel this order.');
+      // The order may have changed (for example, it was just paid): show its real state.
+      void orderQuery.refetch();
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -316,6 +344,18 @@ export default function DashboardOrderDetailPage() {
                     {isRetrying ? 'Redirecting...' : 'Retry payment'}
                   </button>
                 ) : null}
+                {order.status === OrderStatus.PENDING_PAYMENT && !isConfirmingCancel ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancelError(null);
+                      setIsConfirmingCancel(true);
+                    }}
+                    className="inline-flex rounded-lg border border-destructive px-5 py-3 text-sm font-semibold text-destructive"
+                  >
+                    Cancel order
+                  </button>
+                ) : null}
                 <Link
                   href={`/orders/${order.id}/confirm`}
                   className="inline-flex rounded-lg bg-[#004385] px-5 py-3 text-sm font-semibold text-white"
@@ -323,6 +363,45 @@ export default function DashboardOrderDetailPage() {
                   Payment confirmation
                 </Link>
               </div>
+
+              {order.status === OrderStatus.PENDING_PAYMENT && isConfirmingCancel ? (
+                <div
+                  role="group"
+                  aria-labelledby="cancel-order-title"
+                  className="space-y-3 rounded-2xl border border-destructive p-4"
+                >
+                  <h2 id="cancel-order-title" className="text-base font-bold text-foreground">
+                    Cancel this order?
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    The order will be cancelled and its stock is released. This cannot be undone. If
+                    you have already paid, do not cancel: contact support instead.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleCancelOrder()}
+                      disabled={isCancelling}
+                      className="inline-flex rounded-lg bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground disabled:opacity-60"
+                    >
+                      {isCancelling ? 'Cancelling...' : 'Yes, cancel order'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingCancel(false)}
+                      disabled={isCancelling}
+                      className="inline-flex rounded-lg border border-border px-5 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+                    >
+                      Keep order
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {cancelError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {cancelError}
+                </p>
+              ) : null}
             </section>
 
             <aside className="h-fit space-y-4 rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">

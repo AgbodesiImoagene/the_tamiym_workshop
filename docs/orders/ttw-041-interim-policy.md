@@ -18,23 +18,33 @@ This matrix is the working source of truth for cancel, refund and return **eligi
 
 ## Actors (slice 1)
 
-| Actor    | Cancel execute                                                    | Refund execute              | Return execute        |
-| -------- | ----------------------------------------------------------------- | --------------------------- | --------------------- |
-| Customer | Unpaid only (future self-serve); read eligibility on order detail | No — admin initiates        | No — eligibility only |
-| Admin    | Unpaid `PENDING_PAYMENT` only                                     | Via existing refund API     | Eligibility only      |
-| System   | Order expiry unpaid cancel (unchanged)                            | Provider webhook settlement | —                     |
+| Actor    | Cancel execute                                                       | Refund execute              | Return execute        |
+| -------- | -------------------------------------------------------------------- | --------------------------- | --------------------- |
+| Customer | Unpaid only, self-serve since TTW-107 (`POST /v1/orders/:id/cancel`) | No — admin initiates        | No — eligibility only |
+| Admin    | Unpaid `PENDING_PAYMENT` only                                        | Via existing refund API     | Eligibility only      |
+| System   | Order expiry unpaid cancel (unchanged)                               | Provider webhook settlement | —                     |
 
 ## Cancellation matrix
 
 | Order status           | Active outbound shipment | Admin cancel | Customer cancel (execute) | Stock effect                                     | Denial / allow code                       |
 | ---------------------- | ------------------------ | ------------ | ------------------------- | ------------------------------------------------ | ----------------------------------------- |
-| `PENDING_PAYMENT`      | n/a                      | Allowed      | Allowed (when API exists) | Release reserved inventory (TTW-014 unpaid path) | `CANCEL_ALLOWED_UNPAID`                   |
+| `PENDING_PAYMENT`      | n/a                      | Allowed      | Allowed (TTW-107)         | Release reserved inventory (TTW-014 unpaid path) | `CANCEL_ALLOWED_UNPAID`                   |
 | `PAID`                 | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_USE_REFUND`           |
 | `PROCESSING`           | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_USE_REFUND`           |
 | `FULFILLED`            | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_SHIPPED_OR_FULFILLED` |
 | `DELIVERED`            | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_DELIVERED`            |
 | `PARTIALLY_REFUNDED`   | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_USE_REFUND`           |
 | `REFUNDED`/`CANCELLED` | any                      | Denied       | Denied                    | None                                             | `CANCEL_NOT_ALLOWED_TERMINAL`             |
+
+### Customer cancel of an unpaid order (TTW-107)
+
+`POST /v1/orders/:id/cancel`, owner only (another user's or a missing order is a 404).
+
+- One transaction: conditional `PENDING_PAYMENT → CANCELLED`, release of the reservation (once per order item, unique effect key), and every open payment attempt (`PENDING`/`INITIATED`) set to `FAILED`. No provider call is made.
+- A refusal is a 400 with the code of the matrix above (a second cancel gives `CANCEL_NOT_ALLOWED_TERMINAL`). An order that is paid or cancelled while the request runs is a 409 and nothing is written.
+- A `charge.success` that arrives afterwards is a late payment on a cancelled order (TTW-088, below): recorded, then refunded by an admin. If it lands between the webhook's read and its settlement, the webhook transaction rolls back, the endpoint answers an error and Paystack delivers the event again; the redelivery is then recorded as a late payment.
+- Side effects: audit entry `customer.order.cancelled`, the existing cancelled e-mail, and the admin status notification.
+- The admin cancel shares the same transaction body but does not close payment attempts (unchanged by TTW-107).
 
 **Slice 1 change:** admin `PROCESSING → CANCELLED` is **removed**. Paid commercial unwind must go through the refund path so money and stock stay consistent with TTW-013/014.
 
