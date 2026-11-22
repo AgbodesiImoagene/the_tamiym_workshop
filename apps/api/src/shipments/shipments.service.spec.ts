@@ -263,6 +263,109 @@ describe('ShipmentsService', () => {
       events: [],
     };
 
+    describe('unique violation on update', () => {
+      const dispatchDto = {
+        status: 'DISPATCHED' as const,
+        idempotencyKey: 'idem-clash-1',
+        trackingNumber: 'TRK-CLASH',
+      };
+      const uniqueError = () =>
+        new Prisma.PrismaClientKnownRequestError('unique', {
+          code: 'P2002',
+          clientVersion: 'test',
+        });
+
+      beforeEach(() => {
+        prisma.shipment.findUnique.mockResolvedValue(baseShipment);
+        prisma.shipmentEvent.findFirst.mockResolvedValue(null);
+        prisma.$transaction.mockRejectedValue(uniqueError());
+      });
+
+      it('says the tracking number is used when another shipment holds it', async () => {
+        prisma.shipment.findFirst.mockResolvedValue({ id: 'other-ship' });
+
+        await expect(
+          service.updateStatus('ship-1', dispatchDto, 'admin-1'),
+        ).rejects.toThrow('Tracking number already used for this carrier');
+        expect(prisma.shipment.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id: { not: 'ship-1' },
+            }),
+          }),
+        );
+      });
+
+      it('does not blame the tracking number for another unique violation', async () => {
+        prisma.shipment.findFirst.mockResolvedValue(null);
+
+        const result = service.updateStatus('ship-1', dispatchDto, 'admin-1');
+
+        await expect(result).rejects.toThrow(ConflictException);
+        await expect(result).rejects.toThrow(/changed concurrently/);
+        await expect(result).rejects.not.toThrow(/Tracking number/);
+      });
+    });
+
+    describe('queue hand-off failure after commit', () => {
+      it('still succeeds when the OrderFulfilled hand-off fails', async () => {
+        prisma.order.findUnique.mockResolvedValue({
+          id: 'order-1',
+          status: OrderStatus.PROCESSING,
+          user: { id: 'u1', email: 'a@b.com', firstName: 'Ada' },
+        });
+        prisma.shipment.create.mockResolvedValue({
+          id: 'ship-1',
+          orderId: 'order-1',
+          status: ShipmentStatus.READY,
+          events: [],
+        });
+        prisma.order.updateMany.mockResolvedValue({ count: 1 });
+        outbox.enqueueDelivery.mockRejectedValue(new Error('redis down'));
+
+        const result = await service.createForOrder(
+          'order-1',
+          { carrierCode: 'MANUAL', idempotencyKey: 'idem-handoff-1' },
+          'admin-1',
+        );
+
+        expect(result.id).toBe('ship-1');
+        expect(adminNotify.emit).toHaveBeenCalled();
+      });
+
+      it('still succeeds when the OrderDelivered hand-off fails', async () => {
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.OUT_FOR_DELIVERY,
+            trackingNumber: 'TRK1',
+            dispatchedAt: new Date(),
+          })
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DELIVERED,
+            events: [],
+          });
+        prisma.shipmentEvent.create.mockResolvedValue({});
+        prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
+        prisma.order.updateMany.mockResolvedValue({ count: 1 });
+        outbox.enqueueDelivery.mockRejectedValue(new Error('redis down'));
+
+        const result = await service.updateStatus(
+          'ship-1',
+          {
+            status: 'DELIVERED',
+            idempotencyKey: 'idem-handoff-2',
+            trackingNumber: 'TRK1',
+          },
+          'admin-1',
+        );
+
+        expect(result.status).toBe(ShipmentStatus.DELIVERED);
+        expect(adminNotify.emit).toHaveBeenCalled();
+      });
+    });
+
     it('dispatches with tracking and audits', async () => {
       prisma.shipment.findUnique
         .mockResolvedValueOnce(baseShipment)

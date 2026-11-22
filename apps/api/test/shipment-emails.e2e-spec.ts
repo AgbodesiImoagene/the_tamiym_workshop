@@ -185,6 +185,43 @@ describe('Shipment emails (e2e)', () => {
     expect(await emailRows(order.id)).toHaveLength(1);
   });
 
+  it('the same tracking number on two shipments is refused with the tracking message', async () => {
+    const a = await seedProcessingOrder();
+    const b = await seedProcessingOrder();
+    const shipA = await shipments.createForOrder(
+      a.order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `ta-${a.order.id}` },
+      a.user.id,
+    );
+    const shipB = await shipments.createForOrder(
+      b.order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `tb-${b.order.id}` },
+      b.user.id,
+    );
+    const tracking = `SHARED-${a.order.id}`;
+    await shipments.updateStatus(
+      shipA.id,
+      {
+        status: 'DISPATCHED',
+        idempotencyKey: `da-${a.order.id}`,
+        trackingNumber: tracking,
+      },
+      a.user.id,
+    );
+
+    await expect(
+      shipments.updateStatus(
+        shipB.id,
+        {
+          status: 'DISPATCHED',
+          idempotencyKey: `db-${b.order.id}`,
+          trackingNumber: tracking,
+        },
+        b.user.id,
+      ),
+    ).rejects.toThrow('Tracking number already used for this carrier');
+  });
+
   it('two admins delivering at once write one OrderDelivered row', async () => {
     const { user, order } = await seedProcessingOrder();
     const shipment = await shipments.createForOrder(

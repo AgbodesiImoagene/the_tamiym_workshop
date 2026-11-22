@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -55,6 +56,8 @@ const TRACKING_REQUIRED = new Set<ShipmentStatus>([
 
 @Injectable()
 export class ShipmentsService {
+  private readonly logger = new Logger(ShipmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -462,8 +465,21 @@ export class ShipmentsService {
         if (again) {
           return this.getForAdmin(shipmentId);
         }
+        // Name the tracking number only when another shipment really holds it.
+        // Any other unique violation is a concurrent change, not a tracking issue.
+        const holder = carrierTrackingKey
+          ? await this.prisma.shipment.findFirst({
+              where: { carrierTrackingKey, id: { not: shipmentId } },
+              select: { id: true },
+            })
+          : null;
+        if (holder) {
+          throw new ConflictException(
+            'Tracking number already used for this carrier',
+          );
+        }
         throw new ConflictException(
-          'Tracking number already used for this carrier',
+          'Shipment changed concurrently; retry with the latest status',
         );
       }
       throw err;
@@ -615,11 +631,23 @@ export class ShipmentsService {
     return notification.id;
   }
 
-  /** Hands the committed outbox row to the delivery queue (after commit). */
+  /**
+   * Hands the committed outbox row to the delivery queue (after commit). The
+   * order change is already saved, so a queue failure must not turn the request
+   * into an error: the row stays PENDING and the outbox backfill queues it again.
+   */
   private async enqueueOrderStatusEmail(
     notificationId: string | null,
   ): Promise<void> {
     if (!notificationId) return;
-    await this.notificationOutboxDelivery.enqueueDelivery(notificationId);
+    try {
+      await this.notificationOutboxDelivery.enqueueDelivery(notificationId);
+    } catch (err) {
+      this.logger.warn(
+        `Email hand-off failed for outbox ${notificationId}; the backfill will retry (${
+          err instanceof Error ? err.message : 'unknown error'
+        })`,
+      );
+    }
   }
 }
