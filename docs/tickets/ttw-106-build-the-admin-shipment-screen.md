@@ -1,7 +1,7 @@
 # TTW-106 — Build the admin shipment screen
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, review PASS with fixes applied\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-121
@@ -100,6 +100,8 @@ Run in the worktree `.claude/worktrees/ttw-106`, Node 24.22.1, on a throwaway da
 - `pnpm --filter api test:e2e -- test/shipment-emails.e2e-spec.ts` (real Postgres): 9 passed after the dispatch-time change and its review (written after the code, unlike the unit tests): no email on create; `OrderFulfilled` at dispatch; `OrderDelivered` at delivery; replayed create sends nothing; cancelled then recreated shipment, one row; existing row neither blocks nor doubles; two admins dispatching at once, one row; tracking duplicate message; two admins delivering at once, one row. Added after the third review: cancelled after dispatch then recreated and dispatched again (one row, second dispatch works); an order already FULFILLED (row is PENDING with the first name).
 - `pnpm exec playwright test tests/e2e/journeys/admin-shipment --project=setup --project=chromium-journeys` on a fresh database: 15 passed (9 setup, 3 happy-path tests: status list, create → shipped → delivered, customer timeline; 3 problem tests). The UI journey was not run before the screen existed.
 - `pnpm typecheck` 6/6, `pnpm lint` 6/6 (warnings only, none new), `pnpm format:check` clean, `pnpm test` (web 84, app 323, api 2122 passed), `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm coverage:ratchet` (lines 85.56% over floor 56%), `pnpm coverage:diff` 12/12 lines (100%), `pnpm build` exit 0.
+
+Merge into `main` (fast-forward, no conflict with TTW-107, `prisma generate` needed for the new `designSnapshot` column): branch CI green on `ee6b484` (19 jobs). The first run on `main` failed in "Playwright Comprehensive UAT" only: the happy-path journey opens `e2e-order-processing`, whose print-files panel (another ticket) loads a stored preview the seed does not have, and the clean-page guard flagged the blocked image. Fixed in `e7b5552` with the same stand-in the print-files spec uses (preview image only, guard unchanged). Final proof on `main` at `e7b5552`: CI and Playwright Comprehensive both green. A full local replay of `pnpm test:e2e:comprehensive` still showed 11 failures in other tickets' specs (print files, low resolution, order cancel) that passed on the CI, so they are most likely local noise; not investigated.
 
 Not verified: the mobile layout of the panel; the full Playwright suite (only the new journey was run); `pnpm audit:prod` and `pnpm migrations:check` (no schema change); the real email delivery (the queue worker does not run under `NODE_ENV=test`).
 
