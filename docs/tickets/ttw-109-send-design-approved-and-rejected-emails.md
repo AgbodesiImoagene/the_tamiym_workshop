@@ -1,7 +1,7 @@
 # TTW-109 — Send design approved and rejected emails
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, awaiting merge\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** None
