@@ -34,6 +34,7 @@ import {
   Textarea,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 type RouteFormState = {
@@ -277,6 +278,11 @@ export default function AdminNotificationsPage() {
       activeNav="notifications"
       title="Notifications"
       description="Configure admin event routes and queue broadcast emails to verified user segments."
+      actions={
+        <Button asChild variant="secondary">
+          <Link href="/admin/notifications/failed">Failed notifications</Link>
+        </Button>
+      }
     >
       <div className="space-y-6">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">

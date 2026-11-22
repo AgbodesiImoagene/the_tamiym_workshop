@@ -141,6 +141,61 @@ describe('NotificationDeadLetterService', () => {
     ).toHaveBeenCalledWith({ outcome: 'denied' });
   });
 
+  describe('when another replay wins the race', () => {
+    const acknowledged = {
+      id: 'dl-1',
+      status: NotificationStatus.FAILED,
+      deadLetterAckStatus: 'ACKNOWLEDGED',
+      effectKey: 'PaymentConfirmed:u1:EMAIL',
+      channel: NotificationChannel.EMAIL,
+      eventName: 'PaymentConfirmed',
+      recipient: 'a@example.com',
+      recipientUserId: 'u1',
+      payload: {},
+      generation: 1,
+    };
+
+    it('denies the replay when the unique generation index rejects it', async () => {
+      prisma.notificationOutbox.findFirst
+        .mockResolvedValueOnce(acknowledged)
+        .mockResolvedValueOnce(null);
+      dispatch.dispatch.mockRejectedValue({ code: 'P2002' });
+
+      await expect(
+        service.replayDeadLetter('dl-1', 'admin-1', 'retry'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(
+        observability.recordNotificationDeadLetterReplay,
+      ).toHaveBeenCalledWith({ outcome: 'denied' });
+    });
+
+    it('denies the replay when dispatch reuses the other replay row', async () => {
+      prisma.notificationOutbox.findFirst
+        .mockResolvedValueOnce(acknowledged)
+        .mockResolvedValueOnce(null);
+      dispatch.dispatch.mockResolvedValue({
+        outboxId: 'out-2',
+        queued: true,
+        idempotentReuse: true,
+      });
+
+      await expect(
+        service.replayDeadLetter('dl-1', 'admin-1', 'retry'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rethrows an unrelated dispatch error', async () => {
+      prisma.notificationOutbox.findFirst
+        .mockResolvedValueOnce(acknowledged)
+        .mockResolvedValueOnce(null);
+      dispatch.dispatch.mockRejectedValue(new Error('redis down'));
+
+      await expect(
+        service.replayDeadLetter('dl-1', 'admin-1', 'retry'),
+      ).rejects.toThrow('redis down');
+    });
+  });
+
   it('throws when dead letter missing', async () => {
     prisma.notificationOutbox.findFirst.mockResolvedValue(null);
     await expect(

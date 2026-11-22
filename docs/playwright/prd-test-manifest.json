@@ -373,6 +373,16 @@
       "tags": ["@journey", "@admin", "@critical"]
     },
     {
+      "id": "ADMIN-FAILED-EMAILS",
+      "surface": "admin",
+      "feature": "List failed e-mails, acknowledge them, resend one or several",
+      "prd_ref": "Admin Dashboard — notifications",
+      "automation": "automated",
+      "tests": ["tests/e2e/journeys/admin-failed-emails.journey.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@journey", "@admin", "@critical"]
+    },
+    {
       "id": "JOURNEY-SESSION-BOUND",
       "surface": "journey",
       "feature": "Admin/customer session isolation and cross-surface denial",
