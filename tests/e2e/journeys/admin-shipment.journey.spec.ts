@@ -15,6 +15,8 @@ test.describe('Admin shipment journey @journey @admin @critical', () => {
   test('the status list no longer offers fulfilled or delivered', async ({ adminPage }) => {
     await adminPage.goto(`/admin/orders/${ORDER_ID}`);
     await expect(adminPage.getByRole('heading', { name: /Order detail/i })).toBeVisible();
+    // The heading shows before the order loads: wait for the select itself.
+    await expect(adminPage.locator('#status')).toBeVisible();
     const options = await adminPage.locator('#status option').allTextContents();
     expect(options.map((o) => o.toUpperCase())).toEqual(['PROCESSING', 'CANCELLED']);
   });

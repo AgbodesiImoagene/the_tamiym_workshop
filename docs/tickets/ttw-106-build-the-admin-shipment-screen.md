@@ -80,7 +80,7 @@ Findings and what was done:
 - Minor, the screen was not refreshed after a failed call whose result may have been saved: both mutations now refresh the order on error.
 - Missing tests: added to `shipment-emails.e2e-spec.ts` a cancelled-then-recreated shipment (one `OrderFulfilled` row only) and a pre-existing email row (whole create rolls back: order still PROCESSING, no shipment).
 - Not changed: the P2002 branch of `updateStatus` still words any unmatched unique error as "Tracking number already used" (existing behaviour, no real path found to hit it with `dedupeKey`); a failed queue hand-off after commit answers 500 although the change is saved (existing; the outbox backfill requeues the row, and a retry is safe). Left for a separate ticket if wanted.
-- Not added: a Playwright failure scenario and a "Report a problem" journey.
+- Added afterwards at the user's request: `tests/e2e/journeys/admin-shipment-problem.journey.spec.ts` (on the seeded FULFILLED order): a tracking link outside the allowlist shows the API error, the shipment stays READY and the retry with a good link works; "Report a problem" shows the code, adds it to the history and leaves the order FULFILLED; the shipment can then still be delivered. Registered in the Playwright manifest. Writing it also exposed a race in my first test (it read the status list before the order loaded); fixed.
 
 The full review was not repeated after the fixes; the fixes were checked with the commands below.
 
@@ -91,7 +91,7 @@ Run in the worktree `.claude/worktrees/ttw-106`, Node 24.22.1, on a throwaway da
 - Tests first, failing for the right reason: `shipments.service.spec.ts` (2 new tests) failed on missing `dedupeKey`; `apps/api/test/shipment-emails.e2e-spec.ts` failed 3/3 on the old service (`Received length: 0`, no row with the key). Both pass after the change.
 - `pnpm --filter api test -- src/shipments src/admin/admin-shipments`: 26 passed.
 - `pnpm --filter api test:e2e -- test/shipment-emails.e2e-spec.ts` (real Postgres): 5 passed after the review: one `OrderFulfilled` and one `OrderDelivered` row over the whole journey; a replayed create writes one row; a cancelled then recreated shipment writes no second row; an existing email row rolls the create back; two admins delivering at once write one `OrderDelivered` row.
-- `pnpm exec playwright test tests/e2e/journeys/admin-shipment.journey.spec.ts --project=setup --project=chromium-journeys`: 12 passed (9 setup, 3 journey tests: status list, create → shipped → delivered, customer timeline). The UI journey was not run before the screen existed.
+- `pnpm exec playwright test tests/e2e/journeys/admin-shipment --project=setup --project=chromium-journeys` on a fresh database: 15 passed (9 setup, 3 happy-path tests: status list, create → shipped → delivered, customer timeline; 3 problem tests). The UI journey was not run before the screen existed.
 - `pnpm typecheck` 6/6, `pnpm lint` 6/6 (warnings only, none new), `pnpm format:check` clean, `pnpm test` (web 84, app 323, api 2115 passed), `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm coverage:ratchet` (lines 85.56% over floor 56%), `pnpm coverage:diff` 12/12 lines (100%), `pnpm build` exit 0.
 
 Not verified: the mobile layout of the panel; the full Playwright suite (only the new journey was run); `pnpm audit:prod` and `pnpm migrations:check` (no schema change); the real email delivery (the queue worker does not run under `NODE_ENV=test`).
