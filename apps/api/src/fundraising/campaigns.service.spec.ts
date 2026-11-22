@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CampaignsService } from './campaigns.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
@@ -89,6 +90,9 @@ describe('CampaignsService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let pricingService: jest.Mocked<PricingService>;
   let moderationService: jest.Mocked<ModerationService>;
+  let moderationDecisions: { recordAiDecisionInTx: jest.Mock };
+  // The existing tests describe the AI-on behaviour: they run with the setting on (TTW-252).
+  let aiScreening: string | undefined;
   let auditService: jest.Mocked<AuditService>;
   let adminNotifyService: jest.Mocked<AdminNotifyService>;
   let readinessService: { evaluate: jest.Mock };
@@ -96,6 +100,7 @@ describe('CampaignsService', () => {
   let notificationDispatch: { dispatch: jest.Mock };
 
   beforeEach(async () => {
+    aiScreening = 'true';
     const mockPrisma: Record<string, unknown> = {};
     mockPrisma.$transaction = jest.fn(
       async (fn: (tx: unknown) => Promise<unknown>) => fn(mockPrisma),
@@ -152,6 +157,7 @@ describe('CampaignsService', () => {
       recordAdminDecision: jest.fn().mockResolvedValue({ id: 'dec-1' }),
       recordAdminDecisionInTx: jest.fn().mockResolvedValue({ id: 'dec-1' }),
     };
+    moderationDecisions = mockModerationDecisions;
     readinessService = {
       evaluate: jest.fn().mockResolvedValue({ ...READY_RESULT }),
     };
@@ -173,6 +179,14 @@ describe('CampaignsService', () => {
         { provide: PricingService, useValue: mockPricingService },
         { provide: AuditService, useValue: mockAuditService },
         { provide: ModerationService, useValue: mockModerationService },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'AI_SCREENING_ENABLED' ? aiScreening : undefined,
+            ),
+          },
+        },
         {
           provide: ModerationDecisionService,
           useValue: mockModerationDecisions,
@@ -487,6 +501,80 @@ describe('CampaignsService', () => {
       );
       expect(result.status).toBe(CampaignStatus.REVIEW);
       expect(result).not.toHaveProperty('moderationNotes');
+    });
+
+    describe('with AI screening turned off (TTW-252)', () => {
+      beforeEach(() => {
+        aiScreening = undefined;
+        (prisma.campaign.findUnique as jest.Mock).mockResolvedValue({
+          ...mockCampaign,
+          products: [pricedOffer],
+        });
+        (prisma.campaign.update as jest.Mock).mockResolvedValue(
+          mockReviewCampaign,
+        );
+        (prisma.campaign.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+          mockReviewCampaign,
+        );
+      });
+
+      it.each([
+        ['unset', undefined],
+        ['false', 'false'],
+        ['a misspelt value', 'yes please'],
+      ])(
+        'does not send the campaign text to the AI when the setting is %s',
+        async (_n, value) => {
+          aiScreening = value;
+
+          await service.submitForReview('camp-1', 'user-1');
+
+          expect(moderationService.moderateText).not.toHaveBeenCalled();
+        },
+      );
+
+      it('moves the campaign to REVIEW for the admin and records a PENDING decision', async () => {
+        const result = await service.submitForReview('camp-1', 'user-1');
+
+        expect(prisma.campaign.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: CampaignStatus.REVIEW }),
+          }),
+        );
+        expect(result.status).toBe(CampaignStatus.REVIEW);
+        expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            outcome: ModerationStatus.PENDING,
+            notes: 'AI screening is turned off',
+            maxScore: 0,
+          }),
+        );
+        // The audit entry says the screening was skipped, not that it found nothing.
+        expect(auditService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            eventName: 'campaign.review.submitted',
+            note: 'Organiser submitted campaign for review. AI pre-screen skipped (turned off).',
+          }),
+        );
+      });
+
+      it('never sends the campaign back to DRAFT or e-mails a refusal, whatever the AI would have said', async () => {
+        (moderationService.moderateText as jest.Mock).mockResolvedValue({
+          status: ModerationStatus.REJECTED,
+          notes: 'would be rejected',
+          maxScore: 0.99,
+        });
+
+        await service.submitForReview('camp-1', 'user-1');
+
+        expect(prisma.campaign.update).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: CampaignStatus.DRAFT }),
+          }),
+        );
+        expect(outboxDelivery.enqueueDelivery).not.toHaveBeenCalled();
+      });
     });
 
     it('stays in REVIEW with FLAGGED moderation when AI flags content', async () => {

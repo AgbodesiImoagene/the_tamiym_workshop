@@ -194,7 +194,7 @@ export default function AdminModerationDesignsPage() {
     <AdminShell
       activeNav="moderation"
       title="Design moderation"
-      description="Review AI-screened designs. Approve, reject, or flag for further investigation."
+      description="Review submitted designs. Approve, reject, or flag for further investigation."
     >
       {/* Queue switcher */}
       <ModerationQueueNav />
