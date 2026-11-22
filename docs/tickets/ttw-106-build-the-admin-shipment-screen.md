@@ -61,7 +61,7 @@ Finding confirmed on `main` (e0c8370): the admin order page offered FULFILLED an
 
 Decisions (user, 2026-11-22):
 
-- Keep the two existing emails ("order processed" when the shipment is created, "delivered" on delivery). No dedicated "shipped" email for v1; TTW-040 already defers those templates.
+- Keep the two existing emails (`OrderFulfilled`, "Your order has shipped", sent when the shipment is created; `OrderDelivered` on delivery). No new template for v1; TTW-040 already defers those. Correction after the second review: the first email says "shipped" but is sent at creation, while the shipment is still READY, so the customer can be told too early. Sending it at DISPATCHED (or rewording it) is an open product decision, not made in this ticket.
 - Fix the "emails sent once" gap: the email row was written after commit with no `dedupeKey`, so a crash between commit and queueing lost the email for good. The row is now written inside the transaction with `dedupeKey` = `OrderFulfilled:<orderId>` / `OrderDelivered:<orderId>` (the column already existed and is unique: no migration). Queueing stays after commit, as no network call may sit inside a transaction.
 
 UI design: a "Shipment" panel on the admin order page (`apps/admin/components/admin-order-shipments.tsx`). Create form (carrier, service, estimated date, private note); one button per allowed next status (the transition table is mirrored from `shipments.constants.ts`, the API stays the authority); a tracking number is required to ship; a problem needs a code; history of events. Each action keeps one idempotency key until it succeeds, so a retry is the same request. FULFILLED and DELIVERED are removed from the status list.
@@ -82,7 +82,12 @@ Findings and what was done:
 - Fixed afterwards at the user's request: (1) a unique violation in `updateStatus` is called "Tracking number already used" only when another shipment really holds that tracking key; any other unique violation now answers 409 "Shipment changed concurrently; retry with the latest status". (2) A failure of the queue hand-off after commit no longer turns the request into a 500: it is logged as a warning, the outbox row stays PENDING and the existing backfill queues it again; the admin notification is still sent. Unit tests (4) written first and seen failing; a real-Postgres test checks the tracking message for a real duplicate.
 - Added afterwards at the user's request: `tests/e2e/journeys/admin-shipment-problem.journey.spec.ts` (on the seeded FULFILLED order): a tracking link outside the allowlist shows the API error, the shipment stays READY and the retry with a good link works; "Report a problem" shows the code, adds it to the history and leaves the order FULFILLED; the shipment can then still be delivered. Registered in the Playwright manifest. Writing it also exposed a race in my first test (it read the status list before the order loaded); fixed.
 
-The full review was not repeated after the fixes; the fixes were checked with the commands below.
+Second independent review (fresh reviewer, whole diff, 2026-11-22): **PASS with reserves**, no blocker, no security issue. Its findings:
+
+- Important, fixed in the docs: the ticket and the policy said the first email means "order processed"; the template says "Your order has shipped" and it is sent at READY. Docs corrected; the behaviour change is left to the user (see Decisions).
+- Important, fixed: the status line claimed a PASS before the whole diff had been re-reviewed; this second review is that re-review.
+- Minor, noted: "written once" is true for the outbox row, not for the sending, which is at least once (the backfill can requeue a stale row); the `createForOrder` conflict message is still "Order already has an active outbound shipment" for any unique violation, including a pre-existing email row (practically unreachable); the success message after reporting a problem reads "Shipment updated: exception."; the two journeys change the seeded orders for good, so they need a fresh database (documented in their headers and in AGENTS.md).
+- Not covered by a test: the backfill actually re-delivering after a hand-off failure (read in code only).
 
 ## Verification evidence
 
@@ -98,6 +103,6 @@ Not verified: the mobile layout of the panel; the full Playwright suite (only th
 
 ## Completion summary
 
-The admin order page now has a shipment panel: create a shipment, mark it shipped (with tracking), in transit, out for delivery, delivered, report a problem or cancel, and read the event history. The order moves to FULFILLED and DELIVERED only through these routes, and the two customer emails are written once, atomically with the order change.
+The admin order page now has a shipment panel: create a shipment, mark it shipped (with tracking), in transit, out for delivery, delivered, report a problem or cancel, and read the event history. The order moves to FULFILLED and DELIVERED only through these routes, and the two customer emails are written once, atomically with the order change (sending is at least once).
 
-Left for later: a screen for corrections of a recorded event (the API supports them), a dedicated "shipped" email, a mobile check, and the independent review above. Possible conflict at merge with TTW-107 on `docs/tickets/README.md`, `ROADMAP.md` and generated OpenAPI files.
+Left for later: a screen for corrections of a recorded event (the API supports them), the product decision on when the "shipped" email goes out (today at creation, before dispatch), and a mobile check. Possible conflict at merge with TTW-107 on `docs/tickets/README.md`, `ROADMAP.md` and generated OpenAPI files.

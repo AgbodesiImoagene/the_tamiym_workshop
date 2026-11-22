@@ -113,7 +113,7 @@ Exceptions never silently cancel the order, issue a refund, or restore stock (TT
 
 ## Notifications (slice 1)
 
-Slice 1 reuses existing order status emails when derivation sets `FULFILLED` / `DELIVERED`. The email row is written in the same transaction as the order change, with the unique `dedupeKey` `OrderFulfilled:<orderId>` or `OrderDelivered:<orderId>` (TTW-106), so each email exists once per order; the queue hand-off happens after commit. There is no separate "shipped" email: the customer is told when the order is processed and when it is delivered. Dedicated shipment milestone/exception templates and overdue monitors are deferred (later TTW-040 slices / TTW-043).
+Slice 1 reuses existing order status emails when derivation sets `FULFILLED` / `DELIVERED`. The email row is written in the same transaction as the order change, with the unique `dedupeKey` `OrderFulfilled:<orderId>` or `OrderDelivered:<orderId>` (TTW-106), so each email exists once per order; the queue hand-off happens after commit. The writing of the row is exactly once per order; the sending is at least once (the outbox backfill can queue a stale row again). There is no separate dispatch email: `OrderFulfilled` ("Your order has shipped") goes out when the shipment is created (status READY, before any tracking number exists), and `OrderDelivered` when it is delivered. Moving the first email to the DISPATCHED step, or rewording it, is an open product decision. Dedicated shipment milestone/exception templates and overdue monitors are deferred (later TTW-040 slices / TTW-043).
 
 ## Promised delivery
 
