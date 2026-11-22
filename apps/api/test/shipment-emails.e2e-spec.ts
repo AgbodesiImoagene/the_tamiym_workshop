@@ -33,7 +33,9 @@ describe('Shipment emails (e2e)', () => {
     await closeE2eApp(app);
   });
 
-  async function seedProcessingOrder() {
+  async function seedProcessingOrder(
+    status: OrderStatus = OrderStatus.PROCESSING,
+  ) {
     const suffix = `${Date.now()}-${counter++}`;
     const user = await prisma.user.create({
       data: {
@@ -58,7 +60,7 @@ describe('Shipment emails (e2e)', () => {
       data: {
         userId: user.id,
         shippingAddressId: address.id,
-        status: OrderStatus.PROCESSING,
+        status,
         paymentStatus: PaymentStatus.SUCCEEDED,
         subtotalAmount: 5000,
         totalAmount: 5000,
@@ -82,14 +84,11 @@ describe('Shipment emails (e2e)', () => {
     orderId: string,
     userId: string,
     key: string,
+    trackingNumber = `TRK-${orderId}`,
   ) {
     return shipments.updateStatus(
       shipmentId,
-      {
-        status: 'DISPATCHED',
-        idempotencyKey: key,
-        trackingNumber: `TRK-${orderId}`,
-      },
+      { status: 'DISPATCHED', idempotencyKey: key, trackingNumber },
       userId,
     );
   }
@@ -199,6 +198,59 @@ describe('Shipment emails (e2e)', () => {
     });
     expect(after.status).toBe('DISPATCHED');
     expect(await emailRows(order.id)).toHaveLength(1);
+  });
+
+  it('cancelled after dispatch, recreated and dispatched again: one row, and the second dispatch works', async () => {
+    const { user, order } = await seedProcessingOrder();
+    const first = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `f1-${order.id}` },
+      user.id,
+    );
+    await dispatch(first.id, order.id, user.id, `fd1-${order.id}`);
+    await shipments.updateStatus(
+      first.id,
+      { status: 'CANCELLED', idempotencyKey: `fc-${order.id}` },
+      user.id,
+    );
+    const second = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `f2-${order.id}` },
+      user.id,
+    );
+
+    await dispatch(
+      second.id,
+      order.id,
+      user.id,
+      `fd2-${order.id}`,
+      `TRK2-${order.id}`,
+    );
+
+    const after = await prisma.shipment.findUniqueOrThrow({
+      where: { id: second.id },
+    });
+    expect(after.status).toBe('DISPATCHED');
+    expect((await emailRows(order.id)).map((r) => r.dedupeKey)).toEqual([
+      `OrderFulfilled:${order.id}`,
+    ]);
+  });
+
+  it('an order already FULFILLED gets its OrderFulfilled row at dispatch, PENDING with the first name', async () => {
+    const { user, order } = await seedProcessingOrder(OrderStatus.FULFILLED);
+    const shipment = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `ff-${order.id}` },
+      user.id,
+    );
+    expect(await emailRows(order.id)).toHaveLength(0);
+
+    await dispatch(shipment.id, order.id, user.id, `ffd-${order.id}`);
+
+    const rows = await emailRows(order.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('PENDING');
+    expect(rows[0].payload).toEqual({ orderId: order.id, firstName: 'Ship' });
   });
 
   it('two admins dispatching at once write one OrderFulfilled row', async () => {
