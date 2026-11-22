@@ -49,6 +49,20 @@ PRD-to-test traceability: `docs/playwright/prd-test-manifest.json` (validated in
 
 Local tip: export the same env as API Integration (or use `apps/api/.env.test`) before migrate/seed/start.
 
+## Object storage (needed by journeys that upload an image)
+
+Journeys that upload an image in the Design Workshop (for example `app/design-workshop.low-resolution.spec.ts`) need a real object store, as in CI (MinIO service with the buckets `tamiym-assets` and `tamiym-private`, see `.github/workflows/playwright-comprehensive.yml`). Without one, the upload answers 500 and those tests fail, whatever the code. On a machine with Docker (Colima is enough), start one for the run and remove it afterwards, using the `S3_ACCESS_KEY` and `S3_SECRET_KEY` of `apps/api/.env.test` as the root user and password:
+
+```bash
+docker run -d --name tamiym-minio -p 9000:9000 \
+  -e MINIO_ROOT_USER="$S3_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$S3_SECRET_KEY" \
+  -e MINIO_DEFAULT_BUCKETS=tamiym-assets,tamiym-private \
+  bitnamilegacy/minio:2025.5.24
+export S3_PRIVATE_BUCKET=tamiym-private   # the API refuses private uploads without it
+# ... run the suites ...
+docker rm -f tamiym-minio
+```
+
 ## Specs that write shared settings
 
 Site settings are one global row that checkout and payout specs read. Specs that really change it live in `tests/e2e/admin-settings-writes/` and run in the `chromium-admin-settings-writes` project (TTW-211), which starts only after the web, app, admin and journey projects have finished, takes its tests one at a time, and restores the row after each test. Do not put such a spec in the other projects. Keep a single spec file in it (`fullyParallel: false` only serialises the tests of one file). The matrix-only projects (Firefox, WebKit, mobile, a11y, visual) depend on `setup` alone and can overlap with it: none of them prices an order today, so add a dependency if one ever does.
