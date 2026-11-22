@@ -1,7 +1,7 @@
 # TTW-110 — Build the failed-email screens
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented on branch `codex/ttw-110-build-failed-email-screens`, not merged\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -106,4 +106,4 @@ Admins can open `/admin/notifications/failed` (link on the Notifications page): 
 
 While building it, a hole in the existing API was found and fixed: replaying the same failure twice, or two admins replaying at once, delivered the e-mail twice. A replay now targets the next generation and the unique database index allows only one. Seed data (four failed e-mails), the Playwright manifest and the notification policy doc were updated.
 
-Not done here: roadmap and README check boxes, to be ticked at merge. Review finding 7 is kept as is (see the review table).
+Merged into `main` on 2026-11-22 (merge commit `0427f4b`); roadmap and README ticked. CI on the ticket branch passed (run 45061260754, all jobs green). Review finding 7 is kept as is (see the review table).
