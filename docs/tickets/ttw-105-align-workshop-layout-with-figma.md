@@ -1,7 +1,7 @@
 # TTW-105 — Align the Design Workshop layout with Figma
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented locally (not pushed, not merged)\
+**Status:** Complete\
 **Risk:** Standard\
 **Blocked by:** TTW-104\
 **Blocks:** None
@@ -45,10 +45,10 @@ Seen running on 2026-11-12 (`/dashboard/design/new/<product>` on the customer ap
 
 ## Acceptance criteria
 
-- [ ] The workshop matches the approved Figma screens.
-- [ ] No workshop feature regressed.
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] The workshop matches the approved Figma screens (built from the Figma screenshots; the client's own visual check is still to do).
+- [x] No workshop feature regressed.
+- [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -106,7 +106,7 @@ Third review (independent subagent, 2026-11-21, commit `1d208bd`): PASS, no bloc
 - Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing); then for the review fixes, six assertions of `WorkshopEditorLayout.test.tsx` failed before the code change (no group role, typed text lost, image tool unmounted).
 - `pnpm --filter app test`: 43 suites, 322 tests passed (after the canvas origin fix, the centred placement and the DOM order); 323 tests after the review remarks. `pnpm --filter app typecheck` and `lint`: exit 0.
 - `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`, `pnpm format:check`, `pnpm playwright:validate`: exit 0. `pnpm docs:validate` passed at the first commit.
-- Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main`; CI must confirm it.
+- Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main` locally; the CI run on `main` plays it (see the completion summary).
 - Risks of the seed change (a product photo on the Campus Hoodie), checked: the specs above that use the hoodie pass on a fresh seed, and the full API e2e suite gives 377 of 378 passed. The one failure (`address-country-and-text-hardening`, over-long state) passes alone, 20 of 20, and concerns addresses, not products. One earlier run of `products-cart` failed ("Bulk Item 01" missing) on a database already used by several runs; it passed on a fresh seed, and it also failed with the hoodie photo rows deleted, so the cause is not the seed change.
 - Not done: Playwright mobile project, Firefox and WebKit, a visual comparison by the client.
 
@@ -125,4 +125,13 @@ Decided by the product owner on 2026-11-21: only the print area must be visible.
 
 ## Completion summary
 
-Implemented locally, not pushed. Three independent reviews are done (the last two PASS). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.
+The Design Workshop follows the approved Figma layout: the customer dashboard sidebar around the editor, one card with a left tool rail (Upload, Add Text, Product Colors when the product has options, then the view thumbnails), the open tool next to it with the layers, undo/redo and Save under it, and the canvas with the product photo behind the customer's layers. Tools keep their behaviour and their state when another tool is opened. The upload text says what the app accepts (PNG, JPEG or WebP, 10 MB), not what Figma lists. Not added, by decision: Add, Remove and Duplicate Product (3.5) and "Get Price" (no behaviour defined).
+
+Fixed on the way, as the product owner asked: the product photo and the print-area clip were off-centre (Fabric 7 centres an object on left and top); a new text or image now starts at the centre of the print area; on a phone the canvas comes before the tool panel in the page and for the keyboard. Decided: only the print area is visible (the clip stays on the whole canvas).
+
+Merged into `main` on 2026-11-22 and pushed. `main` had been rewritten while the work was under way (`ROADMAP.md` is no longer tracked), so a direct merge would have conflicted on that file; the 7 ticket commits were replayed on the current `main` (same tree apart from `ROADMAP.md` and `README.md`) and `main` was fast-forwarded:
+
+- `dc52de2` (last of the 7 replayed commits, previously `22ccfb4` on the ticket branch, whose CI run 44965530505 was green on all 19 jobs): `CI` green (run 44966572563); `Playwright Comprehensive` red (run 44966572546) on `design-workshop.low-resolution.spec.ts` only. Cause: that spec opens Upload first, which hides the text tool, so its last check on "Add to canvas" found no button. It could not be seen locally because the upload failed first (no object storage on the developer's Mac).
+- `e026c97` (the spec clicks "Add Text" before that check, the assertion unchanged): `CI` green (run 44967302965) and `Playwright Comprehensive` green (run 44967303103).
+
+Open items, none blocking: the client's visual comparison with Figma; Firefox, WebKit and the mobile Playwright project were not run; `design-workshop.layout.spec.ts` is tagged `@app` only and whether the CI plays it was not checked (it passed 3 of 3 locally); on a phone the server HTML uses the tablet order and flips after hydration (a layout shift is possible, not measured), and moving the canvas when the window crosses the breakpoint may drop the focus of a field; a print area stored in pixels would be wrong for the clip and the new placement (normalised values are assumed, as before); repeated additions stack at the same point and a text wider than the print area is cut; the branch `codex/ttw-105-align-workshop-layout-with-figma` on GitHub keeps the old commit ids and is no longer needed; `codex/ttw-101-give-the-workshop-its-print-files` is based on the replaced commit `e73b2c5` and will conflict on `ROADMAP.md` when merged.
