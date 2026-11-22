@@ -17,6 +17,13 @@ import { RefundsService } from './refunds.service';
 import { InventoryLifecycleService } from '../inventory/inventory-lifecycle.service';
 import { InventoryLowStockNotifier } from '../admin-notifications/inventory-low-stock.notifier';
 
+// TTW-248: spy on the real timingSafeEqual without changing what it returns.
+jest.mock('node:crypto', () => {
+  const actual =
+    jest.requireActual<typeof import('node:crypto')>('node:crypto');
+  return { ...actual, timingSafeEqual: jest.fn(actual.timingSafeEqual) };
+});
+
 describe('PaystackWebhookService', () => {
   let service: PaystackWebhookService;
   let prisma: jest.Mocked<PrismaService>;
@@ -165,6 +172,60 @@ describe('PaystackWebhookService', () => {
 
     it('should return false for invalid signature', () => {
       expect(service.verifySignature(rawBody, 'invalid')).toBe(false);
+    });
+
+    describe('constant-time comparison (TTW-248)', () => {
+      const validSignature = () =>
+        crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
+
+      it('compares the two digests with crypto.timingSafeEqual on equal-length buffers', () => {
+        const spy = crypto.timingSafeEqual as jest.Mock;
+        spy.mockClear();
+
+        expect(service.verifySignature(rawBody, validSignature())).toBe(true);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        const [a, b] = spy.mock.calls[0] as [Buffer, Buffer];
+        expect(a.length).toBe(b.length);
+        expect(a.length).toBeGreaterThan(0);
+      });
+
+      it('rejects a different-length signature without throwing', () => {
+        expect(() =>
+          service.verifySignature(rawBody, validSignature().slice(0, -2)),
+        ).not.toThrow();
+        expect(
+          service.verifySignature(rawBody, validSignature().slice(0, -2)),
+        ).toBe(false);
+        expect(service.verifySignature(rawBody, validSignature() + 'ab')).toBe(
+          false,
+        );
+      });
+
+      it('rejects a non-hex value of the right length', () => {
+        const nonHex = 'z'.repeat(validSignature().length);
+        expect(service.verifySignature(rawBody, nonHex)).toBe(false);
+      });
+
+      it('rejects a signature with multi-byte characters', () => {
+        const odd = 'é'.repeat(validSignature().length / 2);
+        expect(service.verifySignature(rawBody, odd)).toBe(false);
+      });
+
+      it('rejects an empty or missing value without throwing', () => {
+        expect(service.verifySignature(rawBody, '')).toBe(false);
+        expect(
+          service.verifySignature(rawBody, undefined as unknown as string),
+        ).toBe(false);
+      });
+
+      it('rejects a signature computed for another body', () => {
+        const other = crypto
+          .createHmac('sha512', secret)
+          .update('{"other":true}')
+          .digest('hex');
+        expect(service.verifySignature(rawBody, other)).toBe(false);
+      });
     });
 
     it('should return false when secret is not set', () => {
@@ -443,7 +504,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123' },
+        data: { reference: 'ref-123', amount: 5000, currency: 'NGN' },
       });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -555,6 +616,112 @@ describe('PaystackWebhookService', () => {
       });
     });
 
+    describe('charge.success without amount or currency fails closed (TTW-248)', () => {
+      const pendingOrder = {
+        id: 'order-1',
+        status: OrderStatus.PENDING_PAYMENT,
+        expiresAt: new Date(Date.now() + 3600000),
+        currency: 'NGN',
+        totalAmount: 100,
+        campaignId: null,
+        items: [{ id: 'oi-1', variantId: 'var-1', quantity: 1 }],
+      };
+
+      beforeEach(() => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-1',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          provider: 'PAYSTACK',
+          order: pendingOrder,
+        });
+      });
+
+      it.each([
+        ['no amount', { reference: 'ref-123', currency: 'NGN' }],
+        ['no currency', { reference: 'ref-123', amount: 10000 }],
+        ['neither', { reference: 'ref-123' }],
+        [
+          'a null amount',
+          { reference: 'ref-123', amount: null, currency: 'NGN' },
+        ],
+      ])(
+        'leaves the order awaiting payment and tells an admin (%s)',
+        async (_label, data) => {
+          await service.processChargeSuccess({
+            event: 'charge.success',
+            data: data as never,
+          });
+
+          // No settlement, no cancellation, no stock release, no claim.
+          expect(prisma.$transaction).not.toHaveBeenCalled();
+          expect(mockTx.chargeSettlementClaim.create).not.toHaveBeenCalled();
+          expect(mockTx.order.updateMany).not.toHaveBeenCalled();
+          expect(mockTx.payment.update).not.toHaveBeenCalled();
+          expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+            'malformed',
+          );
+          expect(observability.recordChargeSettlement).not.toHaveBeenCalledWith(
+            'settled',
+          );
+          expect(observability.recordWebhook).toHaveBeenCalledWith(
+            'charge.success.missing_amount_or_currency',
+            'denied',
+          );
+          expect(adminNotify.emit).toHaveBeenCalledTimes(1);
+          expect(adminNotify.emit).toHaveBeenCalledWith(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            expect.objectContaining({
+              orderId: 'order-1',
+              reference: 'ref-123',
+              reason: expect.stringMatching(/amount or currency/i),
+            }),
+          );
+        },
+      );
+
+      it('still settles when amount and currency are both present', async () => {
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
+        });
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'settled',
+        );
+        expect(observability.recordChargeSettlement).not.toHaveBeenCalledWith(
+          'malformed',
+        );
+      });
+
+      it('reports a distinct reason when a cancelled order gets an event without amount or currency', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-1',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          provider: 'PAYSTACK',
+          order: { ...pendingOrder, status: OrderStatus.CANCELLED },
+        });
+
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123', currency: 'NGN' },
+        });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'malformed',
+        );
+        expect(adminNotify.emit).toHaveBeenCalledWith(
+          ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+          expect.objectContaining({
+            reason: expect.stringMatching(/amount or currency/i),
+          }),
+        );
+      });
+    });
+
     it('should reject expired orders', async () => {
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
         id: 'pay-1',
@@ -571,7 +738,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123' },
+        data: { reference: 'ref-123', amount: 5000, currency: 'NGN' },
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
@@ -598,7 +765,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123', amount: 999 },
+        data: { reference: 'ref-123', amount: 999, currency: 'NGN' },
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
@@ -625,7 +792,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123', currency: 'USD' },
+        data: { reference: 'ref-123', amount: 10000, currency: 'USD' },
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
@@ -659,7 +826,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123' },
+        data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
       });
 
       expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
@@ -686,7 +853,7 @@ describe('PaystackWebhookService', () => {
 
       await service.processChargeSuccess({
         event: 'charge.success',
-        data: { reference: 'ref-123' },
+        data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
@@ -810,7 +977,7 @@ describe('PaystackWebhookService', () => {
       await expect(
         service.processChargeSuccess({
           event: 'charge.success',
-          data: { reference: 'ref-123' },
+          data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
         }),
       ).rejects.toThrow('db down');
     });
@@ -836,7 +1003,7 @@ describe('PaystackWebhookService', () => {
       await expect(
         service.processChargeSuccess({
           event: 'charge.success',
-          data: { reference: 'ref-123' },
+          data: { reference: 'ref-123', amount: 10000, currency: 'NGN' },
         }),
       ).rejects.toThrow(/was not PENDING_PAYMENT/);
     });

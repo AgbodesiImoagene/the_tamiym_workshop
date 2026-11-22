@@ -119,7 +119,7 @@ groups:
           runbook_path: docs/runbooks/webhooks-money.md
 
       - alert: TamiymExtraPaymentCapture
-        expr: sum(increase(tamiym_charge_settlement_total{outcome=~"extra_capture|late_captured"}[15m])) > 0
+        expr: sum(increase(tamiym_charge_settlement_total{outcome=~"extra_capture|late_captured|malformed"}[15m])) > 0
         labels:
           severity: critical
           owner: payments
@@ -128,7 +128,8 @@ groups:
           summary: A customer was charged for an order that cannot use the money
           description: >-
             charge_settlement_total outcome=extra_capture (second payment on a paid order) or late_captured
-            (payment after cancellation) increased. An admin must refund the customer; the admin
+            (payment after cancellation) or malformed (charge.success without amount or currency, order left unpaid
+            with stock reserved) increased. An admin must refund the customer; the admin
             notification may have been lost, so check the open reconciliation findings.
             Runbook: docs/runbooks/webhooks-money.md
           runbook_path: docs/runbooks/webhooks-money.md

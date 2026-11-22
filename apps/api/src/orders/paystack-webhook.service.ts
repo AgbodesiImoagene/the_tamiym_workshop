@@ -71,14 +71,19 @@ export class PaystackWebhookService {
    */
   verifySignature(rawBody: string | Buffer, signature: string): boolean {
     const secret = this.config.get<string>('PAYSTACK_SECRET_KEY');
-    if (!secret) {
+    if (!secret || typeof signature !== 'string' || signature.length === 0) {
       return false;
     }
-    const hash = crypto
-      .createHmac('sha512', secret)
-      .update(rawBody)
-      .digest('hex');
-    return hash === signature;
+    const expected = Buffer.from(
+      crypto.createHmac('sha512', secret).update(rawBody).digest('hex'),
+    );
+    const received = Buffer.from(signature);
+    // timingSafeEqual throws on unequal lengths. The length of a SHA-512 hex
+    // digest is public, so rejecting early leaks nothing (TTW-248).
+    if (received.length !== expected.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expected, received);
   }
 
   /**
@@ -152,7 +157,11 @@ export class PaystackWebhookService {
             'denied',
           );
           this.observability.recordChargeSettlement(
-            outcome === 'recorded' ? 'late_captured' : 'rejected',
+            outcome === 'recorded'
+              ? 'late_captured'
+              : outcome === 'malformed'
+                ? 'malformed'
+                : 'rejected',
           );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
@@ -164,7 +173,9 @@ export class PaystackWebhookService {
               reason:
                 outcome === 'recorded'
                   ? `Order was already CANCELLED. Payment recorded: refund it in full with reason ${RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION}`
-                  : 'Order was already CANCELLED',
+                  : outcome === 'malformed'
+                    ? 'Order was already CANCELLED and the event had no amount or currency: check the capture in the Paystack dashboard'
+                    : 'Order was already CANCELLED',
             },
           );
           return;
@@ -195,7 +206,11 @@ export class PaystackWebhookService {
             'denied',
           );
           this.observability.recordChargeSettlement(
-            outcome === 'recorded' ? 'late_captured' : 'rejected',
+            outcome === 'recorded'
+              ? 'late_captured'
+              : outcome === 'malformed'
+                ? 'malformed'
+                : 'rejected',
           );
           await this.adminNotify.emit(
             ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
@@ -207,44 +222,73 @@ export class PaystackWebhookService {
               reason:
                 outcome === 'recorded'
                   ? `Order was already expired. Payment recorded: refund it in full with reason ${RefundReasonCode.LATE_PAYMENT_AFTER_CANCELLATION}`
-                  : 'Order was already expired',
+                  : outcome === 'malformed'
+                    ? 'Order was already expired and the event had no amount or currency: check the capture in the Paystack dashboard'
+                    : 'Order was already expired',
             },
           );
           return;
         }
-        if (event.data?.amount != null) {
-          const expectedKobo = Math.round(Number(order.totalAmount) * 100);
-          if (event.data.amount !== expectedKobo) {
-            this.logger.error(
-              `charge.success amount mismatch for order ${order.id}: ` +
-                `expected ${expectedKobo} kobo, got ${event.data.amount} (ref: ${reference})`,
-            );
-            this.observability.recordWebhook(
-              'charge.success.amount_mismatch',
-              'denied',
-            );
-            this.observability.recordChargeSettlement('rejected');
-            await this.cancelPendingAndReleaseInventory(
-              order,
-              'charge_success_amount_mismatch_reject',
-            );
-            await this.adminNotify.emit(
-              ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
-              {
-                orderId: order.id,
-                reference,
-                amount: event.data.amount,
-                currency: event.data?.currency ?? order.currency,
-                reason: `Amount mismatch: expected ${expectedKobo} kobo, received ${event.data.amount} kobo`,
-              },
-            );
-            return;
-          }
+        if (event.data?.amount == null || event.data?.currency == null) {
+          // TTW-248: fail closed. A settlement needs both fields to be checked.
+          // The event is malformed, not a wrong payment: nothing is written,
+          // the order stays PENDING_PAYMENT with its stock reserved, and an
+          // admin is told so the capture is checked at Paystack.
+          const missing = [
+            event.data?.amount == null ? 'amount' : null,
+            event.data?.currency == null ? 'currency' : null,
+          ]
+            .filter(Boolean)
+            .join(' and ');
+          this.logger.error(
+            `charge.success without ${missing} for order ${order.id} (ref: ${reference}). ` +
+              'Not settled; order left awaiting payment.',
+          );
+          this.observability.recordWebhook(
+            'charge.success.missing_amount_or_currency',
+            'denied',
+          );
+          this.observability.recordChargeSettlement('malformed');
+          await this.adminNotify.emit(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            {
+              orderId: order.id,
+              reference,
+              amount: event.data?.amount,
+              currency: event.data?.currency ?? order.currency,
+              reason: `Paystack reported a successful charge without ${missing} (amount or currency missing). The order was NOT marked paid and is still awaiting payment, with its stock reserved. Check this payment in the Paystack dashboard: if the money was captured, resend the charge.success webhook from there (it settles once the event is complete); if not, cancel the order`,
+            },
+          );
+          return;
         }
-        if (
-          event.data?.currency != null &&
-          event.data.currency !== order.currency
-        ) {
+        const expectedKobo = Math.round(Number(order.totalAmount) * 100);
+        if (event.data.amount !== expectedKobo) {
+          this.logger.error(
+            `charge.success amount mismatch for order ${order.id}: ` +
+              `expected ${expectedKobo} kobo, got ${event.data.amount} (ref: ${reference})`,
+          );
+          this.observability.recordWebhook(
+            'charge.success.amount_mismatch',
+            'denied',
+          );
+          this.observability.recordChargeSettlement('rejected');
+          await this.cancelPendingAndReleaseInventory(
+            order,
+            'charge_success_amount_mismatch_reject',
+          );
+          await this.adminNotify.emit(
+            ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+            {
+              orderId: order.id,
+              reference,
+              amount: event.data.amount,
+              currency: event.data?.currency ?? order.currency,
+              reason: `Amount mismatch: expected ${expectedKobo} kobo, received ${event.data.amount} kobo`,
+            },
+          );
+          return;
+        }
+        if (event.data.currency !== order.currency) {
           this.logger.error(
             `charge.success currency mismatch for order ${order.id}: ` +
               `expected ${order.currency}, got ${event.data.currency} (ref: ${reference})`,
@@ -536,11 +580,12 @@ export class PaystackWebhookService {
     order: { id: string; totalAmount: unknown; currency: string },
     event: PaystackWebhookEvent,
     reference: string,
-  ): Promise<'recorded' | 'duplicate' | 'skipped'> {
+  ): Promise<'recorded' | 'duplicate' | 'skipped' | 'malformed'> {
     const amount = event.data?.amount;
     const currency = event.data?.currency;
     if (amount == null || currency == null) {
-      return 'skipped';
+      // TTW-248: fail closed with a distinct reason (nothing is recorded).
+      return 'malformed';
     }
     if (event.data?.status != null && event.data.status !== 'success') {
       return 'skipped';

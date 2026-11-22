@@ -53,7 +53,7 @@ A customer paid for an order that cannot use the money: a second payment on an o
 
 ## Verification
 
-- Settlement counters show expected `settled` / `duplicate` outcomes; `rejected` and `failed` at zero rate.
+- Settlement counters show expected `settled` / `duplicate` outcomes; `rejected`, `malformed` and `failed` at zero rate. A `malformed` outcome is a signed `charge.success` without amount or currency: the order stays `PENDING_PAYMENT` with stock reserved (the expiry job skips orders with an in-flight payment), so check the payment in the Paystack dashboard and either resend the webhook (settles once the event is complete) or cancel the order.
 - Webhook failure/denied recording rules below alert thresholds for 15 minutes.
 - Spot-check ledger rows vs provider dashboard for sample references.
 - All money-family alerts resolved in Prometheus.
