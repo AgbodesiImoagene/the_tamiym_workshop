@@ -1,7 +1,7 @@
 # TTW-248 — Harden the Paystack webhook and check its key at startup
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** In progress (package A: points 1 and 3; package B: point 2 in a separate branch)\
+**Status:** Complete\
 **Risk:** Critical\
 **Blocked by:** None\
 **Blocks:** None
@@ -58,10 +58,10 @@ Two independent work packages, each on its own branch from `main` in its own wor
 ## Acceptance criteria
 
 - [x] The signature is compared in constant time, and the existing webhook tests pass. (package A)
-- [ ] The API refuses to start in production without a real `PAYSTACK_SECRET_KEY`.
+- [x] The API refuses to start in production without a real `PAYSTACK_SECRET_KEY`. (package B)
 - [x] A `charge.success` without amount or currency never marks an order paid, and is visible to an admin. (package A)
-- [ ] Required quality gates pass with evidence recorded below. (package A evidence below; package B separate)
-- [ ] Docs, contracts and observability are updated where applicable. (package A done: alert, runbook, metric; package B: env docs still to do)
+- [x] Required quality gates pass with evidence recorded below.
+- [x] Docs, contracts and observability are updated where applicable. (package A: alert, runbook, metric, admin template; package B: environment docs)
 
 ## Out of scope
 
@@ -132,19 +132,31 @@ Package A, Node 24, branch `codex/ttw-248-webhook-hardening`, throwaway database
 - Round 2 (after commit 1d10bc7), same throwaway database (recreated) and `REDIS_DB=7`: unit spec 70 passed before the template fix except 3 failing for the right reason (no template for the event key); after it all passed. `pnpm lint`, `pnpm typecheck`, `pnpm format:check` exit 0; api tests 179 suites, 2217 tests passed; `coverage:ratchet` passed (statements 85.50%, branches 71.36%); `coverage:diff` 24/24 lines; e2e `paystack-*`, `inventory-lifecycle`, `order-customer-cancel`, `address-state-not-deliverable` 9 suites, 47 tests passed. Final check after the review fixes is in the completion summary.
 - `pnpm openapi:check`: not run, no controller, DTO or contract changed.
 
-## Completion summary
+## Package A summary
 
-Package A (points 1 and 3) is done and committed locally on `codex/ttw-248-webhook-hardening`; nothing pushed.
+Package A (points 1 and 3) was done on `codex/ttw-248-webhook-hardening`.
 
 - `verifySignature` uses `crypto.timingSafeEqual` on equal-length buffers and returns `false` (never throws) for a different length, non-hex, multi-byte, empty or missing value.
 - A signed `charge.success` without `amount` or `currency` no longer settles: on a pending order it writes nothing (no claim, no transaction), leaves the order `PENDING_PAYMENT` with stock reserved, logs, counts (`charge.success.missing_amount_or_currency`, settlement outcome `malformed`), alerts (Prometheus) and notifies admins with what to do. On a cancelled or expired order the existing "not recorded, manual refund" handling is kept with the distinct `malformed` reason.
 - Known limit: a malformed event leaves the order pending until a complete event arrives or an admin cancels it (the expiry job skips orders with an `INITIATED` payment). That is not new, and it is why the alert and the admin message exist.
 - Not verified: no Playwright/UI (not applicable); no run against a real Paystack; package B (point 2, `env-validation.ts`) and its acceptance box are another branch and still open; a string-typed `amount` still goes through the old mismatch path (out of scope).
 
-## Verification evidence
+## Merge
 
-To be recorded.
+Both branches were merged locally into `main` with `--no-ff`, A then B, without conflict: `9191284` (package A, commits `1d10bc7` and `f9f3ad5`) and `4808bbd` (package B, commit `db8ba27`). On the merged `main`: `pnpm typecheck` (6 tasks successful), `pnpm --filter api test -- src/config src/orders/paystack-webhook.service.spec.ts src/admin-notifications` (6 suites, 178 tests passed), `pnpm format:check`, `pnpm docs:validate` and `pnpm openapi:check` passed. `main` was pushed at `4808bbd`.
+
+CI on `main`: run 45059501525 (commit `4808bbd`) failed only on `API Open Handles`: all 67 suites and 411 tests passed, then the proof timed out at its 240 s budget (the suite took 237 s). `Playwright Comprehensive` (45059501500) passed. The budget was raised to 360 s in `5c51974` (`.github/workflows/ci.yml`); the run on that commit, 45062267332, passed every job, and `Playwright Comprehensive` 45062267399 passed too.
+
+## Package B evidence (point 2)
+
+Reported by the package B session and its independent review (PASS), re-checked on the merged `main` where stated above: `PAYSTACK_SECRET_KEY` is in `requiredProductionEnvVars`; a placeholder (prefix `placeholder`, the example value, the common forbidden placeholders) is rejected in production without echoing the value; development, staging and `NODE_ENV=test` are unchanged; `pnpm --filter api test -- src/config` gave 99 tests passed in the review. Docs updated: `apps/api/.env.example`, `docs/10-deployment-and-environments.md`, `docs/11-development-setup.md`, `docs/infrastructure/ttw-065-identity-secrets.md`, `infra/runtime/secrets/.env.example` and its README. Not verified: `pnpm infra:validate` was not run on the branch (no `tofu` on the machine; the CI `Infra Validate` job passed on `main`); no real production environment was checked.
 
 ## Completion summary
 
-To be written at the end.
+Points 1, 2 and 3 are done and on `main`. Signature comparison is constant time; a `charge.success` without amount or currency no longer settles and alerts an admin; production refuses to start without a real `PAYSTACK_SECRET_KEY`. A defect older than this ticket was fixed on the way: the admin event `admin.payment.captured_on_cancelled_order` had no template, so no admin alert was ever sent for late, extra or incomplete captures.
+
+Deviations: a new Prometheus alert reason (`malformed`) and a runbook section, because the review asked; the CI budget of `API Open Handles` raised from 240 s to 360 s after this ticket's new e2e suite pushed the job over its limit.
+
+Deploy note: a production environment still holding the template placeholder for `PAYSTACK_SECRET_KEY` will no longer start (API, worker, scheduler); set the real key in `/etc/tamiym/secrets.env` before deploying.
+
+Follow-up tickets opened: TTW-249 (orders stuck after an incomplete event), TTW-250 (format check of the Paystack key), TTW-251 (remaining webhook edge cases).
