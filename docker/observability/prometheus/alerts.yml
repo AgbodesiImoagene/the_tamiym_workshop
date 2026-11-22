@@ -125,12 +125,14 @@ groups:
           owner: payments
           family: webhooks-money
         annotations:
-          summary: A customer was charged for an order that cannot use the money
+          summary: A payment needs a manual check (money may be stuck or must be refunded)
           description: >-
-            charge_settlement_total outcome=extra_capture (second payment on a paid order) or late_captured
-            (payment after cancellation) or malformed (charge.success without amount or currency, order left unpaid
-            with stock reserved) increased. An admin must refund the customer; the admin
-            notification may have been lost, so check the open reconciliation findings.
+            charge_settlement_total increased for extra_capture (second payment on a paid order) or late_captured
+            (payment after cancellation): the customer was charged and an admin must refund them.
+            It also increased for malformed (a charge.success without amount or currency): do NOT refund yet.
+            The order was not marked paid, so check the payment at Paystack first, then settle the order by hand if the
+            money was captured (a resent webhook helps only if it carries amount and currency) or cancel the order if not. The admin notification may have been lost, so check the
+            open reconciliation findings.
             Runbook: docs/runbooks/webhooks-money.md
           runbook_path: docs/runbooks/webhooks-money.md
 

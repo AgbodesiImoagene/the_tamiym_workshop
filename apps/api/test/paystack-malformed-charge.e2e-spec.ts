@@ -63,7 +63,10 @@ describe('charge.success without amount or currency (e2e)', () => {
     return webhooks.handleWebhook(raw, signature);
   }
 
-  async function createReservedPendingOrder(suffix: string) {
+  async function createReservedPendingOrder(
+    suffix: string,
+    expiresAt = new Date(Date.now() + 60 * 60 * 1000),
+  ) {
     const passwordHash = await bcrypt.hash('TestPassword1!', 10);
     const customer = await prisma.user.create({
       data: {
@@ -124,7 +127,7 @@ describe('charge.success without amount or currency (e2e)', () => {
         shipCity: address.city,
         shipState: 'Lagos',
         shipCountry: 'Nigeria',
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiresAt,
         items: {
           create: {
             productId: product.id,
@@ -302,5 +305,74 @@ describe('charge.success without amount or currency (e2e)', () => {
     expect((await state(order.id, payment.id, variant.id)).order.status).toBe(
       OrderStatus.PAID,
     );
+  });
+  it('really delivers the admin alert: an enabled route gets an outbox e-mail naming the order and the reason', async () => {
+    const to = `ops-malformed-${Date.now()}@example.com`;
+    const route = await prisma.adminNotificationRoute.create({
+      data: {
+        eventKey: ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+        name: `ttw248-${Date.now()}`,
+        enabled: true,
+        notifyEmail: true,
+        emailRecipients: [to],
+      },
+    });
+    try {
+      const { order, providerRef } = await createReservedPendingOrder(
+        `route-${Date.now()}`,
+      );
+
+      await deliver({
+        event: 'charge.success',
+        data: { reference: providerRef, status: 'success' },
+      });
+
+      const row = await prisma.notificationOutbox.findFirst({
+        where: { recipient: to },
+      });
+      expect(row).not.toBeNull();
+      const payload = row!.payload as { subject: string; html: string };
+      expect(payload.subject).toContain(order.id);
+      expect(payload.html).toContain(providerRef);
+      expect(payload.html).toMatch(/amount or currency/i);
+    } finally {
+      // The test database is shared: leave no route behind.
+      await prisma.adminNotificationRoute.delete({ where: { id: route.id } });
+    }
+  });
+
+  it('cancels an EXPIRED order and releases its stock on an incomplete event, records no capture, and a later complete event is recorded for refund (TTW-248 decision)', async () => {
+    const { order, payment, variant, providerRef } =
+      await createReservedPendingOrder(
+        `exp-${Date.now()}`,
+        new Date(Date.now() - 60_000),
+      );
+
+    await deliver({
+      event: 'charge.success',
+      data: { reference: providerRef, status: 'success' },
+    });
+    let s = await state(order.id, payment.id, variant.id);
+    expect(s.order.status).toBe(OrderStatus.CANCELLED);
+    expect(s.payment.status).toBe(PaymentStatus.INITIATED);
+    expect(s.inventory.reserved).toBe(0);
+    expect(s.inventory.stockOnHand).toBe(10);
+    expect(s.claims).toBe(0);
+
+    // The complete event arrives later: it is recorded as a late capture.
+    await deliver({
+      event: 'charge.success',
+      data: {
+        reference: providerRef,
+        status: 'success',
+        amount: TOTAL * 100,
+        currency: 'NGN',
+      },
+    });
+    s = await state(order.id, payment.id, variant.id);
+    expect(s.order.status).toBe(OrderStatus.CANCELLED);
+    expect(s.payment.status).toBe(PaymentStatus.SUCCEEDED);
+    expect(s.claims).toBe(1);
+    expect(s.inventory.stockOnHand).toBe(10);
   });
 });

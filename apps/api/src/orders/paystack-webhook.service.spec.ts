@@ -219,6 +219,23 @@ describe('PaystackWebhookService', () => {
         ).toBe(false);
       });
 
+      it('rejects an upper-case copy of a valid signature (Paystack sends lower case)', () => {
+        const upper = validSignature().toUpperCase();
+        expect(upper).not.toBe(validSignature());
+        expect(service.verifySignature(rawBody, upper)).toBe(false);
+      });
+
+      it.each([
+        ['a leading space', (v: string) => ` ${v}`],
+        ['a trailing space', (v: string) => `${v} `],
+        ['a trailing newline', (v: string) => `${v}\n`],
+        ['spaces replacing the end', (v: string) => v.slice(0, -2) + '  '],
+      ])('rejects a valid signature with %s', (_label, mutate) => {
+        expect(service.verifySignature(rawBody, mutate(validSignature()))).toBe(
+          false,
+        );
+      });
+
       it('rejects a signature computed for another body', () => {
         const other = crypto
           .createHmac('sha512', secret)
@@ -691,6 +708,45 @@ describe('PaystackWebhookService', () => {
         );
         expect(observability.recordChargeSettlement).not.toHaveBeenCalledWith(
           'malformed',
+        );
+      });
+
+      it('cancels an expired order and releases its stock for an incomplete event, without recording a capture (TTW-248 decision)', async () => {
+        (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+          id: 'pay-1',
+          providerRef: 'ref-123',
+          status: PaymentStatus.INITIATED,
+          settlementClaim: null,
+          provider: 'PAYSTACK',
+          order: { ...pendingOrder, expiresAt: new Date(Date.now() - 1000) },
+        });
+
+        await service.processChargeSuccess({
+          event: 'charge.success',
+          data: { reference: 'ref-123' },
+        });
+
+        // The only write is the cancellation of the expired order.
+        expect(mockTx.order.updateMany).toHaveBeenCalledTimes(1);
+        expect(mockTx.order.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'order-1', status: OrderStatus.PENDING_PAYMENT },
+            data: expect.objectContaining({ status: OrderStatus.CANCELLED }),
+          }),
+        );
+        expect(mockTx.chargeSettlementClaim.create).not.toHaveBeenCalled();
+        expect(mockTx.payment.update).not.toHaveBeenCalled();
+        expect(observability.recordChargeSettlement).toHaveBeenCalledWith(
+          'malformed',
+        );
+        expect(adminNotify.emit).toHaveBeenCalledTimes(1);
+        expect(adminNotify.emit).toHaveBeenCalledWith(
+          ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
+          expect.objectContaining({
+            reason: expect.stringMatching(
+              /already expired.*amount or currency/i,
+            ),
+          }),
         );
       });
 

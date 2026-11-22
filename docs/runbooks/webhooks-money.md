@@ -51,9 +51,21 @@ A customer paid for an order that cannot use the money: a second payment on an o
 3. The admin notification is sent after the database commit and can be lost if the notification step fails; this alert and the reconciliation finding are the safety net.
 4. Acknowledge the reconciliation finding once the refund is done.
 
+### Incomplete `charge.success` (`malformed`, TTW-248)
+
+Paystack sent a signed `charge.success` without `amount` or `currency`. Nothing is settled and no money is recorded, so **do not refund first**: the customer may or may not have been charged.
+
+1. Find the order and reference in the error log (`charge.success without … for order …`) or in the admin notification ("Payment needs attention").
+2. Check the payment in the Paystack dashboard.
+3. If the money was captured and the order is still `PENDING_PAYMENT`: an engineer settles the order by hand, as for any paid order. Paystack does not retry by itself, because the endpoint answered `200`. A resend from the Paystack dashboard replays the stored payload, so it only helps if that payload carries `amount` and `currency` (it settles exactly once if so); it may well be incomplete again, which raises a new alert and does no harm.
+4. If the money was not captured: cancel the order from the admin order screen (status change to `CANCELLED`, allowed for `PENDING_PAYMENT`) so the reserved stock is released.
+5. If the order was already expired (the message says so), it has been cancelled and its stock released. If the money was captured, a complete event received later is recorded as a late capture and refunded as above; if Paystack will not resend one, refund from the Paystack dashboard.
+
+The order stays `PENDING_PAYMENT` with stock reserved only when it had not expired. The expiry job skips orders that still have an `INITIATED` payment, so an incomplete event on such an order stays stuck until step 3 or 4. This is an accepted risk of TTW-248; an automatic follow-up is proposed as a separate ticket. The e-mail and SMS alert is only sent once an admin has configured a notification route for the event `admin.payment.captured_on_cancelled_order`; none is seeded, so check that one exists.
+
 ## Verification
 
-- Settlement counters show expected `settled` / `duplicate` outcomes; `rejected`, `malformed` and `failed` at zero rate. A `malformed` outcome is a signed `charge.success` without amount or currency: the order stays `PENDING_PAYMENT` with stock reserved (the expiry job skips orders with an in-flight payment), so check the payment in the Paystack dashboard and either resend the webhook (settles once the event is complete) or cancel the order.
+- Settlement counters show expected `settled` / `duplicate` outcomes; `rejected`, `malformed` and `failed` at zero rate. A `malformed` outcome is a signed `charge.success` without amount or currency: the order stays `PENDING_PAYMENT` with stock reserved (the expiry job skips orders with an in-flight payment), so follow "Incomplete `charge.success`" above.
 - Webhook failure/denied recording rules below alert thresholds for 15 minutes.
 - Spot-check ledger rows vs provider dashboard for sample references.
 - All money-family alerts resolved in Prometheus.

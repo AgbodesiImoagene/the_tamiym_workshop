@@ -256,7 +256,7 @@ export class PaystackWebhookService {
               reference,
               amount: event.data?.amount,
               currency: event.data?.currency ?? order.currency,
-              reason: `Paystack reported a successful charge without ${missing} (amount or currency missing). The order was NOT marked paid and is still awaiting payment, with its stock reserved. Check this payment in the Paystack dashboard: if the money was captured, resend the charge.success webhook from there (it settles once the event is complete); if not, cancel the order`,
+              reason: `Paystack reported a successful charge without ${missing} (amount or currency missing). The order was NOT marked paid and is still awaiting payment, with its stock reserved. Check this payment in the Paystack dashboard: if the money was captured, ask an engineer to settle the order by hand (a resent webhook settles it only if it carries the amount and currency); if not, cancel the order`,
             },
           );
           return;
