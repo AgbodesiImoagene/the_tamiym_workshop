@@ -274,6 +274,41 @@ export default function AdminSiteSettingsPage() {
               </label>
             </CardContent>
           </Card>
+          <Card className="rounded-[1.75rem] border-black/8 shadow-none">
+            <CardHeader>
+              <CardTitle>Invoice seller details</CardTitle>
+              <CardDescription>
+                Printed on every VAT invoice. Customers cannot download invoices until all three are
+                set. Invoices already issued never change.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="invoiceSellerLegalName">Legal name</Label>
+                <Input
+                  id="invoiceSellerLegalName"
+                  maxLength={200}
+                  {...register('invoiceSellerLegalName')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoiceSellerTaxNumber">Tax number</Label>
+                <Input
+                  id="invoiceSellerTaxNumber"
+                  maxLength={100}
+                  {...register('invoiceSellerTaxNumber')}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="invoiceSellerAddress">Address</Label>
+                <Input
+                  id="invoiceSellerAddress"
+                  maxLength={500}
+                  {...register('invoiceSellerAddress')}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">

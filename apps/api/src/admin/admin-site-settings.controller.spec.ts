@@ -169,4 +169,54 @@ describe('AdminSiteSettingsController VAT on first save (TTW-084)', () => {
       expect.objectContaining({ update: { payoutCadenceDays: 14 } }),
     );
   });
+
+  it('reports the invoice seller details as not set when the row is missing', async () => {
+    const { controller } = await build(null);
+    expect(await controller.findOne()).toMatchObject({
+      invoiceSellerLegalName: null,
+      invoiceSellerAddress: null,
+      invoiceSellerTaxNumber: null,
+    });
+  });
+
+  it('stores trimmed invoice seller details and turns a blank into not set (TTW-108)', async () => {
+    const { prisma, controller } = await build({
+      id: 'default',
+      vatRate: 0.075,
+      minimumPayoutAmount: null,
+    });
+    await controller.update(
+      {
+        invoiceSellerLegalName: '  Test Seller Ltd ',
+        invoiceSellerAddress: '   ',
+        invoiceSellerTaxNumber: 'TIN-1',
+      } as never,
+      admin,
+    );
+    expect(prisma.siteSettings.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: {
+          invoiceSellerLegalName: 'Test Seller Ltd',
+          invoiceSellerAddress: null,
+          invoiceSellerTaxNumber: 'TIN-1',
+        },
+      }),
+    );
+  });
+
+  it('creates the row with the invoice seller details when they are given with the VAT rate', async () => {
+    const { prisma, controller } = await build(null);
+    await controller.update(
+      { vatRate: 0.075, invoiceSellerLegalName: 'Test Seller Ltd' } as never,
+      admin,
+    );
+    expect(prisma.siteSettings.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          invoiceSellerLegalName: 'Test Seller Ltd',
+          invoiceSellerAddress: null,
+        }),
+      }),
+    );
+  });
 });

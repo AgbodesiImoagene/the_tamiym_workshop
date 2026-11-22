@@ -32,6 +32,9 @@ export const siteSettingsFormSchema = z
     payoutSettlementHoldDays: z.string(),
     minimumPayoutAmount: z.string(),
     autoRetryFailedPayouts: z.boolean(),
+    invoiceSellerLegalName: z.string().trim().max(200, 'Use at most 200 characters.'),
+    invoiceSellerAddress: z.string().trim().max(500, 'Use at most 500 characters.'),
+    invoiceSellerTaxNumber: z.string().trim().max(100, 'Use at most 100 characters.'),
   })
   .transform(
     (form): UpdateSiteSettingsInput => ({
@@ -46,6 +49,9 @@ export const siteSettingsFormSchema = z
       minimumPayoutAmount:
         form.minimumPayoutAmount.trim() === '' ? null : Number(form.minimumPayoutAmount),
       autoRetryFailedPayouts: form.autoRetryFailedPayouts,
+      invoiceSellerLegalName: form.invoiceSellerLegalName,
+      invoiceSellerAddress: form.invoiceSellerAddress,
+      invoiceSellerTaxNumber: form.invoiceSellerTaxNumber,
     })
   );
 
@@ -62,6 +68,9 @@ export const defaultSiteSettingsForm: SiteSettingsFormValues = {
   payoutSettlementHoldDays: '7',
   minimumPayoutAmount: '',
   autoRetryFailedPayouts: true,
+  invoiceSellerLegalName: '',
+  invoiceSellerAddress: '',
+  invoiceSellerTaxNumber: '',
 };
 
 export function toSiteSettingsForm(settings: SiteSettings): SiteSettingsFormValues {
@@ -78,5 +87,8 @@ export function toSiteSettingsForm(settings: SiteSettings): SiteSettingsFormValu
     minimumPayoutAmount:
       settings.minimumPayoutAmount != null ? String(settings.minimumPayoutAmount) : '',
     autoRetryFailedPayouts: settings.autoRetryFailedPayouts,
+    invoiceSellerLegalName: settings.invoiceSellerLegalName ?? '',
+    invoiceSellerAddress: settings.invoiceSellerAddress ?? '',
+    invoiceSellerTaxNumber: settings.invoiceSellerTaxNumber ?? '',
   };
 }

@@ -105,6 +105,10 @@ describeViewportMatrix('Admin site settings save (real API) @comprehensive @admi
       payoutSettlementHoldDays: expect.any(Number),
       minimumPayoutAmount: null,
       autoRetryFailedPayouts: expect.any(Boolean),
+      // TTW-108: the form always sends the seller details it holds.
+      invoiceSellerLegalName: expect.any(String),
+      invoiceSellerAddress: expect.any(String),
+      invoiceSellerTaxNumber: expect.any(String),
     });
     // The real API stored it: the answer and a fresh read carry the saved values.
     expect(first.saved).toMatchObject(first.body);

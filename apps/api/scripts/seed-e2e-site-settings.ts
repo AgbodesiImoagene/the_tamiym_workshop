@@ -24,6 +24,10 @@ export const E2E_SITE_SETTINGS = {
   payoutSettlementHoldDays: 7,
   minimumPayoutAmount: '1000.00',
   autoRetryFailedPayouts: true,
+  /** TTW-108: obvious test values. The client gives the real seller identity before production. */
+  invoiceSellerLegalName: 'Test Seller Ltd (e2e)',
+  invoiceSellerAddress: '1 Test Road, Ikeja, Lagos, Nigeria',
+  invoiceSellerTaxNumber: 'TIN-E2E-0000001',
 } as const;
 
 export async function seedE2eSiteSettings(

@@ -155,6 +155,10 @@ export interface SiteSettingsValues {
   payoutSettlementHoldDays: number;
   minimumPayoutAmount: number | null;
   autoRetryFailedPayouts: boolean;
+  /** TTW-108: seller identity for invoices. An empty string means not set. */
+  invoiceSellerLegalName: string;
+  invoiceSellerAddress: string;
+  invoiceSellerTaxNumber: string;
 }
 
 /** Reads the one global settings row through `GET /admin/site-settings`. */
@@ -163,7 +167,14 @@ export async function readSiteSettings(admin: APIRequestContext): Promise<SiteSe
   if (!res.ok()) {
     throw new Error(`Reading site settings failed: ${res.status()} ${await res.text()}`);
   }
-  const body = (await res.json()) as SiteSettingsValues;
+  const body = (await res.json()) as Omit<
+    SiteSettingsValues,
+    'invoiceSellerLegalName' | 'invoiceSellerAddress' | 'invoiceSellerTaxNumber'
+  > &
+    Record<
+      'invoiceSellerLegalName' | 'invoiceSellerAddress' | 'invoiceSellerTaxNumber',
+      string | null
+    >;
   if (body.vatRate === null || body.vatRate === undefined) {
     throw new Error('Site settings have no VAT rate: run seed:e2e before the settings spec');
   }
@@ -177,6 +188,9 @@ export async function readSiteSettings(admin: APIRequestContext): Promise<SiteSe
     payoutSettlementHoldDays: body.payoutSettlementHoldDays,
     minimumPayoutAmount: body.minimumPayoutAmount,
     autoRetryFailedPayouts: body.autoRetryFailedPayouts,
+    invoiceSellerLegalName: body.invoiceSellerLegalName ?? '',
+    invoiceSellerAddress: body.invoiceSellerAddress ?? '',
+    invoiceSellerTaxNumber: body.invoiceSellerTaxNumber ?? '',
   };
 }
 

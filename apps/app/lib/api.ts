@@ -102,7 +102,11 @@ export class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    parseAs: 'json' | 'blob' = 'json'
+  ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {
@@ -167,11 +171,20 @@ export class ApiClient {
       return undefined as T;
     }
 
+    if (parseAs === 'blob') {
+      return (await response.blob()) as T;
+    }
+
     return response.json();
   }
 
   async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'GET' });
+  }
+
+  /** GET a file (for example a PDF). Errors are parsed as JSON like any other request. */
+  async getBlob(endpoint: string): Promise<Blob> {
+    return this.request<Blob>(endpoint, { method: 'GET' }, 'blob');
   }
 
   async post<T>(endpoint: string, data?: unknown): Promise<T> {
