@@ -872,6 +872,26 @@ export interface paths {
         patch: operations["AdminOrdersController_updateStatus"];
         trace?: never;
     };
+    "/v1/admin/orders/{id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the VAT invoice of any paid order (admin)
+         * @description TTW-108. Same file the customer gets. Issues the invoice when none exists yet.
+         */
+        get: operations["AdminOrderInvoiceController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/orders/{id}/refund": {
         parameters: {
             query?: never;
@@ -3005,6 +3025,26 @@ export interface paths {
         put?: never;
         /** Initiate payment for order */
         post: operations["OrdersController_initiatePayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/{id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download the VAT invoice of my paid order
+         * @description TTW-108. The invoice is issued on the first download and is the same file afterwards. Another user's order and a missing order both answer 404. An order that is not paid (or has no recorded VAT) answers 400 `INVOICE_ORDER_NOT_ELIGIBLE`; missing seller details answer 409 `INVOICE_SELLER_DETAILS_MISSING`.
+         */
+        get: operations["OrderInvoiceController_download"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5403,6 +5443,21 @@ export interface components {
             /** @enum {string} */
             currency?: "NGN";
             /**
+             * @description Seller address printed on VAT invoices (TTW-108). An empty string clears it.
+             * @example 1 Example Road, Ikeja, Lagos, Nigeria
+             */
+            invoiceSellerAddress?: string;
+            /**
+             * @description Seller legal name printed on VAT invoices (TTW-108). An empty string clears it. Invoices cannot be issued while it is empty.
+             * @example Tamiym Workshop Ltd
+             */
+            invoiceSellerLegalName?: string;
+            /**
+             * @description Seller tax identification number printed on VAT invoices (TTW-108). An empty string clears it.
+             * @example 12345678-0001
+             */
+            invoiceSellerTaxNumber?: string;
+            /**
              * @description Minimum payout amount in NGN
              * @example 1000
              */
@@ -7704,6 +7759,64 @@ export interface operations {
             };
             /** @description Order not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminOrderInvoiceController_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Order ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice as a PDF file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Order not eligible for an invoice */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Order not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Seller details not set up */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10888,6 +11001,21 @@ export interface operations {
                     autoRetryFailedPayouts?: boolean;
                     /** @enum {string} */
                     currency?: "NGN";
+                    /**
+                     * @description Seller address printed on VAT invoices (TTW-108). An empty string clears it.
+                     * @example 1 Example Road, Ikeja, Lagos, Nigeria
+                     */
+                    invoiceSellerAddress?: string;
+                    /**
+                     * @description Seller legal name printed on VAT invoices (TTW-108). An empty string clears it. Invoices cannot be issued while it is empty.
+                     * @example Tamiym Workshop Ltd
+                     */
+                    invoiceSellerLegalName?: string;
+                    /**
+                     * @description Seller tax identification number printed on VAT invoices (TTW-108). An empty string clears it.
+                     * @example 12345678-0001
+                     */
+                    invoiceSellerTaxNumber?: string;
                     /**
                      * @description Minimum payout amount in NGN
                      * @example 1000
@@ -14445,6 +14573,57 @@ export interface operations {
                 content?: never;
             };
             /** @description Active attempt is reserved but not yet ready; retry to attach to the same attempt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrderInvoiceController_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Order ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice as a PDF file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Order not eligible for an invoice */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Order not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Seller details not set up */
             409: {
                 headers: {
                     [name: string]: unknown;

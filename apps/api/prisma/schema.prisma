@@ -782,6 +782,11 @@ model SiteSettings {
   minimumPayoutAmount      Decimal?   @db.Decimal(10, 2)
   autoRetryFailedPayouts   Boolean    @default(true)
 
+  /// TTW-108: seller identity printed on VAT invoices. All three are needed before an invoice can be issued.
+  invoiceSellerLegalName String?
+  invoiceSellerAddress   String?
+  invoiceSellerTaxNumber String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1789,6 +1794,8 @@ model Order {
   orderDiscounts OrderDiscount[]
   inventoryMovements InventoryMovement[]
   shipments      Shipment[]
+  /// TTW-108: the VAT invoice issued for this order, if any (never more than one).
+  invoice        Invoice?
 
   @@unique([userId, idempotencyKey])
   @@index([userId])
@@ -1939,6 +1946,51 @@ model OrderItem {
   @@index([campaignId])
   @@index([snapshotSource])
   @@map("order_items")
+}
+
+/// TTW-108: VAT invoice for a paid order. Written once with a full snapshot and never changed:
+/// a database trigger refuses UPDATE and DELETE. One invoice per order, numbers unique and gap-free.
+model Invoice {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  /// Gap-free counter value; `number` is its printed form (for example INV-000042).
+  sequence Int    @unique
+  number   String @unique
+  issuedAt DateTime @default(now())
+
+  currency CurrencyCode
+
+  sellerLegalName String
+  sellerAddress   String
+  sellerTaxNumber String
+  buyerName       String
+  buyerAddress    String
+
+  /// [{ description, quantity, unitPrice, lineTotal }] copied from the order items.
+  lines Json
+
+  subtotalAmount     Decimal  @db.Decimal(10, 2)
+  discountAmount     Decimal  @db.Decimal(10, 2)
+  shippingFee        Decimal  @db.Decimal(10, 2)
+  vatRate            Decimal  @db.Decimal(5, 4)
+  vatAmount          Decimal  @db.Decimal(10, 2)
+  roundingAdjustment Decimal? @db.Decimal(10, 2)
+  pricesIncludeVat   Boolean
+  totalAmount        Decimal  @db.Decimal(10, 2)
+
+  @@map("invoices")
+}
+
+/// TTW-108: single-row counter behind gap-free invoice numbers. Incremented in the same
+/// transaction as the invoice insert, so a rolled-back issue gives its number back.
+model InvoiceCounter {
+  id           String   @id @default("default")
+  lastSequence Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("invoice_counters")
 }
 
 /// Payment attempt for an order. Tracks provider, amount, idempotency key for webhooks.

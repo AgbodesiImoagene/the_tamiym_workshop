@@ -110,6 +110,7 @@ Validation: `pnpm docs:validate` (also runs in CI).
 37. `observability/ttw-051-interim-policy.md` — interim observability SLI catalogue, alert thresholds & owners (TTW-051 slice 1)
 38. `discovery/ttw-070-organic-discovery-brief.md` — interim organic discovery strategy, query map & metrics catalogue (TTW-070 slice 1)
 39. `discovery/ttw-071-interim-policy.md` — interim search technical foundations, indexability matrix & discovery files (TTW-071 slice 1)
+40. `orders/ttw-108-interim-policy.md` — interim VAT invoice issue rules, gap-free numbering & immutability (TTW-108)
 
 ## Deep Dives
 
@@ -123,6 +124,7 @@ Validation: `pnpm docs:validate` (also runs in CI).
 - `fundraising/ttw-035-interim-policy.md` — organiser DRAFT authoring, revision concurrency, offer atomicity, draft preview (TTW-035)
 - `orders/ttw-040-interim-policy.md` — shipment state machine, exception taxonomy, redaction (TTW-040)
 - `orders/ttw-041-interim-policy.md` — cancellation/refund/return eligibility codes and TTW-040 coupling (TTW-041)
+- `orders/ttw-108-interim-policy.md` — VAT invoice eligibility, seller details, numbering and immutability (TTW-108)
 - `payouts/ttw-042-interim-policy.md` — payout eligibility codes, destination lifecycle, automation gate (TTW-042)
 - `analytics/ttw-036-interim-policy.md` — analytics KPI definitions, Lagos windows, export/drill-down contracts (TTW-036)
 - `notifications/ttw-043-interim-policy.md` — notification taxonomy, consent, dead-letter replay and delivery SLO targets (TTW-043)

@@ -287,6 +287,10 @@ export interface SiteSettings {
   payoutSettlementHoldDays: number;
   minimumPayoutAmount?: number | null;
   autoRetryFailedPayouts: boolean;
+  /** Seller identity printed on VAT invoices (TTW-108). Null while not set. */
+  invoiceSellerLegalName?: string | null;
+  invoiceSellerAddress?: string | null;
+  invoiceSellerTaxNumber?: string | null;
 }
 
 export interface UpdateSiteSettingsInput {
@@ -299,6 +303,10 @@ export interface UpdateSiteSettingsInput {
   payoutSettlementHoldDays?: number;
   minimumPayoutAmount?: number | null;
   autoRetryFailedPayouts?: boolean;
+  /** An empty string clears the value (TTW-108). */
+  invoiceSellerLegalName?: string;
+  invoiceSellerAddress?: string;
+  invoiceSellerTaxNumber?: string;
 }
 
 export async function getAdminOverview(opts?: {

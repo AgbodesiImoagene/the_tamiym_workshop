@@ -1493,6 +1493,11 @@ async function main() {
           shippingFee: toAmount(0),
           discountAmount: toAmount(0),
           totalAmount: toAmount(18000),
+          // TTW-108: a paid order with its VAT snapshot, so it can be invoiced (18000 x 0.075 / 1.075).
+          vatAmount: '1255.81',
+          vatRateSnapshot: '0.0750',
+          pricesIncludeVatSnapshot: true,
+          vatAppliesToShippingSnapshot: true,
           shipRecipientName: 'Kemi Customer',
           shipPhone: '+2348000000004',
           shipLine1: '12 Allen Avenue',

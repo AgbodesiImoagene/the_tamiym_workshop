@@ -4,6 +4,8 @@ import {
   IsNumber,
   IsOptional,
   IsEnum,
+  IsString,
+  MaxLength,
   Min,
   Max,
 } from 'class-validator';
@@ -81,4 +83,34 @@ export class UpdateSiteSettingsDto {
   @IsOptional()
   @IsBoolean()
   autoRetryFailedPayouts?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'Tamiym Workshop Ltd',
+    description:
+      'Seller legal name printed on VAT invoices (TTW-108). An empty string clears it. Invoices cannot be issued while it is empty.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  invoiceSellerLegalName?: string;
+
+  @ApiPropertyOptional({
+    example: '1 Example Road, Ikeja, Lagos, Nigeria',
+    description:
+      'Seller address printed on VAT invoices (TTW-108). An empty string clears it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  invoiceSellerAddress?: string;
+
+  @ApiPropertyOptional({
+    example: '12345678-0001',
+    description:
+      'Seller tax identification number printed on VAT invoices (TTW-108). An empty string clears it.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  invoiceSellerTaxNumber?: string;
 }

@@ -32,6 +32,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { MailModule } from './mail/mail.module';
 import { MediaModule } from './media/media.module';
 import { OrdersModule } from './orders/orders.module';
+import { InvoicesModule } from './invoices/invoices.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { ProductsModule } from './products/products.module';
 import { ShippingModule } from './shipping/shipping.module';
@@ -163,6 +164,7 @@ import { redactPublicDesignShareUrl } from './designs/design-share.redact';
     MailModule,
     MediaModule,
     OrdersModule,
+    InvoicesModule,
     PayoutsModule,
     PrivacyModule,
     OrganizerModule,
