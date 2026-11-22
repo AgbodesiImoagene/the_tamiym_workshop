@@ -109,4 +109,4 @@ Not verified: the mobile layout of the panel; the full Playwright suite (only th
 
 The admin order page now has a shipment panel: create a shipment, mark it shipped (with tracking), in transit, out for delivery, delivered, report a problem or cancel, and read the event history. The order moves to FULFILLED and DELIVERED only through these routes, and the two customer emails are written once, atomically with the order change (sending is at least once).
 
-Left for later: a screen for corrections of a recorded event (the API supports them), a mobile check. Possible conflict at merge with TTW-107 on `docs/tickets/README.md`, `ROADMAP.md` and generated OpenAPI files.
+Left for later: a screen for corrections of a recorded event (the API supports them), a mobile check. A second "shipped" email for a parcel cancelled and sent again is deferred after v1 (one per order for now). The merge with TTW-107 had no conflict.
