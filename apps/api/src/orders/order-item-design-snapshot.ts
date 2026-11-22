@@ -6,11 +6,14 @@
  * sides and layers are copied onto the order item, reduced to an allowlist, and never
  * touched again. The admin order screen reads only this copy.
  *
- * Images are not copied. A `DesignAsset` cannot be deleted while its `MediaAsset` exists
- * (`onDelete: Restrict`) and uploads never change, so the layer keeps the asset id.
+ * Images are not copied: uploads never change, so the layer keeps the asset id. They stay
+ * readable because an account that ordered cannot be deleted today; TTW-120 (erase the files
+ * of deleted accounts) must keep the uploads named here.
  *
  * Pure functions: no database, no storage. `OrdersService` reads the rows and calls them.
  */
+
+import { layerKindOf } from '../designs/design-content.validator';
 
 export const DESIGN_SNAPSHOT_VERSION = 1;
 
@@ -143,9 +146,10 @@ function assetIdOf(layer: Record<string, unknown>): string | undefined {
 
 function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
   if (!isRecord(raw)) return null;
-  const type = typeof raw['type'] === 'string' ? raw['type'].toLowerCase() : '';
+  // Same type rules as the save-time check: the workshop's text is an `IText`.
+  const kind = layerKindOf(raw['type']);
 
-  if (type === 'image') {
+  if (kind === 'image') {
     const designAssetId = assetIdOf(raw);
     // An image with no asset is something the print shop could not fetch: do not invent one.
     if (!designAssetId) return null;
@@ -156,7 +160,7 @@ function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
     });
   }
 
-  if (type === 'text' || type === 'textbox' || type === 'i-text') {
+  if (kind === 'text') {
     const text = pickString(raw, 'text', MAX_TEXT);
     if (text === undefined) return null;
     return compact({

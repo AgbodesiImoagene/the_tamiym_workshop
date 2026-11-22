@@ -203,6 +203,62 @@ describe('buildDesignSnapshot (TTW-101)', () => {
     expect(snapshot.views[0].layers).toHaveLength(1);
   });
 
+  // The workshop adds text as a Fabric IText, which serialises as `IText`. The save-time
+  // validator accepts every spelling below, so the frozen copy must too: a layer that
+  // passed validation and is then dropped would print a blank shirt.
+  it.each(['IText', 'i-text', 'itext', 'Textbox', 'textbox', 'Text', 'text'])(
+    'keeps a text layer of type %s, the spellings the save-time validator accepts',
+    (type) => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          front: {
+            productViewId: 'pv-front',
+            fabricJson: { objects: [textLayer({ type })] },
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views).toHaveLength(1);
+      expect(snapshot.views[0].layers).toEqual([
+        expect.objectContaining({ kind: 'text', text: 'Team Tamiym' }),
+      ]);
+    },
+  );
+
+  it.each(['Image', 'image', 'IMAGE'])(
+    'keeps an image layer of type %s',
+    (type) => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          front: {
+            productViewId: 'pv-front',
+            fabricJson: { objects: [imageLayer('da-1', { type })] },
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views[0].layers).toEqual([
+        expect.objectContaining({ kind: 'image', designAssetId: 'da-1' }),
+      ]);
+    },
+  );
+
+  it('does not keep a layer type the validator refuses', () => {
+    const snapshot = buildDesignSnapshot(
+      design({
+        front: {
+          productViewId: 'pv-front',
+          fabricJson: { objects: [textLayer({ type: 'Path' })] },
+        },
+      }),
+      productViews,
+      NOW,
+    );
+    expect(snapshot.views).toEqual([]);
+  });
+
   it('gives an empty snapshot for an empty design', () => {
     const snapshot = buildDesignSnapshot(
       { id: 'd', name: 'Blank', productId: 'p', designData: {} },

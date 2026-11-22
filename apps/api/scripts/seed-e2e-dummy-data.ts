@@ -1537,6 +1537,9 @@ async function main() {
           orderId: IDS.orders.pending,
           productId: IDS.products.tee,
           variantId: IDS.variants.teeNavyM,
+          // TTW-101: a design with no frozen copy, like an order placed before the copy
+          // existed: the admin must say so rather than read the live design.
+          designId: IDS.designs.pending,
           quantity: 1,
           unitBasePrice: toAmount(6500),
           unitViewSurcharge: toAmount(0),

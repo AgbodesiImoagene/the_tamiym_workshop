@@ -81,7 +81,10 @@ export function apiPathHref(path: string): string | null {
   return `${API_BASE_URL()}${path}`;
 }
 
-/** Print area as canvas pixels. Stored as fractions (0..1) or already in pixels. */
+/**
+ * Print area as canvas pixels. Stored as fractions (0..1) or already in pixels. The two cannot
+ * be told apart when every number is between 0 and 1, so such an area is read as fractions.
+ */
 export function printAreaInCanvas(area: PrintArea | null): PrintArea | null {
   if (!area) return null;
   const fractional = [area.x, area.y, area.width, area.height].every((n) => n >= 0 && n <= 1);

@@ -123,6 +123,10 @@ function OriginalFile({ layer }: { layer: PrintImageLayer }) {
     if (tab) tab.opener = null;
     try {
       const { url } = await getOriginalFileLink(layer.originalLinkPath);
+      // A storage link is http(s). Anything else (a script scheme) is never opened.
+      if (!/^https?:$/.test(new URL(url).protocol)) {
+        throw new Error('The file link is not valid.');
+      }
       if (tab) {
         tab.location.href = url;
       } else {

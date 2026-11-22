@@ -7,6 +7,8 @@ export const E2E_PRODUCT_HOODIE_SLUG = 'campus-hoodie-e2e';
 export const E2E_ORDER_PAID_ID = 'e2e-order-paid-campaign';
 /** TTW-101: its item holds a frozen two-sided design (front and back) for the print shop. */
 export const E2E_ORDER_PROCESSING_ID = 'e2e-order-processing';
+/** TTW-101: its item has a design but no frozen copy (an order placed before the copy existed). */
+export const E2E_ORDER_PENDING_ID = 'e2e-order-pending-payment';
 
 /**
  * Deactivated geo rows (TTW-209), for the admin zone area picker. Both are

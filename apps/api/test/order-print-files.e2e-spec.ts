@@ -257,7 +257,8 @@ describe('Order print files (e2e)', () => {
     data: { designAssetId: assetId },
   });
   const textLayer = (text: string) => ({
-    type: 'Textbox',
+    // The workshop adds text as a Fabric IText.
+    type: 'IText',
     text,
     fontFamily: 'Inter',
     fontSize: 40,
@@ -469,6 +470,33 @@ describe('Order print files (e2e)', () => {
         leaks: false,
       });
     }
+  });
+
+  it('does not send the raw frozen design back when an admin changes the status', async () => {
+    const s = await orderTwoSidedDesign('status');
+
+    const res = await request(app.getHttpServer())
+      .patch(`/v1/admin/orders/${s.order.id}`)
+      .set('Authorization', adminAuth)
+      .send({ status: 'CANCELLED' })
+      .expect(200);
+
+    expect(JSON.stringify(res.body)).not.toContain('designSnapshot');
+    expect(JSON.stringify(res.body)).not.toContain('Original text');
+  });
+
+  it('keeps every text of a design the workshop saved, so the print shop sees all of it', async () => {
+    const s = await orderTwoSidedDesign('lettering');
+    const res = await request(app.getHttpServer())
+      .get(`/v1/admin/orders/${s.order.id}`)
+      .set('Authorization', adminAuth)
+      .expect(200);
+
+    const texts = res.body.items[0].printFiles.views.flatMap(
+      (view: { layers: Array<{ kind: string; text?: string }> }) =>
+        view.layers.filter((l) => l.kind === 'text').map((l) => l.text),
+    );
+    expect(texts).toEqual(['Original text', 'Back text']);
   });
 
   // Today the originals of a paid order cannot disappear with the account: the order keeps

@@ -85,49 +85,55 @@ Recorded 2026-11-21, before implementation. Decisions by the user the same day: 
 
 - A generated PDF/PNG export per face (the user chose option A). To reopen only if the print shop asks.
 
-## Open risks (decide before release, not part of this change)
+## Risks recorded after the first review, and how each ended
 
-- **Originals can vanish with the account.** `DesignAsset.owner` is `onDelete: Cascade`. TTW-120 (erase files of deleted accounts) must keep the uploads of designs frozen on a paid order, or the print shop loses them. The admin screen already says "This file is no longer available" instead of failing. Raise it when TTW-120 is designed.
-- **Preview is a layout, not a render.** Text ignores the layer width, alignment and wrapping, so a long text can run past its box in the preview. The positions listed next to it are exact. TTW-143 covers the real render.
-- **Frozen without a second eligibility check.** The design is read inside the order transaction, but owner, product and moderation status are only checked before the quote (TTW-239). A rejection landing in that short window would still freeze the design.
-- **Opening an original** uses an anchor click after the request. A browser that drops the click gesture after an await (Safari) can block the new tab. Not reproduced here.
-- **Playwright stands in for storage.** The local seed has no stored object, so the journey answers the preview and the signed-link requests with fixed responses. The real link endpoint is covered by TTW-099 tests only.
+- **Originals vanishing with the account.** Not possible today: `Order.user` has no cascade, so a buyer cannot be deleted, and the upload cannot be deleted either. `order-print-files.e2e-spec.ts` pins it. TTW-120 now says it must keep the uploads named by `OrderItem.designSnapshot`. Still a risk for TTW-120, not for this change.
+- **Preview text.** Fixed: it wraps inside the stored width and keeps its alignment (checked on a screenshot).
+- **Frozen without a second check.** Fixed for standard orders: the orderable check runs again inside the order transaction (unit tests: rejected, no longer the buyer's, vanished). **Not fixed for campaign orders**: they follow their own design rule (TTW-239 comment), which this ticket does not change.
+- **Opening an original in Safari.** Fixed by design (tab opened on click), plus an http(s) check on the link. Only Chromium was run.
+- **Playwright stands in for storage.** Reduced: the signed link now comes from the real API (new private seeded upload, `S3_PRIVATE_BUCKET` set as in the CI workflows). Only the bytes of the on-screen preview are stood in, because the local seed has no stored object.
 
 ## Implementation reviews
 
-1. `/code-review high` run by the implementing session on the uncommitted diff: 8 findings. Fixed: layer rotation pivot (`layerBox` now returns the Fabric origin point). Recorded above and not fixed: asset deletion with the account, text preview, eligibility window, popup behaviour, first-party mocks in the journey. Fixed in this ticket: the wrong `onDelete: Restrict` claim, and this section. Not fixed: the duplicated snapshot wiring in the two order paths (small, covered by tests in both).
-2. **Still to do:** an independent review in a fresh session, as `AGENTS.md` requires for high risk. The review above was made by the same session that wrote the code, so it does not count as independent.
+1. `/code-review high` by the implementing session: 8 findings, handled above.
+2. **Independent review** by a fresh agent with no context of the work (read-only, high-risk charter: security, integration coverage, the two invariants). Verdict **FAIL** on one blocker, then fixed:
+   - **Blocker, fixed:** text added by the real workshop is a Fabric `IText`; the frozen copy only accepted `text`, `textbox` and `i-text`, so every lettering was dropped (a side with only text vanished). The save-time validator accepted it, the copy did not, and every test used `Textbox`. Fix: one shared rule, `layerKindOf` in `design-content.validator.ts`, used by both. New tests: every accepted spelling (`IText`, `i-text`, `itext`, `Textbox`, `Text`, and image spellings), a refused type, and an end-to-end case with `IText` text on both sides.
+   - Minor, fixed: `PATCH /admin/orders/:id` returned the raw copy (now omitted, with an end-to-end test); the wrong `Restrict` comment in the snapshot module; the third Playwright test now checks the "not recorded" message on a seeded item that has a design and no copy; comment on the fractions-or-pixels ambiguity of print areas.
+   - Nit, fixed: http(s) check before opening the signed link.
+   - Left as is, said by the reviewer: the customer-leak test calls `OrdersService`, not the HTTP routes (the controller only passes the service result through); no concurrency test on the copy; campaign orders (see above).
+   - The reviewer did not run any test. After the fixes, the review was **not repeated** by a second fresh reviewer: the changes were made against its own findings and are covered by the tests listed below. Say so if you want a second pass.
 
 ## Verification evidence
 
-Run in the worktree `.claude/worktrees/ttw-101`, 2026-11-21, on a throwaway database `tamiym_workshop_test_ttw101` (recreated, migrated, seeded with `seed:e2e`), `REDIS_DB=14`. The shared `tamiym_workshop_test` was not used.
+Worktree `.claude/worktrees/ttw-101`, 2026-11-22, final code. Throwaway database `tamiym_workshop_test_ttw101` (recreated, migrated, seeded with `seed:e2e`), `REDIS_DB=14`; the shared `tamiym_workshop_test` was not used.
 
-| Check                                                | Result                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tests written first, seen failing                    | `order-item-design-snapshot.spec.ts`: module not found. `order-print-files.e2e-spec.ts`: 5 of 7 failed (no snapshot, no `printFiles`, customer create response carried `designSnapshot`)                                                                                          |
-| `pnpm typecheck`                                     | 6 of 6 tasks successful                                                                                                                                                                                                                                                           |
-| `pnpm lint`                                          | 0 errors (api 14 warnings, admin 22 warnings, none in the new files)                                                                                                                                                                                                              |
-| `pnpm format:check`                                  | all files use Prettier style                                                                                                                                                                                                                                                      |
-| `pnpm test`                                          | exit 0 (api 177 suites, 2131 tests; web 84 tests)                                                                                                                                                                                                                                 |
-| `pnpm --filter api test:e2e`                         | second run: 64 suites, 385 tests passed. The first run failed 2 suites (`address-state-not-deliverable`, `shipping-zone-admin-corrections`), which passed alone and on the rerun; not reproduced, cause not found, probably state left by the Playwright run on the same database |
-| `pnpm coverage:ratchet`                              | passed (lines 85.68%)                                                                                                                                                                                                                                                             |
-| `pnpm coverage:diff`                                 | 25 of 25 changed lines covered (100%, floor 80%)                                                                                                                                                                                                                                  |
-| `pnpm migrations:check`                              | schema matches the migrations                                                                                                                                                                                                                                                     |
-| `pnpm openapi:generate`, `pnpm openapi:check`        | artefacts regenerated, no drift                                                                                                                                                                                                                                                   |
-| `pnpm docs:validate`, `pnpm playwright:validate`     | passed                                                                                                                                                                                                                                                                            |
-| `pnpm audit:prod`                                    | exit 0 (31 moderate or low, none high)                                                                                                                                                                                                                                            |
-| `pnpm build`                                         | exit 0                                                                                                                                                                                                                                                                            |
-| Playwright `order-print-files.comprehensive.spec.ts` | 9 tests (3 journeys on desktop, tablet and mobile widths) passed, replayed after the last code change; `orders-workspace` spec also passed before it                                                                                                                              |
+| Check                                                                            | Result                                                                                                                            |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Tests written first, seen failing                                                | first round: module not found, then 5 of 7 end-to-end failures. After the review: `IText` and `itext` cases failed before the fix |
+| `pnpm typecheck`                                                                 | 6 of 6 tasks successful                                                                                                           |
+| `pnpm lint`                                                                      | 0 errors (api 14, admin 22 warnings, none in the new files)                                                                       |
+| `pnpm format:check`                                                              | all files use Prettier style                                                                                                      |
+| `pnpm test`                                                                      | exit 0 (api 177 suites, 2145 tests in the coverage run)                                                                           |
+| `pnpm --filter api test:e2e`                                                     | 64 suites, 388 tests passed                                                                                                       |
+| `pnpm coverage:ratchet`                                                          | passed                                                                                                                            |
+| `pnpm coverage:diff`                                                             | 92 of 92 changed lines covered (100%, floor 80%)                                                                                  |
+| `pnpm migrations:check`, `openapi:check`, `docs:validate`, `playwright:validate` | passed                                                                                                                            |
+| `pnpm audit:prod`                                                                | exit 0                                                                                                                            |
+| `pnpm build`                                                                     | exit 0                                                                                                                            |
+| Playwright admin and app projects (`tests/e2e/admin`, `tests/e2e/app`)           | 174 passed, 3 skipped, 1 failed (see below)                                                                                       |
 
-Not verified: a real signed link against object storage (no storage locally), a browser other than Chromium, `pnpm verify` as a single command.
+**The one Playwright failure:** `design-workshop.low-resolution.spec.ts` (TTW-104), "a small image enlarged is flagged". The image upload answers 500 because there is no object storage locally (`localhost:9000` unreachable), with or without `S3_PRIVATE_BUCKET`. No code of this change is on the upload path. It was not run on `main` for lack of a build there, so "same on `main`" is an inference, not a measurement.
+
+**Flaky integration suite, investigated:** in the first full run, 2 suites failed (`address-state-not-deliverable`, `shipping-zone-admin-corrections`); they passed alone and on rerun. In a second full run right after Playwright, `address-default-and-country-code` failed. That suite alone fails about 1 run in 15 to 40, **also on `main` without this change** (failed at the 14th run there), with a plain-text 404 `not found` on `POST /users/addresses` that no code in `src/` writes. Cause not found. It is independent of TTW-101 and deserves its own ticket.
+
+Not verified: a real signed link followed to real object storage, a browser other than Chromium, `pnpm verify` as one command, a second independent review after the last fixes.
 
 ## Completion summary
 
 Done in the worktree, nothing pushed, no pull request.
 
-- `OrderItem.designSnapshot` (migration `20261121220750_ttw101_order_item_design_snapshot`): the design frozen when the order is placed, for standard and campaign orders.
-- `GET /admin/orders/:id` returns `items[].printFiles` (sides, print areas, layers with position, size and turn, file facts, paths to the preview and to a fresh signed link). Customer order responses never carry the copy (`omit` on the shared include, covered by tests on create, detail and list).
-- Admin order detail shows, per item, a layout preview per side, the layer positions and a button to open each original.
-- Orders placed before this change have no copy and say so on screen.
+- `OrderItem.designSnapshot` (migration `20261121220750_ttw101_order_item_design_snapshot`): the design frozen when the order is placed, standard and campaign orders; standard orders also re-check the design inside the transaction.
+- `GET /admin/orders/:id` returns `items[].printFiles` (sides, print areas, layers with position, size and turn, file facts, paths to the preview and to a fresh signed link). No customer response, nor the admin list or status change, carries the raw copy.
+- The admin order detail shows, per item, a layout preview per side, the layer positions and an "Open original file" button. Orders placed before this change say "Print files were not recorded for this item".
 
-Left open: see "Open risks" and the missing independent review. The acceptance criteria stay unchecked until that review passes.
+Acceptance criteria stay unchecked until the person who owns the ticket accepts the evidence above and decides on the open points (campaign recheck, second review, the TTW-104 failure in an environment with storage).

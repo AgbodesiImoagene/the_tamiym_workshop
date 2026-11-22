@@ -1249,6 +1249,8 @@ export class OrdersService {
           where: { id },
           include: {
             items: {
+              // Print files are read from the order detail, not from a status change.
+              omit: { designSnapshot: true },
               include: {
                 product: { select: { id: true, name: true } },
                 variant: { select: { id: true, name: true } },
@@ -1263,6 +1265,7 @@ export class OrdersService {
         data: { status: newStatus },
         include: {
           items: {
+            omit: { designSnapshot: true },
             include: {
               product: { select: { id: true, name: true } },
               variant: { select: { id: true, name: true } },

@@ -2,7 +2,11 @@ import { expect, type Page } from '@playwright/test';
 import { test } from '../fixtures/test';
 import { assertVisibleControlsEnabled } from '../fixtures/interactions';
 import { describeViewportMatrix } from '../fixtures/viewport-suite';
-import { E2E_ORDER_PAID_ID, E2E_ORDER_PROCESSING_ID } from '../fixtures/seed-data';
+import {
+  E2E_ORDER_PAID_ID,
+  E2E_ORDER_PENDING_ID,
+  E2E_ORDER_PROCESSING_ID,
+} from '../fixtures/seed-data';
 
 /**
  * The local seed has no object in storage, so the on-screen rendition of the seeded upload
@@ -85,7 +89,18 @@ describeViewportMatrix('Admin order print files @comprehensive @admin @critical'
     ).toBeNull();
   });
 
-  test('an item with no recorded design says so', async ({ adminPage }) => {
+  test('an item with a design but no frozen copy says so instead of reading the live design', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto(`/admin/orders/${E2E_ORDER_PENDING_ID}`);
+    await expect(adminPage.getByRole('heading', { name: /Order detail/i })).toBeVisible();
+    await expect(adminPage.getByTestId('print-files-missing')).toHaveText(
+      'Print files were not recorded for this item.'
+    );
+    await expect(adminPage.getByTestId('print-files')).toHaveCount(0);
+  });
+
+  test('an item with no design shows no print files section', async ({ adminPage }) => {
     await adminPage.goto(`/admin/orders/${E2E_ORDER_PAID_ID}`);
     await expect(adminPage.getByRole('heading', { name: /Order detail/i })).toBeVisible();
     await expect(adminPage.getByTestId('print-files')).toHaveCount(0);
