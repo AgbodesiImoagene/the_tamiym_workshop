@@ -41,6 +41,16 @@ export async function clearFixtureData(prisma: PrismaClient): Promise<void> {
       ],
     },
   });
+  // TTW-110: failed e-mails and the replays an admin made of them (generated
+  // ids, same effect key). Their delivery attempts go by cascade.
+  await prisma.notificationOutbox.deleteMany({
+    where: {
+      OR: [
+        { id: { startsWith: FIXTURE_PREFIX } },
+        { effectKey: { startsWith: FIXTURE_PREFIX } },
+      ],
+    },
+  });
   // TTW-212: rows with generated ids that keep a Restrict foreign key to a
   // fixture user or product. Children of a deleted campaign (payouts, campaign
   // products and prices) go with it by cascade.
