@@ -12,6 +12,7 @@ import {
   ADMIN_NOTIF_ORDER_PENDING_EXPIRED,
   ADMIN_NOTIF_ORDER_PLACED,
   ADMIN_NOTIF_ORDER_STATUS_CHANGED,
+  ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
   ADMIN_NOTIF_PAYMENT_CONFIRMED,
   ADMIN_NOTIF_PAYOUT_FAILED,
   ADMIN_NOTIF_PAYOUT_SUCCEEDED,
@@ -52,6 +53,19 @@ export const ADMIN_NOTIFICATION_DEFAULTS: Record<
 <p>Reference: <code>{{reference}}</code></p>`,
     smsBody:
       'Paid {{orderId}} {{formatAmount amount currency}} ref {{reference}}',
+  },
+  // TTW-248: this key had no template, so AdminNotifyService.emit sent nothing
+  // for late, extra and incomplete charge.success events. `amount` is the raw
+  // Paystack value in kobo and may be missing, so it is not formatted here.
+  [ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER]: {
+    subject: 'Payment needs attention: order {{orderId}}',
+    emailBody: `<p><strong>A Paystack payment needs a manual check.</strong></p>
+<p>Order: <code>{{orderId}}</code></p>
+<p>Reference: <code>{{reference}}</code></p>
+{{#if amount}}<p>Amount reported by Paystack (kobo): {{amount}} {{currency}}</p>{{/if}}
+<p>{{reason}}</p>`,
+    smsBody:
+      'Payment needs attention: order {{orderId}} ref {{reference}}. {{reason}}',
   },
   [ADMIN_NOTIF_REFUND_COMPLETED]: {
     subject: 'Refund {{orderId}}',

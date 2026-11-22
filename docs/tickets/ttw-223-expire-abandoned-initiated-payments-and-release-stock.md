@@ -14,6 +14,8 @@ Origin: adversarial read-only review of the money flows (finding B1), 2026-11-15
 
 A customer who opens the Paystack checkout and closes the tab never produces a webhook. The payment stays `INITIATED` and the order stays pending, so its stock reservation is never released. On a limited-stock product or campaign this blocks other buyers for an unbounded time. No money is lost; availability is.
 
+Second origin (2026-11-22, [TTW-249](ttw-249-unstick-orders-after-an-incomplete-payment-event.md), merged here): since TTW-248, a signed `charge.success` without `amount` or `currency` is not settled and leaves the payment `INITIATED` and the order pending. It is stuck for the same reason, and the same fix covers it. The runbook `docs/runbooks/webhooks-money.md` (section "Incomplete `charge.success`") describes the manual steps until this ticket ships.
+
 Not yet checked (must be read before the design review): whether another job or the reconciliation module already fails or expires old `INITIATED` payments.
 
 ## Client decisions
@@ -65,6 +67,7 @@ Rejected for now: cancelling on age alone without asking Paystack (would cancel 
 
 - [ ] A test fails today, showing an abandoned `INITIATED` order never expires; it passes after the change.
 - [ ] A paid-at-Paystack order is never cancelled by the job (test).
+- [ ] An order left pending by an incomplete `charge.success` (payment `INITIATED`, no settlement claim) is settled or cancelled with its stock released by the job (test, TTW-249 case); the runbook section is updated.
 - [ ] Concurrent expiry and webhook leave one consistent state and correct stock (real Postgres).
 - [ ] Client decision on the delay recorded in this ticket and in `ROADMAP.md`.
 - [ ] Required quality gates pass with evidence recorded below.

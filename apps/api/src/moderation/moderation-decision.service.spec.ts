@@ -6,6 +6,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { ModerationDecisionService } from './moderation-decision.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import {
   ModerationActorKind,
   ModerationAppealStatus,
@@ -23,6 +24,7 @@ import {
 describe('ModerationDecisionService', () => {
   let service: ModerationDecisionService;
   const prisma: Record<string, unknown> = {};
+  const dispatch = { dispatch: jest.fn() };
 
   beforeEach(async () => {
     prisma.$transaction = jest.fn(
@@ -43,8 +45,14 @@ describe('ModerationDecisionService', () => {
       update: jest.fn(),
       updateMany: jest.fn(),
     };
+    dispatch.dispatch = jest.fn().mockResolvedValue({ outboxId: 'ob-1' });
     prisma.design = {
-      findUnique: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({
+        moderationStatus: ModerationStatus.PENDING,
+        name: 'Team shirt',
+        product: { name: 'T-shirt' },
+        user: { id: 'owner-1', email: 'owner@example.com', firstName: 'Ada' },
+      }),
       update: jest.fn(),
     };
     prisma.mediaAsset = { update: jest.fn() };
@@ -58,6 +66,7 @@ describe('ModerationDecisionService', () => {
       providers: [
         ModerationDecisionService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationDispatchService, useValue: dispatch },
       ],
     }).compile();
 
@@ -198,6 +207,153 @@ describe('ModerationDecisionService', () => {
         moderationStatus: ModerationStatus.REJECTED,
         moderationNotes: 'Categories above threshold: hate: 0.9',
       }),
+    });
+  });
+
+  describe('design decision emails (TTW-109)', () => {
+    function mockDecision(id: string, outcome: ModerationStatus) {
+      (
+        prisma.moderationAppeal as { findMany: jest.Mock }
+      ).findMany.mockResolvedValue([]);
+      (
+        prisma.moderationDecision as { create: jest.Mock }
+      ).create.mockResolvedValue({ id, outcome });
+      (prisma.design as { update: jest.Mock }).update.mockResolvedValue({});
+    }
+    function setPreviousDecision(
+      outcome: ModerationStatus,
+      actorKind: ModerationActorKind,
+    ) {
+      (
+        prisma.moderationDecision as { findFirst: jest.Mock }
+      ).findFirst.mockResolvedValue({ outcome, actorKind });
+    }
+    const adminInput = (outcome: ModerationStatus) => ({
+      subjectType: ModerationSubjectType.DESIGN,
+      subjectId: 'design-1',
+      outcome,
+      actorUserId: 'admin-1',
+      notes: 'INTERNAL: looks like a stolen logo',
+    });
+
+    it('queues exactly one DesignModerationApproved email when an admin approves', async () => {
+      mockDecision('dec-1', ModerationStatus.APPROVED);
+      await service.recordAdminDecision(adminInput(ModerationStatus.APPROVED));
+
+      expect(dispatch.dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tx: prisma,
+          eventName: 'DesignModerationApproved',
+          recipient: 'owner@example.com',
+          recipientUserId: 'owner-1',
+          dedupeKey: 'DesignModerationApproved:dec-1',
+          payload: {
+            designId: 'design-1',
+            designName: 'Team shirt',
+            productName: 'T-shirt',
+            firstName: 'Ada',
+          },
+        }),
+      );
+    });
+
+    it('queues a DesignModerationRejected email and never includes the internal notes', async () => {
+      mockDecision('dec-2', ModerationStatus.REJECTED);
+      await service.recordAdminDecision(adminInput(ModerationStatus.REJECTED));
+
+      expect(dispatch.dispatch).toHaveBeenCalledTimes(1);
+      const arg = dispatch.dispatch.mock.calls[0][0] as {
+        eventName: string;
+        payload: unknown;
+      };
+      expect(arg.eventName).toBe('DesignModerationRejected');
+      expect(JSON.stringify(arg)).not.toContain('stolen logo');
+      expect(JSON.stringify(arg)).not.toContain('INTERNAL');
+    });
+
+    it('sends the email when an admin confirms what only the AI had decided', async () => {
+      setPreviousDecision(ModerationStatus.REJECTED, ModerationActorKind.AI);
+      mockDecision('dec-3b', ModerationStatus.REJECTED);
+      await service.recordAdminDecision(adminInput(ModerationStatus.REJECTED));
+      expect(dispatch.dispatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends nothing when the admin repeats what a human already decided', async () => {
+      setPreviousDecision(ModerationStatus.APPROVED, ModerationActorKind.ADMIN);
+      mockDecision('dec-3', ModerationStatus.APPROVED);
+      await service.recordAdminDecision(adminInput(ModerationStatus.APPROVED));
+      expect(dispatch.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for FLAGGED or PENDING outcomes', async () => {
+      mockDecision('dec-4', ModerationStatus.FLAGGED);
+      await service.recordAdminDecision(adminInput(ModerationStatus.FLAGGED));
+      await service.recordAdminDecision(adminInput(ModerationStatus.PENDING));
+      expect(dispatch.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for automatic (AI) decisions', async () => {
+      mockDecision('dec-5', ModerationStatus.REJECTED);
+      await service.recordAiDecision({
+        subjectType: ModerationSubjectType.DESIGN,
+        subjectId: 'design-1',
+        outcome: ModerationStatus.REJECTED,
+        notes: 'score 0.9',
+      });
+      expect(dispatch.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for media or campaign decisions', async () => {
+      mockDecision('dec-6', ModerationStatus.APPROVED);
+      (prisma.mediaAsset as { update: jest.Mock }).update.mockResolvedValue({});
+      await service.recordAdminDecision({
+        ...adminInput(ModerationStatus.APPROVED),
+        subjectType: ModerationSubjectType.MEDIA,
+        subjectId: 'media-1',
+      });
+      expect(dispatch.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('emails the owner when an appeal is resolved, even if the status is unchanged', async () => {
+      (
+        prisma.moderationAppeal as { findUnique: jest.Mock }
+      ).findUnique.mockResolvedValue({
+        id: 'appeal-1',
+        status: ModerationAppealStatus.PENDING,
+        decision: {
+          id: 'dec-0',
+          subjectType: ModerationSubjectType.DESIGN,
+          subjectId: 'design-1',
+          outcome: ModerationStatus.REJECTED,
+          actorKind: ModerationActorKind.ADMIN,
+          actorUserId: 'admin-1',
+          revisionHash: 'abc',
+        },
+      });
+      mockDecision('dec-7', ModerationStatus.REJECTED);
+      (
+        prisma.moderationAppeal as { updateMany: jest.Mock }
+      ).updateMany.mockResolvedValue({ count: 1 });
+      (
+        prisma.moderationAppeal as { findUniqueOrThrow: jest.Mock }
+      ).findUniqueOrThrow.mockResolvedValue({ id: 'appeal-1', decision: {} });
+
+      await service.resolveAppeal('admin-2', 'appeal-1', {
+        resolution: 'UPHELD',
+        notes: 'INTERNAL appeal note',
+      });
+
+      expect(dispatch.dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventName: 'DesignModerationRejected',
+          dedupeKey: 'DesignModerationRejected:dec-7',
+        }),
+      );
+      expect(JSON.stringify(dispatch.dispatch.mock.calls)).not.toContain(
+        'INTERNAL',
+      );
     });
   });
 

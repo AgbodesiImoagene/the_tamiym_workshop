@@ -111,6 +111,8 @@ Three-tier routing:
 
 Graceful degradation: if `OPENAI_API_KEY` is absent or the API call fails, returns `PENDING` so the item surfaces in the human review queue rather than being silently dropped or auto-approved.
 
+**AI screening of designs and campaigns is off by default (TTW-252).** The admin alone validates content for now. `AI_SCREENING_ENABLED` (`true` or `1` turns it on; anything else, or nothing, leaves it off) controls the two places that act on the AI verdict: `DesignsService` (create, content update, thumbnail upload) and `CampaignsService.submitForReview`. While it is off, nothing is sent to the AI and the item waits for an admin: a design is `PENDING` (a new thumbnail turns an `APPROVED` design back to `PENDING`, so no unscreened picture is public), a campaign moves to `REVIEW` with no automatic rejection. The decision is still recorded, with outcome `PENDING` and the note "AI screening is turned off". Screening of uploaded images (media processor) is not affected by this setting.
+
 ## Auth and security state
 
 Implemented today:

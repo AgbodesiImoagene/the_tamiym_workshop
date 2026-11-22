@@ -67,6 +67,9 @@ export class AdminSiteSettingsController {
         payoutSettlementHoldDays: 7,
         minimumPayoutAmount: null,
         autoRetryFailedPayouts: true,
+        invoiceSellerLegalName: null,
+        invoiceSellerAddress: null,
+        invoiceSellerTaxNumber: null,
         createdAt: null,
         updatedAt: null,
       };
@@ -119,6 +122,13 @@ export class AdminSiteSettingsController {
       data.minimumPayoutAmount = dto.minimumPayoutAmount;
     if (dto.autoRetryFailedPayouts !== undefined)
       data.autoRetryFailedPayouts = dto.autoRetryFailedPayouts;
+    // TTW-108: seller identity for VAT invoices. Blank means "not set".
+    if (dto.invoiceSellerLegalName !== undefined)
+      data.invoiceSellerLegalName = dto.invoiceSellerLegalName.trim() || null;
+    if (dto.invoiceSellerAddress !== undefined)
+      data.invoiceSellerAddress = dto.invoiceSellerAddress.trim() || null;
+    if (dto.invoiceSellerTaxNumber !== undefined)
+      data.invoiceSellerTaxNumber = dto.invoiceSellerTaxNumber.trim() || null;
 
     const before = await this.prisma.siteSettings.findUnique({
       where: { id: SITE_SETTINGS_ID },
@@ -145,6 +155,9 @@ export class AdminSiteSettingsController {
         payoutSettlementHoldDays: dto.payoutSettlementHoldDays ?? 7,
         minimumPayoutAmount: dto.minimumPayoutAmount ?? null,
         autoRetryFailedPayouts: dto.autoRetryFailedPayouts ?? true,
+        invoiceSellerLegalName: dto.invoiceSellerLegalName?.trim() || null,
+        invoiceSellerAddress: dto.invoiceSellerAddress?.trim() || null,
+        invoiceSellerTaxNumber: dto.invoiceSellerTaxNumber?.trim() || null,
       },
       update: data,
     });

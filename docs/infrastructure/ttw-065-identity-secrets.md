@@ -79,6 +79,12 @@ scheduler refuse to start with `NODE_ENV=production` unless `MAIL_HOST`,
 `PLACEHOLDER_*` value or a `MAIL_HOST` naming the local machine is rejected
 (`apps/api/src/config/env-validation.ts`).
 
+**`PAYSTACK_SECRET_KEY` is required in production (TTW-248):** the same startup
+check refuses to boot with `NODE_ENV=production` when it is missing, blank or a
+`PLACEHOLDER_*` value (or the `apps/api/.env.example` template value). Without
+it the webhook rejects every event and no order can ever be paid. Set the real
+key in the host secrets file before deploying this change.
+
 ## Rotation schedule
 
 | Class                       | Cadence (production)           | Procedure outline                                                                 | Owner       |

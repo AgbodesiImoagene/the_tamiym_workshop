@@ -323,8 +323,10 @@ jobs:
           # TTW-213: this step runs the whole suite once more with
           # --detectOpenHandles. Measured on CI: 93 s on a fast runner, 157 s on
           # a slow one (a normal pass takes 79-139 s). 120 s failed twice on a
-          # docs-only commit, so the budget is 240 s.
-          E2E_OPEN_HANDLE_TIMEOUT_MS: '240000'
+          # docs-only commit, so the budget was 240 s. The suite then reached
+          # 237 s on main (run 45059501525, TTW-248) and timed out with every
+          # test passing, so the budget is now 360 s (the job limit is 15 min).
+          E2E_OPEN_HANDLE_TIMEOUT_MS: '360000'
         run: |
           set -o pipefail
           node scripts/quality/prove-e2e-open-handles.mjs 2>&1 | tee apps/api/e2e-open-handles.log

@@ -5,8 +5,10 @@ export const ADMIN_NOTIF_ORDER_STATUS_CHANGED = 'admin.order.status_changed';
 export const ADMIN_NOTIF_PAYMENT_CONFIRMED = 'admin.payment.confirmed';
 export const ADMIN_NOTIF_REFUND_COMPLETED = 'admin.refund.completed';
 /**
- * Paystack captured money for an order that was already cancelled or expired.
- * The customer was charged but the order is closed — manual refund required.
+ * A Paystack payment needs a manual check. Mostly: money was captured for an
+ * order that is cancelled, expired or already paid (manual refund required).
+ * Also (TTW-248): a charge.success without amount or currency left the order
+ * unpaid. The `reason` in the context says which case it is.
  */
 export const ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER =
   'admin.payment.captured_on_cancelled_order';
@@ -63,7 +65,7 @@ export const ADMIN_NOTIFICATION_EVENT_CATALOG: {
   {
     key: ADMIN_NOTIF_PAYMENT_CAPTURED_CANCELLED_ORDER,
     description:
-      'Paystack charge succeeded but the order was already cancelled or expired. Customer was charged — manual refund required.',
+      'A Paystack payment needs a manual check: it was captured for an order that is cancelled, expired or already paid (a refund is usually required), or the charge.success event had no amount or currency and the order was not marked paid (check the payment at Paystack first). The message gives the exact reason.',
   },
   {
     key: ADMIN_NOTIF_REFUND_COMPLETED,

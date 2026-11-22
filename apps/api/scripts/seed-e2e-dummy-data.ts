@@ -14,12 +14,16 @@ import { createHash } from 'node:crypto';
 import {
   CampaignStatus,
   CurrencyCode,
+  DeadLetterAckStatus,
   LedgerEntryType,
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
   MediaVisibility,
   ModerationStatus,
+  NotificationAttemptOutcome,
+  NotificationChannel,
+  NotificationStatus,
   OrderItemSnapshotSource,
   PaymentProvider,
   PaymentStatus,
@@ -247,6 +251,13 @@ const IDS = {
   payoutRuns: {
     pendingApproval: 'e2e-payout-run-pending-approval',
     completed: 'e2e-payout-run-completed',
+  },
+  /** TTW-110: failed e-mails the admin can acknowledge and resend. */
+  failedEmails: {
+    open: 'e2e-failed-email-open',
+    acknowledged: 'e2e-failed-email-acknowledged',
+    bulkA: 'e2e-failed-email-bulk-a',
+    bulkB: 'e2e-failed-email-bulk-b',
   },
   payouts: {
     pendingApproval: 'e2e-payout-pending-approval',
@@ -1482,6 +1493,11 @@ async function main() {
           shippingFee: toAmount(0),
           discountAmount: toAmount(0),
           totalAmount: toAmount(18000),
+          // TTW-108: a paid order with its VAT snapshot, so it can be invoiced (18000 x 0.075 / 1.075).
+          vatAmount: '1255.81',
+          vatRateSnapshot: '0.0750',
+          pricesIncludeVatSnapshot: true,
+          vatAppliesToShippingSnapshot: true,
           shipRecipientName: 'Kemi Customer',
           shipPhone: '+2348000000004',
           shipLine1: '12 Allen Avenue',
@@ -1964,6 +1980,46 @@ async function main() {
         },
       ],
     });
+
+    // TTW-110: four failed confirmation e-mails (one not yet acknowledged).
+    // The API masks a recipient to its first letter: each one starts with its own.
+    const failedEmails: Array<[string, boolean, string]> = [
+      [IDS.failedEmails.open, false, 'oscar'],
+      [IDS.failedEmails.acknowledged, true, 'ada'],
+      [IDS.failedEmails.bulkA, true, 'bola'],
+      [IDS.failedEmails.bulkB, true, 'chike'],
+    ];
+    for (const [id, acknowledged, recipientName] of failedEmails) {
+      await prisma.notificationOutbox.create({
+        data: {
+          id,
+          eventName: 'PaymentConfirmed',
+          channel: NotificationChannel.EMAIL,
+          recipient: `${recipientName}.failed@example.com`,
+          payload: { orderNumber: `ORD-${id}` },
+          effectKey: `${id}:EMAIL`,
+          generation: 1,
+          status: NotificationStatus.FAILED,
+          attempts: 3,
+          lastError: 'SMTP connection timed out',
+          deadLetterAckStatus: acknowledged
+            ? DeadLetterAckStatus.ACKNOWLEDGED
+            : DeadLetterAckStatus.OPEN,
+          deadLetterAckAt: acknowledged ? daysAgo(1) : null,
+          deliveryAttempts: {
+            create: [1, 2, 3].map((attemptNumber) => ({
+              attemptNumber,
+              outcome: NotificationAttemptOutcome.FAILURE,
+              errorClass: 'TimeoutError',
+              errorMessage: 'SMTP connection timed out',
+              durationMs: 30000,
+              startedAt: daysAgo(2),
+              finishedAt: daysAgo(2),
+            })),
+          },
+        },
+      });
+    }
 
     console.log('Seeded deterministic e2e dummy data.');
     console.log('Credentials:');

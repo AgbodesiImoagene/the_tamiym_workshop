@@ -155,7 +155,7 @@ Production-readiness todos:
 Current state:
 
 - Full CRUD at `/v1/designs/*` with JWT auth; admin moderation at `/v1/admin/designs/*`
-- AI moderation (OpenAI `omni-moderation-latest`) on every create/update — three-tier routing; falls back to `PENDING` when no screenable content or API key absent
+- AI moderation (OpenAI `omni-moderation-latest`) on every create/update — three-tier routing; falls back to `PENDING` when no screenable content or API key absent or when `AI_SCREENING_ENABLED` is not `true`/`1` (off by default, TTW-252)
 - `POST /v1/designs/:id/thumbnail` — multipart upload to S3, updates `Design.thumbnailUrl`; no `MediaAsset` record (system derivative)
 - `POST /v1/designs/:id/duplicate` — clones design + `DesignView` rows, resets moderation to `PENDING`
 - `POST /v1/designs/:id/share` — generates a 12-char URL-safe share token; persisted to `Design.shareToken`

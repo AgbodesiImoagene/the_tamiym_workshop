@@ -58,8 +58,11 @@ describe('DesignsService', () => {
   };
   let s3: jest.Mocked<S3Service>;
   let config: { get: jest.Mock };
+  // The existing tests describe the AI-on behaviour: they run with the setting on (TTW-252).
+  let aiScreening: string | undefined;
 
   beforeEach(async () => {
+    aiScreening = 'true';
     const mockPrisma: Record<string, unknown> = {};
     mockPrisma.$transaction = jest.fn(
       async (fn: (tx: unknown) => Promise<unknown>) => fn(mockPrisma),
@@ -125,6 +128,7 @@ describe('DesignsService', () => {
         if (key === 'DESIGN_SHARE_PUBLIC_ORIGIN')
           return 'https://app.example.com';
         if (key === 'API_PUBLIC_URL') return 'https://api.example.com/v1';
+        if (key === 'AI_SCREENING_ENABLED') return aiScreening;
         return undefined;
       }),
     };
@@ -1492,5 +1496,183 @@ describe('DesignsService', () => {
       await service.update('user-1', 'design-1', { name: 'Renamed' });
       expect(prisma.designAsset.findMany).not.toHaveBeenCalled();
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // AI screening turned off (TTW-252)
+  // -------------------------------------------------------------------------
+
+  describe('with AI screening turned off (TTW-252)', () => {
+    const OFF_NOTES = 'AI screening is turned off';
+    const textDesign = {
+      version: 1,
+      views: {
+        front: {
+          productViewId: 'pv-1',
+          layers: [{ type: 'text', content: 'Hello' }],
+        },
+      },
+    };
+    let png: Buffer;
+
+    beforeAll(async () => {
+      png = await sharp({
+        create: { width: 4, height: 4, channels: 3, background: '#ff0000' },
+      })
+        .png()
+        .toBuffer();
+    });
+
+    beforeEach(() => {
+      aiScreening = undefined;
+    });
+
+    it.each([
+      ['unset', undefined],
+      ['false', 'false'],
+      ['a misspelt value', 'yes please'],
+    ])('does not call the AI when the setting is %s', async (_n, value) => {
+      aiScreening = value;
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prod-1',
+        status: 'ACTIVE',
+      });
+      (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+
+      await service.create('user-1', {
+        name: 'D',
+        productId: 'prod-1',
+        designData: textDesign,
+      });
+
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+    });
+
+    it('creates a design that waits for an admin, and records the PENDING decision', async () => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prod-1',
+        status: 'ACTIVE',
+      });
+      (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        productId: 'prod-1',
+      });
+
+      await service.create('user-1', {
+        name: 'D',
+        productId: 'prod-1',
+        designData: textDesign,
+      });
+
+      const createArgs = (prisma.design.create as jest.Mock).mock.calls[0][0];
+      expect(createArgs.data.moderationStatus).toBe(ModerationStatus.PENDING);
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          outcome: ModerationStatus.PENDING,
+          notes: OFF_NOTES,
+          maxScore: 0,
+        }),
+      );
+    });
+
+    it('does not call the AI when the content of a design changes, and records PENDING', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        productId: 'prod-1',
+      });
+      (prisma.design.update as jest.Mock).mockResolvedValue(mockDesign);
+      (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+        mockDesign,
+      );
+      (prisma.productView.findMany as jest.Mock).mockResolvedValue([
+        { id: 'pv-1' },
+      ]);
+
+      await service.update('user-1', 'design-1', { designData: textDesign });
+
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          outcome: ModerationStatus.PENDING,
+          notes: OFF_NOTES,
+        }),
+      );
+    });
+
+    it('does not send the new picture to the AI, and an APPROVED design goes back to PENDING so no unscreened picture is public', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        moderationStatus: ModerationStatus.APPROVED,
+        designData: textDesign,
+      });
+
+      await service.uploadThumbnail('user-1', 'design-1', {
+        buffer: png,
+        mimetype: 'image/png',
+      });
+
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+      expect(moderationDecisions.recordAiDecisionInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          subjectId: 'design-1',
+          outcome: ModerationStatus.PENDING,
+          notes: OFF_NOTES,
+        }),
+      );
+    });
+
+    it('leaves a design that is already waiting or refused as it is when its picture changes', async () => {
+      (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+        ...mockDesign,
+        moderationStatus: ModerationStatus.REJECTED,
+        designData: textDesign,
+      });
+
+      await service.uploadThumbnail('user-1', 'design-1', {
+        buffer: png,
+        mimetype: 'image/png',
+      });
+
+      expect(moderationService.moderate).not.toHaveBeenCalled();
+      expect(moderationDecisions.recordAiDecisionInTx).not.toHaveBeenCalled();
+    });
+
+    it.each([['true'], ['1'], [' TRUE ']])(
+      'calls the AI again when the setting is %j',
+      async (value) => {
+        aiScreening = value;
+        (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+          id: 'prod-1',
+          status: 'ACTIVE',
+        });
+        (prisma.design.create as jest.Mock).mockResolvedValue(mockDesign);
+        (prisma.design.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+          mockDesign,
+        );
+        (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+          productId: 'prod-1',
+        });
+
+        await service.create('user-1', {
+          name: 'D',
+          productId: 'prod-1',
+          designData: textDesign,
+        });
+
+        expect(moderationService.moderate).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 });

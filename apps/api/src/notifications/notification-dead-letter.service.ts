@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AuditAction,
   DeadLetterAckStatus,
   NotificationChannel,
   NotificationStatus,
@@ -12,6 +13,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { ObservabilityService } from '../observability/observability.service';
+import { AuditService } from '../audit/audit.service';
 import {
   maskNotificationRecipient,
   redactAttemptErrorMessage,
@@ -27,6 +29,7 @@ export class NotificationDeadLetterService {
     private readonly dispatch: NotificationDispatchService,
     private readonly observability: ObservabilityService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async listDeadLetters(query: {
@@ -62,12 +65,15 @@ export class NotificationDeadLetterService {
         deadLetterAckAt: true,
         updatedAt: true,
         createdAt: true,
+        _count: { select: { replays: true } },
       },
     });
 
     return {
-      items: rows.map((row) => ({
+      items: rows.map(({ _count, ...row }) => ({
         ...row,
+        // A failure that already has a replay must not be resent again.
+        replayCount: _count.replays,
         recipient: maskNotificationRecipient(row.channel, row.recipient),
         lastError: row.lastError
           ? redactAttemptErrorMessage(row.lastError)
@@ -125,6 +131,14 @@ export class NotificationDeadLetterService {
     if (updated.count === 0) {
       throw new NotFoundException('Dead letter not found.');
     }
+    await this.audit.log({
+      eventName: 'notification.dead_letter.acknowledged',
+      action: AuditAction.UPDATE,
+      entityType: 'NotificationOutbox',
+      entityId: id,
+      actorUserId: adminUserId,
+      note: note?.slice(0, 2000) ?? null,
+    });
     return this.getDeadLetter(id);
   }
 
@@ -151,48 +165,68 @@ export class NotificationDeadLetterService {
       );
     }
 
-    const maxGeneration = await this.prisma.notificationOutbox.aggregate({
-      where: {
-        effectKey: original.effectKey,
-        channel: original.channel,
-      },
-      _max: { generation: true },
-    });
-    const nextGeneration =
-      (maxGeneration._max.generation ?? original.generation) + 1;
+    // A replay always targets the generation right after the one being replayed.
+    // The unique (effectKey, channel, generation) index then lets exactly one
+    // replay of a given failure exist, even when two admins click at once.
+    const nextGeneration = original.generation + 1;
 
-    const sentExists = await this.prisma.notificationOutbox.findFirst({
+    const alreadyReplayed = await this.prisma.notificationOutbox.findFirst({
       where: {
         effectKey: original.effectKey,
         channel: original.channel,
         generation: nextGeneration,
-        status: NotificationStatus.SENT,
-        suppressed: false,
       },
     });
-    if (sentExists) {
-      this.observability.recordNotificationDeadLetterReplay({
-        outcome: 'denied',
-      });
-      throw new BadRequestException(
-        'A successful delivery already exists for the next generation.',
-      );
+    if (alreadyReplayed) {
+      throw this.denyReplay();
     }
 
-    const result = await this.dispatch.dispatch({
-      eventName: original.eventName,
-      channel: original.channel,
-      recipient: original.recipient,
-      recipientUserId: original.recipientUserId,
-      payload: original.payload as Record<string, unknown>,
-      effectKey: original.effectKey,
-      generation: nextGeneration,
-      replayedFromId: original.id,
-      forceQueue: true,
-    });
+    let result: Awaited<ReturnType<NotificationDispatchService['dispatch']>>;
+    try {
+      result = await this.dispatch.dispatch({
+        eventName: original.eventName,
+        channel: original.channel,
+        recipient: original.recipient,
+        recipientUserId: original.recipientUserId,
+        payload: original.payload as Record<string, unknown>,
+        effectKey: original.effectKey,
+        generation: nextGeneration,
+        replayedFromId: original.id,
+        forceQueue: true,
+      });
+    } catch (error) {
+      // Lost the race on the unique index: the other replay won.
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        (error as { code?: string }).code === 'P2002'
+      ) {
+        throw this.denyReplay();
+      }
+      throw error;
+    }
+    // Dispatch found the row the other replay had just created.
+    if (result.idempotentReuse) {
+      throw this.denyReplay();
+    }
 
     this.observability.recordNotificationDeadLetterReplay({
       outcome: 'success',
+    });
+    await this.audit.log({
+      eventName: 'notification.dead_letter.replayed',
+      action: AuditAction.CREATE,
+      entityType: 'NotificationOutbox',
+      entityId: original.id,
+      targetType: 'NotificationOutbox',
+      targetId: result.outboxId,
+      actorUserId: adminUserId,
+      note: trimmedReason,
+      metadata: {
+        channel: original.channel,
+        eventName: original.eventName,
+        generation: nextGeneration,
+      },
     });
 
     return {
@@ -200,6 +234,15 @@ export class NotificationDeadLetterService {
       generation: nextGeneration,
       queued: result.queued,
     };
+  }
+
+  private denyReplay(): BadRequestException {
+    this.observability.recordNotificationDeadLetterReplay({
+      outcome: 'denied',
+    });
+    return new BadRequestException(
+      'This failure was already resent. Resend its latest generation instead.',
+    );
   }
 
   async replayDeadLettersBulk(

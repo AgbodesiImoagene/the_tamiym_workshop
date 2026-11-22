@@ -66,7 +66,7 @@ Minimum API env vars (example names):
 - `DATABASE_URL`
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
-- `PAYSTACK_SECRET_KEY`
+- `PAYSTACK_SECRET_KEY` (required in production: the API refuses to start without a real value)
 - `PAYSTACK_WEBHOOK_SECRET` (or signature verification secret mechanism)
 - `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` (if using S3-compatible storage)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (if using OTel collector)

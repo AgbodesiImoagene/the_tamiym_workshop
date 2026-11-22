@@ -3,12 +3,25 @@
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
 import { OrderStatusBanner } from '@/components/order-status-banner';
 import { ApiError, User, authApi } from '@/lib/auth';
-import { cancelCustomerOrder, getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
+import {
+  cancelCustomerOrder,
+  downloadOrderInvoice,
+  getCustomerOrderDetail,
+  initiateOrderPayment,
+} from '@/lib/checkout';
 import { OrderStatus, PaymentStatus } from '@tamiym/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+/** Statuses of a paid order that can be invoiced (TTW-108). Mirrors the API's rule. */
+const INVOICEABLE_STATUSES: string[] = [
+  OrderStatus.PAID,
+  OrderStatus.PROCESSING,
+  OrderStatus.FULFILLED,
+  OrderStatus.DELIVERED,
+];
 
 export default function DashboardOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -21,6 +34,8 @@ export default function DashboardOrderDetailPage() {
   const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -90,6 +105,30 @@ export default function DashboardOrderDetailPage() {
       void orderQuery.refetch();
     } finally {
       setIsCancelling(false);
+    }
+  }
+
+  async function handleDownloadInvoice() {
+    if (isDownloadingInvoice) {
+      return;
+    }
+    setInvoiceError(null);
+    setIsDownloadingInvoice(true);
+    try {
+      const file = await downloadOrderInvoice(params.id);
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `invoice-${params.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const apiError = err as ApiError;
+      setInvoiceError(apiError.message || 'We could not prepare this invoice.');
+    } finally {
+      setIsDownloadingInvoice(false);
     }
   }
 
@@ -334,6 +373,17 @@ export default function DashboardOrderDetailPage() {
                 >
                   Refresh
                 </button>
+                {order.paymentStatus === PaymentStatus.SUCCEEDED &&
+                INVOICEABLE_STATUSES.includes(order.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleDownloadInvoice()}
+                    disabled={isDownloadingInvoice}
+                    className="inline-flex rounded-lg border border-border px-5 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+                  >
+                    {isDownloadingInvoice ? 'Preparing invoice...' : 'Download invoice'}
+                  </button>
+                ) : null}
                 {order.paymentRetryEligible ? (
                   <button
                     type="button"
@@ -396,6 +446,11 @@ export default function DashboardOrderDetailPage() {
                     </button>
                   </div>
                 </div>
+              ) : null}
+              {invoiceError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {invoiceError}
+                </p>
               ) : null}
               {cancelError ? (
                 <p role="alert" className="text-sm text-destructive">

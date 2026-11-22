@@ -168,3 +168,8 @@ export async function getCustomerOrderDetail(orderId: string) {
 export async function cancelCustomerOrder(orderId: string) {
   return apiClient.post<CustomerOrderDetail>(`/orders/${orderId}/cancel`, {});
 }
+
+/** Download the VAT invoice of one of my paid orders (TTW-108). Returns the PDF. */
+export async function downloadOrderInvoice(orderId: string): Promise<Blob> {
+  return apiClient.getBlob(`/orders/${orderId}/invoice`);
+}
