@@ -280,6 +280,7 @@ export class ObservabilityService {
   constructor() {
     this.chargeSettlements.add(0, { outcome: 'late_captured' });
     this.chargeSettlements.add(0, { outcome: 'extra_capture' });
+    this.chargeSettlements.add(0, { outcome: 'malformed' });
   }
 
   recordChargeSettlement(
@@ -288,7 +289,8 @@ export class ObservabilityService {
       | 'duplicate'
       | 'rejected'
       | 'late_captured'
-      | 'extra_capture',
+      | 'extra_capture'
+      | 'malformed',
   ): void {
     this.chargeSettlements.add(1, { outcome });
   }
