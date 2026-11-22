@@ -115,7 +115,7 @@ export default function AdminOrderDetailPage() {
                     Order ID
                   </p>
                   <p className="mt-2 text-sm font-semibold text-tamiym-blue">{order.id}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2" data-testid="admin-order-status">
                     <AdminStatusBadge value={order.status} />
                     <AdminStatusBadge value={order.paymentStatus} />
                   </div>

@@ -104,7 +104,8 @@ export function AdminOrderShipments({
   const keyFor = (intent: string) => {
     let key = keys.current.get(intent);
     if (!key) {
-      key = `admin-shipment:${intent}:${crypto.randomUUID()}`;
+      // The map key holds the full intent; the sent key stays short (the API allows 128).
+      key = `admin-shipment:${crypto.randomUUID()}`;
       keys.current.set(intent, key);
     }
     return key;
@@ -122,10 +123,12 @@ export function AdminOrderShipments({
           ? new Date(estimatedDeliveryAt).toISOString()
           : undefined,
         privateNotes: privateNotes.trim() || undefined,
-        idempotencyKey: keyFor(`create:${orderId}`),
+        idempotencyKey: keyFor(
+          `create:${orderId}:${JSON.stringify([carrierCode, serviceCode, estimatedDeliveryAt, privateNotes])}`
+        ),
       }),
     onSuccess: async () => {
-      keys.current.delete(`create:${orderId}`);
+      keys.current.clear();
       setMessage('Shipment created.');
       setError(null);
       setServiceCode('');
@@ -133,34 +136,41 @@ export function AdminOrderShipments({
       setPrivateNotes('');
       await onChanged();
     },
-    onError: (e: Error) => {
+    onError: async (e: Error) => {
       setError(e.message || 'We could not create the shipment.');
       setMessage(null);
+      // The server may have saved the shipment before the answer was lost: show the truth.
+      await onChanged();
     },
   });
 
   const statusMutation = useMutation({
     mutationFn: (input: { shipment: AdminShipment; status: string }) => {
-      const intent = `${input.shipment.id}:${input.status}`;
-      return updateAdminShipmentStatus(input.shipment.id, {
+      const body = {
         status: input.status,
-        idempotencyKey: keyFor(intent),
         trackingNumber: trackingNumber.trim() || undefined,
         trackingUrl: trackingUrl.trim() || undefined,
         exceptionCode: input.status === ShipmentStatus.EXCEPTION ? exceptionCode : undefined,
         customerMessage: customerMessage.trim() || undefined,
+      };
+      // The key depends on the values sent: an exact retry reuses it, an edited form gets a
+      // new one, so the API never answers an edited request with the old result.
+      return updateAdminShipmentStatus(input.shipment.id, {
+        ...body,
+        idempotencyKey: keyFor(`${input.shipment.id}:${JSON.stringify(body)}`),
       });
     },
     onSuccess: async (_data, input) => {
-      keys.current.delete(`${input.shipment.id}:${input.status}`);
+      keys.current.clear();
       setMessage(`Shipment updated: ${label(input.status)}.`);
       setError(null);
       setOpenAction(null);
       await onChanged();
     },
-    onError: (e: Error) => {
+    onError: async (e: Error) => {
       setError(e.message || 'We could not update the shipment.');
       setMessage(null);
+      await onChanged();
     },
   });
 
@@ -387,7 +397,7 @@ export function AdminOrderShipments({
         ) : null}
 
         {message ? (
-          <p role="status" className="text-sm text-emerald-700">
+          <p role="status" className="text-sm text-foreground">
             {message}
           </p>
         ) : null}

@@ -26,7 +26,7 @@ test.describe('Admin shipment journey @journey @admin @critical', () => {
     await panel.getByLabel('Carrier').selectOption('MANUAL');
     await panel.getByRole('button', { name: 'Create shipment' }).click();
     await expect(panel.getByRole('status')).toHaveText('Shipment created.');
-    await expect(adminPage.getByText('FULFILLED').first()).toBeVisible();
+    await expect(adminPage.getByTestId('admin-order-status')).toContainText(/fulfilled/i);
 
     await panel.getByRole('button', { name: 'Mark as shipped' }).click();
     // A tracking number is required to ship: the confirm button stays disabled without it.
@@ -43,7 +43,7 @@ test.describe('Admin shipment journey @journey @admin @critical', () => {
     await expect(panel.getByText('This shipment is closed.')).toBeVisible();
     const history = panel.getByRole('list', { name: 'Shipment history' });
     await expect(history.getByRole('listitem')).toHaveCount(3);
-    await expect(adminPage.getByText('DELIVERED').first()).toBeVisible();
+    await expect(adminPage.getByTestId('admin-order-status')).toContainText(/delivered/i);
   });
 
   test('the customer sees the shipment timeline on the order page', async ({ customerPage }) => {

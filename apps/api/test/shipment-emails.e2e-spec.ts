@@ -130,6 +130,61 @@ describe('Shipment emails (e2e)', () => {
     expect(rows[0].dedupeKey).toBe(`OrderFulfilled:${order.id}`);
   });
 
+  it('a cancelled then recreated shipment writes no second OrderFulfilled row', async () => {
+    const { user, order } = await seedProcessingOrder();
+    const first = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `first-${order.id}` },
+      user.id,
+    );
+    await shipments.updateStatus(
+      first.id,
+      { status: 'CANCELLED', idempotencyKey: `cancel-${order.id}` },
+      user.id,
+    );
+    await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `second-${order.id}` },
+      user.id,
+    );
+
+    const rows = await emailRows(order.id);
+    expect(rows.map((r) => r.dedupeKey)).toEqual([
+      `OrderFulfilled:${order.id}`,
+    ]);
+  });
+
+  it('an email row that already exists rolls the whole create back', async () => {
+    const { user, order } = await seedProcessingOrder();
+    await prisma.notificationOutbox.create({
+      data: {
+        eventName: 'OrderFulfilled',
+        channel: 'EMAIL',
+        recipient: user.email,
+        recipientUserId: user.id,
+        dedupeKey: `OrderFulfilled:${order.id}`,
+        payload: { orderId: order.id },
+      },
+    });
+
+    await expect(
+      shipments.createForOrder(
+        order.id,
+        { carrierCode: 'MANUAL', idempotencyKey: `clash-${order.id}` },
+        user.id,
+      ),
+    ).rejects.toBeDefined();
+
+    const after = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    expect(after.status).toBe(OrderStatus.PROCESSING);
+    expect(await prisma.shipment.count({ where: { orderId: order.id } })).toBe(
+      0,
+    );
+    expect(await emailRows(order.id)).toHaveLength(1);
+  });
+
   it('two admins delivering at once write one OrderDelivered row', async () => {
     const { user, order } = await seedProcessingOrder();
     const shipment = await shipments.createForOrder(

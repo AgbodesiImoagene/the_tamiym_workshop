@@ -1,7 +1,7 @@
 # TTW-106 — Build the admin shipment screen
 
 **Epic:** 8 — Client review delivery\
-**Status:** Implemented, awaiting independent review\
+**Status:** Implemented, review PASS with fixes applied\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** TTW-121
@@ -49,7 +49,7 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 - [x] An admin can take a paid order to delivered, and the customer receives the emails.
 - [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
 - [x] Required quality gates pass, with evidence recorded below.
-- [ ] Independent review of the implementation (High risk: design, implementation and security) reached PASS. Not done yet.
+- [x] Independent review of the implementation (High risk: implementation and security charter) reached PASS; its findings were fixed (see below).
 
 ## Out of scope
 
@@ -70,7 +70,19 @@ Threat and failure notes: all routes already require the ADMIN role and CSRF; pr
 
 ## Implementation reviews
 
-Pending: no independent review has been run yet.
+One independent reviewer (fresh session, read-only, implementation + security charter), 2026-11-22. Verdict **PASS**, no blocker. Security: no issue (private notes are not in the customer summary; the outbox payload holds only the order id and first name).
+
+Findings and what was done:
+
+- Important, trivial Playwright assertions (`getByText('FULFILLED')` matched the status guide text): fixed. They now check the order status badge (`data-testid="admin-order-status"`).
+- Minor, hard-coded `text-emerald-700`: replaced with `text-foreground`.
+- Minor, an edited form reused the old idempotency key, so the API could answer with the old result: the key now depends on the values sent (exact retry reuses it, an edit gets a new one). Cleared after a success.
+- Minor, the screen was not refreshed after a failed call whose result may have been saved: both mutations now refresh the order on error.
+- Missing tests: added to `shipment-emails.e2e-spec.ts` a cancelled-then-recreated shipment (one `OrderFulfilled` row only) and a pre-existing email row (whole create rolls back: order still PROCESSING, no shipment).
+- Not changed: the P2002 branch of `updateStatus` still words any unmatched unique error as "Tracking number already used" (existing behaviour, no real path found to hit it with `dedupeKey`); a failed queue hand-off after commit answers 500 although the change is saved (existing; the outbox backfill requeues the row, and a retry is safe). Left for a separate ticket if wanted.
+- Not added: a Playwright failure scenario and a "Report a problem" journey.
+
+The full review was not repeated after the fixes; the fixes were checked with the commands below.
 
 ## Verification evidence
 
@@ -78,7 +90,7 @@ Run in the worktree `.claude/worktrees/ttw-106`, Node 24.22.1, on a throwaway da
 
 - Tests first, failing for the right reason: `shipments.service.spec.ts` (2 new tests) failed on missing `dedupeKey`; `apps/api/test/shipment-emails.e2e-spec.ts` failed 3/3 on the old service (`Received length: 0`, no row with the key). Both pass after the change.
 - `pnpm --filter api test -- src/shipments src/admin/admin-shipments`: 26 passed.
-- `pnpm --filter api test:e2e -- test/shipment-emails.e2e-spec.ts` (real Postgres): 3 passed: one `OrderFulfilled` and one `OrderDelivered` row over the whole journey; a replayed create writes one row; two admins delivering at once write one `OrderDelivered` row.
+- `pnpm --filter api test:e2e -- test/shipment-emails.e2e-spec.ts` (real Postgres): 5 passed after the review: one `OrderFulfilled` and one `OrderDelivered` row over the whole journey; a replayed create writes one row; a cancelled then recreated shipment writes no second row; an existing email row rolls the create back; two admins delivering at once write one `OrderDelivered` row.
 - `pnpm exec playwright test tests/e2e/journeys/admin-shipment.journey.spec.ts --project=setup --project=chromium-journeys`: 12 passed (9 setup, 3 journey tests: status list, create → shipped → delivered, customer timeline). The UI journey was not run before the screen existed.
 - `pnpm typecheck` 6/6, `pnpm lint` 6/6 (warnings only, none new), `pnpm format:check` clean, `pnpm test` (web 84, app 323, api 2115 passed), `pnpm openapi:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm coverage:ratchet` (lines 85.56% over floor 56%), `pnpm coverage:diff` 12/12 lines (100%), `pnpm build` exit 0.
 
