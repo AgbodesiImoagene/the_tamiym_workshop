@@ -428,23 +428,6 @@ describe('ShipmentsService', () => {
         expect(prisma.notificationOutbox.createMany).not.toHaveBeenCalled();
         expect(outbox.enqueueDelivery).not.toHaveBeenCalled();
       });
-
-      it('writes no email when the customer has no address', async () => {
-        prisma.shipment.findUnique
-          .mockResolvedValueOnce({
-            ...baseShipment,
-            order: { ...baseShipment.order, user: null },
-          })
-          .mockResolvedValueOnce({
-            ...baseShipment,
-            status: ShipmentStatus.DISPATCHED,
-            events: [],
-          });
-
-        await service.updateStatus('ship-1', dispatchDto, 'admin-1');
-
-        expect(prisma.notificationOutbox.createMany).not.toHaveBeenCalled();
-      });
     });
 
     it('dispatches with tracking and audits', async () => {

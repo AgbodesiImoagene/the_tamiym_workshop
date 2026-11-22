@@ -613,15 +613,14 @@ export class ShipmentsService {
    * event) makes the row exist once per order: a second insert (for example the
    * dispatch of a second shipment after a cancelled one) is skipped instead of
    * rolling the shipment change back. Returns the new row id, or null when
-   * nothing was written (no address, or the row already exists).
+   * nothing was written (the row already exists, or the status has no email).
    */
   private async createOrderStatusEmailRow(
     tx: Prisma.TransactionClient,
     orderId: string,
-    user: { id: string; email: string; firstName: string } | null | undefined,
+    user: { id: string; email: string; firstName: string },
     newStatus: OrderStatus,
   ): Promise<string | null> {
-    if (!user?.email) return null;
     const eventName =
       newStatus === OrderStatus.FULFILLED
         ? OUTBOX_EVENT_ORDER_FULFILLED
