@@ -11,8 +11,14 @@ import {
   ModerationAppealStatus,
   ModerationStatus,
   ModerationSubjectType,
+  NotificationChannel,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  OUTBOX_EVENT_DESIGN_MODERATION_APPROVED,
+  OUTBOX_EVENT_DESIGN_MODERATION_REJECTED,
+} from '../mail/mail-outbox-templates';
+import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import {
   APPEAL_STATEMENT_MAX_CHARS,
   APPEAL_WINDOW_MS,
@@ -56,7 +62,10 @@ type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class ModerationDecisionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationDispatchService,
+  ) {}
 
   async recordDecision(input: RecordDecisionInput) {
     return this.prisma.$transaction((tx) => this.recordDecisionInTx(tx, input));
@@ -106,6 +115,7 @@ export class ModerationDecisionService {
       },
     });
 
+    await this.queueDesignDecisionEmail(tx, input, decision.id);
     await this.applyProjection(tx, input, customerExplanation);
 
     return decision;
@@ -552,6 +562,80 @@ export class ModerationDecisionService {
       data: {
         status: ModerationAppealStatus.WITHDRAWN,
         withdrawnAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * TTW-109: tell the design owner about a human decision (admin or appeal
+   * resolution) through the outbox, in the same transaction as the decision.
+   * The email carries no moderation notes: only the design, product and first
+   * name. `dedupeKey` ties it to the decision row, so it cannot be sent twice.
+   * An admin repeating what an earlier human decision already said sends
+   * nothing (an earlier automatic decision does not count: the owner was never
+   * emailed for it). An appeal resolved to APPROVED or REJECTED always answers
+   * the appellant; one resolved to FLAGGED or PENDING sends nothing.
+   */
+  private async queueDesignDecisionEmail(
+    tx: Tx,
+    input: RecordDecisionInput,
+    decisionId: string,
+  ) {
+    if (input.subjectType !== ModerationSubjectType.DESIGN) return;
+    const eventName =
+      input.outcome === ModerationStatus.APPROVED
+        ? OUTBOX_EVENT_DESIGN_MODERATION_APPROVED
+        : input.outcome === ModerationStatus.REJECTED
+          ? OUTBOX_EVENT_DESIGN_MODERATION_REJECTED
+          : null;
+    const human =
+      input.actorKind === ModerationActorKind.ADMIN ||
+      input.actorKind === ModerationActorKind.APPEAL_RESOLUTION;
+    if (!eventName || !human) return;
+
+    // Serialise concurrent decisions on this design so the "already said" check
+    // below cannot be raced.
+    await tx.$queryRaw`SELECT id FROM designs WHERE id = ${input.subjectId} FOR UPDATE`;
+    const design = await tx.design.findUnique({
+      where: { id: input.subjectId },
+      select: {
+        name: true,
+        product: { select: { name: true } },
+        user: { select: { id: true, email: true, firstName: true } },
+      },
+    });
+    if (!design) return;
+    if (input.actorKind === ModerationActorKind.ADMIN) {
+      const previous = await tx.moderationDecision.findFirst({
+        where: {
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          id: { not: decisionId },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { outcome: true, actorKind: true },
+      });
+      if (
+        previous?.outcome === input.outcome &&
+        (previous.actorKind === ModerationActorKind.ADMIN ||
+          previous.actorKind === ModerationActorKind.APPEAL_RESOLUTION)
+      ) {
+        return;
+      }
+    }
+
+    await this.notifications.dispatch({
+      tx,
+      eventName,
+      channel: NotificationChannel.EMAIL,
+      recipient: design.user.email,
+      recipientUserId: design.user.id,
+      dedupeKey: `${eventName}:${decisionId}`,
+      payload: {
+        designId: input.subjectId,
+        designName: design.name,
+        productName: design.product?.name ?? '',
+        firstName: design.user.firstName,
       },
     });
   }
