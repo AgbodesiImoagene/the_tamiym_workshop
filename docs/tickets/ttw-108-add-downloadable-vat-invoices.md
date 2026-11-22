@@ -1,7 +1,7 @@
 # TTW-108 — Add downloadable VAT invoices
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -158,4 +158,11 @@ Not verified: invoice numbering on a database with real production volume; behav
 
 ## Completion summary
 
-A customer can download a numbered PDF VAT invoice from a paid order page. Invoices are stored with a full snapshot, numbered without gaps from a counter updated in the same transaction, and refused at the database for any update or delete. An admin sets the seller name, address and tax number under Settings; until they are set, no invoice is issued. Remaining before merge: the independent review, the real seller details from the client, and the follow-ups listed above.
+A customer can download a numbered PDF VAT invoice from a paid order page. Invoices are stored with a full snapshot, numbered without gaps from a counter updated in the same transaction (after locking the order row), and refused at the database for any update or delete. An admin sets the seller name, address and tax number under Settings; until they are set, no invoice is issued.
+
+Merged into `main` on 2026-11-22 (merge `938cc75`). Branch CI green: https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/45071762714. CI on `main` green: CI https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/45074322221 and Playwright Comprehensive https://github.com/AgbodesiImoagene/the_tamiym_workshop/actions/runs/45074322258.
+
+Still open:
+
+- The client must give the real seller legal name, address and tax number. Until they are saved in Settings, customers get "Invoices are not available yet".
+- Follow-ups left as they are (see the reviews above): issuing on a `GET`, an `invoiceAvailable` flag on the order DTO, the saved file name, fonts beyond Latin-1, the issue date in UTC, credit notes for refunds, an admin button for the invoice.
