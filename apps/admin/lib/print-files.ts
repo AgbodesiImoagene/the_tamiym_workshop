@@ -25,8 +25,15 @@ interface LayerGeometry {
   angle?: number;
   flipX?: boolean;
   flipY?: boolean;
+  skewX?: number;
+  skewY?: number;
   originX?: string;
   originY?: string;
+  opacity?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  backgroundColor?: string;
 }
 
 export interface PrintFileFacts {
@@ -40,6 +47,8 @@ export interface PrintFileFacts {
 export type PrintImageLayer = LayerGeometry & {
   kind: 'image';
   designAssetId: string;
+  cropX?: number;
+  cropY?: number;
   previewPath: string;
   originalLinkPath: string;
   file: PrintFileFacts | null;
@@ -51,8 +60,14 @@ export type PrintTextLayer = LayerGeometry & {
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
-  fill?: string;
+  fontStyle?: string;
   textAlign?: string;
+  lineHeight?: number;
+  charSpacing?: number;
+  underline?: boolean;
+  overline?: boolean;
+  linethrough?: boolean;
+  textBackgroundColor?: string;
 };
 
 export type PrintLayer = PrintImageLayer | PrintTextLayer;
@@ -109,6 +124,15 @@ export function layerBox(layer: LayerGeometry) {
     layer.originY === 'center' ? top - height / 2 : layer.originY === 'bottom' ? top - height : top;
   // Fabric turns a layer around its origin point (left, top), not around a corner of the box.
   return { x, y, width, height, angle: layer.angle ?? 0, pivotX: left, pivotY: top };
+}
+
+/** SVG transform that mirrors a layer inside its box, as Fabric's flipX and flipY do. */
+export function flipTransform(layer: LayerGeometry): string | undefined {
+  const box = layerBox(layer);
+  const parts: string[] = [];
+  if (layer.flipX) parts.push(`translate(${2 * box.x + box.width} 0) scale(-1 1)`);
+  if (layer.flipY) parts.push(`translate(0 ${2 * box.y + box.height}) scale(1 -1)`);
+  return parts.length > 0 ? parts.join(' ') : undefined;
 }
 
 export interface PrintLink {

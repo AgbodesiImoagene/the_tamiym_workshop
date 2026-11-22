@@ -1618,6 +1618,8 @@ async function main() {
                     text: 'Choir Tour 2026',
                     fontFamily: 'Inter',
                     fontSize: 32,
+                    fontStyle: 'italic',
+                    underline: true,
                     fill: '#112233',
                     left: 60,
                     top: 260,

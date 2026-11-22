@@ -261,6 +261,7 @@ describe('Order print files (e2e)', () => {
     type: 'IText',
     text,
     fontFamily: 'Inter',
+    fontStyle: 'italic', // every text of the editor carries it
     fontSize: 40,
     fill: '#112233',
     left: 50,
@@ -497,6 +498,12 @@ describe('Order print files (e2e)', () => {
         view.layers.filter((l) => l.kind === 'text').map((l) => l.text),
     );
     expect(texts).toEqual(['Original text', 'Back text']);
+
+    const styles = res.body.items[0].printFiles.views.flatMap(
+      (view: { layers: Array<{ kind: string; fontStyle?: string }> }) =>
+        view.layers.filter((l) => l.kind === 'text').map((l) => l.fontStyle),
+    );
+    expect(styles).toEqual(['italic', 'italic']);
   });
 
   // Today the originals of a paid order cannot disappear with the account: the order keeps

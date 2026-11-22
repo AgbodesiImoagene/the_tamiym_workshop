@@ -40,6 +40,7 @@ export interface SnapshotDesignInput {
   designData: unknown;
 }
 
+/** What every layer carries: where it is, how it is drawn. */
 type Geometry = {
   left?: number;
   top?: number;
@@ -50,13 +51,22 @@ type Geometry = {
   angle?: number;
   flipX?: boolean;
   flipY?: boolean;
+  skewX?: number;
+  skewY?: number;
   originX?: string;
   originY?: string;
+  opacity?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  backgroundColor?: string;
 };
 
 export type SnapshotImageLayer = Geometry & {
   kind: 'image';
   designAssetId: string;
+  cropX?: number;
+  cropY?: number;
 };
 
 export type SnapshotTextLayer = Geometry & {
@@ -65,8 +75,14 @@ export type SnapshotTextLayer = Geometry & {
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
-  fill?: string;
+  fontStyle?: string;
   textAlign?: string;
+  lineHeight?: number;
+  charSpacing?: number;
+  underline?: boolean;
+  overline?: boolean;
+  linethrough?: boolean;
+  textBackgroundColor?: string;
 };
 
 export type SnapshotLayer = SnapshotImageLayer | SnapshotTextLayer;
@@ -119,7 +135,95 @@ function compact<T extends Record<string, unknown>>(input: T): T {
   ) as T;
 }
 
-function geometryOf(layer: Record<string, unknown>): Geometry {
+/**
+ * Every field the save-time check accepts on a layer is decided here (TTW-101). KEPT: copied
+ * into the frozen design, or applied (`visible: false` skips the layer). DROPPED: left out on
+ * purpose, with the reason. `order-item-design-snapshot.fields.spec.ts` fails when the
+ * validator accepts a field that is in neither list, so nothing is lost by accident.
+ */
+const KEPT_BOTH = [
+  'originX',
+  'originY',
+  'left',
+  'top',
+  'width',
+  'height',
+  'scaleX',
+  'scaleY',
+  'angle',
+  'flipX',
+  'flipY',
+  'skewX',
+  'skewY',
+  'opacity',
+  'fill',
+  'stroke',
+  'strokeWidth',
+  'backgroundColor',
+  'visible',
+];
+/** Not set from the workshop, not part of what is printed, or read elsewhere. */
+const DROPPED_BOTH = [
+  'type', // read to choose the kind of layer
+  'version', // Fabric's own version string
+  'strokeDashArray',
+  'strokeLineCap',
+  'strokeDashOffset',
+  'strokeLineJoin',
+  'strokeUniform',
+  'strokeMiterLimit',
+  'shadow', // only null is accepted
+  'fillRule',
+  'paintFirst',
+  'globalCompositeOperation',
+  'selectable', // editor state
+];
+
+export const SNAPSHOT_KEPT_FIELDS: Record<'text' | 'image', readonly string[]> =
+  {
+    text: [
+      ...KEPT_BOTH,
+      'text',
+      'fontFamily',
+      'fontSize',
+      'fontWeight',
+      'fontStyle',
+      'textAlign',
+      'lineHeight',
+      'charSpacing',
+      'underline',
+      'overline',
+      'linethrough',
+      'textBackgroundColor',
+    ],
+    image: [...KEPT_BOTH, 'cropX', 'cropY'],
+  };
+
+export const SNAPSHOT_DROPPED_FIELDS: Record<
+  'text' | 'image',
+  readonly string[]
+> = {
+  text: [
+    ...DROPPED_BOTH,
+    'editable', // editor state
+    // Per-character styles: the workshop only styles a whole text, so it saves none. Kept
+    // out so the copy stays a flat, bounded list; revisit if the editor ever offers them.
+    'styles',
+    'pathStartOffset', // text on a path is not offered by the workshop
+    'pathSide',
+    'pathAlign',
+    'direction',
+    'textDecorationThickness',
+    'minWidth',
+    'splitByGrapheme',
+  ],
+  image: [
+    ...DROPPED_BOTH,
+    'filters', // only an empty list is accepted
+  ],
+};
+
+function commonOf(layer: Record<string, unknown>): Geometry {
   return {
     left: pickNumber(layer, 'left'),
     top: pickNumber(layer, 'top'),
@@ -130,8 +234,15 @@ function geometryOf(layer: Record<string, unknown>): Geometry {
     angle: pickNumber(layer, 'angle'),
     flipX: pickBoolean(layer, 'flipX'),
     flipY: pickBoolean(layer, 'flipY'),
+    skewX: pickNumber(layer, 'skewX'),
+    skewY: pickNumber(layer, 'skewY'),
     originX: pickString(layer, 'originX', 20),
     originY: pickString(layer, 'originY', 20),
+    opacity: pickNumber(layer, 'opacity'),
+    fill: pickString(layer, 'fill', MAX_SHORT),
+    stroke: pickString(layer, 'stroke', MAX_SHORT),
+    strokeWidth: pickNumber(layer, 'strokeWidth'),
+    backgroundColor: pickString(layer, 'backgroundColor', MAX_SHORT),
   };
 }
 
@@ -146,6 +257,8 @@ function assetIdOf(layer: Record<string, unknown>): string | undefined {
 
 function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
   if (!isRecord(raw)) return null;
+  // A layer the customer hid is not printed.
+  if (raw['visible'] === false) return null;
   // Same type rules as the save-time check: the workshop's text is an `IText`.
   const kind = layerKindOf(raw['type']);
 
@@ -156,12 +269,16 @@ function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
     return compact({
       kind: 'image' as const,
       designAssetId,
-      ...geometryOf(raw),
+      cropX: pickNumber(raw, 'cropX'),
+      cropY: pickNumber(raw, 'cropY'),
+      ...commonOf(raw),
     });
   }
 
   if (kind === 'text') {
-    const text = pickString(raw, 'text', MAX_TEXT);
+    // A legacy text layer says `content` where the editor says `text`.
+    const text =
+      pickString(raw, 'text', MAX_TEXT) ?? pickString(raw, 'content', MAX_TEXT);
     if (text === undefined) return null;
     return compact({
       kind: 'text' as const,
@@ -169,9 +286,15 @@ function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
       fontFamily: pickString(raw, 'fontFamily', MAX_SHORT),
       fontSize: pickNumber(raw, 'fontSize'),
       fontWeight: pickString(raw, 'fontWeight', 20),
-      fill: pickString(raw, 'fill', MAX_SHORT),
+      fontStyle: pickString(raw, 'fontStyle', 20),
       textAlign: pickString(raw, 'textAlign', 20),
-      ...geometryOf(raw),
+      lineHeight: pickNumber(raw, 'lineHeight'),
+      charSpacing: pickNumber(raw, 'charSpacing'),
+      underline: pickBoolean(raw, 'underline'),
+      overline: pickBoolean(raw, 'overline'),
+      linethrough: pickBoolean(raw, 'linethrough'),
+      textBackgroundColor: pickString(raw, 'textBackgroundColor', MAX_SHORT),
+      ...commonOf(raw),
     });
   }
 
@@ -180,16 +303,20 @@ function toSnapshotLayer(raw: unknown): SnapshotLayer | null {
 
 function layersOfView(view: Record<string, unknown>): SnapshotLayer[] {
   const fabricJson = view['fabricJson'];
-  const objects =
+  const fromFabric =
     isRecord(fabricJson) && Array.isArray(fabricJson['objects'])
       ? fabricJson['objects']
-      : Array.isArray(view['layers'])
-        ? view['layers'] // legacy format, same rules per layer
-        : [];
-  return objects.flatMap((object) => {
-    const layer = toSnapshotLayer(object);
-    return layer ? [layer] : [];
-  });
+      : [];
+  // Legacy format, same rules per layer. Used when `fabricJson` has nothing to print.
+  const legacy = Array.isArray(view['layers']) ? view['layers'] : [];
+  for (const objects of [fromFabric, legacy]) {
+    const layers = objects.flatMap((object) => {
+      const layer = toSnapshotLayer(object);
+      return layer ? [layer] : [];
+    });
+    if (layers.length > 0) return layers;
+  }
+  return [];
 }
 
 /**
@@ -204,11 +331,25 @@ export function buildDesignSnapshot(
   const data = isRecord(design.designData) ? design.designData : {};
   const rawViews = isRecord(data['views']) ? data['views'] : {};
 
+  // A side is found by the product view key, else by its product view id: an admin may
+  // rename a product view after the customer saved, and the side must not vanish with it.
+  const productKeys = new Set(productViews.map((v) => v.key));
+  const rawFor = (productView: SnapshotProductView) => {
+    const byKey = rawViews[productView.key];
+    if (isRecord(byKey)) return byKey;
+    return Object.entries(rawViews).find(
+      ([key, value]) =>
+        !productKeys.has(key) &&
+        isRecord(value) &&
+        value['productViewId'] === productView.id,
+    )?.[1];
+  };
+
   const views: SnapshotView[] = [];
   for (const productView of [...productViews].sort(
     (a, b) => a.sortOrder - b.sortOrder,
   )) {
-    const raw = rawViews[productView.key];
+    const raw = rawFor(productView);
     if (!isRecord(raw)) continue;
     const layers = layersOfView(raw);
     if (layers.length === 0) continue;

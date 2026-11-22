@@ -5,12 +5,14 @@ import { formatBytes } from '@/lib/media';
 import {
   PRINT_CANVAS_SIZE,
   apiPathHref,
+  flipTransform,
   getOriginalFileLink,
   layerBox,
   printAreaInCanvas,
   type PrintFiles,
   type PrintImageLayer,
   type PrintLayer,
+  type PrintTextLayer,
   type PrintView,
 } from '@/lib/print-files';
 import { Button } from '@tamiym/ui';
@@ -18,6 +20,18 @@ import { useState } from 'react';
 
 function toTextAlign(value: string | undefined): 'left' | 'center' | 'right' | 'justify' {
   return value === 'center' || value === 'right' || value === 'justify' ? value : 'left';
+}
+
+/** Fabric draws a line of text about 1.13 times its font size high, on top of `lineHeight`. */
+const FABRIC_FONT_HEIGHT_FACTOR = 1.13;
+
+function textDecoration(layer: PrintTextLayer): string | undefined {
+  const lines = [
+    layer.underline ? 'underline' : null,
+    layer.overline ? 'overline' : null,
+    layer.linethrough ? 'line-through' : null,
+  ].filter(Boolean);
+  return lines.length > 0 ? lines.join(' ') : undefined;
 }
 
 /** One side of the design, drawn from the frozen layers: a layout preview, not a render. */
@@ -52,27 +66,29 @@ function SidePreview({ view }: { view: PrintView }) {
           const broken = failed.has(layer.designAssetId);
           return (
             <g key={`${layer.designAssetId}-${index}`} transform={transform}>
-              {href && !broken ? (
-                <image
-                  href={href}
-                  x={box.x}
-                  y={box.y}
-                  width={box.width}
-                  height={box.height}
-                  preserveAspectRatio="none"
-                  onError={() => setFailed((prev) => new Set(prev).add(layer.designAssetId))}
-                />
-              ) : (
-                <rect
-                  x={box.x}
-                  y={box.y}
-                  width={box.width}
-                  height={box.height}
-                  fill="none"
-                  stroke="currentColor"
-                  className="text-black/45"
-                />
-              )}
+              <g transform={flipTransform(layer)} opacity={layer.opacity}>
+                {href && !broken ? (
+                  <image
+                    href={href}
+                    x={box.x}
+                    y={box.y}
+                    width={box.width}
+                    height={box.height}
+                    preserveAspectRatio="none"
+                    onError={() => setFailed((prev) => new Set(prev).add(layer.designAssetId))}
+                  />
+                ) : (
+                  <rect
+                    x={box.x}
+                    y={box.y}
+                    width={box.width}
+                    height={box.height}
+                    fill="none"
+                    stroke="currentColor"
+                    className="text-black/45"
+                  />
+                )}
+              </g>
             </g>
           );
         }
@@ -80,30 +96,37 @@ function SidePreview({ view }: { view: PrintView }) {
         // The browser wraps the text inside the stored width, like the editor did, and
         // honours the alignment; a text with no width grows to its content.
         return (
-          <foreignObject
-            key={`text-${index}`}
-            transform={transform}
-            x={box.x}
-            y={box.y}
-            width={box.width > 0 ? box.width : PRINT_CANVAS_SIZE}
-            height={Math.max(box.height, fontSize * 1.3)}
-            overflow="visible"
-          >
-            <div
-              style={{
-                fontSize,
-                lineHeight: 1.16,
-                fontFamily: layer.fontFamily,
-                fontWeight: layer.fontWeight,
-                color: layer.fill ?? 'inherit',
-                textAlign: toTextAlign(layer.textAlign),
-                whiteSpace: 'pre-wrap',
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {layer.text}
-            </div>
-          </foreignObject>
+          <g key={`text-${index}`} transform={transform}>
+            <g transform={flipTransform(layer)} opacity={layer.opacity}>
+              <foreignObject
+                x={box.x}
+                y={box.y}
+                width={box.width > 0 ? box.width : PRINT_CANVAS_SIZE}
+                height={Math.max(box.height, fontSize * 1.3)}
+                overflow="visible"
+              >
+                <div
+                  style={{
+                    fontSize,
+                    lineHeight: (layer.lineHeight ?? 1.16) * FABRIC_FONT_HEIGHT_FACTOR,
+                    fontFamily: layer.fontFamily,
+                    fontWeight: layer.fontWeight,
+                    fontStyle: layer.fontStyle === 'italic' ? 'italic' : undefined,
+                    textDecoration: textDecoration(layer),
+                    // Fabric's charSpacing is in thousandths of an em.
+                    letterSpacing: layer.charSpacing ? `${layer.charSpacing / 1000}em` : undefined,
+                    color: layer.fill ?? 'inherit',
+                    backgroundColor: layer.textBackgroundColor ?? layer.backgroundColor,
+                    textAlign: toTextAlign(layer.textAlign),
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {layer.text}
+                </div>
+              </foreignObject>
+            </g>
+          </g>
         );
       })}
     </svg>
@@ -181,7 +204,32 @@ function layerPosition(layer: PrintLayer) {
   const box = layerBox(layer);
   const round = (n: number) => Math.round(n);
   const turn = box.angle ? `, turned ${round(box.angle)}°` : '';
-  return `x ${round(box.x)}, y ${round(box.y)} · ${round(box.width)} × ${round(box.height)} px${turn}`;
+  const flips = [layer.flipX ? 'mirrored left to right' : null, layer.flipY ? 'upside down' : null]
+    .filter(Boolean)
+    .join(', ');
+  const faded =
+    layer.opacity !== undefined && layer.opacity < 1
+      ? `, ${round(layer.opacity * 100)}% opaque`
+      : '';
+  return `x ${round(box.x)}, y ${round(box.y)} · ${round(box.width)} × ${round(box.height)} px${turn}${flips ? `, ${flips}` : ''}${faded}`;
+}
+
+/** The look of a text in words, so the print shop does not depend on the preview font. */
+function textLook(layer: PrintTextLayer) {
+  return [
+    layer.fontFamily,
+    layer.fontSize ? `${Math.round(layer.fontSize * (layer.scaleY ?? 1))} px` : null,
+    layer.fontWeight && layer.fontWeight !== 'normal' ? layer.fontWeight : null,
+    layer.fontStyle === 'italic' ? 'italic' : null,
+    layer.underline ? 'underlined' : null,
+    layer.overline ? 'overlined' : null,
+    layer.linethrough ? 'struck through' : null,
+    layer.charSpacing ? `letter spacing ${layer.charSpacing}` : null,
+    layer.textAlign ? `${layer.textAlign} aligned` : null,
+    layer.fill ? `colour ${layer.fill}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** The print shop section of an admin order item (TTW-101). */
@@ -233,6 +281,9 @@ export function OrderPrintFiles({ printFiles }: { printFiles: PrintFiles | null 
                     {layer.kind === 'image' ? 'Image' : `Text: “${layer.text}”`}
                   </p>
                   <p className="text-xs text-black/60">{layerPosition(layer)}</p>
+                  {layer.kind === 'text' ? (
+                    <p className="text-xs text-black/60">{textLook(layer)}</p>
+                  ) : null}
                   {layer.kind === 'image' ? <OriginalFile layer={layer} /> : null}
                 </li>
               ))}

@@ -15,7 +15,8 @@ What was seen, all on a freshly migrated and seeded throwaway database with its 
 - First full run: `address-state-not-deliverable` and `shipping-zone-admin-corrections` failed. Both passed alone and on the next full run. The failure messages were not kept.
 - Second full run, right after a Playwright run on the same database: `address-default-and-country-code` failed with `expected 201 "Created", got 404 "Not Found"` on `POST /v1/users/addresses` (line 153 of that spec).
 - That same suite, run alone in a loop, failed 1 run in 6, then at run 14 and run 39 of two other loops, each time on a different test of the file and always on a request of the suite's own `post`/`patch` helper (`expected 201` or `expected 200`, got 404).
-- It also fails on `main` without any TTW-101 change: run 14 of a loop of 45 on the main checkout. So it is not caused by a recent change.
+- 2026-11-22, full run on the final TTW-101 code: `auth-rate-limit` failed with `expected 401 "Unauthorized", got 404 "Not Found"` on `POST /v1/auth/login` (line 61 of that spec). It passed alone twice and in the next full run. So the 404 is not specific to addresses: it hits the login route too, which points at the harness or the transport, not at one controller.
+- The address suite also fails on `main` without any TTW-101 change: run 14 of a loop of 45 on the main checkout. So it is not caused by a recent change.
 - The 404 body is the plain text `not found`. No code under `apps/api/src` writes that text (searched for `'not found'`, `sendStatus(404)`, `.status(404)`), and Nest exceptions answer JSON. The response time of the failing request was not measured.
 
 Not established: where the plain-text 404 comes from, and whether the three suites share one cause.
@@ -25,7 +26,7 @@ Not established: where the plain-text 404 comes from, and whether the three suit
 - Reproduce on purpose: loop the suite alone (about 10 s a run) until it fails, with the response headers and the raw body logged, and with the Nest/Express request log of that request. Start from the loop in the Background.
 - Find out who answers: the in-process app, a proxy, or the HTTP agent (`request.agent`) reusing a connection that the server closed. Check keep-alive and the shutdown of the app of the previous suite (`closeE2eApp`), since suites share one process in band.
 - Fix the cause, in the test harness (`apps/api/test/utils/create-e2e-app.ts`) or in the suites, not by retrying: a retry would hide the next real failure.
-- Check the other two suites against the cause found. If it is different, split a ticket.
+- Check the other suites against the cause found. If it is different, split a ticket.
 
 ## Invariants
 
@@ -41,7 +42,7 @@ Not established: where the plain-text 404 comes from, and whether the three suit
 
 ## Test and observability plan
 
-- Integration: the loop of step 4 on `address-default-and-country-code`, `address-state-not-deliverable` and `shipping-zone-admin-corrections`.
+- Integration: the loop of step 4 on the four suites of the acceptance criteria.
 - Logs, metrics, traces, and alerts: nothing new in production.
 
 ## References
@@ -54,7 +55,7 @@ Not established: where the plain-text 404 comes from, and whether the three suit
 ## Acceptance criteria
 
 - [ ] The cause of the plain-text 404 is written in this ticket, with the evidence that shows it.
-- [ ] The three suites pass 100 runs alone and 5 full runs in a row.
+- [ ] The suites that showed it (`address-default-and-country-code`, `address-state-not-deliverable`, `shipping-zone-admin-corrections`, `auth-rate-limit`) pass 100 runs alone and 5 full runs in a row.
 - [ ] No test was skipped, weakened or retried.
 - [ ] Required quality gates pass, with evidence recorded below.
 

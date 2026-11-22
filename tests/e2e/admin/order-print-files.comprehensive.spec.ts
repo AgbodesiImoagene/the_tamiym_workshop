@@ -47,6 +47,9 @@ describeViewportMatrix('Admin order print files @comprehensive @admin @critical'
 
     // Positions and sizes, text and image layers.
     await expect(front).toContainText('Text: “Choir Tour 2026”');
+    // The look of the text in words, so the print shop does not depend on the preview font.
+    await expect(front).toContainText('italic');
+    await expect(front).toContainText('underlined');
     await expect(front).toContainText('x 40, y 30 · 200 × 150 px');
     await expect(back).toContainText('Text: “Sing Loud”');
     await expect(back).toContainText('turned 10°');

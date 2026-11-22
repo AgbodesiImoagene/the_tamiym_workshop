@@ -167,6 +167,16 @@ const OBJECT_KINDS: Record<string, ObjectKind> = {
 };
 
 /**
+ * Every field the save-time check accepts on a layer, by kind (TTW-101). The frozen copy of
+ * an order keeps some of them and drops the rest on purpose; a test lists every one of
+ * these, so a field added here forces a decision there instead of being lost silently.
+ */
+export const ACCEPTED_LAYER_FIELDS: Record<ObjectKind, readonly string[]> = {
+  text: Object.keys({ ...COMMON_FIELDS, ...TEXT_FIELDS }),
+  image: Object.keys({ ...COMMON_FIELDS, ...IMAGE_FIELDS }),
+};
+
+/**
  * Kind of a Fabric object type, by the rules the save-time check uses (every spelling of
  * `IText`, `Textbox`, `Text` and `Image`), or null for a type that is refused. Shared with
  * the frozen copy of an order (TTW-101), so a layer that was accepted at save time is never

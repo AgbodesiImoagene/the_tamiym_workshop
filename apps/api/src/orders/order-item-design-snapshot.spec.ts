@@ -245,6 +245,172 @@ describe('buildDesignSnapshot (TTW-101)', () => {
     },
   );
 
+  describe('keeps what the real workshop saves (second review of TTW-101)', () => {
+    /** Exactly what `TextTool` hands to the canvas, plus what Fabric adds when it serialises. */
+    const workshopText = (extra: Record<string, unknown> = {}) => ({
+      type: 'IText',
+      text: 'Choir 2026',
+      fontFamily: 'Inter',
+      fontSize: 24,
+      fontWeight: 'bold',
+      fontStyle: 'italic',
+      fill: '#000000',
+      textAlign: 'center',
+      left: 50,
+      top: 50,
+      width: 180,
+      height: 27,
+      scaleX: 1,
+      scaleY: 1,
+      angle: 12,
+      originX: 'left',
+      originY: 'top',
+      selectable: true,
+      editable: true,
+      ...extra,
+    });
+    const front = (objects: unknown[]) =>
+      design({
+        front: { productViewId: 'pv-front', fabricJson: { objects } },
+      });
+
+    it('keeps the italic of a text, which every text of the editor carries', () => {
+      const [layer] = buildDesignSnapshot(
+        front([workshopText()]),
+        productViews,
+        NOW,
+      ).views[0].layers;
+      expect(layer).toMatchObject({ kind: 'text', fontStyle: 'italic' });
+    });
+
+    it('keeps the decoration, spacing, line height, opacity and outline of a text', () => {
+      const [layer] = buildDesignSnapshot(
+        front([
+          workshopText({
+            underline: true,
+            linethrough: true,
+            overline: true,
+            charSpacing: 120,
+            lineHeight: 1.4,
+            opacity: 0.5,
+            stroke: '#ff0000',
+            strokeWidth: 2,
+            textBackgroundColor: '#ffff00',
+            skewX: 5,
+            skewY: 3,
+          }),
+        ]),
+        productViews,
+        NOW,
+      ).views[0].layers;
+      expect(layer).toMatchObject({
+        underline: true,
+        linethrough: true,
+        overline: true,
+        charSpacing: 120,
+        lineHeight: 1.4,
+        opacity: 0.5,
+        stroke: '#ff0000',
+        strokeWidth: 2,
+        textBackgroundColor: '#ffff00',
+        skewX: 5,
+        skewY: 3,
+      });
+    });
+
+    it('keeps the crop and the opacity of an image', () => {
+      const [layer] = buildDesignSnapshot(
+        front([imageLayer('da-1', { cropX: 10, cropY: 20, opacity: 0.8 })]),
+        productViews,
+        NOW,
+      ).views[0].layers;
+      expect(layer).toMatchObject({
+        kind: 'image',
+        cropX: 10,
+        cropY: 20,
+        opacity: 0.8,
+      });
+    });
+
+    it('does not print a layer the customer hid', () => {
+      const snapshot = buildDesignSnapshot(
+        front([
+          workshopText({ text: 'Hidden', visible: false }),
+          workshopText({ text: 'Shown' }),
+        ]),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views[0].layers).toEqual([
+        expect.objectContaining({ text: 'Shown' }),
+      ]);
+    });
+
+    it('finds a side by its product view id when its key is no longer the product view key', () => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          'renamed-side': {
+            productViewId: 'pv-back',
+            fabricJson: { objects: [workshopText({ text: 'Moved' })] },
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views).toHaveLength(1);
+      expect(snapshot.views[0]).toMatchObject({
+        key: 'back',
+        productViewId: 'pv-back',
+      });
+      expect(snapshot.views[0].layers[0]).toMatchObject({ text: 'Moved' });
+    });
+
+    it('does not take one side twice when both its key and its id match', () => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          front: {
+            productViewId: 'pv-front',
+            fabricJson: { objects: [workshopText()] },
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views).toHaveLength(1);
+    });
+
+    it('reads `content` when a legacy layer has no `text`', () => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          front: {
+            productViewId: 'pv-front',
+            layers: [workshopText({ text: undefined, content: 'Legacy' })],
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views[0].layers[0]).toMatchObject({ text: 'Legacy' });
+    });
+
+    it('uses the legacy list when fabricJson is present but empty', () => {
+      const snapshot = buildDesignSnapshot(
+        design({
+          front: {
+            productViewId: 'pv-front',
+            fabricJson: { objects: [] },
+            layers: [workshopText({ text: 'From layers' })],
+          },
+        }),
+        productViews,
+        NOW,
+      );
+      expect(snapshot.views[0].layers[0]).toMatchObject({
+        text: 'From layers',
+      });
+    });
+  });
+
   it('does not keep a layer type the validator refuses', () => {
     const snapshot = buildDesignSnapshot(
       design({
