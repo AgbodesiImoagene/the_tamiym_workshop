@@ -46,7 +46,7 @@ Fix 1 to 4 with the smallest changes, in the design review order of risk. For 2 
 
 ## Out of scope
 
-- Orders stuck after an incomplete event → TTW-249.
+- Orders stuck after an incomplete event → TTW-223 (was TTW-249).
 
 ## Design review
 

@@ -1,10 +1,14 @@
 # TTW-249 — Unstick orders that got an incomplete payment event
 
 **Epic:** 2 — Security and trust boundaries\
-**Status:** Scoped\
+**Status:** Merged into TTW-223\
 **Risk:** Critical\
 **Blocked by:** None\
 **Blocks:** None
+
+## Decision
+
+Merged into [TTW-223](ttw-223-expire-abandoned-initiated-payments-and-release-stock.md) on 2026-11-22. After an incomplete `charge.success`, the payment stays `INITIATED` (TTW-248 writes nothing), which is the exact case TTW-223 handles: after the agreed delay the expiry job asks Paystack for the real status, settles through the existing `charge.success` path, or cancels and releases the stock. Nothing is to be built under this number. The text below is kept as the origin of the case.
 
 ## Background
 

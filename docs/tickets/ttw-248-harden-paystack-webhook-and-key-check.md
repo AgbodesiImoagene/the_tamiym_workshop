@@ -159,4 +159,4 @@ Deviations: a new Prometheus alert reason (`malformed`) and a runbook section, b
 
 Deploy note: a production environment still holding the template placeholder for `PAYSTACK_SECRET_KEY` will no longer start (API, worker, scheduler); set the real key in `/etc/tamiym/secrets.env` before deploying.
 
-Follow-up tickets opened: TTW-249 (orders stuck after an incomplete event), TTW-250 (format check of the Paystack key), TTW-251 (remaining webhook edge cases).
+Follow-up tickets opened: TTW-249 (orders stuck after an incomplete event, merged into TTW-223 on 2026-11-22), TTW-250 (format check of the Paystack key), TTW-251 (remaining webhook edge cases).
