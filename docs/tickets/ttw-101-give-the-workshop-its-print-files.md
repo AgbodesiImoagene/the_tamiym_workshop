@@ -1,7 +1,7 @@
 # TTW-101 — Give the print shop its print files
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** TTW-058; TTW-099\
 **Blocks:** TTW-143
@@ -47,10 +47,10 @@ From the client review of 2026-10-21 (`revue-client/Tamiym_Workshop_Review_2026-
 
 ## Acceptance criteria
 
-- [ ] The print shop can produce an order from the admin screen alone.
-- [ ] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
-- [ ] Swagger, shared contracts, migrations and docs are updated where applicable.
-- [ ] Required quality gates pass, with evidence recorded below.
+- [x] The print shop can produce an order from the admin screen alone.
+- [x] Every visible control works, in English, with theme tokens only. The journey was played end to end, and Playwright coverage is updated.
+- [x] Swagger, shared contracts, migrations and docs are updated where applicable.
+- [x] Required quality gates pass, with evidence recorded below.
 
 ## Out of scope
 
@@ -139,10 +139,14 @@ Not verified: a real signed link followed to real object storage, a browser othe
 
 ## Completion summary
 
-Done in the worktree, nothing pushed, no pull request.
+Merged into `main` on 2026-11-22 as a fast-forward to `2c8cd78` (no pull request, as the project asks). Green CI on the branch (run 44970995031) and on `main` (CI run 44971571132, Playwright Comprehensive run 44971571105).
 
 - `OrderItem.designSnapshot` (migration `20261121220750_ttw101_order_item_design_snapshot`): the design frozen when the order is placed, standard and campaign orders; standard orders also re-check the design inside the transaction.
 - `GET /admin/orders/:id` returns `items[].printFiles` (sides, print areas, layers with position, size and turn, file facts, paths to the preview and to a fresh signed link). No customer response, nor the admin list or status change, carries the raw copy.
 - The admin order detail shows, per item, a layout preview per side, the layer positions and an "Open original file" button. Orders placed before this change say "Print files were not recorded for this item".
 
-Acceptance criteria stay unchecked until the person who owns the ticket accepts the evidence above and decides on the open points (campaign recheck, TTW-247, the small points listed under the second and third reviews).
+**How it got to `main`.** `origin/main` had moved by 10 commits while this was built (TTW-105 and a commit that stops tracking `docs/tickets/ROADMAP.md`). The seven commits of this ticket were rebased onto it; the local-only commit `e73b2c5` (the same tickets 240 to 245 that `origin/main` already had) was left out, so nothing of the maintainer's was published by this branch. Two commits that touched `ROADMAP.md` kept it deleted, as on `main`.
+
+**To do by hand: `ROADMAP.md` is not in the repository any more.** The rows for the tickets opened here (TTW-246 and TTW-247) are not in any tracked roadmap; add them to the local `docs/tickets/ROADMAP.md`: TTW-246 (lot 9B, risk Faible, 4–8 h) and TTW-247 (phase 7A, risk Élevé, 3–6 h, waits for TTW-101, Q23, Q25).
+
+Open points, none blocking (see the three reviews above): campaign orders are not re-checked in the transaction (TTW-247); the small race between the recheck and the snapshot read; `designSnapshot` immutability is enforced by code only; an unknown snapshot version shows the "not recorded" text; per-character `styles` are not copied; the small preview gaps listed under the third review. The intermittent API end-to-end failure is TTW-246.
