@@ -89,7 +89,7 @@ Recorded 2026-11-21, before implementation. Decisions by the user the same day: 
 
 - **Originals vanishing with the account.** Not possible today: `Order.user` has no cascade, so a buyer cannot be deleted, and the upload cannot be deleted either. `order-print-files.e2e-spec.ts` pins it. TTW-120 now says it must keep the uploads named by `OrderItem.designSnapshot`. Still a risk for TTW-120, not for this change.
 - **Preview text.** Fixed: it wraps inside the stored width and keeps its alignment (checked on a screenshot).
-- **Frozen without a second check.** Fixed for standard orders: the orderable check runs again inside the order transaction (unit tests: rejected, no longer the buyer's, vanished). **Not fixed for campaign orders**: they follow their own design rule (TTW-239 comment), which this ticket does not change.
+- **Frozen without a second check.** Fixed for standard orders: the orderable check runs again inside the order transaction (unit tests: rejected, no longer the buyer's, vanished). **Not fixed for campaign orders (now TTW-247)**: they follow their own design rule (TTW-239 comment), which this ticket does not change.
 - **Opening an original in Safari.** Fixed by design (tab opened on click), plus an http(s) check on the link. Only Chromium was run.
 - **Playwright stands in for storage.** Reduced: the signed link now comes from the real API (new private seeded upload, `S3_PRIVATE_BUCKET` set as in the CI workflows). Only the bytes of the on-screen preview are stood in, because the local seed has no stored object.
 
@@ -142,4 +142,4 @@ Done in the worktree, nothing pushed, no pull request.
 - `GET /admin/orders/:id` returns `items[].printFiles` (sides, print areas, layers with position, size and turn, file facts, paths to the preview and to a fresh signed link). No customer response, nor the admin list or status change, carries the raw copy.
 - The admin order detail shows, per item, a layout preview per side, the layer positions and an "Open original file" button. Orders placed before this change say "Print files were not recorded for this item".
 
-Acceptance criteria stay unchecked until the person who owns the ticket accepts the evidence above and decides on the open points (campaign recheck, a possible third review of the last fixes, the small points listed under the second review).
+Acceptance criteria stay unchecked until the person who owns the ticket accepts the evidence above and decides on the open points (campaign recheck, TTW-247, a possible third review of the last fixes, the small points listed under the second review).
