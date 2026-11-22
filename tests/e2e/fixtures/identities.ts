@@ -110,6 +110,12 @@ export const e2eUsers = {
     password: E2E_PASSWORD,
     role: 'CUSTOMER' as const,
   },
+  /** TTW-107: places an unpaid order (saves the address), then cancels it. */
+  orderCancel: {
+    email: 'order-cancel.e2e@tamiym.test',
+    password: E2E_PASSWORD,
+    role: 'CUSTOMER' as const,
+  },
 } as const;
 
 /**

@@ -18,6 +18,7 @@ import {
   MediaAssetStatus,
   MediaDerivativeType,
   MediaSourceType,
+  MediaVisibility,
   ModerationStatus,
   OrderItemSnapshotSource,
   PaymentProvider,
@@ -102,6 +103,8 @@ const CHECKOUT_CUSTOMERS = [
   ['checkoutNote', 'checkout-note', '+2348000000016'],
   // TTW-058: orders saved designs, then checks out.
   ['designOrder', 'design-order', '+2348000000017'],
+  // TTW-107: places an unpaid order, then cancels it.
+  ['orderCancel', 'order-cancel', '+2348000000018'],
 ] as const;
 
 /** An image layer as the Workshop saves it: the stable API path of a customer upload. */
@@ -132,6 +135,7 @@ const IDS = {
     checkoutInstructions: 'e2e-user-checkout-instructions',
     checkoutNote: 'e2e-user-checkout-note',
     designOrder: 'e2e-user-design-order',
+    orderCancel: 'e2e-user-order-cancel',
   },
   address: 'e2e-address-customer-main',
   addressUndeliverable: 'e2e-address-customer-undeliverable',
@@ -182,6 +186,8 @@ const IDS = {
   mediaAssets: {
     pendingUpload: 'e2e-media-asset-pending-upload',
     flaggedUpload: 'e2e-media-asset-flagged-upload',
+    // TTW-101: a private upload (like a real customer file) behind the frozen print design.
+    printUpload: 'e2e-media-asset-print-upload',
   },
   mediaDerivatives: {
     pendingOriginal: 'e2e-media-derivative-pending-original',
@@ -194,6 +200,7 @@ const IDS = {
   designAssets: {
     pendingUpload: 'e2e-design-asset-pending-upload',
     flaggedUpload: 'e2e-design-asset-flagged-upload',
+    printUpload: 'e2e-design-asset-print-upload',
   },
   designs: {
     pending: 'e2e-design-pending-community-tee',
@@ -1126,6 +1133,20 @@ async function main() {
           originalHeight: 1200,
           checksum: 'checksum-e2e-flagged-upload',
         },
+        {
+          id: IDS.mediaAssets.printUpload,
+          sourceType: MediaSourceType.UPLOAD,
+          status: MediaAssetStatus.READY,
+          scanStatus: VirusScanStatus.CLEAN,
+          moderationStatus: ModerationStatus.APPROVED,
+          visibility: MediaVisibility.PRIVATE,
+          originalKey: 'e2e/media/print/original.png',
+          originalMime: 'image/png',
+          originalBytes: 2400000,
+          originalWidth: 3000,
+          originalHeight: 2000,
+          checksum: 'checksum-e2e-print-upload',
+        },
       ],
     });
 
@@ -1329,6 +1350,11 @@ async function main() {
           ownerUserId: IDS.users.organizer,
           mediaAssetId: IDS.mediaAssets.flaggedUpload,
         },
+        {
+          id: IDS.designAssets.printUpload,
+          ownerUserId: IDS.users.customer,
+          mediaAssetId: IDS.mediaAssets.printUpload,
+        },
       ],
     });
 
@@ -1514,6 +1540,9 @@ async function main() {
           orderId: IDS.orders.pending,
           productId: IDS.products.tee,
           variantId: IDS.variants.teeNavyM,
+          // TTW-101: a design with no frozen copy, like an order placed before the copy
+          // existed: the admin must say so rather than read the live design.
+          designId: IDS.designs.pending,
           quantity: 1,
           unitBasePrice: toAmount(6500),
           unitViewSurcharge: toAmount(0),
@@ -1560,6 +1589,76 @@ async function main() {
           optionPresentationSnapshot: variantSnapshot('Size', 'size', 'M', 'M'),
           snapshotSource: OrderItemSnapshotSource.PURCHASE,
           snapshotVersion: 1,
+          // TTW-101: what the print shop reads (frozen design, two sides). Hand-written: the
+          // item has no live design, which proves the screen reads the copy only.
+          designSnapshot: {
+            version: 1,
+            capturedAt: '2026-11-01T09:00:00.000Z',
+            designId: 'e2e-design-frozen-choir',
+            designName: 'Frozen Choir Artwork',
+            productId: IDS.products.hoodie,
+            views: [
+              {
+                key: 'front',
+                displayName: 'Front',
+                sortOrder: 0,
+                productViewId: IDS.productViews.hoodieFront,
+                printArea: { x: 0.2, y: 0.25, width: 0.6, height: 0.5 },
+                layers: [
+                  {
+                    kind: 'image',
+                    designAssetId: IDS.designAssets.printUpload,
+                    left: 40,
+                    top: 30,
+                    width: 400,
+                    height: 300,
+                    scaleX: 0.5,
+                    scaleY: 0.5,
+                    angle: 0,
+                  },
+                  {
+                    kind: 'text',
+                    text: 'Choir Tour 2026',
+                    fontFamily: 'Inter',
+                    fontSize: 32,
+                    fontStyle: 'italic',
+                    underline: true,
+                    fill: '#112233',
+                    left: 60,
+                    top: 260,
+                    width: 220,
+                    height: 40,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 0,
+                  },
+                ],
+              },
+              {
+                key: 'back',
+                displayName: 'Back',
+                sortOrder: 1,
+                productViewId: 'e2e-product-view-hoodie-back',
+                printArea: null,
+                layers: [
+                  {
+                    kind: 'text',
+                    text: 'Sing Loud',
+                    fontFamily: 'Inter',
+                    fontSize: 28,
+                    fill: '#aa0000',
+                    left: 80,
+                    top: 100,
+                    width: 160,
+                    height: 36,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: 10,
+                  },
+                ],
+              },
+            ],
+          },
         },
         {
           id: IDS.orderItems.fulfilled,

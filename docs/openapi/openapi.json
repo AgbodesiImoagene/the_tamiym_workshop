@@ -8742,7 +8742,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later."
+            "description": "Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. Each item carries `printFiles` (TTW-101): the design as it was when the order was placed (designName, capturedAt, and per side the print area and the layers with position, size and turn), or null when none was recorded. It never follows later edits of the design. Each image layer has `previewPath` (on-screen rendition, admin session) and `originalLinkPath` (GET it to receive a fresh short-lived signed link to the original), plus `file` (mime type, bytes, pixel size, status; null if the file is gone). Admin only: customer order responses never include it."
           },
           "401": {
             "description": "Unauthorized"
@@ -18428,6 +18428,574 @@
           }
         ],
         "summary": "Get my order detail (customer-safe projection)",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/v1/orders/{id}/cancel": {
+      "post": {
+        "description": "Only an order still awaiting payment can be cancelled (TTW-041 `CANCEL_ALLOWED_UNPAID`). Its reserved stock is returned and any open payment attempt is closed in the same step. A payment that still arrives afterwards is recorded and refunded by an admin (TTW-088). Other-user and missing ids both yield 404.",
+        "operationId": "OrdersController_cancel",
+        "parameters": [
+          {
+            "description": "Order ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "campaign": {
+                      "allOf": [
+                        {
+                          "properties": {
+                            "id": {
+                              "example": "camp-1",
+                              "type": "string"
+                            },
+                            "slug": {
+                              "example": "school-fundraiser",
+                              "type": "string"
+                            },
+                            "title": {
+                              "example": "School Fundraiser",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "slug",
+                            "title"
+                          ],
+                          "type": "object"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "campaignId": {
+                      "description": "Campaign id when this is a fundraiser order",
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "cancelledAt": {
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "currency": {
+                      "enum": [
+                        "NGN"
+                      ],
+                      "type": "string"
+                    },
+                    "customerNote": {
+                      "description": "Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML.",
+                      "maxLength": 500,
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "discountAmount": {
+                      "example": 0,
+                      "type": "number"
+                    },
+                    "expiresAt": {
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "id": {
+                      "example": "order-1",
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "campaignId": {
+                            "example": "camp-1",
+                            "nullable": true,
+                            "type": "object"
+                          },
+                          "designId": {
+                            "example": "design-1",
+                            "nullable": true,
+                            "type": "object"
+                          },
+                          "id": {
+                            "example": "oi-1",
+                            "type": "string"
+                          },
+                          "legacySnapshotDisclosure": {
+                            "description": "True when snapshotSource is BACKFILLED_CURRENT_CATALOG — display may not match what the buyer originally saw.",
+                            "type": "boolean"
+                          },
+                          "lineTotal": {
+                            "example": 10000,
+                            "type": "number"
+                          },
+                          "optionPresentationSnapshot": {
+                            "items": {
+                              "properties": {
+                                "option": {
+                                  "example": "Size",
+                                  "type": "string"
+                                },
+                                "optionCode": {
+                                  "example": "size",
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "example": "Large",
+                                  "type": "string"
+                                },
+                                "valueCode": {
+                                  "example": "L",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "option",
+                                "optionCode",
+                                "value",
+                                "valueCode"
+                              ],
+                              "type": "object"
+                            },
+                            "nullable": true,
+                            "type": "array"
+                          },
+                          "productId": {
+                            "example": "prod-1",
+                            "type": "string"
+                          },
+                          "productNameSnapshot": {
+                            "example": "Classic Tee",
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "example": 2,
+                            "type": "number"
+                          },
+                          "snapshotSource": {
+                            "enum": [
+                              "BACKFILLED_CURRENT_CATALOG",
+                              "PURCHASE"
+                            ],
+                            "type": "string"
+                          },
+                          "snapshotVersion": {
+                            "example": 1,
+                            "type": "number"
+                          },
+                          "unitFinalPrice": {
+                            "description": "Unit price charged (major units)",
+                            "example": 5000,
+                            "type": "number"
+                          },
+                          "variantDisplaySnapshot": {
+                            "example": "Small / Red (SKU-1)",
+                            "type": "string"
+                          },
+                          "variantId": {
+                            "example": "var-1",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "lineTotal",
+                          "productId",
+                          "productNameSnapshot",
+                          "quantity",
+                          "snapshotSource",
+                          "snapshotVersion",
+                          "unitFinalPrice",
+                          "variantDisplaySnapshot",
+                          "variantId"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "paymentReference": {
+                      "description": "Order-level Paystack reference when set",
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "paymentRetryEligible": {
+                      "description": "True when the server allows starting or continuing payment for this owned order",
+                      "type": "boolean"
+                    },
+                    "paymentStatus": {
+                      "enum": [
+                        "FAILED",
+                        "INITIATED",
+                        "PENDING",
+                        "SUCCEEDED"
+                      ],
+                      "type": "string"
+                    },
+                    "payments": {
+                      "items": {
+                        "properties": {
+                          "amount": {
+                            "example": 12500,
+                            "type": "number"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "enum": [
+                              "NGN"
+                            ],
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "nullable": true,
+                            "type": "object"
+                          },
+                          "id": {
+                            "example": "pay-1",
+                            "type": "string"
+                          },
+                          "providerRef": {
+                            "description": "Public-facing provider reference when present",
+                            "nullable": true,
+                            "type": "object"
+                          },
+                          "status": {
+                            "enum": [
+                              "FAILED",
+                              "INITIATED",
+                              "PENDING",
+                              "SUCCEEDED"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "createdAt",
+                          "currency",
+                          "id",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "policyVersion": {
+                      "description": "Interim policy / response contract version",
+                      "example": "customer-order-detail/v1-interim-2026-08-21",
+                      "type": "string"
+                    },
+                    "refundedAmountConfirmed": {
+                      "description": "Sum of SUCCEEDED refund amounts (major units)",
+                      "example": 0,
+                      "type": "number"
+                    },
+                    "refunds": {
+                      "items": {
+                        "properties": {
+                          "amount": {
+                            "example": 2500,
+                            "type": "number"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "enum": [
+                              "NGN"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "example": "ref-1",
+                            "type": "string"
+                          },
+                          "reason": {
+                            "nullable": true,
+                            "type": "object"
+                          },
+                          "status": {
+                            "enum": [
+                              "FAILED",
+                              "INITIATED",
+                              "NEEDS_ATTENTION",
+                              "PROCESSING",
+                              "SUCCEEDED"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "createdAt",
+                          "currency",
+                          "id",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "resolution": {
+                      "description": "Server-authoritative cancel/refund/return eligibility (TTW-041). Clients must not invent eligibility.",
+                      "type": "object"
+                    },
+                    "shipment": {
+                      "allOf": [
+                        {
+                          "properties": {
+                            "carrierName": {
+                              "example": "Manual dispatch",
+                              "type": "string"
+                            },
+                            "estimatedDeliveryAt": {
+                              "nullable": true,
+                              "type": "object"
+                            },
+                            "events": {
+                              "items": {
+                                "properties": {
+                                  "customerMessage": {
+                                    "nullable": true,
+                                    "type": "object"
+                                  },
+                                  "exceptionCode": {
+                                    "nullable": true,
+                                    "type": "object"
+                                  },
+                                  "id": {
+                                    "example": "evt-1",
+                                    "type": "string"
+                                  },
+                                  "occurredAt": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "CANCELLED",
+                                      "CORRECTION",
+                                      "DELIVERED",
+                                      "DISPATCHED",
+                                      "EXCEPTION",
+                                      "IN_TRANSIT",
+                                      "OUT_FOR_DELIVERY",
+                                      "READY"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "occurredAt",
+                                  "type"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "exceptionCode": {
+                              "nullable": true,
+                              "type": "object"
+                            },
+                            "exceptionMessage": {
+                              "nullable": true,
+                              "type": "object"
+                            },
+                            "id": {
+                              "example": "ship-1",
+                              "type": "string"
+                            },
+                            "policyVersion": {
+                              "example": "shipment-lifecycle/v1-interim-2026-08-21",
+                              "type": "string"
+                            },
+                            "status": {
+                              "enum": [
+                                "CANCELLED",
+                                "DELIVERED",
+                                "DISPATCHED",
+                                "EXCEPTION",
+                                "IN_TRANSIT",
+                                "OUT_FOR_DELIVERY",
+                                "READY"
+                              ],
+                              "type": "string"
+                            },
+                            "trackingNumber": {
+                              "description": "Present only after dispatch",
+                              "nullable": true,
+                              "type": "object"
+                            },
+                            "trackingUrl": {
+                              "nullable": true,
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "carrierName",
+                            "events",
+                            "id",
+                            "policyVersion",
+                            "status"
+                          ],
+                          "type": "object"
+                        }
+                      ],
+                      "description": "Customer-safe shipment summary + timeline when an active outbound shipment exists (TTW-040)",
+                      "nullable": true
+                    },
+                    "shipmentPlaceholder": {
+                      "description": "Honest absent-state copy when no shipment exists; null when shipment is present",
+                      "example": "Shipping updates will appear here when available.",
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "shipping": {
+                      "properties": {
+                        "city": {
+                          "type": "string"
+                        },
+                        "country": {
+                          "example": "Nigeria",
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "description": "Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits.",
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "landmark": {
+                          "nullable": true,
+                          "type": "object"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "nullable": true,
+                          "type": "object"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "object"
+                        },
+                        "postalCode": {
+                          "nullable": true,
+                          "type": "object"
+                        },
+                        "recipientName": {
+                          "nullable": true,
+                          "type": "object"
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "city",
+                        "country",
+                        "line1",
+                        "state"
+                      ],
+                      "type": "object"
+                    },
+                    "shippingFee": {
+                      "example": 2500,
+                      "type": "number"
+                    },
+                    "status": {
+                      "enum": [
+                        "CANCELLED",
+                        "DELIVERED",
+                        "DRAFT",
+                        "FULFILLED",
+                        "PAID",
+                        "PARTIALLY_REFUNDED",
+                        "PENDING_PAYMENT",
+                        "PROCESSING",
+                        "REFUNDED"
+                      ],
+                      "type": "string"
+                    },
+                    "subtotalAmount": {
+                      "example": 10000,
+                      "type": "number"
+                    },
+                    "totalAmount": {
+                      "example": 12500,
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "vatAmount": {
+                      "example": 750,
+                      "nullable": true,
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "createdAt",
+                    "currency",
+                    "discountAmount",
+                    "id",
+                    "items",
+                    "paymentRetryEligible",
+                    "payments",
+                    "paymentStatus",
+                    "policyVersion",
+                    "refundedAmountConfirmed",
+                    "refunds",
+                    "resolution",
+                    "shipping",
+                    "shippingFee",
+                    "status",
+                    "subtotalAmount",
+                    "totalAmount",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The cancelled order (customer-safe projection)"
+          },
+          "400": {
+            "description": "The order cannot be cancelled. `code` is the TTW-041 refusal, e.g. CANCEL_NOT_ALLOWED_USE_REFUND for a paid order or CANCEL_NOT_ALLOWED_TERMINAL for one already cancelled."
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Order not found"
+          },
+          "409": {
+            "description": "The order was paid or cancelled while the request ran; nothing was changed"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Cancel my unpaid order",
         "tags": [
           "Orders"
         ]

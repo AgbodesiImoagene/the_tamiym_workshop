@@ -264,6 +264,16 @@
       "tags": ["@app"]
     },
     {
+      "id": "APP-ORDER-CANCEL",
+      "surface": "app",
+      "feature": "Customer cancels an unpaid order",
+      "prd_ref": "Checkout & Orders — order history",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/order-cancel.spec.ts"],
+      "browser_tiers": ["journey"],
+      "tags": ["@app", "@journey"]
+    },
+    {
       "id": "ADMIN-LANDING",
       "surface": "admin",
       "feature": "Admin console public landing",
@@ -342,7 +352,10 @@
       "feature": "Order search, detail and refund operations",
       "prd_ref": "Admin Dashboard — orders",
       "automation": "automated",
-      "tests": ["tests/e2e/admin/orders-workspace.comprehensive.spec.ts"],
+      "tests": [
+        "tests/e2e/admin/orders-workspace.comprehensive.spec.ts",
+        "tests/e2e/admin/order-print-files.comprehensive.spec.ts"
+      ],
       "browser_tiers": ["matrix", "comprehensive"],
       "tags": ["@admin", "@critical"]
     },

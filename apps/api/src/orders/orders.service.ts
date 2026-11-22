@@ -52,6 +52,13 @@ import { assertResolutionAllowed } from './resolution-policy.assert';
 import type { CustomerOrderDetailDto } from './dto/customer-order-detail.dto';
 import type { PricingLineItemOutput } from '../pricing/pricing.types';
 import type { OrderItemDisplaySnapshots } from './order-item-snapshot';
+import {
+  buildDesignSnapshot,
+  designAssetIdsOf,
+  toAdminPrintFiles,
+  type DesignSnapshot,
+  type PrintFileFacts,
+} from './order-item-design-snapshot';
 import { ShipmentDirection, ShipmentStatus } from '../generated/prisma/enums';
 
 import {
@@ -70,6 +77,8 @@ type QuoteLineForCreate = PricingLineItemOutput & OrderItemDisplaySnapshots;
 
 const ORDER_INCLUDE = {
   items: {
+    // The frozen design is for the print shop only (TTW-101): never in a customer response.
+    omit: { designSnapshot: true },
     include: {
       product: { select: { id: true, name: true, slug: true } },
       variant: { select: { id: true, name: true, sku: true } },
@@ -169,6 +178,14 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          // TTW-101: the copy must not outlive a check made before the quote. A design
+          // rejected, or no longer the buyer's, since then is refused here with the same
+          // codes as the first check. Campaign orders have their own design rule.
+          await assertDesignsOrderableBy(tx, userId, quote.items);
+          const designSnapshots = await this.snapshotDesigns(
+            tx,
+            quote.items.map((item) => item.designId),
+          );
           const created = await tx.order.create({
             data: {
               userId,
@@ -203,7 +220,11 @@ export class OrdersService {
               idempotencyFingerprint: fingerprint,
               items: {
                 create: quote.items.map((item) =>
-                  this.toOrderItemCreateData(item as QuoteLineForCreate),
+                  this.toOrderItemCreateData(
+                    item as QuoteLineForCreate,
+                    undefined,
+                    designSnapshots,
+                  ),
                 ),
               },
             },
@@ -348,6 +369,10 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          const designSnapshots = await this.snapshotDesigns(
+            tx,
+            quote.items.map((item) => item.designId),
+          );
           const created = await tx.order.create({
             data: {
               userId,
@@ -386,6 +411,7 @@ export class OrdersService {
                   this.toOrderItemCreateData(
                     item as QuoteLineForCreate,
                     campaignId,
+                    designSnapshots,
                   ),
                 ),
               },
@@ -569,8 +595,12 @@ export class OrdersService {
   private toOrderItemCreateData(
     item: QuoteLineForCreate,
     campaignIdOverride?: string,
+    designSnapshots?: ReadonlyMap<string, DesignSnapshot>,
   ) {
     return {
+      designSnapshot: (item.designId
+        ? (designSnapshots?.get(item.designId) ?? undefined)
+        : undefined) as Prisma.InputJsonValue | undefined,
       productId: item.productId,
       variantId: item.variantId,
       designId: item.designId,
@@ -589,6 +619,63 @@ export class OrdersService {
       pricingBreakdown: item.pricingBreakdown as object,
       organizerCostBasis: item.organizerCostBasis,
     };
+  }
+
+  /**
+   * Freeze the designs of an order (TTW-101). Read with the order's own transaction so a
+   * save racing with checkout gives the old or the new design of that row, never a mix.
+   * One read per design and one per product's views, however many items share them.
+   */
+  private async snapshotDesigns(
+    tx: Prisma.TransactionClient,
+    designIds: Array<string | null | undefined>,
+  ): Promise<Map<string, DesignSnapshot>> {
+    const ids = [...new Set(designIds.filter((id): id is string => !!id))];
+    const snapshots = new Map<string, DesignSnapshot>();
+    if (ids.length === 0) return snapshots;
+
+    const designs = await tx.design.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        name: true,
+        productId: true,
+        designData: true,
+        product: {
+          select: {
+            views: {
+              select: {
+                id: true,
+                key: true,
+                displayName: true,
+                sortOrder: true,
+                printAreas: {
+                  select: { x: true, y: true, width: true, height: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const now = new Date();
+    for (const design of designs) {
+      snapshots.set(
+        design.id,
+        buildDesignSnapshot(
+          design,
+          design.product.views.map((view) => ({
+            id: view.id,
+            key: view.key,
+            displayName: view.displayName,
+            sortOrder: view.sortOrder,
+            printArea: view.printAreas[0] ?? null,
+          })),
+          now,
+        ),
+      );
+    }
+    return snapshots;
   }
 
   private decimalToNumber(value: unknown): number {
@@ -962,6 +1049,8 @@ export class OrdersService {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
         items: {
+          // The list does not need the frozen design: the detail returns it as `printFiles`.
+          omit: { designSnapshot: true },
           include: {
             product: { select: { id: true, name: true, slug: true } },
             variant: { select: { id: true, name: true, sku: true } },
@@ -1013,7 +1102,56 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+    return this.withPrintFiles(order);
+  }
+
+  /**
+   * TTW-101: replace each item's raw frozen design with `printFiles`, built from the frozen
+   * copy only (never the live design) plus the facts of the uploads it uses, read in one
+   * query. Items without a copy get `printFiles: null`.
+   */
+  private async withPrintFiles<
+    T extends { items: Array<{ designSnapshot: Prisma.JsonValue | null }> },
+  >(order: T) {
+    const assetIds = [
+      ...new Set(
+        order.items.flatMap((item) => designAssetIdsOf(item.designSnapshot)),
+      ),
+    ];
+    const facts = new Map<string, PrintFileFacts>();
+    if (assetIds.length > 0) {
+      const rows = await this.prisma.designAsset.findMany({
+        where: { id: { in: assetIds } },
+        select: {
+          id: true,
+          mediaAsset: {
+            select: {
+              status: true,
+              originalMime: true,
+              originalBytes: true,
+              originalWidth: true,
+              originalHeight: true,
+            },
+          },
+        },
+      });
+      for (const row of rows) {
+        facts.set(row.id, {
+          mimeType: row.mediaAsset.originalMime,
+          bytes: row.mediaAsset.originalBytes,
+          width: row.mediaAsset.originalWidth,
+          height: row.mediaAsset.originalHeight,
+          status: row.mediaAsset.status,
+        });
+      }
+    }
+    return {
+      ...order,
+      items: order.items.map(({ designSnapshot, ...item }) => ({
+        ...item,
+        printFiles: toAdminPrintFiles(designSnapshot, facts),
+      })),
+    };
   }
 
   /**
@@ -1082,35 +1220,16 @@ export class OrdersService {
       newStatus === OrderStatus.CANCELLED
     ) {
       updated = await this.prisma.$transaction(async (tx) => {
-        const cancelled = await tx.order.updateMany({
-          where: {
-            id,
-            status: OrderStatus.PENDING_PAYMENT,
-          },
-          data: {
-            status: newStatus,
-            cancelledAt: new Date(),
-          },
+        await this.cancelUnpaidInTransaction(tx, order, {
+          reason: 'admin_cancel_unpaid',
+          closePaymentAttempts: false,
         });
-        if (cancelled.count !== 1) {
-          throw new ConflictException(
-            'Order is no longer pending payment; cancel aborted',
-          );
-        }
-        await this.inventoryLifecycle.releaseOrderItems(
-          id,
-          order.items.map((i) => ({
-            id: i.id,
-            variantId: i.variantId,
-            quantity: i.quantity,
-          })),
-          tx,
-          { reason: 'admin_cancel_unpaid' },
-        );
         return tx.order.findUniqueOrThrow({
           where: { id },
           include: {
             items: {
+              // Print files are read from the order detail, not from a status change.
+              omit: { designSnapshot: true },
               include: {
                 product: { select: { id: true, name: true } },
                 variant: { select: { id: true, name: true } },
@@ -1125,6 +1244,7 @@ export class OrdersService {
         data: { status: newStatus },
         include: {
           items: {
+            omit: { designSnapshot: true },
             include: {
               product: { select: { id: true, name: true } },
               variant: { select: { id: true, name: true } },
@@ -1155,6 +1275,118 @@ export class OrdersService {
     });
 
     return updated;
+  }
+
+  /**
+   * Shared body of an unpaid cancel (admin and customer, TTW-107): conditional
+   * PENDING_PAYMENT → CANCELLED, then release the reservation, in the caller's
+   * transaction. The conditional update is the lock: when it matches no row the
+   * order was paid or cancelled meanwhile, and nothing is written (409).
+   * `releaseOrderItems` is idempotent per order item (unique effect key).
+   * With `closePaymentAttempts`, open payment attempts become FAILED; a charge
+   * arriving later is still recorded by the webhook (TTW-088), which finds the
+   * payment by provider reference whatever its status.
+   */
+  private async cancelUnpaidInTransaction(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: string;
+      items: Array<{ id: string; variantId: string; quantity: number }>;
+    },
+    opts: { reason: string; closePaymentAttempts: boolean },
+  ): Promise<void> {
+    if (opts.closePaymentAttempts) {
+      // First, so this transaction locks payment then order, like the
+      // settlement webhook does: the two cannot deadlock. If the order check
+      // below fails, the thrown error rolls this update back. An attempt that
+      // already has a settlement claim is money in flight and is left alone.
+      await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          status: { in: [PaymentStatus.PENDING, PaymentStatus.INITIATED] },
+          settlementClaim: null,
+        },
+        data: { status: PaymentStatus.FAILED },
+      });
+    }
+    const cancelled = await tx.order.updateMany({
+      where: { id: order.id, status: OrderStatus.PENDING_PAYMENT },
+      data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
+    });
+    if (cancelled.count !== 1) {
+      throw new ConflictException(
+        'Order is no longer pending payment; cancel aborted',
+      );
+    }
+    await this.inventoryLifecycle.releaseOrderItems(
+      order.id,
+      order.items.map((i) => ({
+        id: i.id,
+        variantId: i.variantId,
+        quantity: i.quantity,
+      })),
+      tx,
+      { reason: opts.reason },
+    );
+  }
+
+  /**
+   * Customer cancels their own unpaid order (TTW-107, policy `CANCEL_ALLOWED_UNPAID`).
+   * Another customer's or a missing order is a 404, like `findOne`. Paid orders
+   * and terminal ones are refused with the TTW-041 code (400); an order that
+   * changes state during the call is a 409.
+   */
+  async cancelMyOrder(
+    userId: string,
+    orderId: string,
+  ): Promise<CustomerOrderDetailDto> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        items: { select: { id: true, variantId: true, quantity: true } },
+        user: { select: { id: true, email: true, firstName: true } },
+      },
+    });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
+    assertResolutionAllowed(
+      evaluateCancellationEligibility({ orderStatus: order.status }),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.cancelUnpaidInTransaction(tx, order, {
+        reason: 'customer_cancel_unpaid',
+        closePaymentAttempts: true,
+      });
+    });
+
+    await this.audit.log({
+      eventName: 'customer.order.cancelled',
+      action: AuditAction.STATUS_CHANGE,
+      entityType: 'Order',
+      entityId: orderId,
+      actorUserId: userId,
+      before: { status: order.status },
+      after: { status: OrderStatus.CANCELLED },
+      note: 'Customer cancelled an unpaid order',
+    });
+    await this.queueCustomerOrderStatusEmail(
+      orderId,
+      order.user,
+      OrderStatus.CANCELLED,
+    );
+    await this.adminNotify.emit(ADMIN_NOTIF_ORDER_STATUS_CHANGED, {
+      orderId,
+      previousStatus: order.status,
+      newStatus: OrderStatus.CANCELLED,
+      actorUserId: userId,
+    });
+
+    return this.findOne(userId, orderId);
   }
 
   private async queueCustomerOrderStatusEmail(

@@ -163,3 +163,8 @@ export async function initiateOrderPayment(orderId: string, customerEmail?: stri
 export async function getCustomerOrderDetail(orderId: string) {
   return apiClient.get<CustomerOrderDetail>(`/orders/${orderId}`);
 }
+
+/** Cancel one of my unpaid orders (TTW-107). Returns the cancelled order. */
+export async function cancelCustomerOrder(orderId: string) {
+  return apiClient.post<CustomerOrderDetail>(`/orders/${orderId}/cancel`, {});
+}

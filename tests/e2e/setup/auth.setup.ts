@@ -23,6 +23,7 @@ async function saveRoleState(
     | 'customer-checkout-instructions'
     | 'customer-checkout-note'
     | 'customer-design-order'
+    | 'customer-order-cancel'
     | 'organiser'
     | 'admin',
   email: string,
@@ -66,6 +67,7 @@ for (const [role, user] of [
   ['customer-checkout-instructions', e2eUsers.checkoutInstructions],
   ['customer-checkout-note', e2eUsers.checkoutNote],
   ['customer-design-order', e2eUsers.designOrder],
+  ['customer-order-cancel', e2eUsers.orderCancel],
 ] as const) {
   setup(`authenticate ${role}`, async () => {
     await saveRoleState(role, user.email, user.password);

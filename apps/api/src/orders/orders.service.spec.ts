@@ -129,17 +129,21 @@ describe('OrdersService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let pricingService: jest.Mocked<PricingService>;
   let orderCreateMock: jest.Mock;
+  /** The design read made inside the order transaction (TTW-101). */
+  let txDesignFindMany: jest.Mock;
 
   beforeEach(async () => {
     orderCreateMock = jest.fn().mockResolvedValue({
       ...mockOrder,
       items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
     });
+    txDesignFindMany = jest.fn().mockResolvedValue([]);
 
     const mockPrisma = {
       address: { findUnique: jest.fn() },
       campaign: { findUnique: jest.fn().mockResolvedValue({ id: 'camp-1' }) },
       design: { findUnique: jest.fn() },
+      designAsset: { findMany: jest.fn().mockResolvedValue([]) },
       productVariant: { findUnique: jest.fn() },
       productPrice: { findFirst: jest.fn() },
       user: {
@@ -165,6 +169,16 @@ describe('OrdersService', () => {
         const tx = {
           order: {
             create: orderCreateMock,
+          },
+          // The orderable check is made again inside the transaction (TTW-101): same rows.
+          design: {
+            findMany: txDesignFindMany,
+            findUnique: (...args: unknown[]) =>
+              mockPrisma.design.findUnique(...args),
+          },
+          productVariant: {
+            findUnique: (...args: unknown[]) =>
+              mockPrisma.productVariant.findUnique(...args),
           },
           orderDiscount: { create: jest.fn() },
           inventoryItem: {
@@ -315,6 +329,219 @@ describe('OrdersService', () => {
       expect(line.campaignId).toBe('camp-1');
       expect(line.snapshotSource).toBe('PURCHASE');
       expect(line.productNameSnapshot).toBe('Classic Tee');
+    });
+
+    describe('frozen design for the print shop (TTW-101)', () => {
+      const designRow = {
+        id: 'design-1',
+        name: 'My shirt',
+        productId: 'prod-1',
+        designData: {
+          views: {
+            front: {
+              fabricJson: {
+                objects: [
+                  { type: 'Textbox', text: 'Frozen text', left: 5, top: 6 },
+                ],
+              },
+            },
+          },
+        },
+        product: {
+          views: [
+            {
+              id: 'pv-front',
+              key: 'front',
+              displayName: 'Front',
+              sortOrder: 0,
+              printAreas: [{ x: 0.1, y: 0.2, width: 0.5, height: 0.4 }],
+            },
+            {
+              id: 'pv-back',
+              key: 'back',
+              displayName: 'Back',
+              sortOrder: 1,
+              printAreas: [],
+            },
+          ],
+        },
+      };
+      const quoteWithDesign = (designId: string | null, count = 1) => ({
+        ...mockQuote,
+        items: Array.from({ length: count }, () => ({
+          ...mockQuote.items[0],
+          designId,
+        })),
+      });
+
+      beforeEach(() => {
+        (prisma.address.findUnique as jest.Mock).mockResolvedValue(mockAddress);
+        (prisma.inventoryItem.findUnique as jest.Mock).mockResolvedValue({
+          variantId: 'var-1',
+          trackInventory: true,
+          stockOnHand: 10,
+          reserved: 0,
+        });
+        txDesignFindMany.mockResolvedValue([designRow]);
+        // The orderable check reads the design and the variant before the quote (TTW-239).
+        (prisma.design.findUnique as jest.Mock).mockResolvedValue({
+          id: 'design-1',
+          userId: 'user-1',
+          productId: 'prod-1',
+          moderationStatus: 'APPROVED',
+        });
+        (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+          productId: 'prod-1',
+        });
+      });
+
+      it('copies the design onto the item, with the print area of the side', async () => {
+        (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
+          quoteWithDesign('design-1'),
+        );
+
+        await service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 2 }],
+        });
+
+        const line = orderCreateMock.mock.calls[0][0].data.items.create[0];
+        expect(line.designSnapshot).toMatchObject({
+          version: 1,
+          designId: 'design-1',
+          designName: 'My shirt',
+          views: [
+            {
+              key: 'front',
+              printArea: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 },
+              layers: [{ kind: 'text', text: 'Frozen text' }],
+            },
+          ],
+        });
+      });
+
+      it('reads each design once, however many items share it', async () => {
+        (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
+          quoteWithDesign('design-1', 3),
+        );
+
+        await service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 3 }],
+        });
+
+        expect(txDesignFindMany).toHaveBeenCalledTimes(1);
+        expect(txDesignFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: { in: ['design-1'] } } }),
+        );
+        const lines = orderCreateMock.mock.calls[0][0].data.items.create;
+        expect(lines).toHaveLength(3);
+        for (const line of lines) {
+          expect(line.designSnapshot).toMatchObject({ designId: 'design-1' });
+        }
+      });
+
+      it('reads no design and stores no copy for an item without one', async () => {
+        await service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', quantity: 2 }],
+        });
+
+        expect(txDesignFindMany).not.toHaveBeenCalled();
+        const line = orderCreateMock.mock.calls[0][0].data.items.create[0];
+        expect(line.designSnapshot).toBeUndefined();
+      });
+
+      describe('checks again inside the transaction, so the copy never outlives the first check', () => {
+        const dto = {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 2 }],
+        };
+        /** Passes the first check (before the quote), then fails the second one. */
+        function changeAfterFirstCheck(row: Record<string, unknown> | null) {
+          (prisma.design.findUnique as jest.Mock)
+            .mockReset()
+            .mockResolvedValueOnce({
+              id: 'design-1',
+              userId: 'user-1',
+              productId: 'prod-1',
+              moderationStatus: 'APPROVED',
+            })
+            .mockResolvedValue(row);
+          (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
+            quoteWithDesign('design-1'),
+          );
+        }
+
+        it('refuses a design rejected by a moderator between the two checks, and writes no order', async () => {
+          changeAfterFirstCheck({
+            id: 'design-1',
+            userId: 'user-1',
+            productId: 'prod-1',
+            moderationStatus: 'REJECTED',
+          });
+
+          await expect(service.create('user-1', dto)).rejects.toMatchObject({
+            response: { code: 'DESIGN_REJECTED' },
+          });
+          expect(orderCreateMock).not.toHaveBeenCalled();
+          expect(txDesignFindMany).not.toHaveBeenCalled();
+        });
+
+        it('refuses a design that is no longer the buyer’s', async () => {
+          changeAfterFirstCheck({
+            id: 'design-1',
+            userId: 'someone-else',
+            productId: 'prod-1',
+            moderationStatus: 'APPROVED',
+          });
+
+          await expect(service.create('user-1', dto)).rejects.toThrow(
+            ForbiddenException,
+          );
+          expect(orderCreateMock).not.toHaveBeenCalled();
+        });
+
+        it('refuses a design that vanished', async () => {
+          changeAfterFirstCheck(null);
+
+          await expect(service.create('user-1', dto)).rejects.toThrow(
+            BadRequestException,
+          );
+          expect(orderCreateMock).not.toHaveBeenCalled();
+        });
+      });
+
+      it('stores no copy for a design row missing at the read, rather than fail the order', async () => {
+        txDesignFindMany.mockResolvedValue([]);
+        (pricingService.quoteStandard as jest.Mock).mockResolvedValue(
+          quoteWithDesign('design-1'),
+        );
+
+        await service.create('user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 2 }],
+        });
+
+        const line = orderCreateMock.mock.calls[0][0].data.items.create[0];
+        expect(line.designSnapshot).toBeUndefined();
+      });
+
+      it('copies the design on a campaign order too', async () => {
+        (pricingService.quoteCampaign as jest.Mock).mockResolvedValue(
+          quoteWithDesign('design-1'),
+        );
+
+        await service.createCampaignOrder('camp-1', 'user-1', {
+          shippingAddressId: 'addr-1',
+          items: [{ variantId: 'var-1', designId: 'design-1', quantity: 2 }],
+        });
+
+        const line =
+          orderCreateMock.mock.calls.at(-1)?.[0].data.items.create[0];
+        expect(line.campaignId).toBe('camp-1');
+        expect(line.designSnapshot).toMatchObject({ designId: 'design-1' });
+      });
     });
 
     // TTW-217 (security review): the snapshot of the address and the quote read
@@ -1164,6 +1391,118 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('print files on the admin order (TTW-101)', () => {
+    const frozen = {
+      version: 1,
+      capturedAt: '2026-11-21T10:00:00.000Z',
+      designId: 'design-1',
+      designName: 'Frozen name',
+      productId: 'prod-1',
+      views: [
+        {
+          key: 'front',
+          displayName: 'Front',
+          sortOrder: 0,
+          productViewId: 'pv-front',
+          printArea: null,
+          layers: [
+            { kind: 'image', designAssetId: 'da-1', left: 1, top: 2 },
+            { kind: 'text', text: 'Hello' },
+          ],
+        },
+      ],
+    };
+
+    it('builds printFiles from the frozen copy and the facts of its uploads, in one query', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        items: [
+          { id: 'oi-1', designSnapshot: frozen },
+          { id: 'oi-2', designSnapshot: frozen },
+          { id: 'oi-3', designSnapshot: null },
+        ],
+      });
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'da-1',
+          mediaAsset: {
+            status: 'READY',
+            originalMime: 'image/png',
+            originalBytes: 1234,
+            originalWidth: 3000,
+            originalHeight: 2000,
+          },
+        },
+      ]);
+
+      const order = await service.findOneForAdmin('order-1');
+
+      expect(prisma.designAsset.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.designAsset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ['da-1'] } } }),
+      );
+      expect(order.items[0].printFiles).toMatchObject({
+        designName: 'Frozen name',
+        views: [
+          {
+            layers: [
+              {
+                kind: 'image',
+                previewPath: '/design-assets/da-1/file?variant=display',
+                file: {
+                  mimeType: 'image/png',
+                  bytes: 1234,
+                  width: 3000,
+                  height: 2000,
+                  status: 'READY',
+                },
+              },
+              { kind: 'text', text: 'Hello' },
+            ],
+          },
+        ],
+      });
+      expect(order.items[2].printFiles).toBeNull();
+      // The raw copy is replaced by the built view, never sent next to it.
+      expect(order.items[0]).not.toHaveProperty('designSnapshot');
+    });
+
+    it('reads no upload when no item has a frozen design', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        items: [{ id: 'oi-1', designSnapshot: null }],
+      });
+
+      const order = await service.findOneForAdmin('order-1');
+
+      expect(prisma.designAsset.findMany).not.toHaveBeenCalled();
+      expect(order.items[0].printFiles).toBeNull();
+    });
+
+    it('marks a file as gone instead of failing when its row no longer exists', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+        items: [{ id: 'oi-1', designSnapshot: frozen }],
+      });
+      (prisma.designAsset.findMany as jest.Mock).mockResolvedValue([]);
+
+      const order = await service.findOneForAdmin('order-1');
+
+      expect(order.items[0].printFiles?.views[0].layers[0]).toMatchObject({
+        kind: 'image',
+        file: null,
+      });
+    });
+
+    it('is a 404 for an unknown order', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.findOneForAdmin('nope')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('findAll', () => {
     it('should return customer-safe list projection for user', async () => {
       (prisma.order.findMany as jest.Mock).mockResolvedValue([
@@ -1501,6 +1840,122 @@ describe('OrdersService', () => {
           now,
         }),
       ).toBe(false);
+    });
+  });
+
+  describe('cancelMyOrder (TTW-107)', () => {
+    const pendingOrder = {
+      id: 'order-1',
+      userId: 'user-1',
+      status: OrderStatus.PENDING_PAYMENT,
+      items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+      user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+    };
+    let tx: {
+      order: { updateMany: jest.Mock };
+      payment: { updateMany: jest.Mock };
+    };
+    let release: jest.Mock;
+    let detail: jest.SpyInstance;
+
+    beforeEach(() => {
+      tx = {
+        order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        payment: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (cb: (t: unknown) => Promise<unknown>) => cb(tx),
+      );
+      release = (
+        service as unknown as {
+          inventoryLifecycle: { releaseOrderItems: jest.Mock };
+        }
+      ).inventoryLifecycle.releaseOrderItems;
+      detail = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue({ id: 'order-1', status: 'CANCELLED' } as never);
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(pendingOrder);
+    });
+
+    it('cancels, releases the reservation and closes open payment attempts in one transaction', async () => {
+      const result = await service.cancelMyOrder('user-1', 'order-1');
+
+      expect(tx.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order-1', status: OrderStatus.PENDING_PAYMENT },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: expect.any(Date),
+        },
+      });
+      expect(release).toHaveBeenCalledWith(
+        'order-1',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        tx,
+        { reason: 'customer_cancel_unpaid' },
+      );
+      expect(tx.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          orderId: 'order-1',
+          status: { in: ['PENDING', 'INITIATED'] },
+          settlementClaim: null,
+        },
+        data: { status: 'FAILED' },
+      });
+      // Same lock order as the settlement webhook (payment, then order), so
+      // the two transactions cannot deadlock.
+      expect(tx.payment.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.order.updateMany.mock.invocationCallOrder[0],
+      );
+      expect(detail).toHaveBeenCalledWith('user-1', 'order-1');
+      expect(result).toEqual({ id: 'order-1', status: 'CANCELLED' });
+    });
+
+    it('answers 404 for a missing order and for another customer’s order', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      await expect(
+        service.cancelMyOrder('user-1', 'nope'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      (prisma.order.findUnique as jest.Mock).mockResolvedValueOnce({
+        ...pendingOrder,
+        userId: 'user-2',
+      });
+      await expect(
+        service.cancelMyOrder('user-1', 'order-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [OrderStatus.PAID, 'CANCEL_NOT_ALLOWED_USE_REFUND'],
+      [OrderStatus.PROCESSING, 'CANCEL_NOT_ALLOWED_USE_REFUND'],
+      [OrderStatus.FULFILLED, 'CANCEL_NOT_ALLOWED_SHIPPED_OR_FULFILLED'],
+      [OrderStatus.DELIVERED, 'CANCEL_NOT_ALLOWED_DELIVERED'],
+      [OrderStatus.CANCELLED, 'CANCEL_NOT_ALLOWED_TERMINAL'],
+    ])(
+      'refuses a %s order with %s and writes nothing',
+      async (status, code) => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+          ...pendingOrder,
+          status,
+        });
+
+        await expect(
+          service.cancelMyOrder('user-1', 'order-1'),
+        ).rejects.toMatchObject({ response: { code } });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(release).not.toHaveBeenCalled();
+      },
+    );
+
+    it('answers 409 and writes nothing when the order moved under us', async () => {
+      tx.order.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.cancelMyOrder('user-1', 'order-1'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      // The thrown error rolls the whole transaction back, payment update included.
+      expect(release).not.toHaveBeenCalled();
     });
   });
 

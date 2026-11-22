@@ -2974,6 +2974,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel my unpaid order
+         * @description Only an order still awaiting payment can be cancelled (TTW-041 `CANCEL_ALLOWED_UNPAID`). Its reserved stock is returned and any open payment attempt is closed in the same step. A payment that still arrives afterwards is recorded and refunded by an admin (TTW-088). Other-user and missing ids both yield 404.
+         */
+        post: operations["OrdersController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orders/{id}/initiate-payment": {
         parameters: {
             query?: never;
@@ -7612,7 +7632,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. */
+            /** @description Order. The shipping snapshot saved when the order was placed is in shipRecipientName, shipPhone, shipLine1, shipLine2, shipCity, shipState, shipPostalCode, shipCountry, shipLandmark and shipInstructions (plain text, may be null). Prefer it over shippingAddress, which is the live address row and can change later. Each item carries `printFiles` (TTW-101): the design as it was when the order was placed (designName, capturedAt, and per side the print area and the layers with position, size and turn), or null when none was recorded. It never follows later edits of the design. Each image layer has `previewPath` (on-screen rendition, admin session) and `originalLinkPath` (GET it to receive a fresh short-lived signed link to the original), plus `file` (mime type, bytes, pixel size, status; null if the file is gone). Admin only: customer order responses never include it. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14123,6 +14143,220 @@ export interface operations {
             };
             /** @description Order not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrdersController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Order ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cancelled order (customer-safe projection) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        campaign?: {
+                            /** @example camp-1 */
+                            id: string;
+                            /** @example school-fundraiser */
+                            slug: string;
+                            /** @example School Fundraiser */
+                            title: string;
+                        } | null;
+                        /** @description Campaign id when this is a fundraiser order */
+                        campaignId?: Record<string, never> | null;
+                        cancelledAt?: Record<string, never> | null;
+                        createdAt: string;
+                        /** @enum {string} */
+                        currency: "NGN";
+                        /** @description Optional note the customer typed at checkout (TTW-197). Plain text: show it as text, never as HTML. */
+                        customerNote?: string | null;
+                        /** @example 0 */
+                        discountAmount: number;
+                        expiresAt?: Record<string, never> | null;
+                        /** @example order-1 */
+                        id: string;
+                        items: {
+                            /** @example camp-1 */
+                            campaignId?: Record<string, never> | null;
+                            /** @example design-1 */
+                            designId?: Record<string, never> | null;
+                            /** @example oi-1 */
+                            id: string;
+                            /** @description True when snapshotSource is BACKFILLED_CURRENT_CATALOG — display may not match what the buyer originally saw. */
+                            legacySnapshotDisclosure?: boolean;
+                            /** @example 10000 */
+                            lineTotal: number;
+                            optionPresentationSnapshot?: {
+                                /** @example Size */
+                                option: string;
+                                /** @example size */
+                                optionCode: string;
+                                /** @example Large */
+                                value: string;
+                                /** @example L */
+                                valueCode: string;
+                            }[] | null;
+                            /** @example prod-1 */
+                            productId: string;
+                            /** @example Classic Tee */
+                            productNameSnapshot: string;
+                            /** @example 2 */
+                            quantity: number;
+                            /** @enum {string} */
+                            snapshotSource: "BACKFILLED_CURRENT_CATALOG" | "PURCHASE";
+                            /** @example 1 */
+                            snapshotVersion: number;
+                            /**
+                             * @description Unit price charged (major units)
+                             * @example 5000
+                             */
+                            unitFinalPrice: number;
+                            /** @example Small / Red (SKU-1) */
+                            variantDisplaySnapshot: string;
+                            /** @example var-1 */
+                            variantId: string;
+                        }[];
+                        /** @description Order-level Paystack reference when set */
+                        paymentReference?: Record<string, never> | null;
+                        /** @description True when the server allows starting or continuing payment for this owned order */
+                        paymentRetryEligible: boolean;
+                        /** @enum {string} */
+                        paymentStatus: "FAILED" | "INITIATED" | "PENDING" | "SUCCEEDED";
+                        payments: {
+                            /** @example 12500 */
+                            amount: number;
+                            createdAt: string;
+                            /** @enum {string} */
+                            currency: "NGN";
+                            expiresAt?: Record<string, never> | null;
+                            /** @example pay-1 */
+                            id: string;
+                            /** @description Public-facing provider reference when present */
+                            providerRef?: Record<string, never> | null;
+                            /** @enum {string} */
+                            status: "FAILED" | "INITIATED" | "PENDING" | "SUCCEEDED";
+                        }[];
+                        /**
+                         * @description Interim policy / response contract version
+                         * @example customer-order-detail/v1-interim-2026-08-21
+                         */
+                        policyVersion: string;
+                        /**
+                         * @description Sum of SUCCEEDED refund amounts (major units)
+                         * @example 0
+                         */
+                        refundedAmountConfirmed: number;
+                        refunds: {
+                            /** @example 2500 */
+                            amount: number;
+                            createdAt: string;
+                            /** @enum {string} */
+                            currency: "NGN";
+                            /** @example ref-1 */
+                            id: string;
+                            reason?: Record<string, never> | null;
+                            /** @enum {string} */
+                            status: "FAILED" | "INITIATED" | "NEEDS_ATTENTION" | "PROCESSING" | "SUCCEEDED";
+                        }[];
+                        /** @description Server-authoritative cancel/refund/return eligibility (TTW-041). Clients must not invent eligibility. */
+                        resolution: Record<string, never>;
+                        /** @description Customer-safe shipment summary + timeline when an active outbound shipment exists (TTW-040) */
+                        shipment?: {
+                            /** @example Manual dispatch */
+                            carrierName: string;
+                            estimatedDeliveryAt?: Record<string, never> | null;
+                            events: {
+                                customerMessage?: Record<string, never> | null;
+                                exceptionCode?: Record<string, never> | null;
+                                /** @example evt-1 */
+                                id: string;
+                                occurredAt: string;
+                                /** @enum {string} */
+                                type: "CANCELLED" | "CORRECTION" | "DELIVERED" | "DISPATCHED" | "EXCEPTION" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "READY";
+                            }[];
+                            exceptionCode?: Record<string, never> | null;
+                            exceptionMessage?: Record<string, never> | null;
+                            /** @example ship-1 */
+                            id: string;
+                            /** @example shipment-lifecycle/v1-interim-2026-08-21 */
+                            policyVersion: string;
+                            /** @enum {string} */
+                            status: "CANCELLED" | "DELIVERED" | "DISPATCHED" | "EXCEPTION" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "READY";
+                            /** @description Present only after dispatch */
+                            trackingNumber?: Record<string, never> | null;
+                            trackingUrl?: Record<string, never> | null;
+                        } | null;
+                        /**
+                         * @description Honest absent-state copy when no shipment exists; null when shipment is present
+                         * @example Shipping updates will appear here when available.
+                         */
+                        shipmentPlaceholder?: Record<string, never> | null;
+                        shipping: {
+                            city: string;
+                            /** @example Nigeria */
+                            country: string;
+                            /** @description Delivery instructions saved on the order when it was placed (plain text). Not changed by later address edits. */
+                            instructions?: string | null;
+                            landmark?: Record<string, never> | null;
+                            line1: string;
+                            line2?: Record<string, never> | null;
+                            phone?: Record<string, never> | null;
+                            postalCode?: Record<string, never> | null;
+                            recipientName?: Record<string, never> | null;
+                            state: string;
+                        };
+                        /** @example 2500 */
+                        shippingFee: number;
+                        /** @enum {string} */
+                        status: "CANCELLED" | "DELIVERED" | "DRAFT" | "FULFILLED" | "PAID" | "PARTIALLY_REFUNDED" | "PENDING_PAYMENT" | "PROCESSING" | "REFUNDED";
+                        /** @example 10000 */
+                        subtotalAmount: number;
+                        /** @example 12500 */
+                        totalAmount: number;
+                        updatedAt: string;
+                        /** @example 750 */
+                        vatAmount?: Record<string, never> | null;
+                    };
+                };
+            };
+            /** @description The order cannot be cancelled. `code` is the TTW-041 refusal, e.g. CANCEL_NOT_ALLOWED_USE_REFUND for a paid order or CANCEL_NOT_ALLOWED_TERMINAL for one already cancelled. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Order not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The order was paid or cancelled while the request ran; nothing was changed */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

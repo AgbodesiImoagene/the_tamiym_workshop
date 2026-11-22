@@ -1920,6 +1920,11 @@ model OrderItem {
   /// Display-snapshot schema version (see ORDER_ITEM_DISPLAY_SNAPSHOT_VERSION).
   snapshotVersion Int @default(1)
 
+  /// Frozen copy of the design at the moment of ordering (TTW-101): sides, print areas and
+  /// layers. What the print shop reads. Written once with the item, never updated. Null when the
+  /// item has no design. Admin-only: customer routes must not select it.
+  designSnapshot Json?
+
   pricingBreakdown         Json?
   organizerDiscountApplied Decimal? @db.Decimal(10, 2) // y (resolved) for audit, optional
   organizerCostBasis       Decimal? @db.Decimal(10, 2) // (x - y), optional
