@@ -93,18 +93,24 @@ Second review (independent subagent, 2026-11-21): PASS, no blocking finding. It 
 - The clip is covered by a unit test on the parameters given to Fabric and by the manual check above; the e2e photo test uses a product with no print area.
 - Not re-checked by the reviewer: Playwright, the API gates, `format:check`, `docs:validate`, `playwright:validate` (run by the author, see the evidence).
 
+Third review (independent subagent, 2026-11-21, commit `1d208bd`): PASS, no blocking finding and nothing to correct. It re-ran the app tests (43 suites, 322 tests), typecheck and lint. It checked that the placement formula is right (Fabric 7.4.0 positions by centre; the canvas is always 600 px in the editor), that React moves the keyed tool panel and canvas without remounting the Fabric canvas, and that the hook subscribes, unsubscribes and copes with no `matchMedia`. Remarks, handled or kept:
+
+- Done afterwards: the hook's subscription is now stable (`useCallback`), the two stray block comments became `//` comments, and a test checks the print area of the open view when two views have different areas (it needs `userEvent` for the tab switch).
+- Kept: on a phone the server HTML uses the tablet order and flips after hydration, so a brief layout shift is possible (not measured; the Fabric canvas is client-only anyway). Moving the canvas in the page when the window crosses the breakpoint may drop the focus of a focused field in some browsers (not tested). Placement and clip both assume a normalised print area on a 600 px canvas; a print area stored in pixels would be wrong for both (existing behaviour). Repeated additions stack at the same point; a text wider than the area is cut by the clip.
+- Not re-checked by the reviewer: Playwright and the browser measurements (299.5, 299 and 120 px against 803 px).
+
 ## Verification evidence
 
 2026-11-21, in the worktree, Node 24.22.1:
 
 - Tests written first and failing for the right reason: `WorkshopEditorLayout.test.tsx` (no toolbar "Workshop tools") and `WorkshopPageShell.test.tsx` (module missing); then for the review fixes, six assertions of `WorkshopEditorLayout.test.tsx` failed before the code change (no group role, typed text lost, image tool unmounted).
-- `pnpm --filter app test`: 43 suites, 322 tests passed (after the canvas origin fix, the centred placement and the DOM order). `pnpm --filter app typecheck` and `lint`: exit 0.
+- `pnpm --filter app test`: 43 suites, 322 tests passed (after the canvas origin fix, the centred placement and the DOM order); 323 tests after the review remarks. `pnpm --filter app typecheck` and `lint`: exit 0.
 - `pnpm --filter app typecheck`, `pnpm --filter app lint`, `pnpm --filter api typecheck`, `pnpm format:check`, `pnpm playwright:validate`: exit 0. `pnpm docs:validate` passed at the first commit.
 - Playwright (chromium, throwaway database `tamiym_workshop_test_ttw105` seeded with `seed:e2e`, built apps), one combined run of `design-workshop*`, `shared-design*`, `design-order*`, `checkout-order-note`, `checkout-delivery-instructions`, `email-verification-banner`, `products-cart`, admin `bulk-pricing`: 51 passed, 1 failed. The failure is `design-workshop.low-resolution.spec.ts`: the image upload answers 500 because no object storage (MinIO) runs on this Mac. It was not run on `main`; CI must confirm it.
 - Risks of the seed change (a product photo on the Campus Hoodie), checked: the specs above that use the hoodie pass on a fresh seed, and the full API e2e suite gives 377 of 378 passed. The one failure (`address-country-and-text-hardening`, over-long state) passes alone, 20 of 20, and concerns addresses, not products. One earlier run of `products-cart` failed ("Bulk Item 01" missing) on a database already used by several runs; it passed on a fresh seed, and it also failed with the hoodie photo rows deleted, so the cause is not the seed change.
 - Not done: Playwright mobile project, Firefox and WebKit, a visual comparison by the client.
 
-Follow-ups after the second review (the product owner asked for both), tests first: three assertions failed before the code change (text and image placement in `WorkshopEditorPlacement.test.tsx`, canvas before the tool panel in the DOM on a phone in `WorkshopEditorLayout.test.tsx`). Checked in the running app with a print area added to the local database only: a new text centred at 299.5, 299 on a 600 px canvas (print-area centre 300, 300), visible at once; at a 390 px width the canvas comes before the tool panel in the DOM and on screen (top 120 px against 803 px). Playwright (clean seed): `design-workshop*`, `shared-design*`, `design-order*`, `products-cart`: 45 passed, 1 failed (the image upload spec, no MinIO). These follow-up commits have not had a third independent review.
+Follow-ups after the second review (the product owner asked for both; reviewed in the third review below), tests first: three assertions failed before the code change (text and image placement in `WorkshopEditorPlacement.test.tsx`, canvas before the tool panel in the DOM on a phone in `WorkshopEditorLayout.test.tsx`). Checked in the running app with a print area added to the local database only: a new text centred at 299.5, 299 on a 600 px canvas (print-area centre 300, 300), visible at once; at a 390 px width the canvas comes before the tool panel in the DOM and on screen (top 120 px against 803 px). Playwright (clean seed): `design-workshop*`, `shared-design*`, `design-order*`, `products-cart`: 45 passed, 1 failed (the image upload spec, no MinIO).
 
 ## Findings outside this ticket
 
@@ -119,4 +125,4 @@ Decided by the product owner on 2026-11-21: only the print area must be visible.
 
 ## Completion summary
 
-Implemented locally, not pushed. Both independent reviews are done (the second one PASS, before the last follow-up commit). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.
+Implemented locally, not pushed. Three independent reviews are done (the last two PASS). Awaiting the client's visual check, the CI run of the image upload spec, and the merge decision.

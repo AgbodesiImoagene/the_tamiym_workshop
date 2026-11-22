@@ -329,9 +329,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
   // The explanation next to the canvas is for the selected image only.
   const selectedLowResolution = layerItems.some((l) => l.id === selectedLayerId && l.lowResolution);
 
-  {
-    /* The open tool, then the parts that do not depend on the tool */
-  }
+  // The open tool, then the parts that do not depend on the tool.
   const toolPanel = (
     <div
       key="tools"
@@ -413,9 +411,7 @@ export default function WorkshopEditor({ workshopContext, existingDesign }: Work
     </div>
   );
 
-  {
-    /* Canvas: the product photo (the template layers) sits behind the customer's layers */
-  }
+  // The canvas: the product photo (the template layers) sits behind the customer's layers.
   const canvasPane = (
     <div
       key="canvas"

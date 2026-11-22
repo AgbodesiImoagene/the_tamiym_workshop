@@ -5,6 +5,7 @@
  */
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TooltipProvider } from '@tamiym/ui';
 import WorkshopEditor from '@/components/workshop/WorkshopEditor';
 import type { PrintArea, WorkshopContext } from '@/lib/designs';
@@ -129,6 +130,35 @@ describe('WorkshopEditor placement of new layers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
     expect(mockControls.addText).toHaveBeenCalledWith(
       expect.objectContaining({ left: 50, top: 50 })
+    );
+  });
+
+  it('uses the print area of the view that is open when two views have different areas', async () => {
+    const context = contextWith(area(0.1, 0.1, 0.2, 0.2));
+    context.views.push({
+      ...context.views[0],
+      id: 'view-2',
+      key: 'back',
+      displayName: 'Back',
+      sortOrder: 1,
+      isDefault: false,
+      printArea: area(0.5, 0.5, 0.4, 0.4),
+    });
+    render(
+      <TooltipProvider>
+        <WorkshopEditor workshopContext={context} />
+      </TooltipProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    expect(mockControls.addText).toHaveBeenLastCalledWith(
+      expect.objectContaining({ left: 120, top: 120 })
+    );
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Back/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    expect(mockControls.addText).toHaveBeenLastCalledWith(
+      expect.objectContaining({ left: 420, top: 420 })
     );
   });
 });
