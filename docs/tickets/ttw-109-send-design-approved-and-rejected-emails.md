@@ -96,3 +96,5 @@ All run in the worktree `.claude/worktrees/ttw-109` on `codex/ttw-109-send-desig
 When an admin approves or rejects a design, or resolves an appeal to APPROVED/REJECTED, the owner gets exactly one email, queued through the outbox in the decision's own transaction. It never contains moderation notes; a repeated or concurrent identical admin decision sends no second email; automatic (AI/system) decisions and FLAGGED/PENDING send nothing. Delivery happens within 2 minutes (outbox sweep). Files: `moderation-decision.service.ts`, `moderation.module.ts`, `docs/notifications/ttw-043-interim-policy.md`, tests. Not done here: ROADMAP checkbox (local file), push, merge.
 
 Follow-up noticed, out of scope: the code still runs an AI screening on every design save and stores its verdict (`designs.service.ts`); the client says the admin alone validates, so whether that screening should stay is a product question for a separate ticket.
+
+Merged into `main` on 2026-11-22 (merge commit `aec648b`). CI on the ticket branch passed (run 45066071260). CI on `main` after the merge passed: `CI` run 45071732043 and `Playwright Comprehensive` run 45071731951, both green.
