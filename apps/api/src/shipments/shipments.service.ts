@@ -102,7 +102,6 @@ export class ShipmentsService {
     }
 
     let derivedOrderStatus: OrderStatus | null = null;
-    let emailNotificationId: string | null = null;
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -143,12 +142,6 @@ export class ShipmentsService {
             );
           }
           derivedOrderStatus = OrderStatus.FULFILLED;
-          emailNotificationId = await this.createOrderStatusEmailRow(
-            tx,
-            orderId,
-            order.user,
-            OrderStatus.FULFILLED,
-          );
         }
 
         await this.audit.log(
@@ -176,7 +169,6 @@ export class ShipmentsService {
       });
 
       if (derivedOrderStatus === OrderStatus.FULFILLED) {
-        await this.enqueueOrderStatusEmail(emailNotificationId);
         await this.adminNotify.emit(ADMIN_NOTIF_ORDER_STATUS_CHANGED, {
           orderId,
           previousStatus: OrderStatus.PROCESSING,
@@ -364,6 +356,7 @@ export class ShipmentsService {
 
     let derivedOrderStatus: OrderStatus | null = null;
     let emailNotificationId: string | null = null;
+    let dispatchEmailId: string | null = null;
     const previousOrderStatus = existing.order.status;
 
     try {
@@ -394,6 +387,20 @@ export class ShipmentsService {
         if (claimed.count !== 1) {
           throw new ConflictException(
             'Shipment status changed concurrently; retry with the latest status',
+          );
+        }
+
+        // The customer is told the order has shipped when the parcel really leaves
+        // (the first move out of READY), not when the shipment record is created.
+        if (
+          existing.status === ShipmentStatus.READY &&
+          nextStatus === ShipmentStatus.DISPATCHED
+        ) {
+          dispatchEmailId = await this.createOrderStatusEmailRow(
+            tx,
+            existing.orderId,
+            existing.order.user,
+            OrderStatus.FULFILLED,
           );
         }
 
@@ -484,6 +491,8 @@ export class ShipmentsService {
       }
       throw err;
     }
+
+    await this.enqueueOrderStatusEmail(dispatchEmailId);
 
     if (derivedOrderStatus === OrderStatus.DELIVERED) {
       await this.enqueueOrderStatusEmail(emailNotificationId);
@@ -599,10 +608,12 @@ export class ShipmentsService {
   }
 
   /**
-   * Writes the status email row in the same transaction as the order status
-   * change, so a crash cannot lose it. The unique `dedupeKey` (one row per
-   * order and event) is a second guard: the order transition is already a
-   * conditional update, and a duplicate would roll the transaction back.
+   * Writes the status email row in the same transaction as the shipment change,
+   * so a crash cannot lose it. The unique `dedupeKey` (one row per order and
+   * event) makes the row exist once per order: a second insert (for example the
+   * dispatch of a second shipment after a cancelled one) is skipped instead of
+   * rolling the shipment change back. Returns the new row id, or null when
+   * nothing was written (no address, or the row already exists).
    */
   private async createOrderStatusEmailRow(
     tx: Prisma.TransactionClient,
@@ -618,17 +629,22 @@ export class ShipmentsService {
           ? OUTBOX_EVENT_ORDER_DELIVERED
           : null;
     if (!eventName) return null;
-    const notification = await tx.notificationOutbox.create({
-      data: {
-        eventName,
-        channel: NotificationChannel.EMAIL,
-        recipient: user.email,
-        recipientUserId: user.id,
-        dedupeKey: `${eventName}:${orderId}`,
-        payload: { orderId, firstName: user.firstName },
-      },
+    const id = randomUUID();
+    const written = await tx.notificationOutbox.createMany({
+      data: [
+        {
+          id,
+          eventName,
+          channel: NotificationChannel.EMAIL,
+          recipient: user.email,
+          recipientUserId: user.id,
+          dedupeKey: `${eventName}:${orderId}`,
+          payload: { orderId, firstName: user.firstName },
+        },
+      ],
+      skipDuplicates: true,
     });
-    return notification.id;
+    return written.count === 1 ? id : null;
   }
 
   /**

@@ -60,7 +60,7 @@ describe('ShipmentsService', () => {
       updateMany: jest.Mock;
     };
     shipmentEvent: { create: jest.Mock; findFirst: jest.Mock };
-    notificationOutbox: { create: jest.Mock };
+    notificationOutbox: { create: jest.Mock; createMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
@@ -81,6 +81,7 @@ describe('ShipmentsService', () => {
       shipmentEvent: { create: jest.fn(), findFirst: jest.fn() },
       notificationOutbox: {
         create: jest.fn().mockResolvedValue({ id: 'outbox-1' }),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
         cb(prisma),
@@ -137,11 +138,12 @@ describe('ShipmentsService', () => {
         }),
         prisma,
       );
-      expect(outbox.enqueueDelivery).toHaveBeenCalled();
+      // The "shipped" email now goes out at the first DISPATCHED, not at creation.
+      expect(outbox.enqueueDelivery).not.toHaveBeenCalled();
       expect(adminNotify.emit).toHaveBeenCalled();
     });
 
-    it('writes the OrderFulfilled email inside the transaction with a dedupe key', async () => {
+    it('writes no email when the shipment is only created (READY)', async () => {
       prisma.order.findUnique.mockResolvedValue({
         id: 'order-1',
         status: OrderStatus.PROCESSING,
@@ -154,22 +156,6 @@ describe('ShipmentsService', () => {
         events: [],
       });
       prisma.order.updateMany.mockResolvedValue({ count: 1 });
-      const order: string[] = [];
-      prisma.notificationOutbox.create.mockImplementation(() => {
-        order.push('outbox-row');
-        return Promise.resolve({ id: 'outbox-1' });
-      });
-      prisma.$transaction.mockImplementation(
-        async (cb: (tx: unknown) => Promise<unknown>) => {
-          const result = await cb(prisma);
-          order.push('commit');
-          return result;
-        },
-      );
-      outbox.enqueueDelivery.mockImplementation(() => {
-        order.push('enqueue');
-        return Promise.resolve();
-      });
 
       await service.createForOrder(
         'order-1',
@@ -177,38 +163,8 @@ describe('ShipmentsService', () => {
         'admin-1',
       );
 
-      expect(prisma.notificationOutbox.create).toHaveBeenCalledTimes(1);
-      expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventName: 'OrderFulfilled',
-          recipient: 'a@b.com',
-          dedupeKey: 'OrderFulfilled:order-1',
-        }),
-      });
-      expect(order).toEqual(['outbox-row', 'commit', 'enqueue']);
-      expect(outbox.enqueueDelivery).toHaveBeenCalledWith('outbox-1');
-    });
-
-    it('queues no email when the order is already FULFILLED', async () => {
-      prisma.order.findUnique.mockResolvedValue({
-        id: 'order-1',
-        status: OrderStatus.FULFILLED,
-        user: { id: 'u1', email: 'a@b.com', firstName: 'Ada' },
-      });
-      prisma.shipment.create.mockResolvedValue({
-        id: 'ship-2',
-        orderId: 'order-1',
-        status: ShipmentStatus.READY,
-        events: [],
-      });
-
-      await service.createForOrder(
-        'order-1',
-        { carrierCode: 'MANUAL', idempotencyKey: 'idem-create-3' },
-        'admin-1',
-      );
-
       expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+      expect(prisma.notificationOutbox.createMany).not.toHaveBeenCalled();
       expect(outbox.enqueueDelivery).not.toHaveBeenCalled();
     });
 
@@ -309,28 +265,29 @@ describe('ShipmentsService', () => {
 
     describe('queue hand-off failure after commit', () => {
       it('still succeeds when the OrderFulfilled hand-off fails', async () => {
-        prisma.order.findUnique.mockResolvedValue({
-          id: 'order-1',
-          status: OrderStatus.PROCESSING,
-          user: { id: 'u1', email: 'a@b.com', firstName: 'Ada' },
-        });
-        prisma.shipment.create.mockResolvedValue({
-          id: 'ship-1',
-          orderId: 'order-1',
-          status: ShipmentStatus.READY,
-          events: [],
-        });
-        prisma.order.updateMany.mockResolvedValue({ count: 1 });
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce(baseShipment)
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DISPATCHED,
+            events: [],
+          });
+        prisma.shipmentEvent.create.mockResolvedValue({});
+        prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
         outbox.enqueueDelivery.mockRejectedValue(new Error('redis down'));
 
-        const result = await service.createForOrder(
-          'order-1',
-          { carrierCode: 'MANUAL', idempotencyKey: 'idem-handoff-1' },
+        const result = await service.updateStatus(
+          'ship-1',
+          {
+            status: 'DISPATCHED',
+            idempotencyKey: 'idem-handoff-1',
+            trackingNumber: 'TRK1',
+          },
           'admin-1',
         );
 
-        expect(result.id).toBe('ship-1');
-        expect(adminNotify.emit).toHaveBeenCalled();
+        expect(result.status).toBe(ShipmentStatus.DISPATCHED);
+        expect(outbox.enqueueDelivery).toHaveBeenCalled();
       });
 
       it('still succeeds when the OrderDelivered hand-off fails', async () => {
@@ -363,6 +320,130 @@ describe('ShipmentsService', () => {
 
         expect(result.status).toBe(ShipmentStatus.DELIVERED);
         expect(adminNotify.emit).toHaveBeenCalled();
+      });
+    });
+
+    describe('OrderFulfilled email at the first dispatch', () => {
+      const dispatchDto = {
+        status: 'DISPATCHED' as const,
+        idempotencyKey: 'idem-dispatch-mail',
+        trackingNumber: 'TRK1',
+      };
+
+      beforeEach(() => {
+        prisma.shipmentEvent.create.mockResolvedValue({});
+        prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
+      });
+
+      it('writes the row in the transaction with a dedupe key, then queues it after commit', async () => {
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce(baseShipment)
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DISPATCHED,
+            events: [],
+          });
+        const order: string[] = [];
+        prisma.notificationOutbox.createMany.mockImplementation(() => {
+          order.push('outbox-row');
+          return Promise.resolve({ count: 1 });
+        });
+        prisma.$transaction.mockImplementation(
+          async (cb: (tx: unknown) => Promise<unknown>) => {
+            const result = await cb(prisma);
+            order.push('commit');
+            return result;
+          },
+        );
+        outbox.enqueueDelivery.mockImplementation(() => {
+          order.push('enqueue');
+          return Promise.resolve();
+        });
+
+        await service.updateStatus('ship-1', dispatchDto, 'admin-1');
+
+        expect(prisma.notificationOutbox.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              eventName: 'OrderFulfilled',
+              recipient: 'a@b.com',
+              dedupeKey: 'OrderFulfilled:order-1',
+            }),
+          ],
+          skipDuplicates: true,
+        });
+        expect(order).toEqual(['outbox-row', 'commit', 'enqueue']);
+        const rowId = (
+          prisma.notificationOutbox.createMany.mock.calls[0] as [
+            { data: Array<{ id: string }> },
+          ]
+        )[0].data[0].id;
+        expect(outbox.enqueueDelivery).toHaveBeenCalledWith(rowId);
+      });
+
+      it('queues nothing when the email row already exists (second shipment after a cancel)', async () => {
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce(baseShipment)
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DISPATCHED,
+            events: [],
+          });
+        prisma.notificationOutbox.createMany.mockResolvedValue({ count: 0 });
+
+        const result = await service.updateStatus(
+          'ship-1',
+          dispatchDto,
+          'admin-1',
+        );
+
+        expect(result.status).toBe(ShipmentStatus.DISPATCHED);
+        expect(outbox.enqueueDelivery).not.toHaveBeenCalled();
+      });
+
+      it('writes no email for later steps such as IN_TRANSIT', async () => {
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DISPATCHED,
+            trackingNumber: 'TRK1',
+            dispatchedAt: new Date(),
+          })
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.IN_TRANSIT,
+            events: [],
+          });
+
+        await service.updateStatus(
+          'ship-1',
+          {
+            status: 'IN_TRANSIT',
+            idempotencyKey: 'idem-transit-mail',
+            trackingNumber: 'TRK1',
+          },
+          'admin-1',
+        );
+
+        expect(prisma.notificationOutbox.createMany).not.toHaveBeenCalled();
+        expect(outbox.enqueueDelivery).not.toHaveBeenCalled();
+      });
+
+      it('writes no email when the customer has no address', async () => {
+        prisma.shipment.findUnique
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            order: { ...baseShipment.order, user: null },
+          })
+          .mockResolvedValueOnce({
+            ...baseShipment,
+            status: ShipmentStatus.DISPATCHED,
+            events: [],
+          });
+
+        await service.updateStatus('ship-1', dispatchDto, 'admin-1');
+
+        expect(prisma.notificationOutbox.createMany).not.toHaveBeenCalled();
       });
     });
 
@@ -488,9 +569,9 @@ describe('ShipmentsService', () => {
       prisma.shipment.updateMany.mockResolvedValue({ count: 1 });
       prisma.order.updateMany.mockResolvedValue({ count: 1 });
       const order: string[] = [];
-      prisma.notificationOutbox.create.mockImplementation(() => {
+      prisma.notificationOutbox.createMany.mockImplementation(() => {
         order.push('outbox-row');
-        return Promise.resolve({ id: 'outbox-9' });
+        return Promise.resolve({ count: 1 });
       });
       prisma.$transaction.mockImplementation(
         async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -514,15 +595,18 @@ describe('ShipmentsService', () => {
         'admin-1',
       );
 
-      expect(prisma.notificationOutbox.create).toHaveBeenCalledTimes(1);
-      expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          eventName: 'OrderDelivered',
-          dedupeKey: 'OrderDelivered:order-1',
-        }),
+      expect(prisma.notificationOutbox.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma.notificationOutbox.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            eventName: 'OrderDelivered',
+            dedupeKey: 'OrderDelivered:order-1',
+          }),
+        ],
+        skipDuplicates: true,
       });
       expect(order).toEqual(['outbox-row', 'commit', 'enqueue']);
-      expect(outbox.enqueueDelivery).toHaveBeenCalledWith('outbox-9');
+      expect(outbox.enqueueDelivery).toHaveBeenCalledTimes(1);
     });
 
     it('records EXCEPTION with taxonomy code', async () => {

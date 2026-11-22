@@ -77,7 +77,24 @@ describe('Shipment emails (e2e)', () => {
     });
   }
 
-  it('writes one OrderFulfilled and one OrderDelivered row across the whole journey', async () => {
+  async function dispatch(
+    shipmentId: string,
+    orderId: string,
+    userId: string,
+    key: string,
+  ) {
+    return shipments.updateStatus(
+      shipmentId,
+      {
+        status: 'DISPATCHED',
+        idempotencyKey: key,
+        trackingNumber: `TRK-${orderId}`,
+      },
+      userId,
+    );
+  }
+
+  it('writes no email on create, OrderFulfilled on dispatch and OrderDelivered on delivery', async () => {
     const { user, order } = await seedProcessingOrder();
 
     const shipment = await shipments.createForOrder(
@@ -85,13 +102,16 @@ describe('Shipment emails (e2e)', () => {
       { carrierCode: 'MANUAL', idempotencyKey: `create-${order.id}` },
       user.id,
     );
+    expect(await emailRows(order.id)).toHaveLength(0);
+
+    await dispatch(shipment.id, order.id, user.id, `dispatch-${order.id}`);
+    expect((await emailRows(order.id)).map((r) => r.dedupeKey)).toEqual([
+      `OrderFulfilled:${order.id}`,
+    ]);
+
     await shipments.updateStatus(
       shipment.id,
-      {
-        status: 'DISPATCHED',
-        idempotencyKey: `dispatch-${order.id}`,
-        trackingNumber: `TRK-${order.id}`,
-      },
+      { status: 'IN_TRANSIT', idempotencyKey: `transit-${order.id}` },
       user.id,
     );
     await shipments.updateStatus(
@@ -112,7 +132,7 @@ describe('Shipment emails (e2e)', () => {
     expect(rows.every((r) => r.recipient === user.email)).toBe(true);
   });
 
-  it('replaying the same create request writes no second email', async () => {
+  it('replaying the same create request writes no email at all', async () => {
     const { user, order } = await seedProcessingOrder();
     const dto = {
       carrierCode: 'MANUAL' as const,
@@ -125,12 +145,10 @@ describe('Shipment emails (e2e)', () => {
     ]);
 
     expect(results.some((r) => r.status === 'fulfilled')).toBe(true);
-    const rows = await emailRows(order.id);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].dedupeKey).toBe(`OrderFulfilled:${order.id}`);
+    expect(await emailRows(order.id)).toHaveLength(0);
   });
 
-  it('a cancelled then recreated shipment writes no second OrderFulfilled row', async () => {
+  it('a cancelled then recreated shipment still writes one OrderFulfilled row, at its dispatch', async () => {
     const { user, order } = await seedProcessingOrder();
     const first = await shipments.createForOrder(
       order.id,
@@ -142,19 +160,21 @@ describe('Shipment emails (e2e)', () => {
       { status: 'CANCELLED', idempotencyKey: `cancel-${order.id}` },
       user.id,
     );
-    await shipments.createForOrder(
+    const second = await shipments.createForOrder(
       order.id,
       { carrierCode: 'MANUAL', idempotencyKey: `second-${order.id}` },
       user.id,
     );
+    expect(await emailRows(order.id)).toHaveLength(0);
 
-    const rows = await emailRows(order.id);
-    expect(rows.map((r) => r.dedupeKey)).toEqual([
+    await dispatch(second.id, order.id, user.id, `d2-${order.id}`);
+
+    expect((await emailRows(order.id)).map((r) => r.dedupeKey)).toEqual([
       `OrderFulfilled:${order.id}`,
     ]);
   });
 
-  it('an email row that already exists rolls the whole create back', async () => {
+  it('an email row that already exists does not block the dispatch and is not doubled', async () => {
     const { user, order } = await seedProcessingOrder();
     await prisma.notificationOutbox.create({
       data: {
@@ -166,23 +186,39 @@ describe('Shipment emails (e2e)', () => {
         payload: { orderId: order.id },
       },
     });
-
-    await expect(
-      shipments.createForOrder(
-        order.id,
-        { carrierCode: 'MANUAL', idempotencyKey: `clash-${order.id}` },
-        user.id,
-      ),
-    ).rejects.toBeDefined();
-
-    const after = await prisma.order.findUniqueOrThrow({
-      where: { id: order.id },
-    });
-    expect(after.status).toBe(OrderStatus.PROCESSING);
-    expect(await prisma.shipment.count({ where: { orderId: order.id } })).toBe(
-      0,
+    const shipment = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `clash-${order.id}` },
+      user.id,
     );
+
+    await dispatch(shipment.id, order.id, user.id, `dc-${order.id}`);
+
+    const after = await prisma.shipment.findUniqueOrThrow({
+      where: { id: shipment.id },
+    });
+    expect(after.status).toBe('DISPATCHED');
     expect(await emailRows(order.id)).toHaveLength(1);
+  });
+
+  it('two admins dispatching at once write one OrderFulfilled row', async () => {
+    const { user, order } = await seedProcessingOrder();
+    const shipment = await shipments.createForOrder(
+      order.id,
+      { carrierCode: 'MANUAL', idempotencyKey: `cc-${order.id}` },
+      user.id,
+    );
+
+    const results = await Promise.allSettled([
+      dispatch(shipment.id, order.id, user.id, `da-${order.id}`),
+      dispatch(shipment.id, order.id, user.id, `db-${order.id}`),
+    ]);
+
+    expect(results.some((r) => r.status === 'fulfilled')).toBe(true);
+    const fulfilled = (await emailRows(order.id)).filter((r) =>
+      r.dedupeKey?.startsWith('OrderFulfilled:'),
+    );
+    expect(fulfilled).toHaveLength(1);
   });
 
   it('the same tracking number on two shipments is refused with the tracking message', async () => {
