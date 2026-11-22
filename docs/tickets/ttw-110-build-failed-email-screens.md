@@ -106,4 +106,4 @@ Admins can open `/admin/notifications/failed` (link on the Notifications page): 
 
 While building it, a hole in the existing API was found and fixed: replaying the same failure twice, or two admins replaying at once, delivered the e-mail twice. A replay now targets the next generation and the unique database index allows only one. Seed data (four failed e-mails), the Playwright manifest and the notification policy doc were updated.
 
-Merged into `main` on 2026-11-22 (merge commit `0427f4b`); roadmap and README ticked. CI on the ticket branch passed (run 45061260754, all jobs green). Review finding 7 is kept as is (see the review table).
+Merged into `main` on 2026-11-22 (merge commit `0427f4b`); roadmap and README ticked. CI on the ticket branch passed (run 45061260754, all jobs green). CI on `main` after the merge passed: `CI` run 45062267332 and `Playwright Comprehensive` run 45062267399, both green (commit `5c51974`, which includes the merge). Review finding 7 is kept as is (see the review table).
