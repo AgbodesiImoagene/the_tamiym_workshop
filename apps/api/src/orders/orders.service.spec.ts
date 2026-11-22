@@ -1843,6 +1843,122 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('cancelMyOrder (TTW-107)', () => {
+    const pendingOrder = {
+      id: 'order-1',
+      userId: 'user-1',
+      status: OrderStatus.PENDING_PAYMENT,
+      items: [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+      user: { id: 'user-1', email: 'a@b.com', firstName: 'A' },
+    };
+    let tx: {
+      order: { updateMany: jest.Mock };
+      payment: { updateMany: jest.Mock };
+    };
+    let release: jest.Mock;
+    let detail: jest.SpyInstance;
+
+    beforeEach(() => {
+      tx = {
+        order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        payment: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (cb: (t: unknown) => Promise<unknown>) => cb(tx),
+      );
+      release = (
+        service as unknown as {
+          inventoryLifecycle: { releaseOrderItems: jest.Mock };
+        }
+      ).inventoryLifecycle.releaseOrderItems;
+      detail = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue({ id: 'order-1', status: 'CANCELLED' } as never);
+      (prisma.order.findUnique as jest.Mock).mockResolvedValue(pendingOrder);
+    });
+
+    it('cancels, releases the reservation and closes open payment attempts in one transaction', async () => {
+      const result = await service.cancelMyOrder('user-1', 'order-1');
+
+      expect(tx.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order-1', status: OrderStatus.PENDING_PAYMENT },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: expect.any(Date),
+        },
+      });
+      expect(release).toHaveBeenCalledWith(
+        'order-1',
+        [{ id: 'oi-1', variantId: 'var-1', quantity: 2 }],
+        tx,
+        { reason: 'customer_cancel_unpaid' },
+      );
+      expect(tx.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          orderId: 'order-1',
+          status: { in: ['PENDING', 'INITIATED'] },
+          settlementClaim: null,
+        },
+        data: { status: 'FAILED' },
+      });
+      // Same lock order as the settlement webhook (payment, then order), so
+      // the two transactions cannot deadlock.
+      expect(tx.payment.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.order.updateMany.mock.invocationCallOrder[0],
+      );
+      expect(detail).toHaveBeenCalledWith('user-1', 'order-1');
+      expect(result).toEqual({ id: 'order-1', status: 'CANCELLED' });
+    });
+
+    it('answers 404 for a missing order and for another customer’s order', async () => {
+      (prisma.order.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      await expect(
+        service.cancelMyOrder('user-1', 'nope'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      (prisma.order.findUnique as jest.Mock).mockResolvedValueOnce({
+        ...pendingOrder,
+        userId: 'user-2',
+      });
+      await expect(
+        service.cancelMyOrder('user-1', 'order-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [OrderStatus.PAID, 'CANCEL_NOT_ALLOWED_USE_REFUND'],
+      [OrderStatus.PROCESSING, 'CANCEL_NOT_ALLOWED_USE_REFUND'],
+      [OrderStatus.FULFILLED, 'CANCEL_NOT_ALLOWED_SHIPPED_OR_FULFILLED'],
+      [OrderStatus.DELIVERED, 'CANCEL_NOT_ALLOWED_DELIVERED'],
+      [OrderStatus.CANCELLED, 'CANCEL_NOT_ALLOWED_TERMINAL'],
+    ])(
+      'refuses a %s order with %s and writes nothing',
+      async (status, code) => {
+        (prisma.order.findUnique as jest.Mock).mockResolvedValue({
+          ...pendingOrder,
+          status,
+        });
+
+        await expect(
+          service.cancelMyOrder('user-1', 'order-1'),
+        ).rejects.toMatchObject({ response: { code } });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(release).not.toHaveBeenCalled();
+      },
+    );
+
+    it('answers 409 and writes nothing when the order moved under us', async () => {
+      tx.order.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.cancelMyOrder('user-1', 'order-1'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      // The thrown error rolls the whole transaction back, payment update included.
+      expect(release).not.toHaveBeenCalled();
+    });
+  });
+
   describe('updateOrderStatus', () => {
     it('releases inventory when cancelling unpaid orders', async () => {
       const release = jest.fn().mockResolvedValue(undefined);

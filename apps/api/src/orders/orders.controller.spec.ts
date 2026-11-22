@@ -22,6 +22,7 @@ describe('OrdersController', () => {
       create: jest.fn(),
       findAll: jest.fn(),
       findOne: jest.fn(),
+      cancelMyOrder: jest.fn(),
     };
     const mockPaymentsService = {
       initiatePayment: jest.fn(),
@@ -85,6 +86,22 @@ describe('OrdersController', () => {
 
       expect(ordersService.findOne).toHaveBeenCalledWith('user-1', 'order-1');
       expect(result).toEqual(mockOrder);
+    });
+  });
+
+  describe('cancel', () => {
+    it('cancels the signed-in user’s order', async () => {
+      const cancelled = { ...mockOrder, status: OrderStatus.CANCELLED };
+      ordersService.cancelMyOrder.mockResolvedValue(cancelled as never);
+      const user = { id: 'user-1' } as never;
+
+      const result = await controller.cancel(user, 'order-1');
+
+      expect(ordersService.cancelMyOrder).toHaveBeenCalledWith(
+        'user-1',
+        'order-1',
+      );
+      expect(result).toEqual(cancelled);
     });
   });
 

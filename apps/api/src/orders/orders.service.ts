@@ -1220,31 +1220,10 @@ export class OrdersService {
       newStatus === OrderStatus.CANCELLED
     ) {
       updated = await this.prisma.$transaction(async (tx) => {
-        const cancelled = await tx.order.updateMany({
-          where: {
-            id,
-            status: OrderStatus.PENDING_PAYMENT,
-          },
-          data: {
-            status: newStatus,
-            cancelledAt: new Date(),
-          },
+        await this.cancelUnpaidInTransaction(tx, order, {
+          reason: 'admin_cancel_unpaid',
+          closePaymentAttempts: false,
         });
-        if (cancelled.count !== 1) {
-          throw new ConflictException(
-            'Order is no longer pending payment; cancel aborted',
-          );
-        }
-        await this.inventoryLifecycle.releaseOrderItems(
-          id,
-          order.items.map((i) => ({
-            id: i.id,
-            variantId: i.variantId,
-            quantity: i.quantity,
-          })),
-          tx,
-          { reason: 'admin_cancel_unpaid' },
-        );
         return tx.order.findUniqueOrThrow({
           where: { id },
           include: {
@@ -1296,6 +1275,118 @@ export class OrdersService {
     });
 
     return updated;
+  }
+
+  /**
+   * Shared body of an unpaid cancel (admin and customer, TTW-107): conditional
+   * PENDING_PAYMENT → CANCELLED, then release the reservation, in the caller's
+   * transaction. The conditional update is the lock: when it matches no row the
+   * order was paid or cancelled meanwhile, and nothing is written (409).
+   * `releaseOrderItems` is idempotent per order item (unique effect key).
+   * With `closePaymentAttempts`, open payment attempts become FAILED; a charge
+   * arriving later is still recorded by the webhook (TTW-088), which finds the
+   * payment by provider reference whatever its status.
+   */
+  private async cancelUnpaidInTransaction(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: string;
+      items: Array<{ id: string; variantId: string; quantity: number }>;
+    },
+    opts: { reason: string; closePaymentAttempts: boolean },
+  ): Promise<void> {
+    if (opts.closePaymentAttempts) {
+      // First, so this transaction locks payment then order, like the
+      // settlement webhook does: the two cannot deadlock. If the order check
+      // below fails, the thrown error rolls this update back. An attempt that
+      // already has a settlement claim is money in flight and is left alone.
+      await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          status: { in: [PaymentStatus.PENDING, PaymentStatus.INITIATED] },
+          settlementClaim: null,
+        },
+        data: { status: PaymentStatus.FAILED },
+      });
+    }
+    const cancelled = await tx.order.updateMany({
+      where: { id: order.id, status: OrderStatus.PENDING_PAYMENT },
+      data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
+    });
+    if (cancelled.count !== 1) {
+      throw new ConflictException(
+        'Order is no longer pending payment; cancel aborted',
+      );
+    }
+    await this.inventoryLifecycle.releaseOrderItems(
+      order.id,
+      order.items.map((i) => ({
+        id: i.id,
+        variantId: i.variantId,
+        quantity: i.quantity,
+      })),
+      tx,
+      { reason: opts.reason },
+    );
+  }
+
+  /**
+   * Customer cancels their own unpaid order (TTW-107, policy `CANCEL_ALLOWED_UNPAID`).
+   * Another customer's or a missing order is a 404, like `findOne`. Paid orders
+   * and terminal ones are refused with the TTW-041 code (400); an order that
+   * changes state during the call is a 409.
+   */
+  async cancelMyOrder(
+    userId: string,
+    orderId: string,
+  ): Promise<CustomerOrderDetailDto> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        items: { select: { id: true, variantId: true, quantity: true } },
+        user: { select: { id: true, email: true, firstName: true } },
+      },
+    });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
+    assertResolutionAllowed(
+      evaluateCancellationEligibility({ orderStatus: order.status }),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.cancelUnpaidInTransaction(tx, order, {
+        reason: 'customer_cancel_unpaid',
+        closePaymentAttempts: true,
+      });
+    });
+
+    await this.audit.log({
+      eventName: 'customer.order.cancelled',
+      action: AuditAction.STATUS_CHANGE,
+      entityType: 'Order',
+      entityId: orderId,
+      actorUserId: userId,
+      before: { status: order.status },
+      after: { status: OrderStatus.CANCELLED },
+      note: 'Customer cancelled an unpaid order',
+    });
+    await this.queueCustomerOrderStatusEmail(
+      orderId,
+      order.user,
+      OrderStatus.CANCELLED,
+    );
+    await this.adminNotify.emit(ADMIN_NOTIF_ORDER_STATUS_CHANGED, {
+      orderId,
+      previousStatus: order.status,
+      newStatus: OrderStatus.CANCELLED,
+      actorUserId: userId,
+    });
+
+    return this.findOne(userId, orderId);
   }
 
   private async queueCustomerOrderStatusEmail(

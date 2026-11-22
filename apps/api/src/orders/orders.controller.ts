@@ -147,6 +147,40 @@ export class OrdersController {
   }
 
   /**
+   * Cancel my unpaid order (TTW-107). Releases the reservation and closes the open payment attempt.
+   */
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel my unpaid order',
+    description:
+      'Only an order still awaiting payment can be cancelled (TTW-041 `CANCEL_ALLOWED_UNPAID`). Its reserved stock is returned and any open payment attempt is closed in the same step. A payment that still arrives afterwards is recorded and refunded by an admin (TTW-088). Other-user and missing ids both yield 404.',
+  })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth('access_token')
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'The cancelled order (customer-safe projection)',
+    type: CustomerOrderDetailDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'The order cannot be cancelled. `code` is the TTW-041 refusal, e.g. CANCEL_NOT_ALLOWED_USE_REFUND for a paid order or CANCEL_NOT_ALLOWED_TERMINAL for one already cancelled.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'The order was paid or cancelled while the request ran; nothing was changed',
+  })
+  async cancel(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.ordersService.cancelMyOrder(user.id, id);
+  }
+
+  /**
    * Initiate Paystack payment for an order
    */
   @Post(':id/initiate-payment')

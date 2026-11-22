@@ -103,6 +103,8 @@ const CHECKOUT_CUSTOMERS = [
   ['checkoutNote', 'checkout-note', '+2348000000016'],
   // TTW-058: orders saved designs, then checks out.
   ['designOrder', 'design-order', '+2348000000017'],
+  // TTW-107: places an unpaid order, then cancels it.
+  ['orderCancel', 'order-cancel', '+2348000000018'],
 ] as const;
 
 /** An image layer as the Workshop saves it: the stable API path of a customer upload. */
@@ -133,6 +135,7 @@ const IDS = {
     checkoutInstructions: 'e2e-user-checkout-instructions',
     checkoutNote: 'e2e-user-checkout-note',
     designOrder: 'e2e-user-design-order',
+    orderCancel: 'e2e-user-order-cancel',
   },
   address: 'e2e-address-customer-main',
   addressUndeliverable: 'e2e-address-customer-undeliverable',
