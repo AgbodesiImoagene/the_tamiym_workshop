@@ -16,6 +16,8 @@ export interface DeadLetterListItem {
   effectKey: string | null;
   generation: number;
   attempts: number;
+  /** How many replays this failure already has; above 0 it must not be resent again. */
+  replayCount: number;
   lastError: string | null;
   deadLetterAckStatus: DeadLetterAckStatus | null;
   deadLetterAckAt: string | null;

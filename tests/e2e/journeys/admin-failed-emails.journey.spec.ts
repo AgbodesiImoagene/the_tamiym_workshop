@@ -68,6 +68,10 @@ test.describe('Admin failed e-mails journey @journey @admin @critical', () => {
     // A reason is required.
     const resend = detail.getByRole('button', { name: 'Resend', exact: true });
     await expect(resend).toBeDisabled();
+    // Too short: the screen says so before anything is sent.
+    await detail.getByLabel('Reason for resending').fill('ab');
+    await expect(detail.getByText('Enter at least 3 characters.')).toBeVisible();
+    await expect(resend).toBeDisabled();
     await detail.getByLabel('Reason for resending').fill('Mail provider is back');
     await resend.click();
     await expect(detail.getByRole('status')).toHaveText(
@@ -77,6 +81,20 @@ test.describe('Admin failed e-mails journey @journey @admin @critical', () => {
     // The same failure cannot be resent twice: the screen says why.
     await expect(detail.getByTestId('dead-letter-resend-hint')).toContainText('already resent');
     await expect(resend).toBeDisabled();
+  });
+
+  test('a failure that was already resent is marked in the list and cannot be selected', async ({
+    adminPage,
+  }) => {
+    await adminPage.goto('/admin/notifications/failed');
+    const row = adminPage
+      .getByTestId('dead-letter-row')
+      .filter({ hasText: 'o***@example.com' })
+      .first();
+    await expect(row).toContainText('Already resent');
+    await expect(
+      adminPage.getByRole('checkbox', { name: /^Select PaymentConfirmed to o\*\*\*/ })
+    ).toBeDisabled();
   });
 
   test('resend two failures at once and see the result for each', async ({ adminPage }) => {
@@ -98,6 +116,13 @@ test.describe('Admin failed e-mails journey @journey @admin @critical', () => {
 
     const results = adminPage.getByTestId('dead-letter-bulk-results');
     await expect(results.getByText(/resent as generation 2/)).toHaveCount(2);
+    // Each line names the e-mail (event and masked recipient), not an internal id.
+    await expect(results).toContainText(
+      'PaymentConfirmed to b***@example.com: resent as generation 2.'
+    );
+    await expect(results).toContainText(
+      'PaymentConfirmed to c***@example.com: resent as generation 2.'
+    );
   });
 
   test('the notifications page links to the failed notifications', async ({ adminPage }) => {

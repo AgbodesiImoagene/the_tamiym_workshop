@@ -14,6 +14,7 @@ import {
   type DeadLetterBulkReplayItem,
   type DeadLetterChannel,
   type DeadLetterDetail,
+  type DeadLetterListItem,
 } from '@/lib/notification-dead-letters';
 import {
   Button,
@@ -39,12 +40,33 @@ import {
   TableRow,
   Textarea,
 } from '@tamiym/ui';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const ALL = 'ALL';
-const MIN_REASON_LENGTH = 3;
+
+// Same limits as DeadLetterReplayDto and DeadLetterAcknowledgeDto in the API.
+const reasonSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, 'Enter at least 3 characters.')
+    .max(500, 'Use 500 characters or fewer.'),
+});
+const noteSchema = z.object({
+  note: z.string().trim().max(2000, 'Use 2000 characters or fewer.'),
+});
+type ReasonValues = z.infer<typeof reasonSchema>;
+type NoteValues = z.infer<typeof noteSchema>;
+
+/** A failure that was already resent, or is not acknowledged, cannot be selected. */
+function isSelectable(item: DeadLetterListItem) {
+  return item.deadLetterAckStatus === 'ACKNOWLEDGED' && item.replayCount === 0;
+}
 
 function errorText(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -58,7 +80,6 @@ export default function AdminFailedNotificationsPage() {
   const [appliedEventName, setAppliedEventName] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [bulkReason, setBulkReason] = useState('');
   const [bulkResults, setBulkResults] = useState<DeadLetterBulkReplayItem[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
@@ -81,13 +102,24 @@ export default function AdminFailedNotificationsPage() {
     await queryClient.invalidateQueries({ queryKey: ['admin-dead-letter'] });
   };
 
+  // Only rows that can still be resent count: a row resent from the detail panel,
+  // or one that left the list after a refresh, drops out of the selection.
+  const selectableIds = new Set(items.filter(isSelectable).map((item) => item.id));
+  const chosenIds = selectedIds.filter((id) => selectableIds.has(id));
+
+  const bulkForm = useForm<ReasonValues>({
+    resolver: zodResolver(reasonSchema),
+    defaultValues: { reason: '' },
+    mode: 'onChange',
+  });
+
   const bulkMutation = useMutation({
-    mutationFn: () => replayAdminDeadLettersBulk(selectedIds, bulkReason),
+    mutationFn: (reason: string) => replayAdminDeadLettersBulk(chosenIds, reason),
     onSuccess: async (data) => {
       setBulkResults(data.results);
       setBulkError(null);
       setSelectedIds([]);
-      setBulkReason('');
+      bulkForm.reset();
       await refreshAll();
     },
     onError: async (e: Error) => {
@@ -98,10 +130,16 @@ export default function AdminFailedNotificationsPage() {
   });
 
   const canBulkResend =
-    selectedIds.length > 0 &&
-    selectedIds.length <= DEAD_LETTER_BULK_MAX &&
-    bulkReason.trim().length >= MIN_REASON_LENGTH &&
+    chosenIds.length > 0 &&
+    chosenIds.length <= DEAD_LETTER_BULK_MAX &&
+    bulkForm.formState.isValid &&
     !bulkMutation.isPending;
+
+  /** What an admin recognises: the event and the masked recipient, not the row id. */
+  function labelFor(id: string) {
+    const item = items.find((candidate) => candidate.id === id);
+    return item ? `${item.eventName} to ${item.recipient}` : id;
+  }
 
   function toggleSelected(id: string, checked: boolean) {
     setSelectedIds((current) =>
@@ -196,27 +234,34 @@ export default function AdminFailedNotificationsPage() {
               </div>
             </form>
 
-            <div className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <form
+              className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start"
+              onSubmit={bulkForm.handleSubmit((values) => bulkMutation.mutate(values.reason))}
+              noValidate
+            >
               <div className="space-y-2">
                 <Label htmlFor="dl-bulk-reason">Reason for resending the selected failures</Label>
                 <Input
                   id="dl-bulk-reason"
-                  value={bulkReason}
-                  onChange={(event) => setBulkReason(event.target.value)}
                   placeholder="Provider outage is over"
+                  aria-invalid={bulkForm.formState.errors.reason ? true : undefined}
+                  {...bulkForm.register('reason')}
                 />
+                {bulkForm.formState.errors.reason ? (
+                  <p className="text-sm text-destructive">
+                    {bulkForm.formState.errors.reason.message}
+                  </p>
+                ) : null}
               </div>
-              <Button disabled={!canBulkResend} onClick={() => bulkMutation.mutate()}>
-                {bulkMutation.isPending
-                  ? 'Resending...'
-                  : `Resend selected (${selectedIds.length})`}
+              <Button type="submit" disabled={!canBulkResend} className="md:mt-[1.625rem]">
+                {bulkMutation.isPending ? 'Resending...' : `Resend selected (${chosenIds.length})`}
               </Button>
-              {selectedIds.length > DEAD_LETTER_BULK_MAX ? (
+              {chosenIds.length > DEAD_LETTER_BULK_MAX ? (
                 <p className="text-sm text-destructive md:col-span-2">
                   Select at most {DEAD_LETTER_BULK_MAX} failures at a time.
                 </p>
               ) : null}
-            </div>
+            </form>
 
             {bulkError ? (
               <p role="alert" className="text-sm text-destructive">
@@ -238,8 +283,8 @@ export default function AdminFailedNotificationsPage() {
                       }
                     >
                       {result.error !== undefined
-                        ? `${result.id}: not resent. ${result.error}`
-                        : `${result.id}: resent as generation ${result.generation}.`}
+                        ? `${labelFor(result.id)}: not resent. ${result.error}`
+                        : `${labelFor(result.id)}: resent as generation ${result.generation}.`}
                     </li>
                   ))}
                 </ul>
@@ -292,8 +337,8 @@ export default function AdminFailedNotificationsPage() {
                           <TableCell>
                             <Checkbox
                               aria-label={`Select ${item.eventName} to ${item.recipient}`}
-                              checked={selectedIds.includes(item.id)}
-                              disabled={!acknowledged}
+                              checked={chosenIds.includes(item.id)}
+                              disabled={!isSelectable(item)}
                               onCheckedChange={(checked) =>
                                 toggleSelected(item.id, checked === true)
                               }
@@ -314,6 +359,9 @@ export default function AdminFailedNotificationsPage() {
                             <p className="mt-1 text-xs text-muted-foreground">
                               {acknowledged ? 'Acknowledged' : 'Not acknowledged'}
                             </p>
+                            {item.replayCount > 0 ? (
+                              <p className="text-xs text-muted-foreground">Already resent</p>
+                            ) : null}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {formatAdminDate(item.updatedAt)}
@@ -367,8 +415,16 @@ function DeadLetterDetailPanel({
   onOpen: (id: string) => void;
   onChanged: () => Promise<void>;
 }) {
-  const [note, setNote] = useState('');
-  const [reason, setReason] = useState('');
+  const noteForm = useForm<NoteValues>({
+    resolver: zodResolver(noteSchema),
+    defaultValues: { note: '' },
+    mode: 'onChange',
+  });
+  const reasonForm = useForm<ReasonValues>({
+    resolver: zodResolver(reasonSchema),
+    defaultValues: { reason: '' },
+    mode: 'onChange',
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -379,11 +435,12 @@ function DeadLetterDetailPanel({
   });
 
   const acknowledgeMutation = useMutation({
-    mutationFn: (current: DeadLetterDetail) => acknowledgeAdminDeadLetter(current.id, note),
+    mutationFn: (input: { current: DeadLetterDetail; note: string }) =>
+      acknowledgeAdminDeadLetter(input.current.id, input.note),
     onSuccess: async () => {
       setMessage('Failure acknowledged. You can resend it now.');
       setError(null);
-      setNote('');
+      noteForm.reset();
       await onChanged();
     },
     onError: async (e: Error) => {
@@ -394,11 +451,12 @@ function DeadLetterDetailPanel({
   });
 
   const resendMutation = useMutation({
-    mutationFn: (current: DeadLetterDetail) => replayAdminDeadLetter(current.id, reason),
+    mutationFn: (input: { current: DeadLetterDetail; reason: string }) =>
+      replayAdminDeadLetter(input.current.id, input.reason),
     onSuccess: async (result) => {
       setMessage(`Resent as generation ${result.generation}. It is queued for delivery.`);
       setError(null);
-      setReason('');
+      reasonForm.reset();
       await onChanged();
     },
     onError: async (e: Error) => {
@@ -445,9 +503,7 @@ function DeadLetterDetailPanel({
   const blockedReason = resendBlockedReason(detail);
   const acknowledged = detail.deadLetterAckStatus === 'ACKNOWLEDGED';
   const canSubmitResend =
-    blockedReason === null &&
-    reason.trim().length >= MIN_REASON_LENGTH &&
-    !resendMutation.isPending;
+    blockedReason === null && reasonForm.formState.isValid && !resendMutation.isPending;
 
   return (
     <Card className="rounded-[1.75rem] border-border shadow-none" data-testid="dead-letter-detail">
@@ -562,33 +618,48 @@ function DeadLetterDetailPanel({
         ) : null}
 
         {!acknowledged ? (
-          <div className="space-y-2">
+          <form
+            className="space-y-2"
+            noValidate
+            onSubmit={noteForm.handleSubmit((values) =>
+              acknowledgeMutation.mutate({ current: detail, note: values.note })
+            )}
+          >
             <Label htmlFor="dl-note">Note (optional)</Label>
             <Textarea
               id="dl-note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
               placeholder="What happened, who was told"
+              aria-invalid={noteForm.formState.errors.note ? true : undefined}
+              {...noteForm.register('note')}
             />
-            <Button
-              disabled={acknowledgeMutation.isPending}
-              onClick={() => acknowledgeMutation.mutate(detail)}
-            >
+            {noteForm.formState.errors.note ? (
+              <p className="text-sm text-destructive">{noteForm.formState.errors.note.message}</p>
+            ) : null}
+            <Button type="submit" disabled={acknowledgeMutation.isPending}>
               {acknowledgeMutation.isPending ? 'Acknowledging...' : 'Acknowledge failure'}
             </Button>
-          </div>
+          </form>
         ) : null}
 
-        <div className="space-y-2">
+        <form
+          className="space-y-2"
+          noValidate
+          onSubmit={reasonForm.handleSubmit((values) =>
+            resendMutation.mutate({ current: detail, reason: values.reason })
+          )}
+        >
           <Label htmlFor="dl-reason">Reason for resending</Label>
           <Input
             id="dl-reason"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
             placeholder="Provider outage is over"
             disabled={blockedReason !== null}
+            aria-invalid={reasonForm.formState.errors.reason ? true : undefined}
+            {...reasonForm.register('reason')}
           />
-          <Button disabled={!canSubmitResend} onClick={() => resendMutation.mutate(detail)}>
+          {reasonForm.formState.errors.reason ? (
+            <p className="text-sm text-destructive">{reasonForm.formState.errors.reason.message}</p>
+          ) : null}
+          <Button type="submit" disabled={!canSubmitResend}>
             {resendMutation.isPending ? 'Resending...' : 'Resend'}
           </Button>
           {blockedReason ? (
@@ -596,7 +667,7 @@ function DeadLetterDetailPanel({
               {blockedReason}
             </p>
           ) : null}
-        </div>
+        </form>
 
         {message ? (
           <p role="status" className="text-sm text-foreground">

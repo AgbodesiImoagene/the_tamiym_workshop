@@ -72,16 +72,16 @@ Decision (in scope, because the screens make "Resend" a one-click action):
 
 Review 1 (2026-11-22, `/code-review` at high effort, one reviewer, charter: correctness, conventions, cleanup of the whole diff). 8 findings:
 
-| #   | Finding                                                                            | Outcome                                                                                                                                    |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Detail panel kept its reason and messages when another failure was opened          | Fixed: the panel is keyed by failure id.                                                                                                   |
-| 2   | The replay reason and the admin id are validated but never stored (no audit trail) | Not changed, out of scope (already noted in the design review). Follow-up: store them in the audit log.                                    |
-| 3   | `ttw-043-interim-policy.md` not updated for the new replay rule                    | Fixed: replay row and rule paragraph updated.                                                                                              |
-| 4   | Hard-coded colours (`text-red-700`, `text-emerald-700`)                            | Fixed: `text-destructive` and `text-foreground`.                                                                                           |
-| 5   | Forms use plain state, not Zod + React Hook Form                                   | Not changed: same style as the neighbouring admin pages, a single text field each. Deviation recorded here.                                |
-| 6   | Bulk selection keeps rows already resent from the detail panel                     | Not changed: the API refuses them and the results list says so line by line. A per-row "already resent" flag needs a list-contract change. |
-| 7   | Pre-read of the next generation duplicates dispatch's own check                    | Not changed: kept for a clear message and because the existing unit tests rely on it; the unique index remains the real guard.             |
-| 8   | API e2e leaves queued delivery jobs in Redis for deleted rows                      | Not changed: same as the other e2e specs that call real services on Redis DB 15.                                                           |
+| #   | Finding                                                                            | Outcome                                                                                                                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Detail panel kept its reason and messages when another failure was opened          | Fixed: the panel is keyed by failure id.                                                                                                                                                                                     |
+| 2   | The replay reason and the admin id are validated but never stored (no audit trail) | Fixed in a second round: acknowledge and replay now write an audit log entry (admin, reason as note, new row).                                                                                                               |
+| 3   | `ttw-043-interim-policy.md` not updated for the new replay rule                    | Fixed: replay row and rule paragraph updated.                                                                                                                                                                                |
+| 4   | Hard-coded colours (`text-red-700`, `text-emerald-700`)                            | Fixed: `text-destructive` and `text-foreground`.                                                                                                                                                                             |
+| 5   | Forms use plain state, not Zod + React Hook Form                                   | Fixed in a second round for the three text forms (bulk reason, note, resend reason), with the API's limits. The filter row stays on plain state: it has no validation.                                                       |
+| 6   | Bulk selection keeps rows already resent from the detail panel                     | Fixed in a second round: the list API returns `replayCount`, rows already resent show "Already resent" and cannot be selected, the selection is recomputed from the list, and bulk results name the e-mail instead of an id. |
+| 7   | Pre-read of the next generation duplicates dispatch's own check                    | Kept on purpose: removing it means rewriting the existing unit test `denies replay when next generation already succeeded`, which the project rules forbid without your approval. The unique index remains the real guard.   |
+| 8   | API e2e leaves queued delivery jobs in Redis for deleted rows                      | Fixed in a second round: the spec removes the delivery job of each outbox row before deleting it.                                                                                                                            |
 
 No second reviewer: the charters do not differ (no money or ledger involved).
 
@@ -90,13 +90,13 @@ No second reviewer: the charters do not differ (no money or ledger involved).
 Run in the worktree, 2026-11-22.
 
 - Failing first (real Postgres, before the fix): `pnpm --filter api test:e2e -- test/notification-dead-letter-replay.e2e-spec.ts` gave 2 failed, 2 passed. A second replay of the same failure created generation 3, and two concurrent replays both succeeded (generations 2 and 3).
-- After the fix: the same command gave 4 passed, run three more times with 4 passed each.
-- `pnpm --filter api test`: 178 suites, 2181 tests passed (includes 17 in `notification-dead-letter.service.spec.ts`, 3 new).
+- After the fix: the same command gave 4 passed, run three more times with 4 passed each. After the second round it has 7 tests (audit on replay and on acknowledge, `replayCount` in the list) and gave 7 passed, twice. Those three new tests failed first (3 failed, 4 passed).
+- `pnpm --filter api test`: 178 suites, 2184 tests passed after the second round (new unit tests: replay count in the list, audit on replay, no audit on a denied replay; the acknowledge test also checks the audit entry). The fixture of the existing list test gained a `_count` field and the existing bulk-max test module gained the `AuditService` provider; no assertion was changed.
 - `pnpm --filter api typecheck`, `pnpm --filter admin typecheck`: no error.
 - `pnpm --filter api lint`: 0 errors, 14 warnings. `pnpm --filter admin lint`: 0 errors, 22 warnings. None is in a changed file.
 - `pnpm format:check`, `pnpm docs:validate`, `pnpm playwright:validate`, `pnpm openapi:check` passed. No endpoint or DTO changed, so no OpenAPI regeneration.
-- `pnpm --filter api test:coverage` then `pnpm coverage:ratchet` passed (lines 85.79%, floor 56%). `pnpm coverage:diff` passed: 13/13 changed lines covered against `origin/main`.
-- `pnpm build` passed. Playwright, on a throwaway database `tamiym_workshop_test_ttw110` (migrated, seeded with `seed:e2e`, dropped afterwards): `tests/e2e/journeys/admin-failed-emails.journey.spec.ts`, 6 passed, run again after the review fixes (6 passed). One earlier failure came from the test order in serial mode, fixed in the test.
+- `pnpm --filter api test:coverage` then `pnpm coverage:ratchet` passed (lines 85.79%, floor 56%). `pnpm coverage:diff` passed: 18/18 changed lines covered against `origin/main`.
+- `pnpm build` passed. Playwright, on a throwaway database `tamiym_workshop_test_ttw110` (migrated, seeded with `seed:e2e`, dropped afterwards): `tests/e2e/journeys/admin-failed-emails.journey.spec.ts`, now 7 tests (short reason message, row marked "Already resent", readable bulk results), 7 passed; run again on a fresh database after each round of review fixes. One earlier failure came from the test order in serial mode, fixed in the test.
 
 Not verified: the other Playwright suites (only the new journey was run); no check on the deployed environment; the delivery of the resent e-mail by a real worker and mail server (the screen reports it as queued).
 
@@ -106,4 +106,4 @@ Admins can open `/admin/notifications/failed` (link on the Notifications page): 
 
 While building it, a hole in the existing API was found and fixed: replaying the same failure twice, or two admins replaying at once, delivered the e-mail twice. A replay now targets the next generation and the unique database index allows only one. Seed data (four failed e-mails), the Playwright manifest and the notification policy doc were updated.
 
-Left for later: store the replay reason and admin in the audit log (finding 2), a per-row "already resent" flag in the list API (finding 6). Not done here: roadmap and README check boxes, to be ticked at merge.
+Not done here: roadmap and README check boxes, to be ticked at merge. Review finding 7 is kept as is (see the review table).

@@ -53,7 +53,7 @@ Preference updates are auditable via `NotificationConsent` append rows. Unsubscr
 
 Replay never mutates the original `FAILED` row or a prior `SENT` generation for the same effect.
 
-A failure can be replayed once: its replay takes the next generation, and the unique `(effectKey, channel, generation)` index lets only one request create it, even when two admins click at once (the loser gets a 400). If the replay fails too, acknowledge and replay that newest generation instead (TTW-110). The admin screen is `/admin/notifications/failed`.
+A failure can be replayed once: its replay takes the next generation, and the unique `(effectKey, channel, generation)` index lets only one request create it, even when two admins click at once (the loser gets a 400). If the replay fails too, acknowledge and replay that newest generation instead (TTW-110). Each acknowledge and each replay writes an audit log entry (`notification.dead_letter.acknowledged` / `.replayed`) with the admin, the reason as note, and the new row for a replay. The admin screen is `/admin/notifications/failed`.
 
 ## Delivery SLO targets (interim)
 

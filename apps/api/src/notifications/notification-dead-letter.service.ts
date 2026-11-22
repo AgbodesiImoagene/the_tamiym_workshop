@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AuditAction,
   DeadLetterAckStatus,
   NotificationChannel,
   NotificationStatus,
@@ -12,6 +13,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { ObservabilityService } from '../observability/observability.service';
+import { AuditService } from '../audit/audit.service';
 import {
   maskNotificationRecipient,
   redactAttemptErrorMessage,
@@ -27,6 +29,7 @@ export class NotificationDeadLetterService {
     private readonly dispatch: NotificationDispatchService,
     private readonly observability: ObservabilityService,
     private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   async listDeadLetters(query: {
@@ -62,12 +65,15 @@ export class NotificationDeadLetterService {
         deadLetterAckAt: true,
         updatedAt: true,
         createdAt: true,
+        _count: { select: { replays: true } },
       },
     });
 
     return {
-      items: rows.map((row) => ({
+      items: rows.map(({ _count, ...row }) => ({
         ...row,
+        // A failure that already has a replay must not be resent again.
+        replayCount: _count.replays,
         recipient: maskNotificationRecipient(row.channel, row.recipient),
         lastError: row.lastError
           ? redactAttemptErrorMessage(row.lastError)
@@ -125,6 +131,14 @@ export class NotificationDeadLetterService {
     if (updated.count === 0) {
       throw new NotFoundException('Dead letter not found.');
     }
+    await this.audit.log({
+      eventName: 'notification.dead_letter.acknowledged',
+      action: AuditAction.UPDATE,
+      entityType: 'NotificationOutbox',
+      entityId: id,
+      actorUserId: adminUserId,
+      note: note?.slice(0, 2000) ?? null,
+    });
     return this.getDeadLetter(id);
   }
 
@@ -198,6 +212,21 @@ export class NotificationDeadLetterService {
 
     this.observability.recordNotificationDeadLetterReplay({
       outcome: 'success',
+    });
+    await this.audit.log({
+      eventName: 'notification.dead_letter.replayed',
+      action: AuditAction.CREATE,
+      entityType: 'NotificationOutbox',
+      entityId: original.id,
+      targetType: 'NotificationOutbox',
+      targetId: result.outboxId,
+      actorUserId: adminUserId,
+      note: trimmedReason,
+      metadata: {
+        channel: original.channel,
+        eventName: original.eventName,
+        generation: nextGeneration,
+      },
     });
 
     return {

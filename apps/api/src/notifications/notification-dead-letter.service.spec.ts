@@ -5,6 +5,7 @@ import { NotificationDeadLetterService } from './notification-dead-letter.servic
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { ObservabilityService } from '../observability/observability.service';
+import { AuditService } from '../audit/audit.service';
 import {
   NotificationChannel,
   NotificationStatus,
@@ -23,6 +24,7 @@ describe('NotificationDeadLetterService', () => {
   };
   const dispatch = { dispatch: jest.fn() };
   const observability = { recordNotificationDeadLetterReplay: jest.fn() };
+  const audit = { log: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -32,6 +34,7 @@ describe('NotificationDeadLetterService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationDispatchService, useValue: dispatch },
         { provide: ObservabilityService, useValue: observability },
+        { provide: AuditService, useValue: audit },
         {
           provide: ConfigService,
           useValue: { get: jest.fn((_k, def) => def) },
@@ -58,11 +61,77 @@ describe('NotificationDeadLetterService', () => {
         deadLetterAckAt: null,
         updatedAt: new Date(),
         createdAt: new Date(),
+        _count: { replays: 0 },
       },
     ]);
 
     const result = await service.listDeadLetters({});
     expect(result.items[0].recipient).toBe('a***@example.com');
+  });
+
+  it('tells the list how many replays a failure already has', async () => {
+    prisma.notificationOutbox.findMany.mockResolvedValue([
+      {
+        id: 'dl-1',
+        eventName: 'PaymentConfirmed',
+        channel: NotificationChannel.EMAIL,
+        recipient: 'alice@example.com',
+        lastError: null,
+        _count: { replays: 2 },
+      },
+    ]);
+
+    const result = await service.listDeadLetters({});
+    expect(result.items[0].replayCount).toBe(2);
+    expect(result.items[0]).not.toHaveProperty('_count');
+  });
+
+  it('records the replay reason and the admin in the audit log', async () => {
+    prisma.notificationOutbox.findFirst
+      .mockResolvedValueOnce({
+        id: 'dl-1',
+        status: NotificationStatus.FAILED,
+        deadLetterAckStatus: 'ACKNOWLEDGED',
+        effectKey: 'PaymentConfirmed:u1:EMAIL',
+        channel: NotificationChannel.EMAIL,
+        eventName: 'PaymentConfirmed',
+        recipient: 'a@example.com',
+        recipientUserId: 'u1',
+        payload: {},
+        generation: 1,
+      })
+      .mockResolvedValueOnce(null);
+    dispatch.dispatch.mockResolvedValue({ outboxId: 'out-2', queued: true });
+
+    await service.replayDeadLetter('dl-1', 'admin-1', '  provider is back  ');
+
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'notification.dead_letter.replayed',
+        entityId: 'dl-1',
+        targetId: 'out-2',
+        actorUserId: 'admin-1',
+        note: 'provider is back',
+      }),
+    );
+  });
+
+  it('does not audit a replay that was denied', async () => {
+    prisma.notificationOutbox.findFirst
+      .mockResolvedValueOnce({
+        id: 'dl-1',
+        status: NotificationStatus.FAILED,
+        deadLetterAckStatus: 'ACKNOWLEDGED',
+        effectKey: 'k1',
+        channel: NotificationChannel.EMAIL,
+        generation: 1,
+      })
+      .mockResolvedValueOnce({ id: 'out-2' });
+
+    await expect(
+      service.replayDeadLetter('dl-1', 'admin-1', 'retry'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(audit.log).not.toHaveBeenCalled();
   });
 
   it('replays with next generation when acknowledged', async () => {
@@ -250,6 +319,14 @@ describe('NotificationDeadLetterService', () => {
 
     expect(prisma.notificationOutbox.updateMany).toHaveBeenCalled();
     expect(result.id).toBe('dl-1');
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'notification.dead_letter.acknowledged',
+        entityId: 'dl-1',
+        actorUserId: 'admin-1',
+        note: 'reviewed',
+      }),
+    );
   });
 
   it('throws when acknowledge target missing', async () => {
@@ -316,6 +393,7 @@ describe('NotificationDeadLetterService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationDispatchService, useValue: dispatch },
         { provide: ObservabilityService, useValue: observability },
+        { provide: AuditService, useValue: audit },
         {
           provide: ConfigService,
           useValue: { get: jest.fn(() => 1) },
