@@ -79,6 +79,11 @@ export function setSurfaceAuthCookies(
   surface: AuthSurface,
   accessToken: string,
   refreshToken: string,
+  /**
+   * TTW-262: CSRF token to keep (a refresh passes the one the browser already holds, so the
+   * other tabs' copy stays valid). Omit to mint a new one (login, register, body-only refresh).
+   */
+  existingCsrfToken?: string,
 ): string {
   const names = surfaceCookieNames(surface);
   const base = authCookieBaseOptions();
@@ -92,13 +97,23 @@ export function setSurfaceAuthCookies(
     maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
   });
 
-  const csrfToken = generateCsrfToken();
+  const csrfToken = isWellFormedCsrfToken(existingCsrfToken)
+    ? existingCsrfToken
+    : generateCsrfToken();
   setSurfaceCsrfCookie(res, surface, csrfToken);
 
   clearSurfaceAuthCookies(res, oppositeSurface(surface));
   clearLegacyAuthCookies(res);
 
   return csrfToken;
+}
+
+/**
+ * A CSRF value we would have minted ourselves. A cookie can be planted by a sibling
+ * subdomain, so a malformed value is replaced, never kept alive by a refresh.
+ */
+export function isWellFormedCsrfToken(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 }
 
 /** Fresh double-submit CSRF token value. */

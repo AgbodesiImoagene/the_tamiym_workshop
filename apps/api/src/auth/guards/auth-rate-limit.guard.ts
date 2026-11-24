@@ -11,6 +11,7 @@ import {
 } from '../admin-mfa.service';
 import { AUTH_RATE_LIMIT_BUCKET_KEY } from '../auth-rate-limit';
 import { AuthRateLimitService } from '../auth-rate-limit.service';
+import { surfaceCookieNames } from '../auth-cookies';
 
 const MFA_TOKEN_PURPOSES = new Set([
   MFA_TOKEN_PURPOSE_ENROLL,
@@ -41,16 +42,22 @@ export class AuthRateLimitGuard implements CanActivate {
       signupToken?: unknown;
     };
     const email = typeof body.email === 'string' ? body.email : null;
-    const identity =
-      this.identityFromMfaToken(
-        typeof body.mfa_token === 'string' ? body.mfa_token : null,
-      ) ??
-      this.identityFromResetToken(
-        typeof body.token === 'string' ? body.token : null,
-      ) ??
-      this.identityFromSignupToken(
-        typeof body.signupToken === 'string' ? body.signupToken : null,
-      );
+    const sessionBucket =
+      bucket === 'session_refresh' || bucket === 'csrf_token';
+    // Refresh and CSRF-token calls are keyed by the session cookie only: a body field must
+    // not buy a fresh identity.
+    const identity = sessionBucket
+      ? this.identityFromSessionCookie(bucket, req)
+      : (this.identityFromMfaToken(
+          typeof body.mfa_token === 'string' ? body.mfa_token : null,
+        ) ??
+        this.identityFromResetToken(
+          typeof body.token === 'string' ? body.token : null,
+        ) ??
+        this.identityFromSignupToken(
+          typeof body.signupToken === 'string' ? body.signupToken : null,
+        ) ??
+        this.identityFromSessionCookie(bucket, req));
     const path = req.path ?? '';
     const surface =
       path.includes('/admin') || path.includes('/auth/admin')
@@ -96,6 +103,31 @@ export class AuthRateLimitGuard implements CanActivate {
       // fall through to token fingerprint
     }
     return fingerprint;
+  }
+
+  /**
+   * TTW-262: refresh and CSRF-token calls carry no email, so without this every caller would
+   * share the `anon` identity key. Count per session cookie (hashed, never stored raw), or per
+   * IP when there is none.
+   */
+  private identityFromSessionCookie(
+    bucket: AuthRateLimitBucket,
+    req: Request,
+  ): string | null {
+    if (bucket !== 'session_refresh' && bucket !== 'csrf_token') return null;
+    for (const surface of [AuthSurface.CUSTOMER, AuthSurface.ADMIN]) {
+      const names = surfaceCookieNames(surface);
+      const value = (req.cookies?.[names.refresh] ||
+        req.cookies?.[names.access]) as unknown;
+      if (typeof value === 'string' && value.length > 0) {
+        return `session:${createHash('sha256').update(value).digest('hex').slice(0, 32)}`;
+      }
+    }
+    const body = req.body as { refresh_token?: unknown } | undefined;
+    if (typeof body?.refresh_token === 'string' && body.refresh_token) {
+      return `session:${createHash('sha256').update(body.refresh_token).digest('hex').slice(0, 32)}`;
+    }
+    return `ip:${req.ip ?? 'unknown'}`;
   }
 
   /** Hash password-reset tokens so resets do not share a global `anon` key. */

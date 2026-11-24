@@ -12,6 +12,7 @@ import {
   Delete,
   Param,
   Headers,
+  Header,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
@@ -720,11 +721,13 @@ export class AuthController {
    */
   @Public()
   @Post('refresh')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('session_refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Refresh access token',
     description:
-      'Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt.',
+      'Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt. The refresh token is rotated; the CSRF token is NOT: the value of the existing CSRF cookie is kept (and returned in `csrf_token`), so other tabs holding it stay valid. A request with no CSRF cookie (body-only client) gets a new one. Rate limited per session cookie and per IP.',
   })
   @ApiResponse({
     status: 200,
@@ -753,6 +756,7 @@ export class AuthController {
     status: 403,
     description: 'Missing/invalid CSRF token or disallowed Origin',
   })
+  @ApiResponse({ status: 429, description: 'Too many refresh attempts' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -773,9 +777,56 @@ export class AuthController {
       surface,
       result.access_token,
       result.refresh_token,
+      // TTW-262: keep the CSRF token the browser already holds.
+      (req?.cookies?.[surfaceCookieNames(surface).csrf] as
+        | string
+        | undefined) || undefined,
     );
 
     return { user: result.user, csrf_token: csrfToken };
+  }
+
+  /**
+   * TTW-262: hand the CSRF token back to a tab that lost it (new tab, restart:
+   * `sessionStorage` is empty and the host-only API cookie is unreadable).
+   */
+  @Public()
+  @Get('csrf')
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('csrf_token')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Get the session CSRF token',
+    description:
+      'Safe method, so it is not CSRF-checked. Needs a surface session cookie (access or refresh, even an expired access token) and an allowlisted Origin of the same surface, like refresh. Returns only the existing CSRF cookie value (minted and set only if the session has none). Never cacheable. Rate limited per session cookie and per IP.',
+  })
+  @ApiCookieAuth('access_token')
+  @ApiResponse({
+    status: 200,
+    description: 'The session CSRF token',
+    schema: {
+      type: 'object',
+      properties: { csrf_token: CSRF_TOKEN_SCHEMA },
+      required: ['csrf_token'],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description:
+      'No session cookie, or the Origin does not match the cookie surface',
+  })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  getCsrfToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const surface = this.resolveSessionSurface(req);
+    // A CSRF cookie alone is not a session: ask for an access or refresh cookie.
+    const csrfToken =
+      surface && surfacesWithSessionCookies(req).includes(surface)
+        ? ensureSurfaceCsrfCookie(req, res, surface)
+        : undefined;
+    if (!csrfToken) {
+      throw new UnauthorizedException('No session');
+    }
+    return { csrf_token: csrfToken };
   }
 
   /**

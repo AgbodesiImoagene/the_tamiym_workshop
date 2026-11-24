@@ -381,6 +381,138 @@ describe('AuthController', () => {
     });
   });
 
+  const GOOD_CSRF = 'ab12'.repeat(16);
+
+  describe('refresh keeps the CSRF token (TTW-262)', () => {
+    const refreshResult = {
+      user: mockUser,
+      access_token: 'new-access',
+      refresh_token: 'new-refresh',
+    };
+
+    it('returns and sets again the CSRF value the browser already holds', async () => {
+      authService.refresh.mockResolvedValue(refreshResult);
+      const mockReq = buildRequest({
+        origin: CUSTOMER_ORIGIN,
+        cookies: {
+          [CUSTOMER_REFRESH_COOKIE]: 'old-refresh',
+          [CUSTOMER_CSRF_COOKIE]: GOOD_CSRF,
+        },
+      });
+
+      const result = await controller.refresh(
+        mockReq,
+        mockRes as unknown as Response,
+      );
+
+      expect(result.csrf_token).toBe(GOOD_CSRF);
+      expect(cookieValue(mockRes, CUSTOMER_CSRF_COOKIE)).toBe(GOOD_CSRF);
+    });
+
+    it('mints a new CSRF token when the request carries none', async () => {
+      authService.refresh.mockResolvedValue(refreshResult);
+      const mockReq = buildRequest({
+        body: { refresh_token: 'body-refresh' },
+      });
+
+      const result = await controller.refresh(
+        mockReq,
+        mockRes as unknown as Response,
+      );
+
+      expect(result.csrf_token).toEqual(expect.any(String));
+      expect(result.csrf_token).not.toBe('');
+      expect(cookieValue(mockRes, CUSTOMER_CSRF_COOKIE)).toBe(
+        result.csrf_token,
+      );
+    });
+
+    it('replaces a malformed CSRF cookie instead of keeping it alive', async () => {
+      authService.refresh.mockResolvedValue(refreshResult);
+      const mockReq = buildRequest({
+        origin: CUSTOMER_ORIGIN,
+        cookies: {
+          [CUSTOMER_REFRESH_COOKIE]: 'old-refresh',
+          [CUSTOMER_CSRF_COOKIE]: 'planted',
+        },
+      });
+
+      const result = await controller.refresh(
+        mockReq,
+        mockRes as unknown as Response,
+      );
+
+      expect(result.csrf_token).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+
+  describe('getCsrfToken (TTW-262)', () => {
+    it('returns the existing CSRF cookie value and sets nothing', () => {
+      const mockReq = buildRequest({
+        origin: CUSTOMER_ORIGIN,
+        cookies: {
+          [CUSTOMER_REFRESH_COOKIE]: 'refresh',
+          [CUSTOMER_CSRF_COOKIE]: 'existing-csrf',
+        },
+      });
+
+      expect(
+        controller.getCsrfToken(mockReq, mockRes as unknown as Response),
+      ).toEqual({ csrf_token: 'existing-csrf' });
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+    });
+
+    it('mints and sets a token for a session cookie that has none', () => {
+      const mockReq = buildRequest({
+        origin: CUSTOMER_ORIGIN,
+        cookies: { [CUSTOMER_REFRESH_COOKIE]: 'refresh' },
+      });
+
+      const result = controller.getCsrfToken(
+        mockReq,
+        mockRes as unknown as Response,
+      );
+
+      expect(result.csrf_token).toEqual(expect.any(String));
+      expect(cookieValue(mockRes, CUSTOMER_CSRF_COOKIE)).toBe(
+        result.csrf_token,
+      );
+    });
+
+    it('answers 401 with only a CSRF cookie, which is not a session', () => {
+      expect(() =>
+        controller.getCsrfToken(
+          buildRequest({
+            origin: CUSTOMER_ORIGIN,
+            cookies: { [CUSTOMER_CSRF_COOKIE]: 'existing-csrf' },
+          }),
+          mockRes as unknown as Response,
+        ),
+      ).toThrow(UnauthorizedException);
+    });
+
+    it('answers 401 with no session cookie, or an unresolved surface', () => {
+      expect(() =>
+        controller.getCsrfToken(
+          buildRequest({ origin: CUSTOMER_ORIGIN }),
+          mockRes as unknown as Response,
+        ),
+      ).toThrow(UnauthorizedException);
+      expect(() =>
+        controller.getCsrfToken(
+          buildRequest({ cookies: { [CUSTOMER_REFRESH_COOKIE]: 'refresh' } }),
+          mockRes as unknown as Response,
+        ),
+      ).toThrow(UnauthorizedException);
+      expect(() =>
+        controller.getCsrfToken(
+          buildRequest({}),
+          mockRes as unknown as Response,
+        ),
+      ).toThrow(UnauthorizedException);
+    });
+  });
+
   describe('refresh', () => {
     it('reads the CUSTOMER refresh cookie when Origin resolves to CUSTOMER', async () => {
       authService.refresh.mockResolvedValue({

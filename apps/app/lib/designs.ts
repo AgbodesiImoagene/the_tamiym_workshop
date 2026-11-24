@@ -1,4 +1,4 @@
-import { apiClient, csrfHeaders } from './api';
+import { apiClient, apiFetch } from './api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -196,12 +196,11 @@ export async function uploadThumbnail(
   const formData = new FormData();
   formData.append('thumbnail', blob, 'thumb.webp');
 
-  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1'}/designs/${designId}/thumbnail`;
-  const response = await fetch(url, {
+  // Through `apiFetch`: renews the session when the access cookie expired during a long editing
+  // session (TTW-262). No Content-Type: the browser sets the multipart boundary.
+  const response = await apiFetch(`/designs/${designId}/thumbnail`, {
     method: 'POST',
     body: formData,
-    credentials: 'include',
-    headers: csrfHeaders(),
   });
 
   if (!response.ok) {
@@ -297,12 +296,9 @@ export async function uploadDesignAsset(
   const formData = new FormData();
   formData.append('file', file);
 
-  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1'}/design-assets/upload`;
-  const response = await fetch(url, {
+  const response = await apiFetch('/design-assets/upload', {
     method: 'POST',
     body: formData,
-    credentials: 'include',
-    headers: csrfHeaders(),
   });
 
   if (!response.ok) {
