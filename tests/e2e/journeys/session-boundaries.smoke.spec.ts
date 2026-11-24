@@ -105,12 +105,16 @@ test.describe('CSRF token storage @smoke', () => {
     ).toBeVisible();
 
     // The dashboard's auth/me call is what seeds the token for a tab that
-    // never saw a login response (TTW-020).
-    const stored = await customerPage.evaluate(
-      (key) => window.sessionStorage.getItem(key),
-      csrfStorageKey('CUSTOMER')
-    );
-    expect(stored).toEqual(expect.any(String));
+    // never saw a login response (TTW-020). Since TTW-260 the page shows its
+    // heading before that call returns, so wait for the token instead of
+    // reading it at once.
+    const readStored = () =>
+      customerPage.evaluate(
+        (key) => window.sessionStorage.getItem(key),
+        csrfStorageKey('CUSTOMER')
+      );
+    await expect.poll(readStored).toEqual(expect.any(String));
+    const stored = await readStored();
 
     // It is the token the API expects back in the CSRF header, i.e. the same
     // value as the session's CSRF cookie.

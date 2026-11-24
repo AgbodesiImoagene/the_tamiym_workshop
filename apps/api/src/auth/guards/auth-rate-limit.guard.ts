@@ -58,6 +58,11 @@ export class AuthRateLimitGuard implements CanActivate {
           typeof body.signupToken === 'string' ? body.signupToken : null,
         ) ??
         this.identityFromSessionCookie(bucket, req));
+    // No session credential at all: the handler answers 401 at once, so there is nothing to
+    // protect, and counting by IP would make every signed-out visitor share one budget.
+    if (sessionBucket && identity === null) {
+      return true;
+    }
     const path = req.path ?? '';
     const surface =
       path.includes('/admin') || path.includes('/auth/admin')
@@ -107,8 +112,8 @@ export class AuthRateLimitGuard implements CanActivate {
 
   /**
    * TTW-262: refresh and CSRF-token calls carry no email, so without this every caller would
-   * share the `anon` identity key. Count per session cookie (hashed, never stored raw), or per
-   * IP when there is none.
+   * share the `anon` identity key. Count per session credential (hashed, never stored raw).
+   * `null` when the request carries none: it is not counted.
    */
   private identityFromSessionCookie(
     bucket: AuthRateLimitBucket,
@@ -127,7 +132,7 @@ export class AuthRateLimitGuard implements CanActivate {
     if (typeof body?.refresh_token === 'string' && body.refresh_token) {
       return `session:${createHash('sha256').update(body.refresh_token).digest('hex').slice(0, 32)}`;
     }
-    return `ip:${req.ip ?? 'unknown'}`;
+    return null;
   }
 
   /** Hash password-reset tokens so resets do not share a global `anon` key. */

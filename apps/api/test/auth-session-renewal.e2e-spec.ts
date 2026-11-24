@@ -409,6 +409,24 @@ describe('Auth session renewal (e2e)', () => {
         .expect(401);
     });
 
+    it('never refuses a signed-out visitor with 429: no credential, nothing counted', async () => {
+      const limit = AUTH_RATE_LIMIT_BUCKETS.csrf_token.identityLimit;
+      for (let i = 0; i < limit + 5; i += 1) {
+        await request(app.getHttpServer())
+          .get('/v1/auth/csrf')
+          .set('Origin', CUSTOMER_ORIGIN)
+          .expect(401);
+      }
+      const refreshLimit =
+        AUTH_RATE_LIMIT_BUCKETS.session_refresh.identityLimit;
+      for (let i = 0; i < refreshLimit + 5; i += 1) {
+        await request(app.getHttpServer())
+          .post('/v1/auth/refresh')
+          .set('Origin', CUSTOMER_ORIGIN)
+          .expect(401);
+      }
+    });
+
     it('limits GET /auth/csrf per session cookie', async () => {
       const limit = AUTH_RATE_LIMIT_BUCKETS.csrf_token.identityLimit;
       const cookies = cookieHeader({
