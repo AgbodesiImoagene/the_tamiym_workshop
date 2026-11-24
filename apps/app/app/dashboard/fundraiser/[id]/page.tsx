@@ -1,7 +1,7 @@
 'use client';
 
-import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
-import { authApi, ApiError, User } from '@/lib/auth';
+import { formatCurrency } from '@/components/customer-dashboard-shell';
+import { ApiError } from '@/lib/auth';
 import {
   addCampaignOffer,
   getCampaignDraftPreview,
@@ -16,8 +16,9 @@ import { getMyDesigns, Design } from '@/lib/designs';
 import { getAllDashboardProducts, DashboardProduct } from '@/lib/products';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { useCurrentUser } from '@/lib/current-user';
 
 function errorMessage(err: unknown): string {
   const apiError = err as ApiError;
@@ -162,10 +163,8 @@ function BasicsEditor({
 export default function CampaignAuthoringPage() {
   const params = useParams<{ id: string }>();
   const campaignId = params.id;
-  const router = useRouter();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<User | null>(null);
-  const [bootError, setBootError] = useState<string | null>(null);
+  const { user } = useCurrentUser();
   const [formError, setFormError] = useState<string | null>(null);
   const [staleNotice, setStaleNotice] = useState<string | null>(null);
 
@@ -175,23 +174,6 @@ export default function CampaignAuthoringPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await authApi.getMe();
-        setUser(userData);
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setBootError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-    void fetchUser();
-  }, [router]);
 
   const detailQuery = useQuery({
     queryKey: ['campaign-authoring', campaignId],
@@ -326,19 +308,8 @@ export default function CampaignAuthoringPage() {
     },
   });
 
-  if (bootError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{bootError}</p>
-      </div>
-    );
-  }
-
   return (
-    <CustomerDashboardShell
-      activeNav="fundraiser"
-      displayName={user?.firstName || user?.email?.split('@')[0]}
-    >
+    <>
       <div className="mt-10 space-y-8 lg:mt-0" data-testid="campaign-authoring-editor">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
@@ -665,6 +636,6 @@ export default function CampaignAuthoringPage() {
           </div>
         ) : null}
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
-import { authApi, ApiError, User } from '@/lib/auth';
+import { formatCurrency } from '@/components/customer-dashboard-shell';
+import { ApiError } from '@/lib/auth';
 import { getCustomerCampaigns } from '@/lib/dashboard';
 import { createPayoutProfile, getBanks, getPayoutProfiles } from '@/lib/fundraising';
 import {
@@ -30,8 +30,9 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useCurrentUser } from '@/lib/current-user';
 
 interface PayoutFormValues {
   label: string;
@@ -43,8 +44,7 @@ interface PayoutFormValues {
 export default function DashboardFundraiserPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useCurrentUser();
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   const [organisationName, setOrganisationName] = useState('');
@@ -59,24 +59,6 @@ export default function DashboardFundraiserPage() {
       accountName: '',
     },
   });
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await authApi.getMe();
-        setUser(userData);
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
 
   const eligibilityQuery = useQuery({
     queryKey: ['organizer-eligibility'],
@@ -171,19 +153,8 @@ export default function DashboardFundraiserPage() {
     (banksQuery.error as ApiError | null)?.statusCode === 403 ||
     (payoutProfilesQuery.error as ApiError | null)?.statusCode === 403;
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
-
   return (
-    <CustomerDashboardShell
-      activeNav="fundraiser"
-      displayName={user?.firstName || user?.email?.split('@')[0]}
-    >
+    <>
       <div className="mt-10 space-y-10 lg:mt-0">
         <div className="space-y-3">
           <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">Fundraiser</h1>
@@ -584,6 +555,6 @@ export default function DashboardFundraiserPage() {
           </div>
         </section>
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }

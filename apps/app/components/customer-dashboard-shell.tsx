@@ -3,6 +3,7 @@
 import { EmailVerificationBanner } from '@/components/email-verification-banner';
 import { authApi } from '@/lib/auth';
 import { customerAssets } from '@/lib/assets';
+import type { NavKey } from '@/lib/dashboard-nav';
 import {
   Avatar,
   AvatarFallback,
@@ -17,8 +18,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-
-type NavKey = 'home' | 'products' | 'design' | 'orders' | 'fundraiser' | 'cart';
 
 interface CustomerDashboardShellProps {
   activeNav: NavKey;

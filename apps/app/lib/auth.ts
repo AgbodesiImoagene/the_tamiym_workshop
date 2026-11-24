@@ -5,6 +5,7 @@
 import { apiClient, API_BASE_URL, clearCsrfToken, setCsrfToken } from './api';
 export type { ApiError } from './api';
 import { UserRole } from '@tamiym/types';
+import { resetSession } from './session-reset';
 
 export interface User {
   id: string;
@@ -81,6 +82,7 @@ export const authApi = {
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/register', data);
     setCsrfToken(response.csrf_token);
+    resetSession();
     return response;
   },
 
@@ -102,6 +104,7 @@ export const authApi = {
       code,
     });
     setCsrfToken(response.csrf_token);
+    resetSession();
     return response;
   },
 
@@ -115,6 +118,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
     setCsrfToken(response.csrf_token);
+    resetSession();
     return response;
   },
 
@@ -136,6 +140,7 @@ export const authApi = {
       await apiClient.post<void>('/auth/logout');
     } finally {
       clearCsrfToken();
+      resetSession();
     }
   },
 

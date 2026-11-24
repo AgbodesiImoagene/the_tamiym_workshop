@@ -1,8 +1,8 @@
 'use client';
 
-import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
+import { formatCurrency } from '@/components/customer-dashboard-shell';
 import { OrderStatusBanner } from '@/components/order-status-banner';
-import { ApiError, User, authApi } from '@/lib/auth';
+import { ApiError } from '@/lib/auth';
 import {
   cancelCustomerOrder,
   downloadOrderInvoice,
@@ -12,8 +12,9 @@ import {
 import { OrderStatus, PaymentStatus } from '@tamiym/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { useCurrentUser } from '@/lib/current-user';
 
 /** Statuses of a paid order that can be invoiced (TTW-108). Mirrors the API's rule. */
 const INVOICEABLE_STATUSES: string[] = [
@@ -25,9 +26,7 @@ const INVOICEABLE_STATUSES: string[] = [
 
 export default function DashboardOrderDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useCurrentUser();
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const queryClient = useQueryClient();
@@ -36,23 +35,6 @@ export default function DashboardOrderDetailPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setUser(await authApi.getMe());
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
 
   const orderQuery = useQuery({
     queryKey: ['customer-order-detail', params.id],
@@ -132,21 +114,10 @@ export default function DashboardOrderDetailPage() {
     }
   }
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
-
   const order = orderQuery.data;
 
   return (
-    <CustomerDashboardShell
-      activeNav="orders"
-      displayName={user?.firstName || user?.email?.split('@')[0]}
-    >
+    <>
       <div className="mt-10 space-y-6 lg:mt-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -487,6 +458,6 @@ export default function DashboardOrderDetailPage() {
           </div>
         ) : null}
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }
