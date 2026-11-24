@@ -78,14 +78,226 @@ export function getCsrfToken(): string | undefined {
 }
 
 /**
- * Headers for a mutating (POST/PUT/PATCH/DELETE) request made via raw
- * `fetch` instead of `apiClient` (e.g. multipart/form-data uploads). Returns
- * an empty object when there is no CSRF token to echo (unauthenticated, or
- * bearer-only auth with no cookie session).
+ * Session renewal (TTW-262).
+ *
+ * The access cookie lasts 15 minutes, the refresh cookie 7 days. When a request is answered
+ * 401 because the access cookie expired, we renew the session and replay the request once,
+ * instead of sending the person back to the login page. See
+ * docs/14-auth-and-session-architecture.md ("Renewing a customer session").
  */
-export function csrfHeaders(): Record<string, string> {
-  const csrfToken = getCsrfToken();
-  return csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {};
+const RENEWAL_LOCK_NAME = 'ttw-customer-refresh';
+/** Shared by the tabs of one browser: when the last successful renewal finished (ms). */
+const RENEWED_AT_STORAGE_KEY = 'ttw_customer_renewed_at';
+/** `/auth/*` calls that act on the signed-in session: a 401 there can mean "expired". */
+const RENEWABLE_AUTH_PATHS = ['/auth/me', '/auth/sessions', '/auth/change-password'];
+/** Longest wait for one call of the renewal (CSRF token or refresh). */
+const RENEWAL_TIMEOUT_MS = 15_000;
+const CSRF_ERROR_MESSAGE = 'Missing or invalid CSRF token';
+
+export type RenewalOutcome = 'renewed' | 'ended';
+
+let renewalInFlight: Promise<RenewalOutcome> | null = null;
+let renewedAtInMemory = 0;
+
+function renewalError(statusCode: number): ApiError {
+  // Never put a token or a cookie value here.
+  return {
+    message: 'Could not renew your session. Please try again.',
+    statusCode,
+    code: 'SESSION_RENEWAL_FAILED',
+  };
+}
+
+function readRenewedAt(): number {
+  let stored = 0;
+  try {
+    stored = Number(window.localStorage.getItem(RENEWED_AT_STORAGE_KEY)) || 0;
+  } catch {
+    // Storage blocked: this tab's own memory is enough for single-flight in the tab.
+  }
+  // A stamp from the future (clock stepped back, garbage) must never skip a needed refresh.
+  if (!Number.isFinite(stored) || stored > Date.now()) stored = 0;
+  return Math.max(stored, renewedAtInMemory);
+}
+
+function markRenewed(): void {
+  renewedAtInMemory = Date.now();
+  try {
+    window.localStorage.setItem(RENEWED_AT_STORAGE_KEY, String(renewedAtInMemory));
+  } catch {
+    // Ignore: see readRenewedAt.
+  }
+}
+
+/** Bodies we can send a second time. A stream is consumed by the first attempt. */
+function canResendBody(body: BodyInit | null | undefined): boolean {
+  if (body == null || typeof body === 'string') return true;
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return true;
+  if (typeof Blob !== 'undefined' && body instanceof Blob) return true;
+  if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) return true;
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return true;
+  return false;
+}
+
+/** Whether a 401 on `endpoint` may mean "access cookie expired" (rule in TTW-262). */
+function isRenewablePath(endpoint: string): boolean {
+  const path = endpoint.split('?')[0];
+  // Never trust a path that could be normalised into another one.
+  if (path.includes('..') || path.includes('//')) return false;
+  if (!path.startsWith('/auth/') && path !== '/auth') return true;
+  return RENEWABLE_AUTH_PATHS.some((allowed) => path === allowed || path.startsWith(`${allowed}/`));
+}
+
+/** One call of the renewal itself: never renewed, never replayed. */
+async function renewalCall(
+  method: 'GET' | 'POST',
+  endpoint: string,
+  baseUrl: string
+): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (method === 'POST') {
+    const token = getCsrfToken();
+    if (token) headers[CSRF_HEADER_NAME] = token;
+  }
+  // A hung call must not hold the lock (and every tab's requests) forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RENEWAL_TIMEOUT_MS);
+  try {
+    return await fetch(`${baseUrl}${endpoint}`, {
+      method,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+  } catch {
+    throw renewalError(503);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readCsrfFromBody(response: Response): Promise<string | undefined> {
+  try {
+    const data = (await response.json()) as { csrf_token?: unknown };
+    return typeof data.csrf_token === 'string' && data.csrf_token ? data.csrf_token : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `GET /auth/csrf`: the token of the session cookie, for a tab that lost it.
+ * 'ended' when there is no session cookie (401/403). Throws a retryable error on
+ * network/5xx/429.
+ */
+async function syncCsrfToken(baseUrl: string): Promise<RenewalOutcome> {
+  const response = await renewalCall('GET', '/auth/csrf', baseUrl);
+  if (response.status === 401 || response.status === 403) return 'ended';
+  if (!response.ok) throw renewalError(response.status);
+  const token = await readCsrfFromBody(response);
+  if (token) setCsrfToken(token);
+  // Without a token the refresh would be refused (403) and read as a sign-out: retry instead.
+  else if (!getCsrfToken()) throw renewalError(503);
+  return 'renewed';
+}
+
+async function renewSessionOnce(startedAt: number, baseUrl: string): Promise<RenewalOutcome> {
+  // Another tab renewed while we waited for the lock: its refresh already covers our request.
+  if (readRenewedAt() > startedAt) {
+    if (!getCsrfToken()) return syncCsrfToken(baseUrl);
+    return 'renewed';
+  }
+
+  const csrf = await syncCsrfToken(baseUrl);
+  if (csrf === 'ended') return 'ended';
+
+  const response = await renewalCall('POST', '/auth/refresh', baseUrl);
+  if (response.status === 401 || response.status === 403) return 'ended';
+  if (!response.ok) throw renewalError(response.status);
+  const token = await readCsrfFromBody(response);
+  if (token) setCsrfToken(token);
+  markRenewed();
+  return 'renewed';
+}
+
+/**
+ * Renew the session. One renewal at a time per tab (shared promise) and per browser
+ * (`navigator.locks`): a refresh token is single-use, so two renewals at once would sign the
+ * loser out.
+ */
+function renewSession(startedAt: number, baseUrl: string): Promise<RenewalOutcome> {
+  if (!renewalInFlight) {
+    const run = () => renewSessionOnce(startedAt, baseUrl);
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    const exclusive = locks ? locks.request(RENEWAL_LOCK_NAME, run) : run();
+    renewalInFlight = Promise.resolve(exclusive).finally(() => {
+      renewalInFlight = null;
+    });
+  }
+  return renewalInFlight;
+}
+
+async function isCsrfRejection(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false;
+  try {
+    const probe = typeof response.clone === 'function' ? response.clone() : response;
+    const data = (await probe.json()) as { message?: unknown };
+    return data.message === CSRF_ERROR_MESSAGE;
+  } catch {
+    return false;
+  }
+}
+
+function buildHeaders(init: RequestInit, method: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const isForm = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  // Multipart: the browser must set Content-Type itself (with the boundary).
+  if (!isForm) headers['Content-Type'] = 'application/json';
+  Object.assign(headers, init.headers as Record<string, string> | undefined);
+  // Double-submit CSRF (TTW-020): rebuilt on every attempt, because a renewal can change it.
+  if (MUTATING_METHODS.has(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) headers[CSRF_HEADER_NAME] = csrfToken;
+  }
+  return headers;
+}
+
+/**
+ * Low-level request to the API with the session cookie, the CSRF header and session renewal.
+ * Returns the final `Response` (it does not throw on an HTTP error status).
+ */
+export async function apiFetch(
+  endpoint: string,
+  init: RequestInit = {},
+  baseUrl: string = API_BASE_URL
+): Promise<Response> {
+  const method = (init.method || 'GET').toUpperCase();
+  const send = () =>
+    fetch(`${baseUrl}${endpoint}`, {
+      ...init,
+      headers: buildHeaders(init, method),
+      credentials: 'include',
+    });
+
+  const startedAt = Date.now();
+  const response = await send();
+  if (!canResendBody(init.body)) return response;
+
+  if (response.status === 401 && isRenewablePath(endpoint)) {
+    // A guard 401 happens before the handler ran, so one replay cannot run it twice.
+    const outcome = await renewSession(startedAt, baseUrl);
+    return outcome === 'renewed' ? send() : response;
+  }
+
+  if (MUTATING_METHODS.has(method) && (await isCsrfRejection(response))) {
+    // The CSRF guard rejects before the handler too. One resync, one replay.
+    try {
+      if ((await syncCsrfToken(baseUrl)) === 'renewed') return send();
+    } catch {
+      // Could not resync: the caller sees the original 403.
+    }
+  }
+  return response;
 }
 
 export interface ApiError {
@@ -107,30 +319,7 @@ export class ApiClient {
     options: RequestInit = {},
     parseAs: 'json' | 'blob' = 'json'
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const method = (options.method || 'GET').toUpperCase();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> | undefined),
-    };
-
-    // Double-submit CSRF: echo the stored CSRF token in a request header on
-    // cookie-authenticated mutations (TTW-020). No-op if unauthenticated or
-    // authenticating via bearer token only (no CSRF token issued).
-    if (MUTATING_METHODS.has(method)) {
-      const csrfToken = getCsrfToken();
-      if (csrfToken) {
-        headers[CSRF_HEADER_NAME] = csrfToken;
-      }
-    }
-
-    const config: RequestInit = {
-      ...options,
-      headers,
-      credentials: 'include', // Include cookies
-    };
-
-    const response = await fetch(url, config);
+    const response = await apiFetch(endpoint, options, this.baseUrl);
 
     if (!response.ok) {
       const error: ApiError = {

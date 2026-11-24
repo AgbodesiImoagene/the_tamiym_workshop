@@ -14703,6 +14703,49 @@
         ]
       }
     },
+    "/v1/auth/csrf": {
+      "get": {
+        "description": "Safe method, so it is not CSRF-checked. Needs a surface session cookie (access or refresh, even an expired access token) and an allowlisted Origin of the same surface, like refresh. Returns only the existing CSRF cookie value (minted and set only if the session has none). Never cacheable. Rate limited per session cookie and per IP.",
+        "operationId": "AuthController_getCsrfToken",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "csrf_token": {
+                      "description": "Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "csrf_token"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The session CSRF token"
+          },
+          "401": {
+            "description": "No session cookie, or the Origin does not match the cookie surface"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Get the session CSRF token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/v1/auth/forgot-password": {
       "post": {
         "operationId": "AuthController_forgotPassword",
@@ -14992,7 +15035,7 @@
     },
     "/v1/auth/refresh": {
       "post": {
-        "description": "Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt.",
+        "description": "Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt. The refresh token is rotated; the CSRF token is NOT: the value of the existing CSRF cookie is kept (and returned in `csrf_token`), so other tabs holding it stay valid. A request with no CSRF cookie (body-only client) gets a new one. Rate limited per session cookie and per IP.",
         "operationId": "AuthController_refresh",
         "parameters": [],
         "responses": {
@@ -15052,6 +15095,9 @@
           },
           "403": {
             "description": "Missing/invalid CSRF token or disallowed Origin"
+          },
+          "429": {
+            "description": "Too many refresh attempts"
           }
         },
         "summary": "Refresh access token",

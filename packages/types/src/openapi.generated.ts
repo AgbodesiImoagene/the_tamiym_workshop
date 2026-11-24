@@ -2109,6 +2109,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the session CSRF token
+         * @description Safe method, so it is not CSRF-checked. Needs a surface session cookie (access or refresh, even an expired access token) and an allowlisted Origin of the same surface, like refresh. Returns only the existing CSRF cookie value (minted and set only if the session has none). Never cacheable. Rate limited per session cookie and per IP.
+         */
+        get: operations["AuthController_getCsrfToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/forgot-password": {
         parameters: {
             query?: never;
@@ -2228,7 +2248,7 @@ export interface paths {
         put?: never;
         /**
          * Refresh access token
-         * @description Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt.
+         * @description Cookie sessions must send the surface CSRF header (X-CSRF-Token) and an allowlisted Origin; a body-only `refresh_token` call (no session cookies) is treated as a non-browser client and is CSRF-exempt. The refresh token is rotated; the CSRF token is NOT: the value of the existing CSRF cookie is kept (and returned in `csrf_token`), so other tabs holding it stay valid. A request with no CSRF cookie (body-only client) gets a new one. Rate limited per session cookie and per IP.
          */
         post: operations["AuthController_refresh"];
         delete?: never;
@@ -11589,6 +11609,43 @@ export interface operations {
             };
         };
     };
+    AuthController_getCsrfToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session CSRF token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests. */
+                        csrf_token: string;
+                    };
+                };
+            };
+            /** @description No session cookie, or the Origin does not match the cookie surface */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AuthController_forgotPassword: {
         parameters: {
             query?: never;
@@ -11826,6 +11883,13 @@ export interface operations {
             };
             /** @description Missing/invalid CSRF token or disallowed Origin */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many refresh attempts */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

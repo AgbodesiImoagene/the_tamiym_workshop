@@ -26,7 +26,11 @@ describe('AuthRateLimitGuard', () => {
     );
   });
 
-  function contextFor(body: Record<string, unknown>, path: string) {
+  function contextFor(
+    body: Record<string, unknown>,
+    path: string,
+    cookies: Record<string, string> = {},
+  ) {
     return {
       getHandler: () => ({}),
       getClass: () => ({}),
@@ -34,6 +38,7 @@ describe('AuthRateLimitGuard', () => {
         getRequest: () => ({
           body,
           path,
+          cookies,
           ip: '127.0.0.1',
         }),
       }),
@@ -174,6 +179,85 @@ describe('AuthRateLimitGuard', () => {
       identity: null,
       ip: '127.0.0.1',
       surface: 'CUSTOMER',
+    });
+  });
+
+  describe('refresh and CSRF-token buckets (TTW-262)', () => {
+    const fingerprint = (value: string) =>
+      `session:${createHash('sha256').update(value).digest('hex').slice(0, 32)}`;
+
+    it.each(['session_refresh', 'csrf_token'] as const)(
+      'keys %s by the customer refresh cookie, never a shared anon key',
+      async (bucket) => {
+        reflector.getAllAndOverride.mockReturnValue(bucket);
+        await guard.canActivate(
+          contextFor({}, '/v1/auth/refresh', {
+            ttw_customer_refresh: 'refresh-cookie',
+            ttw_customer_access: 'access-cookie',
+          }),
+        );
+        expect(rateLimit.consume).toHaveBeenCalledWith({
+          bucket,
+          email: null,
+          identity: fingerprint('refresh-cookie'),
+          ip: '127.0.0.1',
+          surface: 'CUSTOMER',
+        });
+      },
+    );
+
+    it('falls back to the access cookie, then to the admin cookies', async () => {
+      reflector.getAllAndOverride.mockReturnValue('csrf_token');
+      await guard.canActivate(
+        contextFor({}, '/v1/auth/csrf', { ttw_customer_access: 'access-only' }),
+      );
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: fingerprint('access-only') }),
+      );
+      await guard.canActivate(
+        contextFor({}, '/v1/auth/csrf', { ttw_admin_refresh: 'admin-refresh' }),
+      );
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: fingerprint('admin-refresh') }),
+      );
+    });
+
+    it('keys a cookie-less body refresh by its refresh_token, and nothing by the IP', async () => {
+      reflector.getAllAndOverride.mockReturnValue('session_refresh');
+      await guard.canActivate(
+        contextFor({ refresh_token: 'body-token' }, '/v1/auth/refresh'),
+      );
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: fingerprint('body-token') }),
+      );
+      await guard.canActivate(contextFor({}, '/v1/auth/refresh'));
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: 'ip:127.0.0.1' }),
+      );
+    });
+
+    it('ignores body token fields for these buckets', async () => {
+      reflector.getAllAndOverride.mockReturnValue('session_refresh');
+      await guard.canActivate(
+        contextFor({ token: 'x', signupToken: 'y' }, '/v1/auth/refresh', {
+          ttw_customer_refresh: 'refresh-cookie',
+        }),
+      );
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: fingerprint('refresh-cookie') }),
+      );
+    });
+
+    it('does not read cookies for the other buckets', async () => {
+      reflector.getAllAndOverride.mockReturnValue('customer_auth');
+      await guard.canActivate(
+        contextFor({ email: 'a@b.c' }, '/v1/auth/login', {
+          ttw_customer_refresh: 'refresh-cookie',
+        }),
+      );
+      expect(rateLimit.consume).toHaveBeenLastCalledWith(
+        expect.objectContaining({ identity: null }),
+      );
     });
   });
 });

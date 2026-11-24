@@ -136,6 +136,22 @@ export const AUTH_RATE_LIMIT_BUCKETS = {
     ipLimit: 30,
     ttlMs: 10 * 60_000,
   },
+  /**
+   * TTW-262: `POST /auth/refresh`. Identity = fingerprint of the session cookie (never the
+   * email: the body has none), so one customer cannot use up another's budget. Sized well
+   * above normal use (a tab refreshes about every 15 minutes).
+   */
+  session_refresh: {
+    identityLimit: 30,
+    ipLimit: 120,
+    ttlMs: 60_000,
+  },
+  /** TTW-262: `GET /auth/csrf`, called by a tab that lost its CSRF token. Same identity rule. */
+  csrf_token: {
+    identityLimit: 60,
+    ipLimit: 240,
+    ttlMs: 60_000,
+  },
 } as const;
 
 export type AuthRateLimitBucket = keyof typeof AUTH_RATE_LIMIT_BUCKETS;
