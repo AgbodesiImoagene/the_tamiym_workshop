@@ -38,6 +38,9 @@ export const requiredProductionEnvVars = [
   'NOTIFICATION_UNSUBSCRIBE_SECRET',
   // Signs and authenticates every Paystack call and webhook; without it no order can be paid (TTW-248).
   'PAYSTACK_SECRET_KEY',
+  // Keys the HMAC of the sign-up email codes (TTW-254). Outside production it falls back to a key
+  // derived from the JWT secret.
+  'SIGNUP_CODE_HMAC_KEY',
   ...requiredProductionMailEnvVars,
 ] as const;
 
@@ -253,6 +256,13 @@ export function validateEnv(
     ) {
       throw new Error(
         'Environment variable PAYSTACK_SECRET_KEY must be set to a real value, not a placeholder',
+      );
+    }
+
+    // Never echo the value (TTW-248, TTW-254).
+    if (String(config.SIGNUP_CODE_HMAC_KEY).trim().length < 32) {
+      throw new Error(
+        'Environment variable SIGNUP_CODE_HMAC_KEY must be at least 32 characters',
       );
     }
 

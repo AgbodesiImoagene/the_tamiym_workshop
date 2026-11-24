@@ -10,6 +10,7 @@ import {
   JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
   JOB_PASSWORD_RESET_EMAIL,
+  JOB_SIGNUP_CODE_EMAIL,
   JOB_VERIFICATION_EMAIL,
 } from '../../constants';
 
@@ -19,6 +20,7 @@ describe('MailProcessor', () => {
     Pick<
       MailService,
       | 'sendVerificationEmail'
+      | 'sendSignupCodeEmail'
       | 'sendPasswordResetEmail'
       | 'sendGoogleLinkedPasswordRemovedEmail'
       | 'sendGoogleLinkedAccountSuspendedEmail'
@@ -32,6 +34,7 @@ describe('MailProcessor', () => {
   beforeEach(async () => {
     mailService = {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      sendSignupCodeEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
       sendGoogleLinkedPasswordRemovedEmail: jest
         .fn()
@@ -72,6 +75,45 @@ describe('MailProcessor', () => {
       opts: extra.opts ?? { attempts: 8 },
     } as unknown as Job;
   }
+
+  describe('sign-up code email (TTW-254)', () => {
+    it('sends a live code and logs neither the address nor the code', async () => {
+      const log = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => undefined);
+      const data = {
+        to: 'a@b.com',
+        code: '123456',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+
+      await processor.process(makeJob(JOB_SIGNUP_CODE_EMAIL, data));
+
+      expect(mailService.sendSignupCodeEmail).toHaveBeenCalledWith(data);
+      const logged = JSON.stringify(log.mock.calls);
+      expect(logged).not.toContain('a@b.com');
+      expect(logged).not.toContain('123456');
+      log.mockRestore();
+    });
+
+    it('skips a code that has expired, so a late retry never sends a dead code', async () => {
+      const log = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => undefined);
+
+      await processor.process(
+        makeJob(JOB_SIGNUP_CODE_EMAIL, {
+          to: 'a@b.com',
+          code: '123456',
+          expiresAt: new Date(Date.now() - 1_000).toISOString(),
+        }),
+      );
+
+      expect(mailService.sendSignupCodeEmail).not.toHaveBeenCalled();
+      expect(JSON.stringify(log.mock.calls)).not.toContain('123456');
+      log.mockRestore();
+    });
+  });
 
   it('sends verification email without logging the address (TTW-184)', async () => {
     const log = jest
@@ -135,6 +177,7 @@ describe('MailProcessor', () => {
         .spyOn(Logger.prototype, 'warn')
         .mockImplementation(() => undefined);
       mailService.sendVerificationEmail.mockRejectedValue(failingSend());
+      mailService.sendSignupCodeEmail.mockRejectedValue(failingSend());
       mailService.sendPasswordResetEmail.mockRejectedValue(failingSend());
       mailService.sendGoogleLinkedAccountSuspendedEmail.mockRejectedValue(
         failingSend(),
@@ -146,6 +189,10 @@ describe('MailProcessor', () => {
     it.each([
       [JOB_PASSWORD_RESET_EMAIL, { to: ADDRESS, resetUrl: LINK }],
       [JOB_VERIFICATION_EMAIL, { to: ADDRESS, verifyUrl: LINK }],
+      [
+        JOB_SIGNUP_CODE_EMAIL,
+        { to: ADDRESS, code: '123456', expiresAt: '2099-01-01T00:00:00.000Z' },
+      ],
     ])(
       'logs a warning for %s without the address, link, token or error message, then rethrows',
       async (name, data) => {

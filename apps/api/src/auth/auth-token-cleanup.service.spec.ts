@@ -15,6 +15,9 @@ describe('AuthTokenCleanupService', () => {
       authSession: {
         deleteMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
+      pendingSignup: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -64,6 +67,44 @@ describe('AuthTokenCleanupService', () => {
           ],
         },
       });
+    });
+
+    it('deletes a pending sign-up only once its code has expired and its hourly send window has ended (TTW-254)', async () => {
+      const before = Date.now();
+      await service.handleExpiredTokensCleanup();
+
+      const call = (prisma.pendingSignup.deleteMany as jest.Mock).mock
+        .calls[0][0] as {
+        where: { expiresAt: { lt: Date }; windowStartedAt: { lt: Date } };
+      };
+      expect(call.where.expiresAt.lt).toBeInstanceOf(Date);
+      // The window cutoff is an hour before now, so the send cap survives until then.
+      const hourMs = 60 * 60 * 1000;
+      expect(call.where.windowStartedAt.lt.getTime()).toBeLessThanOrEqual(
+        Date.now() - hourMs + 1000,
+      );
+      expect(call.where.windowStartedAt.lt.getTime()).toBeGreaterThanOrEqual(
+        before - hourMs - 1000,
+      );
+    });
+
+    it('logs the count of expired pending sign-ups and nothing else about them (TTW-254)', async () => {
+      const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
+      (prisma.authToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.authSession.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.pendingSignup.deleteMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
+
+      await service.handleExpiredTokensCleanup();
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'Deleted 2 expired pending sign-up(s)',
+      );
     });
 
     it('should log when tokens are deleted', async () => {

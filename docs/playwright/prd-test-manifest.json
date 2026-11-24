@@ -43,9 +43,19 @@
       "tags": ["@web", "@app", "@critical"]
     },
     {
+      "id": "APP-SIGNUP-EMAIL-CODE",
+      "surface": "app",
+      "feature": "Sign-up confirmed by an emailed 6-digit code before any account exists",
+      "prd_ref": "Accounts — email verification",
+      "automation": "automated",
+      "tests": ["tests/e2e/app/signup-email-code.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@app", "@critical"]
+    },
+    {
       "id": "APP-EMAIL-VERIFICATION-BANNER",
       "surface": "app",
-      "feature": "Unverified email banner after sign-up, with a resend-link action",
+      "feature": "Unverified email banner for an unverified account, with a resend-link action",
       "prd_ref": "Accounts — email verification",
       "automation": "automated",
       "tests": ["tests/e2e/app/email-verification-banner.comprehensive.spec.ts"],

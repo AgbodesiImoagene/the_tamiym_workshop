@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SignupCodeService } from './signup-code.service';
 import { surfaceCookieNames } from './auth-cookies';
 import { AuthSurface } from '../generated/prisma/enums';
 
@@ -54,6 +55,11 @@ function buildRequest(opts: {
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: jest.Mocked<AuthService>;
+  let signupCode: {
+    start: jest.Mock;
+    verify: jest.Mock;
+    resend: jest.Mock;
+  };
   let mockRes: jest.Mocked<Pick<Response, 'cookie'>>;
 
   beforeEach(async () => {
@@ -76,9 +82,18 @@ describe('AuthController', () => {
       adminMfaRecover: jest.fn(),
     };
 
+    const mockSignupCodeService = {
+      start: jest.fn(),
+      verify: jest.fn(),
+      resend: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: mockAuthService }],
+      providers: [
+        { provide: AuthService, useValue: mockAuthService },
+        { provide: SignupCodeService, useValue: mockSignupCodeService },
+      ],
     })
       .overrideGuard(AuthRateLimitGuard)
       .useValue({ canActivate: () => true })
@@ -86,10 +101,79 @@ describe('AuthController', () => {
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get(AuthService);
+    signupCode = module.get(SignupCodeService);
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('sign-up confirmed by an emailed code (TTW-254)', () => {
+    it('start returns the service answer and sets no cookie', async () => {
+      const answer = { message: 'sent', signupToken: 'a'.repeat(64) };
+      signupCode.start.mockResolvedValue(answer);
+      const dto = {
+        email: 'test@example.com',
+        password: 'Password1!',
+        firstName: 'Test',
+        lastName: 'User',
+      };
+
+      const result = await controller.registerStart(dto as any);
+
+      expect(signupCode.start).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(answer);
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+    });
+
+    it('verify opens a CUSTOMER session: cookies set, csrf token in the body, no token in the body', async () => {
+      signupCode.verify.mockResolvedValue({
+        user: mockUser,
+        access_token: 'access',
+        refresh_token: 'refresh',
+      });
+
+      const result = await controller.registerVerify(
+        { signupToken: 'a'.repeat(64), code: '123456' },
+        undefined,
+        mockRes as unknown as Response,
+      );
+
+      expect(signupCode.verify).toHaveBeenCalledWith('a'.repeat(64), '123456', {
+        deviceLabel: null,
+      });
+      expect(result.user).toEqual(mockUser);
+      expect(result).not.toHaveProperty('access_token');
+      expect(result).not.toHaveProperty('refresh_token');
+      expect(result.csrf_token).toBe(
+        cookieValue(mockRes, CUSTOMER_CSRF_COOKIE),
+      );
+      expect(cookieValue(mockRes, CUSTOMER_REFRESH_COOKIE)).toBe('refresh');
+    });
+
+    it('verify sets no cookie when the code is refused', async () => {
+      signupCode.verify.mockRejectedValue(new Error('refused'));
+
+      await expect(
+        controller.registerVerify(
+          { signupToken: 'a'.repeat(64), code: '000000' },
+          undefined,
+          mockRes as unknown as Response,
+        ),
+      ).rejects.toThrow('refused');
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+    });
+
+    it('resend passes only the token to the service', async () => {
+      signupCode.resend.mockResolvedValue({ message: 'sent' });
+
+      const result = await controller.registerResend({
+        signupToken: 'a'.repeat(64),
+      });
+
+      expect(signupCode.resend).toHaveBeenCalledWith('a'.repeat(64));
+      expect(result).toEqual({ message: 'sent' });
+    });
   });
 
   describe('register', () => {

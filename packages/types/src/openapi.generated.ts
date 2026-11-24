@@ -2254,6 +2254,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/register/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend the sign-up confirmation code */
+        post: operations["AuthController_registerResend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/register/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a sign-up and email a 6-digit confirmation code
+         * @description Always answers the same, whether or not the address already has an account. The returned `signupToken` binds the confirmation to this browser: keep it in sessionStorage and send it with the code.
+         */
+        post: operations["AuthController_registerStart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm the emailed code, create the account and sign in */
+        post: operations["AuthController_registerVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/resend-verification": {
         parameters: {
             query?: never;
@@ -4918,6 +4972,18 @@ export interface components {
             /** @example +2348012345678 */
             phone?: string;
         };
+        RegisterStartDto: {
+            /** @example user@example.com */
+            email: string;
+            /** @example John */
+            firstName: string;
+            /** @example Doe */
+            lastName: string;
+            /** @example password123 */
+            password: string;
+            /** @example +2348012345678 */
+            phone?: string;
+        };
         RejectCampaignDto: {
             /**
              * @description Internal admin notes (not shown to organiser)
@@ -4953,6 +5019,10 @@ export interface components {
              * @example Goodwill adjustment per organizer request
              */
             reason: string;
+        };
+        ResendSignupCodeDto: {
+            /** @example aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa */
+            signupToken: string;
         };
         ResendVerificationDto: {
             /** @example user@example.com */
@@ -5559,6 +5629,18 @@ export interface components {
              * @example clx...
              */
             token: string;
+        };
+        VerifySignupCodeDto: {
+            /**
+             * @description Six-digit code from the email
+             * @example 123456
+             */
+            code: string;
+            /**
+             * @description Token returned by `register/start`; binds this browser to the sign-up
+             * @example aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+             */
+            signupToken: string;
         };
         ViewSurchargeResponseDto: {
             /**
@@ -11811,6 +11893,169 @@ export interface operations {
             };
             /** @description Email already exists */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_registerResend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa */
+                    signupToken: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A new code has been sent if the sign-up can take one. Unknown tokens, the 60 s cooldown and the hourly cap all get this same answer */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Rate limit (per sign-up token and per IP) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rate limiter unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_registerStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example user@example.com */
+                    email: string;
+                    /** @example John */
+                    firstName: string;
+                    /** @example Doe */
+                    lastName: string;
+                    /** @example password123 */
+                    password: string;
+                    /** @example +2348012345678 */
+                    phone?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A code has been sent if the details can be used */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                        /** @example aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa */
+                        signupToken?: string;
+                    };
+                };
+            };
+            /** @description Invalid input data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rate limiter unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_registerVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Six-digit code from the email
+                     * @example 123456
+                     */
+                    code: string;
+                    /**
+                     * @description Token returned by `register/start`; binds this browser to the sign-up
+                     * @example aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                     */
+                    signupToken: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Account created and signed in (customer cookies set) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests. */
+                        csrf_token?: string;
+                        user?: Record<string, never>;
+                    };
+                };
+            };
+            /** @description Invalid or expired code (the same answer for wrong, expired, locked, unknown and reused) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rate limiter unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

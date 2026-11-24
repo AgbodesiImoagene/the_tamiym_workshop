@@ -3,28 +3,44 @@ import { e2eUnverifiedCustomers, e2eUsers, urls } from '../fixtures/identities';
 import { paystackSimulator } from '../fixtures/paystack-simulator';
 
 /**
- * TTW-090: a customer who just signed up is told the email must be verified before ordering,
- * and can ask for a new link. The test registers its own customer through the sign-up form.
+ * TTW-090: a customer whose email is not verified is told it must be verified before ordering,
+ * and can ask for a new link.
+ *
+ * TTW-254: the sign-up form in apps/app now confirms the address with an emailed code before
+ * any account exists, so a person who just signed up there is already verified (see
+ * `signup-email-code.comprehensive.spec.ts`). An unverified account can still come from the old
+ * `POST /v1/auth/register` route, which apps/web keeps for now; this test creates its customer
+ * through that route and signs in through the login form.
  *
  * The second test plays "verify, then order". The API keeps only the sha256 of a verification
  * token and e2e cannot read an inbox, so seed:e2e writes a known token for one unverified
  * customer per attempt (see `e2eUnverifiedCustomers`).
  */
 test.describe('Unverified email banner @comprehensive @app', () => {
-  test('sign up, see the verification message, resend the link', async ({ browser }) => {
+  test('an unverified account sees the verification message and can resend the link', async ({
+    browser,
+  }) => {
     const context = await browser.newContext({
       baseURL: urls.app,
       storageState: { cookies: [], origins: [] },
     });
     const page = await context.newPage();
     try {
-      await page.goto('/auth/register');
-      await page.getByLabel('Email address').fill(`verify.banner.${Date.now()}@tamiym.test`);
-      await page.getByLabel('First name').fill('Verify');
-      await page.getByLabel('Last name').fill('Banner');
-      await page.getByLabel('Password', { exact: true }).fill(e2eUsers.customer.password);
-      await page.getByRole('button', { name: /create account|sign up|register/i }).click();
+      const email = `verify.banner.${Date.now()}@tamiym.test`;
+      const created = await context.request.post(`${urls.api}/v1/auth/register`, {
+        data: {
+          email,
+          password: e2eUsers.customer.password,
+          firstName: 'Verify',
+          lastName: 'Banner',
+        },
+      });
+      expect(created.ok(), await created.text()).toBeTruthy();
 
+      await page.goto('/auth/login');
+      await page.getByLabel('Email address').fill(email);
+      await page.getByLabel('Password', { exact: true }).fill(e2eUsers.customer.password);
+      await page.getByRole('button', { name: 'Sign in' }).click();
       await expect(page).toHaveURL(/\/dashboard/);
       const banner = page.getByRole('status').filter({ hasText: /verify your email/i });
       await expect(banner).toBeVisible();

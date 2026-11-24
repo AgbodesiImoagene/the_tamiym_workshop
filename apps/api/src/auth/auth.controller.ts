@@ -25,6 +25,12 @@ import {
 } from '@nestjs/swagger';
 import { AuthService, isMfaChallengeResponse } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import {
+  RegisterStartDto,
+  ResendSignupCodeDto,
+  VerifySignupCodeDto,
+} from './dto/signup-code.dto';
+import { SignupCodeService } from './signup-code.service';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
@@ -76,7 +82,10 @@ function bodyRefreshToken(req: Request): string | undefined {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly signupCode: SignupCodeService,
+  ) {}
 
   /**
    * Register a new user account
@@ -142,6 +151,111 @@ export class AuthController {
       user: loginResult.user,
       csrf_token: csrfToken,
     };
+  }
+
+  /**
+   * Start a sign-up confirmed by an emailed code (TTW-254). Creates no user,
+   * session or cookie: the account exists only after `register/verify`.
+   */
+  @Public()
+  @Post('register/start')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('signup_send')
+  @ApiOperation({
+    summary: 'Start a sign-up and email a 6-digit confirmation code',
+    description:
+      'Always answers the same, whether or not the address already has an account. The returned `signupToken` binds the confirmation to this browser: keep it in sessionStorage and send it with the code.',
+  })
+  @ApiBody({ type: RegisterStartDto })
+  @ApiResponse({
+    status: 202,
+    description: 'A code has been sent if the details can be used',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        signupToken: { type: 'string', example: 'a'.repeat(64) },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({ status: 503, description: 'Rate limiter unavailable' })
+  async registerStart(@Body() dto: RegisterStartDto) {
+    return this.signupCode.start(dto);
+  }
+
+  /**
+   * Confirm the code. Only here are the account created and the session opened (TTW-254).
+   */
+  @Public()
+  @Post('register/verify')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('signup_verify')
+  @ApiOperation({
+    summary: 'Confirm the emailed code, create the account and sign in',
+  })
+  @ApiBody({ type: VerifySignupCodeDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Account created and signed in (customer cookies set)',
+    schema: {
+      type: 'object',
+      properties: {
+        user: { type: 'object' },
+        csrf_token: CSRF_TOKEN_SCHEMA,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid or expired code (the same answer for wrong, expired, locked, unknown and reused)',
+  })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({ status: 503, description: 'Rate limiter unavailable' })
+  async registerVerify(
+    @Body() dto: VerifySignupCodeDto,
+    @Headers('user-agent') userAgent: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.signupCode.verify(dto.signupToken, dto.code, {
+      deviceLabel: this.authService.deviceLabelFromUserAgent(userAgent),
+    });
+    const csrfToken = setSurfaceAuthCookies(
+      res,
+      AuthSurface.CUSTOMER,
+      result.access_token,
+      result.refresh_token,
+    );
+    return { user: result.user, csrf_token: csrfToken };
+  }
+
+  /**
+   * Send the code again (60 s cooldown, at most 5 sends an hour).
+   */
+  @Public()
+  @Post('register/resend')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthRateLimitGuard)
+  @AuthRateLimit('signup_send')
+  @ApiOperation({ summary: 'Resend the sign-up confirmation code' })
+  @ApiBody({ type: ResendSignupCodeDto })
+  @ApiResponse({
+    status: 202,
+    description:
+      'A new code has been sent if the sign-up can take one. Unknown tokens, the 60 s cooldown and the hourly cap all get this same answer',
+    schema: { type: 'object', properties: { message: { type: 'string' } } },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limit (per sign-up token and per IP)',
+  })
+  @ApiResponse({ status: 503, description: 'Rate limiter unavailable' })
+  async registerResend(@Body() dto: ResendSignupCodeDto) {
+    return this.signupCode.resend(dto.signupToken);
   }
 
   /**

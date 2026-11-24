@@ -142,4 +142,38 @@ describe('AuthRateLimitGuard', () => {
       surface: 'CUSTOMER',
     });
   });
+
+  it('keys sign-up confirmations by the hashed sign-up token, never by an email (TTW-254)', async () => {
+    reflector.getAllAndOverride.mockReturnValue('signup_verify');
+    const signupToken = 'a'.repeat(64);
+    await guard.canActivate(
+      contextFor(
+        { signupToken, code: '123456', email: 'victim@example.com' },
+        '/v1/auth/register/verify',
+      ),
+    );
+    expect(rateLimit.consume).toHaveBeenCalledWith({
+      bucket: 'signup_verify',
+      // The email in the body is passed along but the identity key wins, so a third party
+      // naming a victim's address cannot burn that address's window.
+      email: 'victim@example.com',
+      identity: `signup:${createHash('sha256').update(signupToken).digest('hex').slice(0, 32)}`,
+      ip: '127.0.0.1',
+      surface: 'CUSTOMER',
+    });
+  });
+
+  it('keys the start of a sign-up by email when there is no sign-up token (TTW-254)', async () => {
+    reflector.getAllAndOverride.mockReturnValue('signup_send');
+    await guard.canActivate(
+      contextFor({ email: 'new@example.com' }, '/v1/auth/register/start'),
+    );
+    expect(rateLimit.consume).toHaveBeenCalledWith({
+      bucket: 'signup_send',
+      email: 'new@example.com',
+      identity: null,
+      ip: '127.0.0.1',
+      surface: 'CUSTOMER',
+    });
+  });
 });

@@ -40,6 +40,11 @@ const CSRF_EXEMPT_PUBLIC_PATHS = [
   'auth/admin/mfa/challenge',
   'auth/admin/mfa/recover',
   'auth/register',
+  // TTW-254: sign-up confirmed by an emailed code. Suffix matching does not cover these
+  // through 'auth/register', so each path is listed.
+  'auth/register/start',
+  'auth/register/verify',
+  'auth/register/resend',
   'auth/google',
   'auth/google/callback',
   'auth/forgot-password',

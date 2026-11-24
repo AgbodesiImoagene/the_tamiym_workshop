@@ -3585,6 +3585,38 @@
         ],
         "type": "object"
       },
+      "RegisterStartDto": {
+        "properties": {
+          "email": {
+            "example": "user@example.com",
+            "type": "string"
+          },
+          "firstName": {
+            "example": "John",
+            "type": "string"
+          },
+          "lastName": {
+            "example": "Doe",
+            "type": "string"
+          },
+          "password": {
+            "example": "password123",
+            "minLength": 8,
+            "type": "string"
+          },
+          "phone": {
+            "example": "+2348012345678",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "password"
+        ],
+        "type": "object"
+      },
       "RejectCampaignDto": {
         "properties": {
           "notes": {
@@ -3650,6 +3682,18 @@
         "required": [
           "amount",
           "reason"
+        ],
+        "type": "object"
+      },
+      "ResendSignupCodeDto": {
+        "properties": {
+          "signupToken": {
+            "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signupToken"
         ],
         "type": "object"
       },
@@ -4953,6 +4997,25 @@
         },
         "required": [
           "token"
+        ],
+        "type": "object"
+      },
+      "VerifySignupCodeDto": {
+        "properties": {
+          "code": {
+            "description": "Six-digit code from the email",
+            "example": "123456",
+            "type": "string"
+          },
+          "signupToken": {
+            "description": "Token returned by `register/start`; binds this browser to the sign-up",
+            "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "signupToken"
         ],
         "type": "object"
       },
@@ -15108,6 +15171,204 @@
           }
         },
         "summary": "Register a new user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/register/resend": {
+      "post": {
+        "operationId": "AuthController_registerResend",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "signupToken": {
+                    "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "signupToken"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A new code has been sent if the sign-up can take one. Unknown tokens, the 60 s cooldown and the hourly cap all get this same answer"
+          },
+          "429": {
+            "description": "Rate limit (per sign-up token and per IP)"
+          },
+          "503": {
+            "description": "Rate limiter unavailable"
+          }
+        },
+        "summary": "Resend the sign-up confirmation code",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/register/start": {
+      "post": {
+        "description": "Always answers the same, whether or not the address already has an account. The returned `signupToken` binds the confirmation to this browser: keep it in sessionStorage and send it with the code.",
+        "operationId": "AuthController_registerStart",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "example": "user@example.com",
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "example": "John",
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "example": "Doe",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "password123",
+                    "minLength": 8,
+                    "type": "string"
+                  },
+                  "phone": {
+                    "example": "+2348012345678",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "firstName",
+                  "lastName",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "signupToken": {
+                      "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A code has been sent if the details can be used"
+          },
+          "400": {
+            "description": "Invalid input data"
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "503": {
+            "description": "Rate limiter unavailable"
+          }
+        },
+        "summary": "Start a sign-up and email a 6-digit confirmation code",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/register/verify": {
+      "post": {
+        "operationId": "AuthController_registerVerify",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "code": {
+                    "description": "Six-digit code from the email",
+                    "example": "123456",
+                    "type": "string"
+                  },
+                  "signupToken": {
+                    "description": "Token returned by `register/start`; binds this browser to the sign-up",
+                    "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "signupToken"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "csrf_token": {
+                      "description": "Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests.",
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Account created and signed in (customer cookies set)"
+          },
+          "400": {
+            "description": "Invalid or expired code (the same answer for wrong, expired, locked, unknown and reused)"
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "503": {
+            "description": "Rate limiter unavailable"
+          }
+        },
+        "summary": "Confirm the emailed code, create the account and sign in",
         "tags": [
           "Auth"
         ]
