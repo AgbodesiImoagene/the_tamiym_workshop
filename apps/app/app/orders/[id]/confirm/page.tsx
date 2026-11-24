@@ -2,39 +2,21 @@
 
 import { OrderStatusBanner } from '@/components/order-status-banner';
 import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
-import { ApiError, User, authApi } from '@/lib/auth';
+import { ApiError } from '@/lib/auth';
+import { displayNameOf, useRequireUser } from '@/lib/current-user';
 import { clearCartIfPendingOrder } from '@/lib/cart-store';
 import { getCustomerOrderDetail, initiateOrderPayment } from '@/lib/checkout';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function OrderConfirmPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user, error } = useRequireUser();
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setUser(await authApi.getMe());
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
 
   const orderQuery = useQuery({
     queryKey: ['customer-order-confirm', params.id],
@@ -73,19 +55,16 @@ export default function OrderConfirmPage() {
     }
   }
 
-  if (error) {
+  if (error && error.statusCode !== 401) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{error}</p>
+        <p className="text-red-700">{error.message || 'Failed to load user data'}</p>
       </div>
     );
   }
 
   return (
-    <CustomerDashboardShell
-      activeNav="orders"
-      displayName={user?.firstName || user?.email?.split('@')[0]}
-    >
+    <CustomerDashboardShell activeNav="orders" displayName={displayNameOf(user)}>
       <div className="mt-10 grid gap-8 lg:mt-0 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="space-y-6 rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
           <div className="space-y-2">

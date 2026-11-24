@@ -1,8 +1,8 @@
 'use client';
 
-import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
+import { formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
-import { ApiError, User, authApi } from '@/lib/auth';
+import { ApiError } from '@/lib/auth';
 import { addCartItem } from '@/lib/cart-store';
 import { quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { designThumbnailSrc } from '@/lib/design-thumbnail';
@@ -13,8 +13,9 @@ import { getDashboardProductDetail, getDashboardProducts } from '@/lib/products'
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Suspense, useMemo, useRef, useState } from 'react';
+import { useCurrentUser } from '@/lib/current-user';
 
 const MAX_UNTRACKED_QUANTITY = 999;
 const MAX_RELATED_PRODUCTS = 4;
@@ -39,12 +40,10 @@ export default function ProductDetailPage() {
 type QuoteStatus = 'idle' | 'loading' | 'error' | 'no-address';
 
 function ProductDetailContent({ productId }: { productId: string }) {
-  const router = useRouter();
   // TTW-058: opened from a saved design, the page orders that design.
   const designId = useSearchParams().get('designId');
 
-  const [user, setUser] = useState<User | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const { user } = useCurrentUser();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -53,23 +52,6 @@ function ProductDetailContent({ productId }: { productId: string }) {
   const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>('idle');
   // A quote that comes back after the quantities changed must not be shown.
   const quoteRequestId = useRef(0);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setUser(await authApi.getMe());
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setAuthError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
 
   const productQuery = useQuery({
     queryKey: ['dashboard-product', productId],
@@ -205,20 +187,10 @@ function ProductDetailContent({ productId }: { productId: string }) {
     );
   };
 
-  const displayName = user?.firstName || user?.email?.split('@')[0];
-
-  if (authError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-destructive">{authError}</p>
-      </div>
-    );
-  }
-
   const productError = productQuery.error as ApiError | null;
 
   return (
-    <CustomerDashboardShell activeNav="products" displayName={displayName}>
+    <>
       <div className="mt-10 space-y-8 lg:mt-0">
         <Link
           href="/dashboard/products"
@@ -520,6 +492,6 @@ function ProductDetailContent({ productId }: { productId: string }) {
           </>
         ) : null}
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }

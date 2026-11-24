@@ -1,8 +1,8 @@
 'use client';
 
-import { CustomerDashboardShell, formatCurrency } from '@/components/customer-dashboard-shell';
+import { formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
-import { ApiError, User, authApi } from '@/lib/auth';
+
 import {
   type DashboardProduct,
   getDashboardCategories,
@@ -11,9 +11,9 @@ import {
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Tabs, TabsList, TabsTrigger } from '@tamiym/ui';
+import { useCurrentUser } from '@/lib/current-user';
 
 // Not a valid slug, so it can never collide with a real category.
 const ALL_CATEGORIES = '__all__';
@@ -39,28 +39,9 @@ function priceLine(product: DashboardProduct) {
 }
 
 export default function DashboardProductsPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useCurrentUser();
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORIES);
   const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setUser(await authApi.getMe());
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setError(apiError.message || 'Failed to load user data');
-        }
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
 
   const categoriesQuery = useQuery({
     queryKey: ['dashboard-categories'],
@@ -88,19 +69,8 @@ export default function DashboardProductsPage() {
     setPage(0);
   };
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
-
   return (
-    <CustomerDashboardShell
-      activeNav="products"
-      displayName={user?.firstName || user?.email?.split('@')[0]}
-    >
+    <>
       <div className="mt-10 space-y-8 lg:mt-0">
         <div className="space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -274,6 +244,6 @@ export default function DashboardProductsPage() {
           </div>
         )}
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }

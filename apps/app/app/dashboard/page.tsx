@@ -1,27 +1,23 @@
 'use client';
 
-import {
-  CustomerDashboardShell,
-  GridIcon,
-  TruckIcon,
-  formatCurrency,
-} from '@/components/customer-dashboard-shell';
+import { GridIcon, TruckIcon, formatCurrency } from '@/components/customer-dashboard-shell';
 import { customerAssets } from '@/lib/assets';
-import { ApiError, User, authApi } from '@/lib/auth';
+
 import { getCustomerOrders } from '@/lib/dashboard';
 import { OrderStatus } from '@tamiym/types';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, cn } from '@tamiym/ui';
+import { Card, CardContent, Skeleton, cn } from '@tamiym/ui';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { displayNameOf, useCurrentUser } from '@/lib/current-user';
+import { summariseOrders } from '@/lib/order-summary';
 
 function SettingsIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-10 w-10"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -43,7 +39,7 @@ function OrdersGlyph() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-10 w-10"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.9"
@@ -112,29 +108,7 @@ function getStatusStep(orderStatus?: OrderStatus) {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setUser(await authApi.getMe());
-      } catch (err) {
-        const apiError = err as ApiError;
-        if (apiError.statusCode === 401) {
-          router.push('/auth/login');
-        } else {
-          setError(apiError.message || 'Failed to load user data');
-        }
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-
-    void fetchUser();
-  }, [router]);
+  const { user } = useCurrentUser();
 
   const ordersQuery = useQuery({
     queryKey: ['customer-orders'],
@@ -143,48 +117,30 @@ export default function DashboardPage() {
   });
 
   const dashboardData = useMemo(() => {
-    const orders = ordersQuery.data ?? [];
-    const latestOrder = orders[0];
-    const deliveredCount = orders.filter((order) => order.status === OrderStatus.DELIVERED).length;
-    const pendingCount = orders.filter(
-      (order) =>
-        ![OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status)
-    ).length;
+    const summary = summariseOrders(ordersQuery.data ?? []);
 
     return {
-      displayName: user?.firstName || user?.email?.split('@')[0],
-      deliveredCount,
-      pendingCount,
-      latestOrder,
-      latestStatusStep: getStatusStep(latestOrder?.status),
-      orderCount: orders.length,
+      displayName: displayNameOf(user),
+      deliveredCount: summary.deliveredCount,
+      pendingCount: summary.pendingCount,
+      latestOrder: summary.latestPlaced,
+      latestStatusStep: getStatusStep(summary.latestPlaced?.status),
+      orderCount: summary.placedCount,
     };
   }, [ordersQuery.data, user]);
 
-  if (isLoadingUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading your dashboard...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-red-700">{error}</p>
-      </div>
-    );
-  }
-
   return (
-    <CustomerDashboardShell activeNav="home" displayName={dashboardData.displayName}>
+    <>
       <div className="mt-10 lg:mt-0">
         <div className="grid gap-6 lg:grid-cols-[1fr_134px] lg:items-start">
           <div className="space-y-3">
             <h1 className="max-w-[614px] text-[32px] font-semibold leading-[0.95] tracking-[-0.02em] sm:text-[40px] lg:text-[48px]">
               Welcome To Your Workshop{' '}
-              <span className="text-[#1e39d2]">{dashboardData.displayName}!</span>
+              {dashboardData.displayName ? (
+                <span className="text-[#1e39d2]">{dashboardData.displayName}!</span>
+              ) : (
+                <Skeleton className="ml-2 inline-block h-9 w-40 align-middle" aria-hidden="true" />
+              )}
             </h1>
             <p className="max-w-[614px] text-sm leading-normal sm:text-base">
               Here is everything you need to stay up to date with:
@@ -375,6 +331,6 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-    </CustomerDashboardShell>
+    </>
   );
 }

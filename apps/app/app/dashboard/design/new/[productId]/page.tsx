@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import WorkshopEditor from '@/components/workshop/WorkshopEditor';
-import WorkshopPageShell from '@/components/workshop/WorkshopPageShell';
 import { getProductWorkshop } from '@/lib/designs';
 
 interface NewDesignPageProps {
@@ -19,9 +18,5 @@ export default async function NewDesignPage({ params }: NewDesignPageProps) {
 
   if (!workshopContext) notFound();
 
-  return (
-    <WorkshopPageShell>
-      <WorkshopEditor workshopContext={workshopContext} />
-    </WorkshopPageShell>
-  );
+  return <WorkshopEditor workshopContext={workshopContext} />;
 }

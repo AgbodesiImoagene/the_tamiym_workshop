@@ -1,6 +1,7 @@
 'use client';
 
 import { authApi } from '@/lib/auth';
+import { authMeQueryOptions } from '@/lib/current-user';
 import { EMAIL_NOT_VERIFIED_MESSAGE } from '@/lib/email-verification';
 import { Button } from '@tamiym/ui';
 import { useQuery } from '@tanstack/react-query';
@@ -67,10 +68,10 @@ export function EmailVerificationNotice({
 /** Shown on every dashboard page while the API reports the email as unverified. */
 export function EmailVerificationBanner() {
   const { data: user } = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: () => authApi.getMe(),
-    // Back from the verification link in another tab: drop the banner without a reload.
-    refetchOnWindowFocus: true,
+    ...authMeQueryOptions,
+    // Back from the verification link in another tab: drop the banner without a reload,
+    // even though the shared user is still fresh.
+    refetchOnWindowFocus: 'always',
   });
 
   if (!user || user.emailVerified !== false) {
