@@ -222,7 +222,7 @@ describe('AuthRateLimitGuard', () => {
       );
     });
 
-    it('keys a cookie-less body refresh by its refresh_token, and nothing by the IP', async () => {
+    it('keys a cookie-less body refresh by its refresh_token', async () => {
       reflector.getAllAndOverride.mockReturnValue('session_refresh');
       await guard.canActivate(
         contextFor({ refresh_token: 'body-token' }, '/v1/auth/refresh'),
@@ -230,11 +230,21 @@ describe('AuthRateLimitGuard', () => {
       expect(rateLimit.consume).toHaveBeenLastCalledWith(
         expect.objectContaining({ identity: fingerprint('body-token') }),
       );
-      await guard.canActivate(contextFor({}, '/v1/auth/refresh'));
-      expect(rateLimit.consume).toHaveBeenLastCalledWith(
-        expect.objectContaining({ identity: 'ip:127.0.0.1' }),
-      );
     });
+
+    // A caller with no session credential at all is answered 401 by the handler at once, so it
+    // is not counted: otherwise every signed-out visitor behind one address would share one
+    // budget, and a burst of them would be refused with 429 instead of being sent to log in.
+    it.each(['session_refresh', 'csrf_token'] as const)(
+      'does not count a %s request that carries no session credential',
+      async (bucket) => {
+        reflector.getAllAndOverride.mockReturnValue(bucket);
+        await expect(
+          guard.canActivate(contextFor({}, '/v1/auth/csrf')),
+        ).resolves.toBe(true);
+        expect(rateLimit.consume).not.toHaveBeenCalled();
+      },
+    );
 
     it('ignores body token fields for these buckets', async () => {
       reflector.getAllAndOverride.mockReturnValue('session_refresh');
