@@ -1,7 +1,7 @@
 # TTW-254 — Confirm a new sign-up with a one-time code sent by email
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review\
+**Status:** Complete\
 **Risk:** High\
 **Blocked by:** None\
 **Blocks:** None
@@ -169,10 +169,18 @@ Last run 2026-11-24 (after review 2), on branch `codex/ttw-254-confirm-signup-wi
 | Browser journey in `apps/app` (API on port 3011, app on 3002), run before review 1                                                                                          | Form, then code screen (0 users, 1 pending row); wrong code refused on the same screen; right code opens the dashboard; account verified, role CUSTOMER, pending row gone. Test rows deleted |
 | Fixture `tests/e2e/fixtures/signup-code.ts` against the real Redis                                                                                                          | Scans the queue's list, stream and counter keys without `WRONGTYPE` (review 2, S1); no code found for an absent address, as expected                                                         |
 
+CI, 2026-11-24:
+
+| Run                                                        | Result                                                                                                                                               |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CI` on the pushed branch (run 45379879598)                | 19 of 19 jobs green, including API Integration (all e2e suites, `auth-link-retention` included), Unit Tests, Coverage, Migration Baseline            |
+| `CI` on `main` after the merge `b9aff2d` (run 45382586979) | 19 of 19 jobs green                                                                                                                                  |
+| `Playwright Comprehensive` on `main` (run 45382587063)     | Green. It ran `signup-email-code.comprehensive.spec.ts` and both tests of the adapted `email-verification-banner.comprehensive.spec.ts`, all passing |
+
 Not verified:
 
-- **Playwright was not run** (`signup-email-code.comprehensive.spec.ts`, the adapted `email-verification-banner.comprehensive.spec.ts`): another API occupied port 3001 and the test database is shared. Both pass the manifest validator, and review 2 found and I fixed two defects in them by reading (the fixture key scan, an unfiltered `role="alert"`).
-- **`auth-link-retention.e2e-spec.ts`** failed ("jobs never failed", 30 s) when run during this work. Another API on the same Redis was consuming the shared `mail` queue, which is the likely cause (the intermittent class of TTW-246). Not re-run on `main` or with that API stopped.
+- **Playwright was not run locally** (another API occupied port 3001 and the test database is shared). It ran in CI on `main` and passed (see above).
+- **`auth-link-retention.e2e-spec.ts`** failed locally ("jobs never failed", 30 s) because another API on the same Redis consumed the shared `mail` queue; it passes in CI.
 - **Intermittent failures from other processes.** Two `auth-surface` tests failed once in a grouped run (socket hang up, a 404) and passed alone and again in later grouped runs. Other APIs on this machine share its ports, database and Redis.
 - The automatic after-change check failed on product list and checkout app tests (1 s waits, TTW-255) while the machine was saturated (load average above 150); the same suites pass when it is calm.
 - Request logging of `code` and `signupToken`: no test; the request serializer logs only id, method and URL (accepted gap). A real mail send and `apps/web` were not tried.
@@ -181,16 +189,21 @@ Migration `20261123134156_ttw254_pending_signups` was generated with `prisma mig
 
 ## Completion summary
 
-Not complete: Playwright has not run, and the work is not committed. Reviews 1 and 2 are recorded above; no blocker is open.
+Complete. Merged into `main` as `b9aff2d` (feature commit `4319a66`) on 2026-11-24, no pull request, with a green `CI` and a green `Playwright Comprehensive` on `main` (see Verification evidence).
 
-Shipped so far: the three routes, the pending sign-up table, the two rate-limit buckets, the keyed code hash, the mail template and job, the cleanup, the CSRF exemptions, the Google clean-up, the OpenAPI artefacts, the auth architecture doc, and the code screen in `apps/app`.
+Shipped: a new apps/app sign-up creates no account, session or cookie until the person enters the 6-digit code emailed to them. Three routes (`register/start`, `register/verify`, `register/resend`) and a `pending_signups` table; a keyed code hash; a browser-bound token against pre-hijacking; attempts, cooldown and the hourly send cap enforced in SQL; two Redis rate-limit buckets; identical generic answers so the routes reveal nothing about existing accounts; a one-transaction confirmation that creates or secures the user and opens the session; the mail job, CSRF exemptions, Google clean-up, expired-row cleanup and env validation; a code screen in `apps/app`; API integration, unit, component and Playwright tests; the architecture doc and the OpenAPI artefacts. Two independent reviews are recorded above; no blocker is open.
 
 Deviations from the plan:
 
 - `POST /v1/auth/register` (old route) now answers 409 when the address is taken between its check and its insert, instead of a 500. Found by the race test; the route is otherwise unchanged.
 - `register/verify` and `register/resend` take only `signupToken` (and `code`), not the email, so the limiter can key on the token (design review B3).
-- Outside production `SIGNUP_CODE_HMAC_KEY` is optional: a key is derived from `JWT_ACCESS_SECRET` with HKDF. Production requires it (at least 32 characters). The user added a development value to the three local env files; production needs its own.
-- The hourly send cap is enforced in SQL on the row; a refused queue add gives the send back.
+- Outside production `SIGNUP_CODE_HMAC_KEY` is optional: a key is derived from `JWT_ACCESS_SECRET` with HKDF. Production requires it (at least 32 characters). The user added a development value to the three local env files; **production needs its own value before this is deployed**.
+- The hourly send cap is a fixed window enforced in SQL on the row; a refused queue add gives the send back.
+- `register/resend` always answers the same generic 202 (review 1 finding 1).
+- A unique-address collision on confirm is retried once, then refused (review 2, S5).
 - The old Playwright banner test no longer signs up through the form (a form sign-up is now verified); it creates its customer through the old route.
+- The Google clean-up deletes the pending row just before Google's transaction, not inside it (accepted).
 
-Follow-ups: `apps/web` sign-up (the user has not reviewed it yet; noted in the local ROADMAP); existing unverified accounts logging in; an "account already exists" notice; a CAPTCHA if the limits are not enough.
+Operations: set `SIGNUP_CODE_HMAC_KEY` in every production environment (the API refuses to start in production without it). The migration is in the Prisma history and was checked by the Migration Baseline job.
+
+Follow-ups, none ticketed yet: the `apps/web` sign-up (the user has not reviewed that page; noted in the local ROADMAP), which still uses the old route without these protections; existing unverified accounts logging in; an "account already exists" notice; a CAPTCHA if the limits are not enough; no test that `code` and `signupToken` stay out of request logs.
