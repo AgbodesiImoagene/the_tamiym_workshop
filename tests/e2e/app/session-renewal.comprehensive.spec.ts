@@ -90,7 +90,9 @@ test.describe('Customer session renewal @comprehensive @app', () => {
       await context.clearCookies({ name: ACCESS_COOKIE });
       await context.clearCookies({ name: REFRESH_COOKIE });
 
-      await navigateCustomerSidebarLink(page, 'Products', '/dashboard/products');
+      // A full page load, not a sidebar click: the signed-in user is cached for a minute, so a
+      // click inside the page would not ask the API again and nothing would answer 401.
+      await page.goto('/dashboard/products');
       await expect(page).toHaveURL(/\/auth\/login/);
       await page.waitForTimeout(500);
       expect(refreshCalls).toBe(0);
