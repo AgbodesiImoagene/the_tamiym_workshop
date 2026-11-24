@@ -31,4 +31,48 @@ a {
     font-family: var(--font-sans);
     margin: 0;
   }
+
+  /*
+   * Clickable elements: pointer cursor + soft hover, defined once for the whole app.
+   * `:where()` keeps specificity at zero, so any Tailwind `hover:` / `cursor-*`
+   * class on a component still wins. New buttons and links inherit this for free.
+   */
+  :where(
+    button,
+    [role='button'],
+    [role='tab'],
+    [role='menuitem'],
+    a[href],
+    summary,
+    select,
+    label[for],
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='submit'],
+    input[type='button']
+  ) {
+    cursor: pointer;
+    transition-property: color, background-color, border-color, opacity, box-shadow;
+    transition-duration: 150ms;
+    transition-timing-function: ease-in-out;
+  }
+
+  :where(button, [role='button']):where(:hover):not(:disabled, [aria-disabled='true']) {
+    opacity: 0.9;
+  }
+
+  :where(a[href]:hover) {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  :where(
+    button:disabled,
+    [role='button'][aria-disabled='true'],
+    a[aria-disabled='true'],
+    select:disabled,
+    input:disabled
+  ) {
+    cursor: not-allowed;
+  }
 }

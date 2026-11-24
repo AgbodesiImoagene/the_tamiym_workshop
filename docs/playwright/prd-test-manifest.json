@@ -132,6 +132,7 @@
       "prd_ref": "Customer Dashboard",
       "automation": "automated",
       "tests": [
+        "tests/e2e/app/clickable-affordance.comprehensive.spec.ts",
         "tests/e2e/app/customer.smoke.spec.ts",
         "tests/e2e/app/dashboard-navigation.comprehensive.spec.ts",
         "tests/e2e/app/products-cart.comprehensive.spec.ts",
