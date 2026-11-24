@@ -31,6 +31,27 @@ describe('MailService', () => {
     );
   });
 
+  it('sends the sign-up code with the code in the template context (TTW-254)', async () => {
+    const mailer = {
+      sendMail: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MailTransportService;
+    const service = new MailService(mailer);
+
+    await service.sendSignupCodeEmail({
+      to: 'user@example.com',
+      code: '123456',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    expect(mailer.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'user@example.com',
+        template: 'signup-code',
+        context: { code: '123456' },
+      }),
+    );
+  });
+
   describe('Google-linked password-removed notice (TTW-179)', () => {
     it('sends the notice template to the account address', async () => {
       const mailer = {

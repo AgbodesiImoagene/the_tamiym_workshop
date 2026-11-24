@@ -5,6 +5,7 @@ import {
   MAIL_QUEUE_NAME,
   AUTH_LINK_JOB_NAMES,
   JOB_VERIFICATION_EMAIL,
+  JOB_SIGNUP_CODE_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
   JOB_NOTIFICATION_OUTBOX,
   JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL,
@@ -13,6 +14,7 @@ import {
 import {
   MailService,
   SendVerificationEmailPayload,
+  SendSignupCodeEmailPayload,
   SendPasswordResetEmailPayload,
   SendGoogleLinkedPasswordRemovedEmailPayload,
   SendGoogleLinkedAccountSuspendedEmailPayload,
@@ -67,6 +69,23 @@ export class MailProcessor extends WorkerHost {
                 `Sent verification email (job ${job.id ?? 'unknown'})`,
               );
               break;
+            case JOB_SIGNUP_CODE_EMAIL: {
+              // A retry can come minutes later, after a newer code was sent or this one expired:
+              // never deliver a code that no longer works (TTW-254).
+              const data = job.data as SendSignupCodeEmailPayload;
+              if (Date.parse(data.expiresAt) <= Date.now()) {
+                this.logger.log(
+                  `Skipped expired sign-up code email (job ${job.id ?? 'unknown'})`,
+                );
+                break;
+              }
+              await this.mailService.sendSignupCodeEmail(data);
+              // No address and no code in the log line (TTW-184).
+              this.logger.log(
+                `Sent sign-up code email (job ${job.id ?? 'unknown'})`,
+              );
+              break;
+            }
             case JOB_PASSWORD_RESET_EMAIL:
               await this.mailService.sendPasswordResetEmail(
                 job.data as SendPasswordResetEmailPayload,

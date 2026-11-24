@@ -644,6 +644,30 @@ model AuthToken {
   @@map("auth_tokens")
 }
 
+/// Sign-up waiting for its emailed code (TTW-254). No user exists until the code is entered.
+/// The password is kept only as a hash; the code only as a keyed digest (null once locked);
+/// the browser token only as a SHA-256 digest. `sendCount` and `windowStartedAt` outlive wrong
+/// guesses and restarts so the hourly send cap cannot be reset.
+model PendingSignup {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  signupTokenHash String   @unique
+  codeHash        String?
+  passwordHash    String
+  firstName       String
+  lastName        String
+  phone           String?
+  attempts        Int      @default(0)
+  sendCount       Int      @default(1)
+  windowStartedAt DateTime @default(now())
+  lastSentAt      DateTime @default(now())
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("pending_signups")
+}
+
 /// Audience-bound, rotating refresh session (TTW-023). Refresh plaintext is
 /// never stored — only sha256(refreshToken). Access JWTs carry `sid`.
 model AuthSession {

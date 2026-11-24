@@ -18,7 +18,12 @@ import {
   JOB_VERIFICATION_EMAIL,
   MAIL_QUEUE_NAME,
 } from '../constants';
-import { TokenType, UserRole, UserStatus } from '../generated/prisma/client';
+import {
+  Prisma,
+  TokenType,
+  UserRole,
+  UserStatus,
+} from '../generated/prisma/client';
 import { AccountPolicyService } from './account-policy.service';
 import { AuthSessionService } from './auth-session.service';
 import { AdminMfaService } from './admin-mfa.service';
@@ -48,6 +53,7 @@ describe('AuthService', () => {
       delete: jest.Mock;
       deleteMany: jest.Mock;
     };
+    pendingSignup: { deleteMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let audit: { log: jest.Mock };
@@ -106,6 +112,7 @@ describe('AuthService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn(),
       },
+      pendingSignup: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(async (callbackOrSteps: unknown) => {
         if (Array.isArray(callbackOrSteps)) {
           return Promise.all(callbackOrSteps);
@@ -763,6 +770,37 @@ describe('AuthService', () => {
       ).resolves.toMatchObject({ refresh_token: 'refresh-plain' });
     });
   });
+  describe('register: an address taken at the same moment (TTW-254)', () => {
+    const dto = {
+      email: 'Race@Example.com',
+      password: 'RacePassword1!',
+      firstName: 'Race',
+      lastName: 'Condition',
+    };
+
+    it('answers the same 409 as the existence check when the unique address constraint fires', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(service.register(dto)).rejects.toThrow(
+        'Email already exists',
+      );
+      expect(mailQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('lets any other database error through', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.register(dto)).rejects.toThrow('connection lost');
+    });
+  });
+
   describe('loginWithGoogleProfile (TTW-082)', () => {
     const existingPasswordUser = {
       id: 'user-1',
@@ -833,6 +871,26 @@ describe('AuthService', () => {
           providerAccountId: 'g-sub-2',
           userId: 'user-new',
         }),
+      });
+    });
+
+    it('drops a sign-up still waiting for its emailed code for that address (TTW-254)', async () => {
+      prisma.userOAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...data, id: 'user-new' }),
+      );
+      prisma.userOAuthAccount.create.mockResolvedValue({});
+
+      await service.loginWithGoogleProfile({
+        providerAccountId: 'g-sub-3',
+        email: 'Pending@Example.com',
+        emailVerified: true,
+      });
+
+      expect(prisma.pendingSignup.deleteMany).toHaveBeenCalledWith({
+        where: { email: 'pending@example.com' },
       });
     });
 

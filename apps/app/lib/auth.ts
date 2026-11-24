@@ -34,6 +34,20 @@ export interface RegisterRequest {
   role?: UserRole;
 }
 
+/** Body of `POST /auth/register/start` (TTW-254). */
+export interface SignupStartRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+/** The API answers the same whether or not the address can be used; the token binds this browser. */
+export interface SignupStartResponse {
+  message: string;
+  signupToken: string;
+}
+
 export interface AuthResponse {
   user: User;
   /**
@@ -69,6 +83,31 @@ export const authApi = {
     setCsrfToken(response.csrf_token);
     return response;
   },
+
+  /**
+   * Start a sign-up (TTW-254). Creates no account and no session: the API emails a 6-digit code
+   * and returns a token to keep for the confirmation. The account exists only after
+   * `signupVerify` succeeds.
+   */
+  signupStart: async (data: SignupStartRequest): Promise<SignupStartResponse> =>
+    apiClient.post<SignupStartResponse>('/auth/register/start', data),
+
+  /**
+   * Confirm the emailed code. On success the API creates the verified account, opens the
+   * customer session and returns the CSRF token for it.
+   */
+  signupVerify: async (signupToken: string, code: string): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/register/verify', {
+      signupToken,
+      code,
+    });
+    setCsrfToken(response.csrf_token);
+    return response;
+  },
+
+  /** Ask for a new code (60 s cooldown, at most 5 an hour). */
+  signupResend: async (signupToken: string): Promise<{ message: string }> =>
+    apiClient.post<{ message: string }>('/auth/register/resend', { signupToken }),
 
   /**
    * Login with email and password

@@ -41,6 +41,22 @@ export class AuthTokenCleanupService {
               this.logger.log(`Deleted ${result.count} expired auth token(s)`);
             }
 
+            // TTW-254: a pending sign-up goes only once its code has expired and its hourly
+            // send window has ended, so deleting it can never reset the send cap.
+            const pending = await this.prisma.pendingSignup.deleteMany({
+              where: {
+                expiresAt: { lt: now },
+                windowStartedAt: {
+                  lt: new Date(now.getTime() - 60 * 60 * 1000),
+                },
+              },
+            });
+            if (pending.count > 0) {
+              this.logger.log(
+                `Deleted ${pending.count} expired pending sign-up(s)`,
+              );
+            }
+
             const sessions = await this.prisma.authSession.deleteMany({
               where: {
                 OR: [

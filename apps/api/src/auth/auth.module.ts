@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { SignupCodeService } from './signup-code.service';
 import { AuthController } from './auth.controller';
 import { GoogleOAuthController } from './google-oauth.controller';
 import { GoogleOAuthService } from './google-oauth.service';
@@ -48,6 +49,7 @@ import { StringValue } from 'ms';
   controllers: [AuthController, GoogleOAuthController],
   providers: [
     AuthService,
+    SignupCodeService,
     AuthSessionService,
     AdminMfaService,
     GoogleOAuthService,

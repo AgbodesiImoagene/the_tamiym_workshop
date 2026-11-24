@@ -38,6 +38,7 @@ export class AuthRateLimitGuard implements CanActivate {
       email?: unknown;
       mfa_token?: unknown;
       token?: unknown;
+      signupToken?: unknown;
     };
     const email = typeof body.email === 'string' ? body.email : null;
     const identity =
@@ -46,6 +47,9 @@ export class AuthRateLimitGuard implements CanActivate {
       ) ??
       this.identityFromResetToken(
         typeof body.token === 'string' ? body.token : null,
+      ) ??
+      this.identityFromSignupToken(
+        typeof body.signupToken === 'string' ? body.signupToken : null,
       );
     const path = req.path ?? '';
     const surface =
@@ -98,5 +102,15 @@ export class AuthRateLimitGuard implements CanActivate {
   private identityFromResetToken(token: string | null): string | null {
     if (!token || token.trim().length === 0) return null;
     return `reset:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`;
+  }
+
+  /**
+   * TTW-254: sign-up confirmations and resends are counted per sign-up token,
+   * never per email, so a third party cannot burn a victim's window by sending
+   * bad requests that name the victim's address.
+   */
+  private identityFromSignupToken(token: string | null): string | null {
+    if (!token || token.trim().length === 0) return null;
+    return `signup:${createHash('sha256').update(token).digest('hex').slice(0, 32)}`;
   }
 }

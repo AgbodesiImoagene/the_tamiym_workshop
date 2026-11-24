@@ -208,6 +208,7 @@ describe('env-validation', () => {
         MAIL_PASSWORD: 'a-real-mail-password',
         MAIL_FROM: '"Tamiym" <noreply@mail.example.com>',
         PAYSTACK_SECRET_KEY: 'sk_live_a_real_paystack_secret',
+        SIGNUP_CODE_HMAC_KEY: 'a-dedicated-signup-code-hmac-key-0123456789',
       };
 
       beforeEach(() => {
@@ -300,6 +301,28 @@ describe('env-validation', () => {
           expect(validateEnv(validProductionConfig)).toEqual(
             validProductionConfig,
           );
+        });
+      });
+
+      describe('sign-up code key (TTW-254)', () => {
+        it('throws when SIGNUP_CODE_HMAC_KEY is missing', () => {
+          expect(() =>
+            validateEnv(omit(validProductionConfig, 'SIGNUP_CODE_HMAC_KEY')),
+          ).toThrow(
+            'Missing required production environment variable: SIGNUP_CODE_HMAC_KEY',
+          );
+        });
+
+        it('throws when SIGNUP_CODE_HMAC_KEY is shorter than 32 characters, without echoing it', () => {
+          const run = () =>
+            validateEnv({
+              ...validProductionConfig,
+              SIGNUP_CODE_HMAC_KEY: 'too-short-key',
+            });
+          expect(run).toThrow(
+            'Environment variable SIGNUP_CODE_HMAC_KEY must be at least 32 characters',
+          );
+          expect(run).not.toThrow(/too-short-key/);
         });
       });
 

@@ -15,6 +15,7 @@ import { AuditService } from '../audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import {
+  Prisma,
   UserRole,
   UserStatus,
   TokenType,
@@ -131,26 +132,39 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email.toLowerCase().trim(),
-        passwordHash: hashedPassword,
-        firstName: registerDto.firstName,
-        lastName: registerDto.lastName,
-        phone: registerDto.phone ?? null,
-        role: UserRole.CUSTOMER,
-        status: UserStatus.ACTIVE,
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: registerDto.email.toLowerCase().trim(),
+          passwordHash: hashedPassword,
+          firstName: registerDto.firstName,
+          lastName: registerDto.lastName,
+          phone: registerDto.phone ?? null,
+          role: UserRole.CUSTOMER,
+          status: UserStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+        },
+      });
+    } catch (error) {
+      // The address was taken between the check above and this insert (two sign-ups at once, or a
+      // sign-up confirmed by emailed code, TTW-254): the same refusal as the check, not a 500.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Email already exists');
+      }
+      throw error;
+    }
 
     await this.enqueueVerificationEmail(user.id, user.email);
     return user;
@@ -649,6 +663,10 @@ export class AuthService {
         this.observability.recordAuthLogin({ outcome: 'denied' });
         throw new UnauthorizedException('Google sign-in failed');
       }
+
+      // TTW-254: a sign-up still waiting for its code for this address must not later attach
+      // its password to the account Google creates or links.
+      await this.prisma.pendingSignup.deleteMany({ where: { email } });
 
       const existingByEmail = await this.prisma.user.findUnique({
         where: { email },

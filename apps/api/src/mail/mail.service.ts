@@ -5,6 +5,13 @@ import { MailTransportService } from './mail-transport.service';
 // Simple RFC-5321 check: at least one character @ at least one character . at least 2 chars
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+export interface SendSignupCodeEmailPayload {
+  to: string;
+  code: string;
+  /** ISO time after which the code no longer works. */
+  expiresAt: string;
+}
+
 export interface SendVerificationEmailPayload {
   to: string;
   verifyUrl: string;
@@ -74,6 +81,18 @@ export class MailService {
       subject: 'Verify your email',
       template: 'verification',
       context: { verifyUrl },
+    });
+  }
+
+  async sendSignupCodeEmail(
+    payload: SendSignupCodeEmailPayload,
+  ): Promise<void> {
+    const { to, code } = payload;
+    await this.sendTemplatedEmail({
+      to,
+      subject: 'Your Tamiym Workshop confirmation code',
+      template: 'signup-code',
+      context: { code },
     });
   }
 

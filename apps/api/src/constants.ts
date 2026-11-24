@@ -23,10 +23,14 @@ export const JOB_GOOGLE_LINKED_PASSWORD_REMOVED_EMAIL =
 export const JOB_GOOGLE_LINKED_ACCOUNT_SUSPENDED_EMAIL =
   'google-linked-account-suspended-email';
 
-/** Jobs whose data carries a working reset or verification link (TTW-184). */
+/** Email carrying the one-time code that confirms a new sign-up (TTW-254). */
+export const JOB_SIGNUP_CODE_EMAIL = 'signup-code-email';
+
+/** Jobs whose data carries a working reset or verification link, or a sign-up code (TTW-184, TTW-254). */
 export const AUTH_LINK_JOB_NAMES: ReadonlySet<string> = new Set([
   JOB_VERIFICATION_EMAIL,
   JOB_PASSWORD_RESET_EMAIL,
+  JOB_SIGNUP_CODE_EMAIL,
 ]);
 /**
  * TTW-184: options for the jobs above. `removeOnFail: true` deletes the job
@@ -43,6 +47,12 @@ export const JOB_EXECUTE_PAYOUT_RUN = 'execute-payout-run';
 /** Token TTLs in milliseconds */
 export const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/** Sign-up email code (TTW-254). */
+export const SIGNUP_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+export const SIGNUP_CODE_MAX_ATTEMPTS = 5;
+export const SIGNUP_RESEND_COOLDOWN_SECONDS = 60;
+export const SIGNUP_MAX_SENDS_PER_HOUR = 5;
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
@@ -113,6 +123,18 @@ export const AUTH_RATE_LIMIT_BUCKETS = {
     identityLimit: 5,
     ipLimit: 40,
     ttlMs: 60_000,
+  },
+  /** TTW-254: start and resend of a sign-up code. Identity = email (start) or token fingerprint (resend). */
+  signup_send: {
+    identityLimit: 3,
+    ipLimit: 10,
+    ttlMs: 15 * 60_000,
+  },
+  /** TTW-254: entering a sign-up code. Identity = token fingerprint, never the email. */
+  signup_verify: {
+    identityLimit: 10,
+    ipLimit: 30,
+    ttlMs: 10 * 60_000,
   },
 } as const;
 
