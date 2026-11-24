@@ -145,7 +145,7 @@ export default function DashboardOrderDetailPage() {
   return (
     <CustomerDashboardShell
       activeNav="orders"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Borngreat'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <div className="mt-10 space-y-6 lg:mt-0">
         <div className="flex flex-wrap items-center justify-between gap-3">

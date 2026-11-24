@@ -99,7 +99,7 @@ export default function DashboardProductsPage() {
   return (
     <CustomerDashboardShell
       activeNav="products"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Borngreat'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <div className="mt-10 space-y-8 lg:mt-0">
         <div className="space-y-5">

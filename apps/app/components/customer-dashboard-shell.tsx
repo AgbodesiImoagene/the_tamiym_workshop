@@ -7,6 +7,7 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -21,7 +22,8 @@ type NavKey = 'home' | 'products' | 'design' | 'orders' | 'fundraiser' | 'cart';
 
 interface CustomerDashboardShellProps {
   activeNav: NavKey;
-  displayName: string;
+  /** Undefined while the account is loading: the sidebar then shows a placeholder, never a made-up name. */
+  displayName?: string;
   children: ReactNode;
 }
 
@@ -60,14 +62,25 @@ export function CustomerDashboardShell({
       <div className="lg:flex">
         <aside className="hidden min-h-screen w-[300px] flex-col justify-between bg-black px-[15px] py-12 text-white lg:flex">
           <div className="space-y-10">
-            <div className="flex items-center gap-3 px-1">
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarFallback className="bg-white/20 text-sm font-semibold text-white">
-                  {displayName.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <p className="text-base font-medium">{displayName}</p>
-            </div>
+            {displayName ? (
+              <div className="flex items-center gap-3 px-1">
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarFallback className="bg-white/20 text-sm font-semibold text-white">
+                    {displayName.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="text-base font-medium">{displayName}</p>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-3 px-1"
+                data-testid="sidebar-user-loading"
+                aria-hidden="true"
+              >
+                <Skeleton className="h-10 w-10 shrink-0 rounded-full bg-white/20" />
+                <Skeleton className="h-5 w-28 bg-white/20" />
+              </div>
+            )}
 
             <nav className="space-y-8">
               {desktopNavItems.map(({ key, label, href, icon: Icon }) => {

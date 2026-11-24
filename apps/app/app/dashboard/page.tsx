@@ -152,7 +152,7 @@ export default function DashboardPage() {
     ).length;
 
     return {
-      displayName: user?.firstName || user?.email?.split('@')[0] || 'Borngreat',
+      displayName: user?.firstName || user?.email?.split('@')[0],
       deliveredCount,
       pendingCount,
       latestOrder,

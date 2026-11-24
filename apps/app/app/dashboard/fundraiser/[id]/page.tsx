@@ -337,7 +337,7 @@ export default function CampaignAuthoringPage() {
   return (
     <CustomerDashboardShell
       activeNav="fundraiser"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Organiser'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <div className="mt-10 space-y-8 lg:mt-0" data-testid="campaign-authoring-editor">
         <div className="flex flex-wrap items-start justify-between gap-4">

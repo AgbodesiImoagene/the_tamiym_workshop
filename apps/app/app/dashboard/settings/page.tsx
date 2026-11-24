@@ -40,7 +40,7 @@ export default function DashboardSettingsPage() {
   return (
     <CustomerDashboardShell
       activeNav="home"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Borngreat'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <CustomerSettingsForm
         pageTitle="Settings"

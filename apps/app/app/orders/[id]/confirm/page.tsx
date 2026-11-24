@@ -84,7 +84,7 @@ export default function OrderConfirmPage() {
   return (
     <CustomerDashboardShell
       activeNav="orders"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Borngreat'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <div className="mt-10 grid gap-8 lg:mt-0 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="space-y-6 rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">

@@ -205,7 +205,7 @@ function ProductDetailContent({ productId }: { productId: string }) {
     );
   };
 
-  const displayName = user?.firstName || user?.email?.split('@')[0] || 'Borngreat';
+  const displayName = user?.firstName || user?.email?.split('@')[0];
 
   if (authError) {
     return (

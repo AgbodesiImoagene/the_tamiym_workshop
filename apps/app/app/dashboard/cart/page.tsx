@@ -43,7 +43,7 @@ export default function DashboardCartPage() {
   return (
     <CustomerDashboardShell
       activeNav="cart"
-      displayName={user?.firstName || user?.email?.split('@')[0] || 'Borngreat'}
+      displayName={user?.firstName || user?.email?.split('@')[0]}
     >
       <div className="mt-10 space-y-8 lg:mt-0">
         <div className="flex flex-wrap items-end justify-between gap-4">
