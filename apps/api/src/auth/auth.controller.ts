@@ -946,6 +946,11 @@ export class AuthController {
           description:
             'True when the account email is verified (TTW-023). Used by web checkout gates.',
         },
+        avatarVersion: {
+          type: 'string',
+          description:
+            'Version of the profile picture (TTW-263). Absent when the user has none. The picture itself is read at GET /users/profile/avatar.',
+        },
         surface: { type: 'string', enum: Object.values(AuthSurface) },
         sessionId: {
           type: 'string',

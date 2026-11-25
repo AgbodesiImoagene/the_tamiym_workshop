@@ -14959,6 +14959,10 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "avatarVersion": {
+                      "description": "Version of the profile picture (TTW-263). Absent when the user has none. The picture itself is read at GET /users/profile/avatar.",
+                      "type": "string"
+                    },
                     "csrf_token": {
                       "description": "Double-submit CSRF token, also set as the surface CSRF cookie. Send it back in the X-CSRF-Token header on mutating requests. Absent for bearer-only callers, which hold no cookie session.",
                       "type": "string"
@@ -22262,6 +22266,134 @@
           }
         ],
         "summary": "Update current user profile",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/v1/users/profile/avatar": {
+      "delete": {
+        "operationId": "UsersController_removeAvatar",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Picture removed (or none)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove the current user profile picture",
+        "tags": [
+          "Users"
+        ]
+      },
+      "get": {
+        "operationId": "UsersController_getAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The picture, as a 256 px WebP image."
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "The user has no picture"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Read the current user profile picture",
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_uploadAvatar",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "avatarVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "avatarVersion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Picture stored. `avatarVersion` busts caches of the picture."
+          },
+          "400": {
+            "description": "Missing file, file over 5 MB, not a JPEG, PNG or WebP image, or rejected by the scan"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "The picture was changed at the same time; try again"
+          },
+          "503": {
+            "description": "The file scanner is unavailable; nothing was stored"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Upload the current user profile picture",
         "tags": [
           "Users"
         ]

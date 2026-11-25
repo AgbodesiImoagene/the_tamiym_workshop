@@ -7,6 +7,7 @@ export default function DashboardProfilePage() {
     <>
       <CustomerSettingsForm
         pageTitle="Profile"
+        pictureButtonLabel="Upload Profile Picture"
         personalTitle="Personal Information"
         passwordTitle="Password"
         shippingTitle="Shipping Information"

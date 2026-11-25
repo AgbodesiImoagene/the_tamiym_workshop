@@ -38,6 +38,7 @@ import { VIRUS_SCANNER } from './virus-scanner.types';
       inject: [ObservabilityService],
     },
   ],
-  exports: [MediaService],
+  // S3Service and VirusScanService are shared with the profile picture (TTW-263).
+  exports: [MediaService, S3Service, VirusScanService],
 })
 export class MediaModule {}

@@ -113,6 +113,25 @@ describe('JwtStrategy', () => {
     });
   });
 
+  it('exposes the profile picture version, never its storage key (TTW-263)', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockDbUser,
+      avatarKey: 'avatars/user-1/0123abcd.webp',
+    });
+    const req = buildRequest({ origin: 'http://localhost:3000' });
+
+    const result = await strategy.validate(req, payload());
+
+    expect(result.avatarVersion).toBe('0123abcd');
+    expect(JSON.stringify(result)).not.toContain('avatars/');
+    expect(result).not.toHaveProperty('avatarKey');
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ avatarKey: true }),
+      }),
+    );
+  });
+
   it('rejects a token with missing sid', async () => {
     prisma.user.findUnique.mockResolvedValue(mockDbUser);
     const req = buildRequest({ origin: 'http://localhost:3000' });

@@ -30,6 +30,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <CustomerDashboardShell
       activeNav={activeNavForPath(pathname)}
       displayName={displayNameOf(user)}
+      avatarVersion={user?.avatarVersion}
     >
       {children}
     </CustomerDashboardShell>
