@@ -75,15 +75,15 @@ export function ProfilePictureField({ buttonLabel }: ProfilePictureFieldProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+    <div className="mb-8 mt-6 flex flex-col items-center gap-5">
       <UserAvatar
         initials={initials}
         avatarVersion={user?.avatarVersion}
         alt={name ? `${name}'s profile picture` : 'Profile picture'}
-        className="h-[120px] w-[120px] bg-black/10"
-        initialsClassName="text-3xl text-black/70"
+        className="h-44 w-44 bg-black/10 lg:h-[252px] lg:w-[252px]"
+        initialsClassName="text-5xl text-black/70 lg:text-7xl"
       />
-      <div className="flex flex-col items-center gap-2 sm:items-start">
+      <div className="flex flex-col items-center gap-2">
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"

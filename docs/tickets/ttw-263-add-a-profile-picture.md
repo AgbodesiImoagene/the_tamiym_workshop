@@ -106,6 +106,10 @@ All run in the worktree on 2026-11-25, throwaway database `tamiym_workshop_test_
 
 `Playwright Comprehensive` on `main` failed on `settings.comprehensive.spec.ts` ("settings page exposes personal, password, and shipping forms" and "profile page reuses settings form controls"): both still asserted TTW-091's "no profile picture button", which this ticket reverses on purpose. I had not run that spec before pushing. With the owner's approval the two assertions now check that the picture button exists and is enabled ("Update Profile Picture" on Settings, "Upload Profile Picture" on Profile) and that no image appears for a customer who has no picture (TTW-091's "no demo photo" is kept). Run on a throwaway database: `settings.comprehensive.spec.ts` and `profile-picture.comprehensive.spec.ts`, 26 passed (one `profile-picture` run timed out on the 15 s `/auth/register` call while four specs ran in parallel, and passed alone).
 
+### Layout fix (2026-11-25)
+
+The owner supplied the Figma capture: the picture sits **inside** the "Personal Information" card, centred under its title, with the button centred below it, then the first fields. The first version put it above the card in a row. `ProfilePictureField` is now rendered inside the card as a centred column (252 px circle from `lg`, 176 px below). Checked by unit tests (47 passed) and by a bounding-box assertion added to `profile-picture.comprehensive.spec.ts` (button below the card title, above First Name, centred on the card). That Playwright assertion was not run: the owner's dev servers occupied ports 3001 and 3002.
+
 A separate failure on `main`, `fundraiser-checkout-undeliverable-state.comprehensive.spec.ts` (web), is not related to this ticket and was not investigated.
 
 ## Completion summary

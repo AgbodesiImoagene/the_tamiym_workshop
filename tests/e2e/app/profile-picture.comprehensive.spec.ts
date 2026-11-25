@@ -36,6 +36,21 @@ test.describe('Profile picture @comprehensive @app', () => {
     await expect(sidebar.getByText('PI', { exact: true })).toBeVisible();
     await expect(sidebar.getByRole('img', { name: /profile picture/i })).toHaveCount(0);
 
+    // Figma: the picture block is inside the "Personal Information" card, centred under its
+    // title and above the first field.
+    const box = async (locator: import('@playwright/test').Locator) => {
+      const b = await locator.boundingBox();
+      if (!b) throw new Error('element has no box');
+      return b;
+    };
+    const title = await box(page.getByText('Personal Information', { exact: true }));
+    const button = await box(page.getByRole('button', { name: 'Upload Profile Picture' }));
+    const firstName = await box(page.getByLabel('First Name'));
+    const email = await box(page.getByLabel('Email'));
+    expect(button.y).toBeGreaterThan(title.y);
+    expect(button.y).toBeLessThan(firstName.y);
+    expect(Math.abs(button.x + button.width / 2 - (email.x + email.width / 2))).toBeLessThan(3);
+
     // A file that is not an image is refused in the page, with a reason.
     await page.getByLabel('Profile picture file').setInputFiles({
       name: 'notes.pdf',

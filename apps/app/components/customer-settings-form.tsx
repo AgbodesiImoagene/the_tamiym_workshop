@@ -269,10 +269,10 @@ export function CustomerSettingsForm({
         <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">{pageTitle}</h1>
       </div>
 
-      {pictureButtonLabel ? <ProfilePictureField buttonLabel={pictureButtonLabel} /> : null}
-
       {/* ── Profile ── */}
       <SectionCard title={personalTitle}>
+        {/* Figma: the picture sits inside this card, centred under the title. */}
+        {pictureButtonLabel ? <ProfilePictureField buttonLabel={pictureButtonLabel} /> : null}
         <FormProvider {...profileForm}>
           <form
             className="space-y-8"
