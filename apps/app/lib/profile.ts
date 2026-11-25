@@ -69,6 +69,11 @@ export async function changePassword(input: ChangePasswordInput) {
   return apiClient.post<void>('/auth/change-password', input);
 }
 
+/** Emails a password reset link (public endpoint; the answer is the same for any address). */
+export async function requestPasswordReset(email: string) {
+  return apiClient.post<{ message: string }>('/auth/forgot-password', { email });
+}
+
 export async function getUserAddresses() {
   return apiClient.get<ShippingAddress[]>('/users/addresses');
 }

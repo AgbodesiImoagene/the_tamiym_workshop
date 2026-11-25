@@ -9,6 +9,7 @@ import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates } from '@/lib/geo';
 import {
   changePassword,
+  requestPasswordReset,
   getUserAddresses,
   getUserProfile,
   updateUserProfile,
@@ -37,6 +38,7 @@ jest.mock('@/lib/profile', () => ({
   changePassword: jest.fn(),
   getUserAddresses: jest.fn(),
   getUserProfile: jest.fn(),
+  requestPasswordReset: jest.fn(),
   updateUserProfile: jest.fn(),
   upsertPrimaryAddress: jest.fn(),
 }));
@@ -780,5 +782,75 @@ describe('CustomerSettingsForm notifications (TTW-265)', () => {
     fireEvent.click(within(passwordForm()).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Current password is wrong'));
+  });
+});
+
+describe('CustomerSettingsForm password visibility', () => {
+  it('shows the same three password fields on the Profile page as on Settings', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    for (const [field, toggle] of [
+      ['Previous Password', 'previous password'],
+      ['New Password', 'new password'],
+      ['Confirm Password', 'confirm password'],
+    ] as const) {
+      const input = screen.getByLabelText(field);
+      expect(input).toHaveAttribute('type', 'password');
+      fireEvent.click(screen.getByRole('button', { name: `Show ${toggle}` }));
+      expect(input).toHaveAttribute('type', 'text');
+      fireEvent.click(screen.getByRole('button', { name: `Hide ${toggle}` }));
+      expect(input).toHaveAttribute('type', 'password');
+    }
+  });
+
+  it('does the same for the three fields of the Settings page', async () => {
+    renderForm();
+    await loaded();
+
+    for (const toggle of ['previous password', 'new password', 'confirm password']) {
+      fireEvent.click(screen.getByRole('button', { name: `Show ${toggle}` }));
+    }
+    expect(screen.getByLabelText('Previous Password')).toHaveAttribute('type', 'text');
+    expect(screen.getByLabelText('New Password')).toHaveAttribute('type', 'text');
+    expect(screen.getByLabelText('Confirm Password')).toHaveAttribute('type', 'text');
+  });
+});
+
+describe('CustomerSettingsForm forgotten previous password', () => {
+  const emailLink = () => screen.getByRole('button', { name: /email me a reset link/i });
+
+  it('emails a reset link to the account address and confirms with a toast', async () => {
+    (requestPasswordReset as jest.Mock).mockResolvedValue({ message: 'ok' });
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue('buyer@example.com'));
+
+    fireEvent.click(emailLink());
+
+    await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledTimes(1));
+    expect((requestPasswordReset as jest.Mock).mock.calls[0][0]).toBe('buyer@example.com');
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('buyer@example.com'))
+    );
+  });
+
+  it('shows a toast when the email cannot be requested', async () => {
+    (requestPasswordReset as jest.Mock).mockRejectedValue({ message: 'Too many requests' });
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue('buyer@example.com'));
+
+    fireEvent.click(emailLink());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
+  });
+
+  it('is offered on the Profile page too, under "Previous Password"', async () => {
+    (requestPasswordReset as jest.Mock).mockResolvedValue({ message: 'ok' });
+    renderForm('Profile');
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue('buyer@example.com'));
+
+    fireEvent.click(emailLink());
+
+    await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledTimes(1));
   });
 });

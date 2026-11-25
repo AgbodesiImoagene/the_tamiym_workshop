@@ -60,4 +60,8 @@ To do.
 
 ## Completion summary
 
+Also added at the product owner's request: under "Previous Password" (Settings page only; the Profile page's first field is "Create Password"), a button "Forgot your previous password? Email me a reset link" calls the existing public `POST /auth/forgot-password` with the account email and confirms with a toast. The emailed link opens the existing reset page. Tests: 52 passed, typecheck and lint OK.
+
+Added afterwards at the product owner's request: the password fields of the form use the existing `PasswordInput` (show/hide eye): 2 fields on Profile, 3 on Settings. Tests: 49 passed, typecheck and lint OK.
+
 `customer-settings-form.tsx` now shows `toast.success` / `toast.error` for profile, password and address saves. A refused password change no longer fails silently, and the address and password submits catch the rejection. Remaining: browser check, review.

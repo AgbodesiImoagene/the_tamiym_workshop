@@ -23,6 +23,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { PasswordInput } from '@/components/password-input';
 import { PhoneCountrySelect } from '@/components/phone-country-select';
 import { ProfilePictureField } from '@/components/profile-picture-field';
 import { canGoBack } from '@/lib/can-go-back';
@@ -33,6 +34,7 @@ import {
   changePassword,
   getUserAddresses,
   getUserProfile,
+  requestPasswordReset,
   updateUserProfile,
   upsertPrimaryAddress,
 } from '@/lib/profile';
@@ -282,6 +284,13 @@ export function CustomerSettingsForm({
     onError: (error) => toast.error(errorMessage(error, 'We could not change your password.')),
   });
 
+  // The customer forgot the previous password: email a reset link to the account address.
+  const resetLinkMutation = useMutation({
+    mutationFn: requestPasswordReset,
+    onSuccess: (_data, email) => toast.success(`We sent a reset link to ${email}.`),
+    onError: (error) => toast.error(errorMessage(error, 'We could not send the email.')),
+  });
+
   const router = useRouter();
 
   // TTW-229: go back in the history; a page opened directly has no previous page of this
@@ -457,12 +466,26 @@ export function CustomerSettingsForm({
               name="currentPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={labelClassName}>
-                    {pageTitle === 'Profile' ? 'Create Password' : 'Previous Password'}
-                  </FormLabel>
+                  <FormLabel className={labelClassName}>Previous Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="********************" {...field} />
+                    <PasswordInput
+                      placeholder="********************"
+                      toggleLabel="previous password"
+                      {...field}
+                    />
                   </FormControl>
+                  {profileQuery.data?.email ? (
+                    <button
+                      type="button"
+                      onClick={() => resetLinkMutation.mutate(profileQuery.data.email)}
+                      disabled={resetLinkMutation.isPending}
+                      className="justify-self-start text-left text-sm font-medium text-primary hover:text-primary-700 disabled:opacity-60"
+                    >
+                      {resetLinkMutation.isPending
+                        ? 'Sending...'
+                        : 'Forgot your previous password? Email me a reset link'}
+                    </button>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}
@@ -473,32 +496,36 @@ export function CustomerSettingsForm({
               name="newPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={labelClassName}>
-                    {pageTitle === 'Profile' ? 'Confirm Password' : 'New Password'}
-                  </FormLabel>
+                  <FormLabel className={labelClassName}>New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="********************" {...field} />
+                    <PasswordInput
+                      placeholder="********************"
+                      toggleLabel="new password"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {pageTitle !== 'Profile' ? (
-              <FormField
-                control={passwordForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className={labelClassName}>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="********************" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : null}
+            <FormField
+              control={passwordForm.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={labelClassName}>Confirm Password</FormLabel>
+                  <FormControl>
+                    <PasswordInput
+                      placeholder="********************"
+                      toggleLabel="confirm password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <SaveButton label="Save" loading={passwordMutation.isPending} />
           </form>
