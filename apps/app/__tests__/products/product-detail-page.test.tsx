@@ -201,6 +201,19 @@ describe('product detail page (TTW-092)', () => {
     expect(screen.queryByLabelText('Quantity for M')).not.toBeInTheDocument();
   });
 
+  it('says the image is not available, with no stand-in picture, when the product has no photo', async () => {
+    detailMock.mockResolvedValue({ ...detail, images: [], productImageRoles: [] });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Classic Tee', level: 1 });
+
+    expect(screen.getByText('Image not available')).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByRole('img')
+        .filter((img) => (img.getAttribute('src') ?? '').includes('product-fallback'))
+    ).toEqual([]);
+  });
+
   it('keeps what was chosen for another colour out of the cart', async () => {
     renderPage();
     await screen.findByRole('heading', { name: 'Classic Tee', level: 1 });

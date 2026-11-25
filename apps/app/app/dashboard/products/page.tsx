@@ -1,7 +1,8 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { customerAssets, productFallbackImage } from '@/lib/assets';
+import { customerAssets } from '@/lib/assets';
+import { ProductImagePlaceholder } from '@/components/product-image-placeholder';
 
 import {
   type DashboardProduct,
@@ -119,8 +120,7 @@ export default function DashboardProductsPage() {
           <div className="space-y-8">
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product) => {
-                const imageUrl =
-                  product.productImageRoles[0]?.image?.url ?? productFallbackImage(product.id);
+                const imageUrl = product.productImageRoles[0]?.image?.url;
 
                 return (
                   <article key={product.id} className="bg-background">
@@ -130,13 +130,17 @@ export default function DashboardProductsPage() {
                       className="group block rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1e39d2]"
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-[#f4f6f9]">
-                        <Image
-                          src={imageUrl}
-                          alt={product.productImageRoles[0]?.image?.altText || product.name}
-                          fill
-                          className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                          sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                        />
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={product.productImageRoles[0]?.image?.altText || product.name}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                            sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
+                          />
+                        ) : (
+                          <ProductImagePlaceholder />
+                        )}
                       </div>
 
                       <div className="space-y-2 px-1 pt-3">

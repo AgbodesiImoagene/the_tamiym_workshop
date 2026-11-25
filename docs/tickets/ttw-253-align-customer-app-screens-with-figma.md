@@ -144,7 +144,12 @@ Bug fix, product page image, 2026-11-25 (reported by the product owner: after cl
 - New test, seen failing first (function missing) then passing: `__tests__/lib/product-fallback-image.test.ts` (same product gives the same placeholder, always a known one, spread over several).
 - `pnpm --filter app test -- __tests__/lib __tests__/products`: 23 suites, 224 tests passed. `typecheck`, `lint`, prettier on touched files: clean.
 - Browser check (localhost:3002, test customer): list card and product page now show the same placeholder for two products (`product-fallback-3` = `product-fallback-3`, `product-fallback-5` = `product-fallback-5`).
-- Not verified: a product that has a real photo (none in the dev database); the Playwright run.
+- Product owner's decision (2026-11-25), replaces fix 2: no random stand-in pictures. A product without a photo shows the text "Image not available" (new `apps/app/components/product-image-placeholder.tsx`) on the list card and on the product page. `productFallbackImage` and its test were removed (the function is gone); `customerAssets.productFallbacks` stays because the orders page and the empty-catalogue preview cards still use it.
+- New tests, seen failing first then passing: `product-list-card.test.tsx` ("says the image is not available…", "shows the product photo when it has one") and `product-detail-page.test.tsx` ("says the image is not available…").
+- `pnpm --filter app test -- __tests__/products __tests__/lib`: 22 suites, 224 tests passed. `typecheck`, `lint`, prettier on touched files: clean.
+- Browser check (localhost:3002, test customer): list card and product page of "Authoring Tee" both show "Image not available", no stand-in picture.
+- Not verified: a product that has a real photo in the browser (none in the dev database; covered by the unit test only); the Playwright run.
+- To flag, not changed: `apps/app/app/dashboard/orders/page.tsx` still shows a random stand-in picture per order, and the empty-catalogue preview cards on the product list also use them.
 
 ## Completion summary
 

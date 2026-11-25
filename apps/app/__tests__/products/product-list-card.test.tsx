@@ -108,6 +108,27 @@ describe('product list card (TTW-204)', () => {
     expect(dot.getAttribute('style') ?? '').not.toContain('background-color');
   });
 
+  it('says the image is not available, with no stand-in picture, when the product has no photo', async () => {
+    renderPage([tee]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).getByText('Image not available')).toBeInTheDocument();
+    expect(card.querySelector('img[src*="product-fallback"]')).toBeNull();
+  });
+
+  it('shows the product photo when it has one', async () => {
+    renderPage([
+      { ...tee, productImageRoles: [{ image: { url: '/photo.png', altText: 'Red tee front' } }] },
+    ]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).getByRole('img', { name: 'Red tee front' })).toHaveAttribute(
+      'src',
+      '/photo.png'
+    );
+    expect(within(card).queryByText('Image not available')).not.toBeInTheDocument();
+  });
+
   it('shows the size range', async () => {
     renderPage([tee]);
     const card = await cardOf('Classic Tee');

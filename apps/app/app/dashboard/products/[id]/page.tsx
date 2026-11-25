@@ -1,7 +1,7 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { productFallbackImage } from '@/lib/assets';
+import { ProductImagePlaceholder } from '@/components/product-image-placeholder';
 import { ApiError } from '@/lib/auth';
 import { addCartItem } from '@/lib/cart-store';
 import { quoteOrder, type OrderQuote } from '@/lib/checkout';
@@ -220,13 +220,17 @@ function ProductDetailContent({ productId }: { productId: string }) {
             <div className="grid gap-8 lg:grid-cols-2">
               <div className="space-y-3">
                 <div className="relative h-[360px] w-full overflow-hidden rounded-[28px] border border-border bg-muted">
-                  <Image
-                    src={mainImage?.url ?? productFallbackImage(product.id)}
-                    alt={mainImage?.altText || product.name}
-                    fill
-                    className="object-contain p-5"
-                    sizes="(min-width: 1024px) 45vw, 100vw"
-                  />
+                  {mainImage ? (
+                    <Image
+                      src={mainImage.url}
+                      alt={mainImage.altText || product.name}
+                      fill
+                      className="object-contain p-5"
+                      sizes="(min-width: 1024px) 45vw, 100vw"
+                    />
+                  ) : (
+                    <ProductImagePlaceholder />
+                  )}
                 </div>
                 {images.length > 1 ? (
                   <div className="flex flex-wrap gap-2">
