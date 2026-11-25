@@ -443,3 +443,147 @@ describe('CustomerSettingsForm back button', () => {
     expect(back).not.toHaveBeenCalled();
   });
 });
+
+// TTW-264: saving the personal details used to fail for anyone without a phone number (the
+// form sent an empty phone, which the API refuses) and the refusal was never shown. The phone
+// is a country (calling code) next to a field that takes digits only; the form builds the
+// international number the API wants.
+describe('CustomerSettingsForm personal details', () => {
+  function personalForm() {
+    return screen.getByLabelText('First Name').closest('form') as HTMLFormElement;
+  }
+  function saveDetails() {
+    fireEvent.click(within(personalForm()).getByRole('button', { name: 'Save' }));
+  }
+  const phoneInput = () => screen.getByLabelText('Phone') as HTMLInputElement;
+  const countrySelect = () => screen.getByLabelText('Country calling code') as HTMLSelectElement;
+  const profilePayloads = () => (updateUserProfile as jest.Mock).mock.calls.map(([p]) => p);
+
+  it('saves a new name for a customer with no phone, and sends no phone at all', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Adaeze' } });
+    saveDetails();
+
+    await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+    expect(profilePayloads()[0]).toEqual({ firstName: 'Adaeze', lastName: 'Obi' });
+    expect(profilePayloads()[0]).not.toHaveProperty('phone');
+  });
+
+  it('offers the countries with their calling code, Nigeria first and selected', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    expect(countrySelect()).toHaveValue('NG');
+    const options = within(countrySelect()).getAllByRole('option');
+    expect(options[0]).toHaveTextContent('Nigeria (+234)');
+    expect(
+      within(countrySelect()).getByRole('option', { name: 'United Kingdom (+44)' })
+    ).toBeInTheDocument();
+    expect(options.length).toBeGreaterThan(200);
+  });
+
+  it('keeps only digits in the field', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(phoneInput(), { target: { value: 'abc +234 (801)-23' } });
+    expect(phoneInput().value).toBe('23480123');
+  });
+
+  it('builds the international number from the country and the digits', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(phoneInput(), { target: { value: '8012345678' } });
+    saveDetails();
+
+    await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+    expect(profilePayloads()[0]).toEqual({
+      firstName: 'Ada',
+      lastName: 'Obi',
+      phone: '+2348012345678',
+    });
+  });
+
+  it('turns a local number with its leading 0 into the international one', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(phoneInput(), { target: { value: '08012345678' } });
+    saveDetails();
+
+    await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+    expect(profilePayloads()[0].phone).toBe('+2348012345678');
+  });
+
+  it('uses the country that was chosen', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(countrySelect(), { target: { value: 'GB' } });
+    fireEvent.change(phoneInput(), { target: { value: '7911123456' } });
+    saveDetails();
+
+    await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+    expect(profilePayloads()[0].phone).toBe('+447911123456');
+  });
+
+  it('shows a saved number as its country and its digits', async () => {
+    (getUserProfile as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      email: 'buyer@example.com',
+      firstName: 'Ada',
+      lastName: 'Obi',
+      phone: '+442079460958',
+    });
+    renderForm('Profile');
+    await loaded();
+
+    await waitFor(() => expect(countrySelect()).toHaveValue('GB'));
+    expect(phoneInput()).toHaveValue('2079460958');
+  });
+
+  it('refuses a number that is not valid for the country and sends nothing', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(phoneInput(), { target: { value: '123' } });
+    saveDetails();
+
+    expect(
+      await screen.findByText(/valid phone number for the selected country/i)
+    ).toBeInTheDocument();
+    expect(updateUserProfile).not.toHaveBeenCalled();
+  });
+
+  it('shows the refusal of the API instead of failing silently', async () => {
+    (updateUserProfile as jest.Mock).mockRejectedValue({
+      message: 'Something went wrong on our side',
+      statusCode: 500,
+    });
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Adaeze' } });
+    saveDetails();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong on our side');
+    expect(within(personalForm()).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('explains a phone refused by the API', async () => {
+    (updateUserProfile as jest.Mock).mockRejectedValue({
+      message: ['phone must be a valid phone number'],
+      statusCode: 400,
+    });
+    renderForm('Profile');
+    await loaded();
+
+    fireEvent.change(phoneInput(), { target: { value: '8012345678' } });
+    saveDetails();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/valid phone number/i);
+  });
+});

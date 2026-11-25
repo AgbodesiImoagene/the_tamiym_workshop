@@ -429,6 +429,9 @@ importers:
       fabric:
         specifier: ^7.4.0
         version: 7.4.0
+      libphonenumber-js:
+        specifier: 1.12.35
+        version: 1.12.35
       next:
         specifier: 16.4.6
         version: 16.4.6(@babel/core@7.28.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.62.1)(@types/node@20.19.30)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)

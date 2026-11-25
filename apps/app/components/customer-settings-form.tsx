@@ -24,6 +24,14 @@ import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
 import { ProfilePictureField } from '@/components/profile-picture-field';
 import { canGoBack } from '@/lib/can-go-back';
+import {
+  DEFAULT_PHONE_COUNTRY,
+  digitsOnly,
+  phoneCountryOptions,
+  splitStoredPhone,
+  toE164,
+} from '@/lib/phone';
+import type { CountryCode } from 'libphonenumber-js/max';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
   changePassword,
@@ -46,7 +54,9 @@ interface ProfileFormValues {
   firstName: string;
   lastName: string;
   email: string;
+  /** National digits only; the country is `phoneCountry`. */
   phone: string;
+  phoneCountry: string;
 }
 
 interface PasswordFormValues {
@@ -58,6 +68,31 @@ interface PasswordFormValues {
 // TTW-192: the state is chosen from the list (TTW-087), so a form without a state code
 // cannot be saved.
 const STATE_NOT_LISTED_MESSAGE = 'Choose a state from the list.';
+
+// TTW-264: the phone is a country (calling code) and digits only. The international number
+// the API wants is built on save; an empty phone means "no phone" and is not sent.
+const PHONE_INVALID_MESSAGE = 'Enter a valid phone number for the selected country.';
+
+const profileSchema = z
+  .object({
+    firstName: z.string(),
+    lastName: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    phoneCountry: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    if (values.phone && !toE164(values.phoneCountry as CountryCode, values.phone)) {
+      ctx.addIssue({ code: 'custom', path: ['phone'], message: PHONE_INVALID_MESSAGE });
+    }
+  });
+
+function profileSaveMessage(error: unknown): string {
+  const raw = (error as { message?: unknown } | null)?.message;
+  const message = Array.isArray(raw) ? raw.join(' ') : typeof raw === 'string' ? raw : '';
+  if (/phone/i.test(message)) return PHONE_INVALID_MESSAGE;
+  return message || 'We could not save your details.';
+}
 
 const addressSchema = z.object({
   country: z.string(),
@@ -121,8 +156,17 @@ export function CustomerSettingsForm({
   });
 
   const profileForm = useForm<ProfileFormValues>({
-    defaultValues: { firstName: '', lastName: '', email: '', phone: '' },
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      phoneCountry: DEFAULT_PHONE_COUNTRY,
+    },
   });
+
+  const phoneCountry = useWatch({ control: profileForm.control, name: 'phoneCountry' });
 
   const passwordForm = useForm<PasswordFormValues>({
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
@@ -167,11 +211,13 @@ export function CustomerSettingsForm({
 
   useEffect(() => {
     if (profileQuery.data) {
+      const stored = splitStoredPhone(profileQuery.data.phone);
       profileForm.reset({
         firstName: profileQuery.data.firstName ?? '',
         lastName: profileQuery.data.lastName ?? '',
         email: profileQuery.data.email ?? '',
-        phone: profileQuery.data.phone ?? '',
+        phone: stored.digits,
+        phoneCountry: stored.country,
       });
     }
   }, [profileForm, profileQuery.data]);
@@ -277,11 +323,18 @@ export function CustomerSettingsForm({
           <form
             className="space-y-8"
             onSubmit={profileForm.handleSubmit(async (values) => {
-              await profileMutation.mutateAsync({
-                firstName: values.firstName,
-                lastName: values.lastName,
-                phone: values.phone,
-              });
+              try {
+                await profileMutation.mutateAsync({
+                  firstName: values.firstName,
+                  lastName: values.lastName,
+                  // An empty phone is "none": the API refuses an empty string.
+                  ...(values.phone
+                    ? { phone: toE164(values.phoneCountry as CountryCode, values.phone)! }
+                    : {}),
+                });
+              } catch {
+                // Shown under the form below; nothing is left unhandled.
+              }
             })}
           >
             <div className="grid gap-6 lg:grid-cols-2">
@@ -333,14 +386,45 @@ export function CustomerSettingsForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={labelClassName}>Phone</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter number" {...field} />
-                  </FormControl>
+                  <div className="flex gap-2">
+                    <select
+                      aria-label="Country calling code"
+                      className={`${selectClassName} w-[170px] shrink-0`}
+                      value={phoneCountry}
+                      onChange={(event) =>
+                        profileForm.setValue('phoneCountry', event.target.value, {
+                          shouldDirty: true,
+                        })
+                      }
+                    >
+                      {phoneCountryOptions().map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.name} (+{option.callingCode})
+                        </option>
+                      ))}
+                    </select>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        maxLength={15}
+                        placeholder="8012345678"
+                        {...field}
+                        onChange={(event) => field.onChange(digitsOnly(event.target.value))}
+                      />
+                    </FormControl>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {profileMutation.isError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {profileSaveMessage(profileMutation.error)}
+              </p>
+            ) : null}
             <SaveButton label="Save" loading={profileMutation.isPending} />
           </form>
         </FormProvider>
