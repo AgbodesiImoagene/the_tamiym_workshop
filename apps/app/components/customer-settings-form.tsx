@@ -17,6 +17,7 @@ import {
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -87,6 +88,12 @@ function profileSaveMessage(error: unknown): string {
   const message = Array.isArray(raw) ? raw.join(' ') : typeof raw === 'string' ? raw : '';
   if (/phone/i.test(message)) return PHONE_INVALID_MESSAGE;
   return message || 'We could not save your details.';
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  const raw = (error as { message?: unknown } | null)?.message;
+  const message = Array.isArray(raw) ? raw.join(' ') : typeof raw === 'string' ? raw : '';
+  return message || fallback;
 }
 
 const addressSchema = z.object({
@@ -261,14 +268,18 @@ export function CustomerSettingsForm({
     mutationFn: updateUserProfile,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+      toast.success('Profile updated');
     },
+    onError: (error) => toast.error(profileSaveMessage(error)),
   });
 
   const passwordMutation = useMutation({
     mutationFn: changePassword,
     onSuccess: () => {
       passwordForm.reset();
+      toast.success('Password updated');
     },
+    onError: (error) => toast.error(errorMessage(error, 'We could not change your password.')),
   });
 
   const router = useRouter();
@@ -284,7 +295,9 @@ export function CustomerSettingsForm({
     mutationFn: upsertPrimaryAddress,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['user-addresses'] });
+      toast.success('Shipping address saved');
     },
+    onError: (error) => toast.error(errorMessage(error, 'We could not save your address.')),
   });
 
   return (
@@ -429,10 +442,14 @@ export function CustomerSettingsForm({
                 });
                 return;
               }
-              await passwordMutation.mutateAsync({
-                currentPassword: values.currentPassword,
-                newPassword: values.newPassword,
-              });
+              try {
+                await passwordMutation.mutateAsync({
+                  currentPassword: values.currentPassword,
+                  newPassword: values.newPassword,
+                });
+              } catch {
+                // Shown as a notification by the mutation; nothing is left unhandled.
+              }
             })}
           >
             <FormField
@@ -494,21 +511,25 @@ export function CustomerSettingsForm({
           <form
             className="space-y-8"
             onSubmit={addressForm.handleSubmit(async (values) => {
-              await addressMutation.mutateAsync({
-                country: values.country,
-                state: values.state,
-                stateCode: values.stateCode,
-                ...(lgasQuery.isSuccess && lgas.some((item) => item.id === values.lgaId)
-                  ? { lgaId: values.lgaId }
-                  : // TTW-193: an emptied select on an address that had an LGA means "remove it".
-                    // A saved LGA the list cannot show is left alone (the value is not empty).
-                    values.lgaId === '' && primaryAddress?.lgaId
-                    ? { lgaId: null }
-                    : {}),
-                city: values.city,
-                addressLine1: values.addressLine1,
-                ...instructionsPayload(values.instructions, primaryAddress?.instructions),
-              });
+              try {
+                await addressMutation.mutateAsync({
+                  country: values.country,
+                  state: values.state,
+                  stateCode: values.stateCode,
+                  ...(lgasQuery.isSuccess && lgas.some((item) => item.id === values.lgaId)
+                    ? { lgaId: values.lgaId }
+                    : // TTW-193: an emptied select on an address that had an LGA means "remove it".
+                      // A saved LGA the list cannot show is left alone (the value is not empty).
+                      values.lgaId === '' && primaryAddress?.lgaId
+                      ? { lgaId: null }
+                      : {}),
+                  city: values.city,
+                  addressLine1: values.addressLine1,
+                  ...instructionsPayload(values.instructions, primaryAddress?.instructions),
+                });
+              } catch {
+                // Shown under the form and as a notification; nothing is left unhandled.
+              }
             })}
           >
             <div className="grid gap-6 lg:grid-cols-2">

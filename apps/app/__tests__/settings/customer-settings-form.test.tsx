@@ -15,6 +15,10 @@ import {
   upsertPrimaryAddress,
 } from '@/lib/profile';
 
+import { toast } from 'sonner';
+
+jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+
 const back = jest.fn();
 const push = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -709,5 +713,72 @@ describe('CustomerSettingsForm personal details', () => {
     saveDetails();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/valid phone number/i);
+  });
+});
+
+describe('CustomerSettingsForm notifications (TTW-265)', () => {
+  function passwordForm() {
+    return screen.getByLabelText('New Password').closest('form') as HTMLFormElement;
+  }
+
+  it('confirms a saved profile with a toast', async () => {
+    renderForm('Profile');
+    await loaded();
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Adaeze' } });
+    const form = screen.getByLabelText('First Name').closest('form') as HTMLFormElement;
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Profile updated'));
+  });
+
+  it('shows the refusal of a profile save as a toast', async () => {
+    (updateUserProfile as jest.Mock).mockRejectedValue({ message: 'Something went wrong' });
+    renderForm('Profile');
+    await loaded();
+    const form = screen.getByLabelText('First Name').closest('form') as HTMLFormElement;
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Something went wrong'));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('confirms a saved shipping address with a toast', async () => {
+    renderForm();
+    await loaded();
+    save();
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Shipping address saved'));
+  });
+
+  it('shows the refusal of an address save as a toast', async () => {
+    (upsertPrimaryAddress as jest.Mock).mockRejectedValue({ message: 'LGA is required' });
+    renderForm();
+    await loaded();
+    save();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('LGA is required'));
+  });
+
+  it('confirms a changed password with a toast', async () => {
+    renderForm();
+    await loaded();
+    fireEvent.change(screen.getByLabelText('Previous Password'), { target: { value: 'oldpass1' } });
+    fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'newpass12' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'newpass12' } });
+    fireEvent.click(within(passwordForm()).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Password updated'));
+  });
+
+  it('shows a refused password change as a toast, without an unhandled rejection', async () => {
+    (changePassword as jest.Mock).mockRejectedValue({ message: 'Current password is wrong' });
+    renderForm();
+    await loaded();
+    fireEvent.change(screen.getByLabelText('Previous Password'), { target: { value: 'oldpass1' } });
+    fireEvent.change(screen.getByLabelText('New Password'), { target: { value: 'newpass12' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'newpass12' } });
+    fireEvent.click(within(passwordForm()).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Current password is wrong'));
   });
 });
