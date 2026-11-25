@@ -41,7 +41,9 @@ test.describe('Profile personal details @comprehensive @app', () => {
 
     // The phone is a country and digits only: letters, spaces and dashes never reach the field,
     // and a local number with its leading 0 becomes the international one.
-    await expect(page.getByLabel('Country calling code')).toHaveValue('NG');
+    await expect(page.getByRole('combobox', { name: 'Country calling code' })).toContainText(
+      'Nigeria (+234)'
+    );
     const phone = page.getByLabel('Phone');
     await phone.pressSequentially('abc0801-234 5678');
     await expect(phone).toHaveValue('08012345678');
@@ -54,11 +56,15 @@ test.describe('Profile personal details @comprehensive @app', () => {
     // Reloaded: the saved number is shown as its country and its digits.
     await page.reload();
     await expect(page.getByLabel('First Name')).toHaveValue('Adaeze');
-    await expect(page.getByLabel('Country calling code')).toHaveValue('NG');
+    await expect(page.getByRole('combobox', { name: 'Country calling code' })).toContainText(
+      'Nigeria (+234)'
+    );
     await expect(page.getByLabel('Phone')).toHaveValue('8012345678');
 
     // Another country, with a number that is not valid for it: refused in the page.
-    await page.getByLabel('Country calling code').selectOption('GB');
+    await page.getByRole('combobox', { name: 'Country calling code' }).click();
+    await page.getByLabel('Search country code').fill('44');
+    await page.getByRole('option', { name: 'United Kingdom (+44)' }).click();
     await page.getByLabel('Phone').fill('123');
     await form.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText(/valid phone number for the selected country/i)).toBeVisible();

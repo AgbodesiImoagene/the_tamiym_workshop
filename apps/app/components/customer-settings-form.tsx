@@ -17,21 +17,15 @@ import {
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { PhoneCountrySelect } from '@/components/phone-country-select';
 import { ProfilePictureField } from '@/components/profile-picture-field';
 import { canGoBack } from '@/lib/can-go-back';
-import {
-  DEFAULT_PHONE_COUNTRY,
-  digitsOnly,
-  phoneCountryOptions,
-  searchPhoneCountries,
-  splitStoredPhone,
-  toE164,
-} from '@/lib/phone';
+import { DEFAULT_PHONE_COUNTRY, digitsOnly, splitStoredPhone, toE164 } from '@/lib/phone';
 import type { CountryCode } from 'libphonenumber-js/max';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
@@ -111,12 +105,6 @@ type AddressFormValues = z.infer<typeof addressSchema>;
 const selectClassName =
   'h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm';
 
-// The country selector is a fixed-width column next to the phone field. `selectClassName` is
-// full width, which would make it fill the whole line.
-const phoneSelectClassName = selectClassName.replace('w-full', 'w-[150px] shrink-0 sm:w-[190px]');
-
-const phoneSearchClassName = selectClassName.replace('w-full', 'w-[84px] shrink-0');
-
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
@@ -174,33 +162,6 @@ export function CustomerSettingsForm({
   });
 
   const phoneCountry = useWatch({ control: profileForm.control, name: 'phoneCountry' });
-  // Quick search of the country selector, by calling code or by name.
-  const [countryQuery, setCountryQuery] = useState('');
-  const countryMatches = useMemo(
-    () => searchPhoneCountries(phoneCountryOptions(), countryQuery),
-    [countryQuery]
-  );
-  // The chosen country always stays in the list, so the selector never goes blank.
-  const visibleCountries = useMemo(
-    () =>
-      countryMatches.some((option) => option.code === phoneCountry)
-        ? countryMatches
-        : phoneCountryOptions().filter(
-            (option) =>
-              option.code === phoneCountry ||
-              countryMatches.some((match) => match.code === option.code)
-          ),
-    [countryMatches, phoneCountry]
-  );
-  const onCountrySearch = (value: string) => {
-    setCountryQuery(value);
-    const matches = searchPhoneCountries(phoneCountryOptions(), value);
-    // One country has this code: choose it, the person only has to type the number.
-    if (value.trim() && matches.length === 1) {
-      profileForm.setValue('phoneCountry', matches[0].code, { shouldDirty: true });
-    }
-  };
-
   const passwordForm = useForm<PasswordFormValues>({
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
@@ -420,32 +381,13 @@ export function CustomerSettingsForm({
                 <FormItem>
                   <FormLabel className={labelClassName}>Phone</FormLabel>
                   <div className="flex flex-wrap gap-2 sm:flex-nowrap">
-                    <input
-                      type="search"
-                      aria-label="Search country code"
-                      placeholder="+44"
-                      autoComplete="off"
-                      maxLength={20}
-                      value={countryQuery}
-                      onChange={(event) => onCountrySearch(event.target.value)}
-                      className={phoneSearchClassName}
-                    />
-                    <select
-                      aria-label="Country calling code"
-                      className={phoneSelectClassName}
+                    <PhoneCountrySelect
                       value={phoneCountry}
-                      onChange={(event) =>
-                        profileForm.setValue('phoneCountry', event.target.value, {
-                          shouldDirty: true,
-                        })
+                      onChange={(code) =>
+                        profileForm.setValue('phoneCountry', code, { shouldDirty: true })
                       }
-                    >
-                      {visibleCountries.map((option) => (
-                        <option key={option.code} value={option.code}>
-                          {option.name} (+{option.callingCode})
-                        </option>
-                      ))}
-                    </select>
+                      className="w-[170px] shrink-0 sm:w-[210px]"
+                    />
                     <FormControl>
                       <Input
                         type="tel"
@@ -459,9 +401,6 @@ export function CustomerSettingsForm({
                       />
                     </FormControl>
                   </div>
-                  {countryQuery.trim() && countryMatches.length === 0 ? (
-                    <p className="text-xs text-black/60">No country matches.</p>
-                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}

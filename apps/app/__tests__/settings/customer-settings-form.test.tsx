@@ -447,8 +447,18 @@ describe('CustomerSettingsForm back button', () => {
 // TTW-264: saving the personal details used to fail for anyone without a phone number (the
 // form sent an empty phone, which the API refuses) and the refusal was never shown. The phone
 // is a country (calling code) next to a field that takes digits only; the form builds the
-// international number the API wants.
+// international number the API wants. The country list opens from the selector and has its
+// own search field inside.
 describe('CustomerSettingsForm personal details', () => {
+  beforeAll(() => {
+    // Radix positions the dropdown with a ResizeObserver, which jsdom does not have.
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+
   function personalForm() {
     return screen.getByLabelText('First Name').closest('form') as HTMLFormElement;
   }
@@ -456,7 +466,13 @@ describe('CustomerSettingsForm personal details', () => {
     fireEvent.click(within(personalForm()).getByRole('button', { name: 'Save' }));
   }
   const phoneInput = () => screen.getByLabelText('Phone') as HTMLInputElement;
-  const countrySelect = () => screen.getByLabelText('Country calling code') as HTMLSelectElement;
+  const countryTrigger = () => screen.getByRole('combobox', { name: 'Country calling code' });
+  const openCountries = () => fireEvent.click(countryTrigger());
+  const searchField = () => screen.getByLabelText('Search country code') as HTMLInputElement;
+  const listedCodes = () =>
+    within(screen.getByRole('listbox', { name: 'Countries' }))
+      .queryAllByRole('option')
+      .map((o) => o.getAttribute('data-code'));
   const profilePayloads = () => (updateUserProfile as jest.Mock).mock.calls.map(([p]) => p);
 
   it('saves a new name for a customer with no phone, and sends no phone at all', async () => {
@@ -471,90 +487,36 @@ describe('CustomerSettingsForm personal details', () => {
     expect(profilePayloads()[0]).not.toHaveProperty('phone');
   });
 
-  it('offers the countries in alphabetical order with their calling code, Nigeria selected', async () => {
+  it('shows the chosen country on the selector, Nigeria by default, and keeps it narrow', async () => {
     renderForm('Profile');
     await loaded();
 
-    expect(countrySelect()).toHaveValue('NG');
-    const options = within(countrySelect()).getAllByRole('option');
-    const names = options.map((o) => (o.textContent ?? '').replace(/ \(\+\d+\)$/, ''));
-    expect(names).toEqual([...names].sort((x, y) => x.localeCompare(y)));
-    expect(options[0]).toHaveTextContent(/^Afghanistan \(\+93\)$/);
-    expect(
-      within(countrySelect()).getByRole('option', { name: 'United Kingdom (+44)' })
-    ).toBeInTheDocument();
-    expect(options.length).toBeGreaterThan(200);
-  });
-
-  describe('country search', () => {
-    const search = () => screen.getByLabelText('Search country code') as HTMLInputElement;
-    const optionValues = () =>
-      within(countrySelect())
-        .getAllByRole('option')
-        .map((o) => (o as HTMLOptionElement).value);
-
-    it('lists only the countries with that calling code, and keeps the chosen one', async () => {
-      renderForm('Profile');
-      await loaded();
-
-      fireEvent.change(search(), { target: { value: '+44' } });
-
-      expect(optionValues().sort()).toEqual(['GB', 'GG', 'IM', 'JE', 'NG']);
-      expect(countrySelect()).toHaveValue('NG');
-    });
-
-    it('selects the country when the code belongs to one country only', async () => {
-      renderForm('Profile');
-      await loaded();
-
-      fireEvent.change(search(), { target: { value: '33' } });
-
-      expect(countrySelect()).toHaveValue('FR');
-      expect(optionValues()).toEqual(['FR']);
-    });
-
-    it('also finds a country by its name', async () => {
-      renderForm('Profile');
-      await loaded();
-
-      fireEvent.change(search(), { target: { value: 'kingd' } });
-
-      expect(optionValues()).toContain('GB');
-      expect(optionValues()).not.toContain('FR');
-    });
-
-    it('says so when nothing matches, and shows the full list again when cleared', async () => {
-      renderForm('Profile');
-      await loaded();
-
-      fireEvent.change(search(), { target: { value: '999' } });
-      expect(screen.getByText('No country matches.')).toBeInTheDocument();
-
-      fireEvent.change(search(), { target: { value: '' } });
-      expect(screen.queryByText('No country matches.')).not.toBeInTheDocument();
-      expect(optionValues().length).toBeGreaterThan(200);
-    });
-
-    it('builds the number with the country found by its code', async () => {
-      renderForm('Profile');
-      await loaded();
-
-      fireEvent.change(search(), { target: { value: '33' } });
-      fireEvent.change(phoneInput(), { target: { value: '612345678' } });
-      saveDetails();
-
-      await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
-      expect(profilePayloads()[0].phone).toBe('+33612345678');
-    });
-  });
-
-  it('keeps the country selector narrow so the phone field stays on its line', async () => {
-    renderForm('Profile');
-    await loaded();
-
-    expect(countrySelect().className).not.toMatch(/(^|\s)w-full(\s|$)/);
-    expect(countrySelect().className).toContain('shrink-0');
+    expect(countryTrigger()).toHaveTextContent('Nigeria (+234)');
+    expect(countryTrigger().className).not.toMatch(/(^|\s)w-full(\s|$)/);
+    expect(countryTrigger().className).toContain('shrink-0');
     expect(phoneInput().className).toContain('flex-1');
+  });
+
+  it('opens a list in alphabetical order with the search field inside it', async () => {
+    renderForm('Profile');
+    await loaded();
+    expect(screen.queryByRole('listbox', { name: 'Countries' })).not.toBeInTheDocument();
+
+    openCountries();
+
+    const list = screen.getByRole('listbox', { name: 'Countries' });
+    const options = within(list).getAllByRole('option');
+    const names = options.map((o) => (o.textContent ?? '').replace(/ \(\+\d+\)$/, ''));
+    expect(names).toEqual([...names].sort((x, y) => x.localeCompare(y, 'en')));
+    expect(options[0]).toHaveTextContent('Afghanistan (+93)');
+    expect(within(list).getByRole('option', { name: 'United Kingdom (+44)' })).toBeInTheDocument();
+    expect(options.length).toBeGreaterThan(200);
+    // The search field is in the dropdown, with the focus.
+    expect(searchField()).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Nigeria (+234)' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   it('keeps only digits in the field', async () => {
@@ -591,11 +553,15 @@ describe('CustomerSettingsForm personal details', () => {
     expect(profilePayloads()[0].phone).toBe('+2348012345678');
   });
 
-  it('uses the country that was chosen', async () => {
+  it('uses the country that was clicked in the list, and closes the list', async () => {
     renderForm('Profile');
     await loaded();
 
-    fireEvent.change(countrySelect(), { target: { value: 'GB' } });
+    openCountries();
+    fireEvent.click(screen.getByRole('option', { name: 'United Kingdom (+44)' }));
+
+    expect(countryTrigger()).toHaveTextContent('United Kingdom (+44)');
+    expect(screen.queryByRole('listbox', { name: 'Countries' })).not.toBeInTheDocument();
     fireEvent.change(phoneInput(), { target: { value: '7911123456' } });
     saveDetails();
 
@@ -614,8 +580,93 @@ describe('CustomerSettingsForm personal details', () => {
     renderForm('Profile');
     await loaded();
 
-    await waitFor(() => expect(countrySelect()).toHaveValue('GB'));
+    await waitFor(() => expect(countryTrigger()).toHaveTextContent('United Kingdom (+44)'));
     expect(phoneInput()).toHaveValue('2079460958');
+  });
+
+  describe('search inside the list', () => {
+    it('lists only the countries with that calling code', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+
+      fireEvent.change(searchField(), { target: { value: '+44' } });
+
+      expect(listedCodes().sort()).toEqual(['GB', 'GG', 'IM', 'JE']);
+    });
+
+    it('also finds a country by its name', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+
+      fireEvent.change(searchField(), { target: { value: 'kingd' } });
+
+      expect(listedCodes()).toContain('GB');
+      expect(listedCodes()).not.toContain('FR');
+    });
+
+    it('says so when nothing matches, and shows the full list again when cleared', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+
+      fireEvent.change(searchField(), { target: { value: '999' } });
+      expect(screen.getByText('No country matches.')).toBeInTheDocument();
+      expect(listedCodes()).toEqual([]);
+
+      fireEvent.change(searchField(), { target: { value: '' } });
+      expect(screen.queryByText('No country matches.')).not.toBeInTheDocument();
+      expect(listedCodes().length).toBeGreaterThan(200);
+    });
+
+    it('chooses the first match with Enter, and moves with the arrow keys', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+
+      fireEvent.change(searchField(), { target: { value: '33' } });
+      fireEvent.keyDown(searchField(), { key: 'Enter' });
+      expect(countryTrigger()).toHaveTextContent('France (+33)');
+
+      openCountries();
+      fireEvent.change(searchField(), { target: { value: '44' } });
+      fireEvent.keyDown(searchField(), { key: 'ArrowDown' });
+      fireEvent.keyDown(searchField(), { key: 'Enter' });
+      // Guernsey, Isle of Man, Jersey, United Kingdom: the second one in alphabetical order.
+      expect(countryTrigger()).toHaveTextContent('Isle of Man (+44)');
+    });
+
+    it('closes with Escape without changing the country, and forgets the search', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+      fireEvent.change(searchField(), { target: { value: '33' } });
+
+      fireEvent.keyDown(searchField(), { key: 'Escape' });
+      await waitFor(() =>
+        expect(screen.queryByRole('listbox', { name: 'Countries' })).not.toBeInTheDocument()
+      );
+      expect(countryTrigger()).toHaveTextContent('Nigeria (+234)');
+
+      openCountries();
+      expect(searchField()).toHaveValue('');
+      expect(listedCodes().length).toBeGreaterThan(200);
+    });
+
+    it('builds the number with the country found by its code', async () => {
+      renderForm('Profile');
+      await loaded();
+      openCountries();
+
+      fireEvent.change(searchField(), { target: { value: '33' } });
+      fireEvent.click(screen.getByRole('option', { name: 'France (+33)' }));
+      fireEvent.change(phoneInput(), { target: { value: '612345678' } });
+      saveDetails();
+
+      await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+      expect(profilePayloads()[0].phone).toBe('+33612345678');
+    });
   });
 
   it('refuses a number that is not valid for the country and sends nothing', async () => {

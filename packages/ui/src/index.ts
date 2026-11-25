@@ -31,6 +31,7 @@ export {
   SelectTrigger,
   SelectValue,
 } from './components/ui/select';
+export { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 export { Checkbox } from './components/ui/checkbox';
 export { Switch } from './components/ui/switch';
 export {
