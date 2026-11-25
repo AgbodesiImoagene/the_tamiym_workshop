@@ -6,12 +6,4 @@ export const customerAssets = {
   tutorialVideoOne: '/assets/customer/tutorial-video-one.jpg',
   tutorialVideoTwo: '/assets/customer/tutorial-video-two.png',
   emptyCartIllustration: '/assets/customer/sidebar-illustration.svg',
-  productFallbacks: [
-    '/assets/customer/product-fallback-1.jpg',
-    '/assets/customer/product-fallback-2.png',
-    '/assets/customer/product-fallback-3.jpg',
-    '/assets/customer/product-fallback-4.jpg',
-    '/assets/customer/product-fallback-5.jpg',
-    '/assets/customer/product-fallback-6.jpg',
-  ],
 } as const;

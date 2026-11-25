@@ -1,16 +1,12 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { customerAssets } from '@/lib/assets';
-
+import { ProductImagePlaceholder } from '@/components/product-image-placeholder';
 import { getCustomerOrders } from '@/lib/dashboard';
 import { useQuery } from '@tanstack/react-query';
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { useCurrentUser } from '@/lib/current-user';
-
-const fallbackImages = customerAssets.productFallbacks;
 
 export default function DashboardOrdersPage() {
   const { user } = useCurrentUser();
@@ -74,12 +70,11 @@ export default function DashboardOrdersPage() {
           </div>
         ) : (
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-            {orders.map((order, index) => {
+            {orders.map((order) => {
               const title = order.items[0]?.productNameSnapshot ?? 'Workshop order';
               const subtitle = `${order.items.length} item${
                 order.items.length === 1 ? '' : 's'
               } · ${order.status.replaceAll('_', ' ')}`;
-              const image = fallbackImages[index % fallbackImages.length];
 
               return (
                 <article
@@ -87,13 +82,7 @@ export default function DashboardOrdersPage() {
                   className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
                 >
                   <div className="relative h-[260px]">
-                    <Image
-                      src={image}
-                      alt={title}
-                      fill
-                      className="object-cover"
-                      sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                    />
+                    <ProductImagePlaceholder />
                   </div>
                   <div className="space-y-3 p-5">
                     <div className="space-y-1">

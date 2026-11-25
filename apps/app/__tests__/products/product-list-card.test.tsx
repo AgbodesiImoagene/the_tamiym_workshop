@@ -116,6 +116,14 @@ describe('product list card (TTW-204)', () => {
     expect(card.querySelector('img[src*="product-fallback"]')).toBeNull();
   });
 
+  it('shows no stand-in picture on the preview cards of an empty catalogue', async () => {
+    const { container } = renderPage([]);
+
+    await screen.findByText('Classic Tee');
+    expect(screen.getAllByText('Image not available')).toHaveLength(3);
+    expect(container.querySelector('img[src*="product-fallback"]')).toBeNull();
+  });
+
   it('shows the product photo when it has one', async () => {
     renderPage([
       { ...tee, productImageRoles: [{ image: { url: '/photo.png', altText: 'Red tee front' } }] },

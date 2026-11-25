@@ -149,7 +149,11 @@ Bug fix, product page image, 2026-11-25 (reported by the product owner: after cl
 - `pnpm --filter app test -- __tests__/products __tests__/lib`: 22 suites, 224 tests passed. `typecheck`, `lint`, prettier on touched files: clean.
 - Browser check (localhost:3002, test customer): list card and product page of "Authoring Tee" both show "Image not available", no stand-in picture.
 - Not verified: a product that has a real photo in the browser (none in the dev database; covered by the unit test only); the Playwright run.
-- To flag, not changed: `apps/app/app/dashboard/orders/page.tsx` still shows a random stand-in picture per order, and the empty-catalogue preview cards on the product list also use them.
+- Same rule applied to the two other places that used stand-in pictures (product owner's request, 2026-11-25): the order history cards (`orders/page.tsx`; the orders API sends no product photo, so each card says "Image not available") and the preview cards shown for an empty catalogue (`products/page.tsx`). `customerAssets.productFallbacks` is removed from `lib/assets.ts`; the six `public/assets/customer/product-fallback-*` files are now unused and were left in place (delete them in a follow-up if wanted).
+- New tests, seen failing first then passing: `__tests__/orders/order-list-page.test.tsx` and "shows no stand-in picture on the preview cards of an empty catalogue" in `product-list-card.test.tsx`.
+- `pnpm --filter app test -- __tests__`: 58 suites, 529 tests passed. `typecheck`, `lint`, prettier on touched files: clean.
+- Not verified in the browser: the order cards (the test customer has no order) and the empty-catalogue preview cards (the dev catalogue is not empty). Unit tests only.
+- Not changed: the two "Quick Tutorial Videos" thumbnails on the dashboard home are not product images.
 
 ## Completion summary
 

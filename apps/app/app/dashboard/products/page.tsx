@@ -1,7 +1,6 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { customerAssets } from '@/lib/assets';
 import { ProductImagePlaceholder } from '@/components/product-image-placeholder';
 
 import {
@@ -19,8 +18,6 @@ import { useCurrentUser } from '@/lib/current-user';
 // Not a valid slug, so it can never collide with a real category.
 const ALL_CATEGORIES = '__all__';
 const PAGE_SIZE = 12;
-
-const fallbackImages = customerAssets.productFallbacks;
 
 const previewCards = [
   { name: 'Classic Tee', subtitle: 'Preview while catalog is being published' },
@@ -216,19 +213,13 @@ export default function DashboardProductsPage() {
               Your catalog is connected, but no published products are available for this view yet.
             </div>
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {previewCards.map((card, index) => (
+              {previewCards.map((card) => (
                 <article
                   key={card.name}
                   className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
                 >
                   <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
-                    <Image
-                      src={fallbackImages[index % fallbackImages.length]}
-                      alt={card.name}
-                      fill
-                      className="object-contain p-5 opacity-90"
-                      sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                    />
+                    <ProductImagePlaceholder />
                     <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#004385]">
                       Preview
                     </span>
