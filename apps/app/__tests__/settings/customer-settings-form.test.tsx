@@ -471,17 +471,81 @@ describe('CustomerSettingsForm personal details', () => {
     expect(profilePayloads()[0]).not.toHaveProperty('phone');
   });
 
-  it('offers the countries with their calling code, Nigeria first and selected', async () => {
+  it('offers the countries in alphabetical order with their calling code, Nigeria selected', async () => {
     renderForm('Profile');
     await loaded();
 
     expect(countrySelect()).toHaveValue('NG');
     const options = within(countrySelect()).getAllByRole('option');
-    expect(options[0]).toHaveTextContent('Nigeria (+234)');
+    const names = options.map((o) => (o.textContent ?? '').replace(/ \(\+\d+\)$/, ''));
+    expect(names).toEqual([...names].sort((x, y) => x.localeCompare(y)));
+    expect(options[0]).toHaveTextContent(/^Afghanistan \(\+93\)$/);
     expect(
       within(countrySelect()).getByRole('option', { name: 'United Kingdom (+44)' })
     ).toBeInTheDocument();
     expect(options.length).toBeGreaterThan(200);
+  });
+
+  describe('country search', () => {
+    const search = () => screen.getByLabelText('Search country code') as HTMLInputElement;
+    const optionValues = () =>
+      within(countrySelect())
+        .getAllByRole('option')
+        .map((o) => (o as HTMLOptionElement).value);
+
+    it('lists only the countries with that calling code, and keeps the chosen one', async () => {
+      renderForm('Profile');
+      await loaded();
+
+      fireEvent.change(search(), { target: { value: '+44' } });
+
+      expect(optionValues().sort()).toEqual(['GB', 'GG', 'IM', 'JE', 'NG']);
+      expect(countrySelect()).toHaveValue('NG');
+    });
+
+    it('selects the country when the code belongs to one country only', async () => {
+      renderForm('Profile');
+      await loaded();
+
+      fireEvent.change(search(), { target: { value: '33' } });
+
+      expect(countrySelect()).toHaveValue('FR');
+      expect(optionValues()).toEqual(['FR']);
+    });
+
+    it('also finds a country by its name', async () => {
+      renderForm('Profile');
+      await loaded();
+
+      fireEvent.change(search(), { target: { value: 'kingd' } });
+
+      expect(optionValues()).toContain('GB');
+      expect(optionValues()).not.toContain('FR');
+    });
+
+    it('says so when nothing matches, and shows the full list again when cleared', async () => {
+      renderForm('Profile');
+      await loaded();
+
+      fireEvent.change(search(), { target: { value: '999' } });
+      expect(screen.getByText('No country matches.')).toBeInTheDocument();
+
+      fireEvent.change(search(), { target: { value: '' } });
+      expect(screen.queryByText('No country matches.')).not.toBeInTheDocument();
+      expect(optionValues().length).toBeGreaterThan(200);
+    });
+
+    it('builds the number with the country found by its code', async () => {
+      renderForm('Profile');
+      await loaded();
+
+      fireEvent.change(search(), { target: { value: '33' } });
+      fireEvent.change(phoneInput(), { target: { value: '612345678' } });
+      saveDetails();
+
+      await waitFor(() => expect(updateUserProfile).toHaveBeenCalledTimes(1));
+      expect(profilePayloads()[0].phone).toBe('+33612345678');
+    });
   });
 
   it('keeps the country selector narrow so the phone field stays on its line', async () => {

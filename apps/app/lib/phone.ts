@@ -11,7 +11,7 @@ import {
   type CountryCode,
 } from 'libphonenumber-js/max';
 
-/** Nigeria first: this is a Nigeria-first product. */
+/** Selected by default: this is a Nigeria-first product. The list itself is alphabetical. */
 export const DEFAULT_PHONE_COUNTRY: CountryCode = 'NG';
 
 export interface PhoneCountryOption {
@@ -22,7 +22,7 @@ export interface PhoneCountryOption {
 
 let cachedOptions: PhoneCountryOption[] | undefined;
 
-/** Every country with its calling code, the default country first, then by name. */
+/** Every country with its calling code, in alphabetical order. */
 export function phoneCountryOptions(): PhoneCountryOption[] {
   if (cachedOptions) return cachedOptions;
   const names = new Intl.DisplayNames(['en'], { type: 'region' });
@@ -31,13 +31,7 @@ export function phoneCountryOptions(): PhoneCountryOption[] {
     name: names.of(code) ?? code,
     callingCode: getCountryCallingCode(code),
   }));
-  options.sort((a, b) =>
-    a.code === DEFAULT_PHONE_COUNTRY
-      ? -1
-      : b.code === DEFAULT_PHONE_COUNTRY
-        ? 1
-        : a.name.localeCompare(b.name)
-  );
+  options.sort((a, b) => a.name.localeCompare(b.name, 'en'));
   cachedOptions = options;
   return options;
 }
@@ -62,4 +56,18 @@ export function splitStoredPhone(stored: string | null | undefined): {
   const parsed = parsePhoneNumberFromString(stored);
   if (parsed?.country) return { country: parsed.country, digits: parsed.nationalNumber };
   return { country: DEFAULT_PHONE_COUNTRY, digits: digitsOnly(stored) };
+}
+
+/**
+ * Countries matching a quick search: digits match the start of the calling code ("44",
+ * "+44"), letters match the country name. Empty search: everything.
+ */
+export function searchPhoneCountries(
+  options: PhoneCountryOption[],
+  query: string
+): PhoneCountryOption[] {
+  const text = query.trim().replace(/^\+/, '').toLowerCase();
+  if (!text) return options;
+  if (/^\d+$/.test(text)) return options.filter((option) => option.callingCode.startsWith(text));
+  return options.filter((option) => option.name.toLowerCase().includes(text));
 }

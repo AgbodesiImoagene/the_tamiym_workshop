@@ -17,7 +17,7 @@ import {
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,6 +28,7 @@ import {
   DEFAULT_PHONE_COUNTRY,
   digitsOnly,
   phoneCountryOptions,
+  searchPhoneCountries,
   splitStoredPhone,
   toE164,
 } from '@/lib/phone';
@@ -114,6 +115,8 @@ const selectClassName =
 // full width, which would make it fill the whole line.
 const phoneSelectClassName = selectClassName.replace('w-full', 'w-[150px] shrink-0 sm:w-[190px]');
 
+const phoneSearchClassName = selectClassName.replace('w-full', 'w-[84px] shrink-0');
+
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
@@ -171,6 +174,32 @@ export function CustomerSettingsForm({
   });
 
   const phoneCountry = useWatch({ control: profileForm.control, name: 'phoneCountry' });
+  // Quick search of the country selector, by calling code or by name.
+  const [countryQuery, setCountryQuery] = useState('');
+  const countryMatches = useMemo(
+    () => searchPhoneCountries(phoneCountryOptions(), countryQuery),
+    [countryQuery]
+  );
+  // The chosen country always stays in the list, so the selector never goes blank.
+  const visibleCountries = useMemo(
+    () =>
+      countryMatches.some((option) => option.code === phoneCountry)
+        ? countryMatches
+        : phoneCountryOptions().filter(
+            (option) =>
+              option.code === phoneCountry ||
+              countryMatches.some((match) => match.code === option.code)
+          ),
+    [countryMatches, phoneCountry]
+  );
+  const onCountrySearch = (value: string) => {
+    setCountryQuery(value);
+    const matches = searchPhoneCountries(phoneCountryOptions(), value);
+    // One country has this code: choose it, the person only has to type the number.
+    if (value.trim() && matches.length === 1) {
+      profileForm.setValue('phoneCountry', matches[0].code, { shouldDirty: true });
+    }
+  };
 
   const passwordForm = useForm<PasswordFormValues>({
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
@@ -390,7 +419,17 @@ export function CustomerSettingsForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={labelClassName}>Phone</FormLabel>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <input
+                      type="search"
+                      aria-label="Search country code"
+                      placeholder="+44"
+                      autoComplete="off"
+                      maxLength={20}
+                      value={countryQuery}
+                      onChange={(event) => onCountrySearch(event.target.value)}
+                      className={phoneSearchClassName}
+                    />
                     <select
                       aria-label="Country calling code"
                       className={phoneSelectClassName}
@@ -401,7 +440,7 @@ export function CustomerSettingsForm({
                         })
                       }
                     >
-                      {phoneCountryOptions().map((option) => (
+                      {visibleCountries.map((option) => (
                         <option key={option.code} value={option.code}>
                           {option.name} (+{option.callingCode})
                         </option>
@@ -414,12 +453,15 @@ export function CustomerSettingsForm({
                         autoComplete="tel-national"
                         maxLength={15}
                         placeholder="8012345678"
-                        className="min-w-0 flex-1"
+                        className="min-w-[160px] flex-1"
                         {...field}
                         onChange={(event) => field.onChange(digitsOnly(event.target.value))}
                       />
                     </FormControl>
                   </div>
+                  {countryQuery.trim() && countryMatches.length === 0 ? (
+                    <p className="text-xs text-black/60">No country matches.</p>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}
