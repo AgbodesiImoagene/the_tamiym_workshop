@@ -76,6 +76,13 @@ The VM already has dependencies installed by the startup update script (`pnpm in
 
 Independent tickets may use separate worktrees. Dependent or overlapping tickets remain sequential.
 
+### Seeing front changes
+
+- The developer's dev servers (`pnpm dev`: web, app, admin, api) run from the **main checkout**, not from worktrees or ticket branches. A front change (`apps/app`, `apps/web`, `apps/admin`, `packages/ui`) on another branch or in a worktree is therefore invisible to them until it is in `main`.
+- Standing instruction from the product owner (2026-11-25): once a front change is committed, merge its branch into the **local** `main` so it shows on the dev server, and say so. This local merge needs no further request. Do **not** push: pushing `main` or a `codex/ttw-**` / `claude/ttw-**` branch still happens only when the user asks, because it starts the full CI.
+- Merge without disturbing other work: if `main` is not checked out anywhere, fast-forward or merge in a temporary worktree and remove it afterwards. Never switch the main checkout's branch while it holds another session's uncommitted work.
+- If the main checkout is on a branch other than `main` (check `git branch --show-current` there), the dev server still shows that branch. Tell the user which branch it is on and ask before moving it.
+
 ### Client decisions
 
 - Stop before coding and tell the user if the ticket's `Blocked by` names a client answer, if its question is still listed under "Décisions à obtenir du client" in `docs/tickets/ROADMAP.md`, or if the work needs a business decision the ticket does not settle.
