@@ -32,4 +32,16 @@ describe('CustomerDashboardShell user name', () => {
     expect(screen.queryByText('Borngreat')).not.toBeInTheDocument();
     expect(screen.getByTestId('sidebar-user-loading')).toBeInTheDocument();
   });
+
+  it('pins the sidebar to the window height, so it does not stretch with a long page', () => {
+    renderShell('Ada');
+    const aside = document.querySelector('aside');
+    expect(aside).not.toBeNull();
+    const classes = aside?.className.split(/\s+/) ?? [];
+    // Pinned while the page scrolls, as tall as the window, never as tall as the content.
+    expect(classes).toEqual(expect.arrayContaining(['sticky', 'top-0', 'h-screen', 'self-start']));
+    expect(classes).not.toContain('min-h-screen');
+    // On a short window its own content scrolls instead of being cut off.
+    expect(classes).toContain('overflow-y-auto');
+  });
 });

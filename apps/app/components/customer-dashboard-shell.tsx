@@ -54,7 +54,7 @@ export function CustomerDashboardShell({
   return (
     <main className="min-h-screen bg-white text-black">
       <div className="lg:flex">
-        <aside className="hidden min-h-screen w-[300px] flex-col justify-between bg-black px-[15px] py-12 text-white lg:flex">
+        <aside className="sticky top-0 hidden h-screen w-[300px] shrink-0 flex-col justify-between self-start overflow-y-auto bg-black px-[15px] py-12 text-white lg:flex">
           <div className="space-y-10">
             {displayName ? (
               <div className="flex items-center gap-3 px-1">
