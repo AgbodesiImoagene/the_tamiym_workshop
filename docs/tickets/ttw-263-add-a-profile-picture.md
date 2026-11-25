@@ -102,6 +102,12 @@ All run in the worktree on 2026-11-25, throwaway database `tamiym_workshop_test_
 - Playwright (real MinIO, real Postgres, production builds): `profile-picture.comprehensive.spec.ts` (upload, refusal of a PDF, page and sidebar show the picture, `naturalWidth > 0`, served as WebP, reload, remove), plus `clickable-affordance` and `dashboard-navigation`: 22 passed.
 - Not verified: the Figma pixel match (the spec checks behaviour, not looks), and the ClamAV scanner (tests use the deterministic scanner).
 
+### Follow-up after the push to `main` (2026-11-25)
+
+`Playwright Comprehensive` on `main` failed on `settings.comprehensive.spec.ts` ("settings page exposes personal, password, and shipping forms" and "profile page reuses settings form controls"): both still asserted TTW-091's "no profile picture button", which this ticket reverses on purpose. I had not run that spec before pushing. With the owner's approval the two assertions now check that the picture button exists and is enabled ("Update Profile Picture" on Settings, "Upload Profile Picture" on Profile) and that no image appears for a customer who has no picture (TTW-091's "no demo photo" is kept). Run on a throwaway database: `settings.comprehensive.spec.ts` and `profile-picture.comprehensive.spec.ts`, 26 passed (one `profile-picture` run timed out on the 15 s `/auth/register` call while four specs ran in parallel, and passed alone).
+
+A separate failure on `main`, `fundraiser-checkout-undeliverable-state.comprehensive.spec.ts` (web), is not related to this ticket and was not investigated.
+
 ## Completion summary
 
 Customers can upload, replace and remove a profile picture on Profile ("Upload Profile Picture") and Settings ("Update Profile Picture"); it also shows in the sidebar. The API scans, checks and compresses it to a 256 px WebP stored in the private bucket, serves it only to its owner, and deletes it with the account. New: `User.avatarKey` migration `20261125090039_add_user_avatar_key`, three routes under `/v1/users/profile/avatar`, `avatarVersion` in `/auth/me`, `S3_PRIVATE_BUCKET` needed in the API environment (MinIO: bucket `tamiym-private`). Follow-up for the owner: TTW-253 rows 1, 4 and 5 (photo) and the TTW-091 note should now point to this ticket; that file is untracked in the main checkout so it was not edited here.

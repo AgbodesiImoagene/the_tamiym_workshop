@@ -17,12 +17,16 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await expect(customerPage.getByLabel('State')).not.toHaveJSProperty('tagName', 'INPUT');
     await expect(customerPage.getByLabel('LGA')).not.toHaveJSProperty('tagName', 'INPUT');
 
-    // TTW-091: no demo photo and no inactive picture button on this page either.
+    // TTW-091 removed the demo photo; TTW-263 brought back a real picture block. A customer
+    // with no picture sees the initials and a working button, never a demo photo.
     const personalForm = customerPage
       .locator('form')
       .filter({ has: customerPage.getByLabel('First Name') });
     await expect(personalForm.getByRole('img')).toHaveCount(0);
-    await expect(customerPage.getByRole('button', { name: /profile picture/i })).toHaveCount(0);
+    await expect(customerPage.getByRole('img', { name: /profile picture/i })).toHaveCount(0);
+    await expect(
+      customerPage.getByRole('button', { name: 'Update Profile Picture' })
+    ).toBeEnabled();
 
     const saveButtons = customerPage.getByRole('button', { name: 'Save' });
     expect(await saveButtons.count()).toBeGreaterThanOrEqual(1);
@@ -87,9 +91,13 @@ describeViewportMatrix('Customer settings forms @comprehensive @app', () => {
     await customerPage.goto('/dashboard/profile');
     await expect(customerPage.getByRole('heading', { name: /Profile/i })).toBeVisible();
     await expect(customerPage.getByLabel('First Name')).toBeVisible();
-    // TTW-091: no demo photo and no inactive picture button.
+    // TTW-091 removed the demo photo; TTW-263 brought back a real picture block. A customer
+    // with no picture sees the initials and a working button, never a demo photo.
     await expect(customerPage.getByRole('img', { name: 'Profile', exact: true })).toHaveCount(0);
-    await expect(customerPage.getByRole('button', { name: /profile picture/i })).toHaveCount(0);
+    await expect(customerPage.getByRole('img', { name: /profile picture/i })).toHaveCount(0);
+    await expect(
+      customerPage.getByRole('button', { name: 'Upload Profile Picture' })
+    ).toBeEnabled();
     await assertVisibleControlsEnabled(customerPage.locator('main'));
   });
 
