@@ -484,6 +484,15 @@ describe('CustomerSettingsForm personal details', () => {
     expect(options.length).toBeGreaterThan(200);
   });
 
+  it('keeps the country selector narrow so the phone field stays on its line', async () => {
+    renderForm('Profile');
+    await loaded();
+
+    expect(countrySelect().className).not.toMatch(/(^|\s)w-full(\s|$)/);
+    expect(countrySelect().className).toContain('shrink-0');
+    expect(phoneInput().className).toContain('flex-1');
+  });
+
   it('keeps only digits in the field', async () => {
     renderForm('Profile');
     await loaded();

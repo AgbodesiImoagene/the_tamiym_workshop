@@ -110,6 +110,10 @@ type AddressFormValues = z.infer<typeof addressSchema>;
 const selectClassName =
   'h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm';
 
+// The country selector is a fixed-width column next to the phone field. `selectClassName` is
+// full width, which would make it fill the whole line.
+const phoneSelectClassName = selectClassName.replace('w-full', 'w-[150px] shrink-0 sm:w-[190px]');
+
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="rounded-[32px] border-black/20 shadow-[0_4px_4px_rgba(0,0,0,0.15)]">
@@ -389,7 +393,7 @@ export function CustomerSettingsForm({
                   <div className="flex gap-2">
                     <select
                       aria-label="Country calling code"
-                      className={`${selectClassName} w-[170px] shrink-0`}
+                      className={phoneSelectClassName}
                       value={phoneCountry}
                       onChange={(event) =>
                         profileForm.setValue('phoneCountry', event.target.value, {
@@ -410,6 +414,7 @@ export function CustomerSettingsForm({
                         autoComplete="tel-national"
                         maxLength={15}
                         placeholder="8012345678"
+                        className="min-w-0 flex-1"
                         {...field}
                         onChange={(event) => field.onChange(digitsOnly(event.target.value))}
                       />
