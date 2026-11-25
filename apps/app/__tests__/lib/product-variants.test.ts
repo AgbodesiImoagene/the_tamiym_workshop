@@ -163,6 +163,19 @@ describe('imagesForColor', () => {
     expect(imagesForColor(detail, red).map((image) => image.url)).toEqual(['/generic.png']);
   });
 
+  it('falls back to the product main image (the one the list shows) when no gallery image fits', () => {
+    const detail: DashboardProductDetail = {
+      ...product(
+        [variant('v9', ['RED', 'Red'], ['S', 'S'])],
+        [{ id: 'i1', variantId: 'v1', url: '/other-colour.png', altText: null }]
+      ),
+      productImageRoles: [{ image: { url: '/main.png', altText: 'Main' } }],
+    };
+    const [red] = groupVariantsByColor(detail);
+
+    expect(imagesForColor(detail, red).map((image) => image.url)).toEqual(['/main.png']);
+  });
+
   it('returns nothing when the product has no usable image', () => {
     const detail = product([variant('v9', ['RED', 'Red'], ['S', 'S'])]);
     const [red] = groupVariantsByColor(detail);

@@ -66,7 +66,7 @@ describe('product list page (TTW-092)', () => {
       </QueryClientProvider>
     );
 
-    const link = await screen.findByRole('link', { name: 'View product' });
+    const link = await screen.findByRole('link', { name: /^View product/ });
     expect(link).toHaveAttribute('href', '/dashboard/products/p1');
     expect(screen.queryByRole('button', { name: /add to cart/i })).not.toBeInTheDocument();
     expect(getDashboardProductDetail).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe('product list categories and pagination (TTW-093)', () => {
     });
     renderPage();
 
-    expect(await screen.findAllByRole('link', { name: 'View product' })).toHaveLength(PAGE_SIZE);
+    expect(await screen.findAllByRole('link', { name: /^View product/ })).toHaveLength(PAGE_SIZE);
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled();
 
@@ -164,14 +164,14 @@ describe('product list categories and pagination (TTW-093)', () => {
       })
     );
     await waitFor(() =>
-      expect(screen.getAllByRole('link', { name: 'View product' })).toHaveLength(20 - PAGE_SIZE)
+      expect(screen.getAllByRole('link', { name: /^View product/ })).toHaveLength(20 - PAGE_SIZE)
     );
     expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Previous page' }));
     await waitFor(() =>
-      expect(screen.getAllByRole('link', { name: 'View product' })).toHaveLength(PAGE_SIZE)
+      expect(screen.getAllByRole('link', { name: /^View product/ })).toHaveLength(PAGE_SIZE)
     );
 
     await user.click(screen.getByRole('button', { name: 'Next page' }));
@@ -187,13 +187,13 @@ describe('product list categories and pagination (TTW-093)', () => {
 
   it('does not tag any product as a best seller (no sales data behind it)', async () => {
     renderPage();
-    await screen.findAllByRole('link', { name: 'View product' });
+    await screen.findAllByRole('link', { name: /^View product/ });
     expect(screen.queryByText('Best Seller')).not.toBeInTheDocument();
   });
 
   it('shows no pagination when everything fits on one page', async () => {
     renderPage();
-    await screen.findAllByRole('link', { name: 'View product' });
+    await screen.findAllByRole('link', { name: /^View product/ });
     expect(screen.queryByRole('button', { name: 'Next page' })).not.toBeInTheDocument();
   });
 });

@@ -74,7 +74,10 @@ export function groupVariantsByColor(detail: DashboardProductDetail): ColorGroup
   return [...groups.values()];
 }
 
-/** Images of the chosen colour, else the images that belong to no variant, else none. */
+/**
+ * Images of the chosen colour, else the images that belong to no variant, else the product's
+ * main images (the ones the product list shows), else none.
+ */
 export function imagesForColor(detail: DashboardProductDetail, group: ColorGroup): ProductImage[] {
   const variantIds = new Set(group.choices.map((choice) => choice.variantId));
   const usable = detail.images.filter(
@@ -89,5 +92,12 @@ export function imagesForColor(detail: DashboardProductDetail, group: ColorGroup
 
   const ofColor = usable.filter((image) => image.variantId && variantIds.has(image.variantId));
   if (ofColor.length > 0) return ofColor.map(toImage);
-  return usable.filter((image) => !image.variantId).map(toImage);
+  const shared = usable.filter((image) => !image.variantId);
+  if (shared.length > 0) return shared.map(toImage);
+
+  return detail.productImageRoles.flatMap((role, index) =>
+    role.image?.url
+      ? [{ id: `role-${index}`, url: role.image.url, altText: role.image.altText ?? null }]
+      : []
+  );
 }

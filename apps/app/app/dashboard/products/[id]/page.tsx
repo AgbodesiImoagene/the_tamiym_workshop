@@ -1,7 +1,7 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { customerAssets } from '@/lib/assets';
+import { productFallbackImage } from '@/lib/assets';
 import { ApiError } from '@/lib/auth';
 import { addCartItem } from '@/lib/cart-store';
 import { quoteOrder, type OrderQuote } from '@/lib/checkout';
@@ -19,7 +19,6 @@ import { useCurrentUser } from '@/lib/current-user';
 
 const MAX_UNTRACKED_QUANTITY = 999;
 const MAX_RELATED_PRODUCTS = 4;
-const fallbackImages = customerAssets.productFallbacks;
 
 function clampQuantity(raw: string, max: number | null) {
   const parsed = Number.parseInt(raw, 10);
@@ -222,7 +221,7 @@ function ProductDetailContent({ productId }: { productId: string }) {
               <div className="space-y-3">
                 <div className="relative h-[360px] w-full overflow-hidden rounded-[28px] border border-border bg-muted">
                   <Image
-                    src={mainImage?.url ?? fallbackImages[0]}
+                    src={mainImage?.url ?? productFallbackImage(product.id)}
                     alt={mainImage?.altText || product.name}
                     fill
                     className="object-contain p-5"

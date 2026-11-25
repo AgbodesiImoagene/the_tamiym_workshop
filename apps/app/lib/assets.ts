@@ -15,3 +15,15 @@ export const customerAssets = {
     '/assets/customer/product-fallback-6.jpg',
   ],
 } as const;
+
+/**
+ * Placeholder for a product without a photo. Picked from the product id so the list card
+ * and the product page show the same one (a list position would differ between the two).
+ */
+export function productFallbackImage(productId: string): string {
+  let hash = 0;
+  for (const char of productId) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return customerAssets.productFallbacks[hash % customerAssets.productFallbacks.length];
+}

@@ -19,7 +19,7 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
 
     // TTW-092: a card no longer adds a default variant; it opens the product page.
     await expect(customerPage.getByRole('button', { name: /Add to cart/i })).toHaveCount(0);
-    const viewProduct = customerPage.getByRole('link', { name: 'View product' });
+    const viewProduct = customerPage.getByRole('link', { name: /^View product/ });
     if ((await viewProduct.count()) > 0) {
       await viewProduct.first().click();
       await expect(customerPage).toHaveURL(/\/dashboard\/products\/[^/]+$/);
@@ -47,7 +47,7 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await expect(customerPage.getByText('No products in this category yet.')).toBeVisible();
 
     // 22 bulk products: 12 on page 1, 10 on page 2.
-    const cards = customerPage.getByRole('link', { name: 'View product' });
+    const cards = customerPage.getByRole('link', { name: /^View product/ });
     await customerPage.getByRole('tab', { name: 'Bulk Catalogue' }).click();
     await expect(cards).toHaveCount(12);
     await expect(customerPage.getByRole('button', { name: 'Previous page' })).toBeDisabled();
@@ -95,7 +95,7 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await expect(customerPage.getByText(/best seller/i)).toHaveCount(0);
 
     // Choosing size and colour, and so adding to the cart, stays one click away.
-    await tee.getByRole('link', { name: 'View product' }).click();
+    await tee.getByRole('link', { name: /^View product/ }).click();
     await expect(customerPage).toHaveURL(/\/dashboard\/products\/e2e-product-classic-tee$/);
   });
 
