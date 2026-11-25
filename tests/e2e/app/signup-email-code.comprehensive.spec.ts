@@ -27,6 +27,7 @@ test.describe('Sign-up confirmed by an emailed code @comprehensive @app', () => 
       await page.getByLabel('First name').fill('Code');
       await page.getByLabel('Last name').fill('Tester');
       await page.getByLabel('Password', { exact: true }).fill(e2eUsers.customer.password);
+      await page.getByLabel('Confirm password', { exact: true }).fill(e2eUsers.customer.password);
       await page.getByRole('button', { name: 'Send confirmation code' }).click();
 
       // The code screen, not the dashboard: nobody is signed in yet.

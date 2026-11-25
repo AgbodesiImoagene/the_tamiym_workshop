@@ -1,6 +1,7 @@
 'use client';
 
 import { authApi, ApiError, getGoogleSignInUrl, GOOGLE_SIGN_IN_ERROR_MESSAGES } from '@/lib/auth';
+import { PasswordInput } from '@/components/password-input';
 import { SignupCodeForm } from '@/components/signup-code-form';
 import {
   clearPendingSignup,
@@ -17,18 +18,24 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@tamiym/ui';
 
-const registerSchema = z.object({
-  email: z.email('Enter a valid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Include at least one uppercase letter')
-    .regex(/[a-z]/, 'Include at least one lowercase letter')
-    .regex(/[0-9]/, 'Include at least one number')
-    .regex(/[^A-Za-z0-9]/, 'Include at least one symbol'),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-});
+const registerSchema = z
+  .object({
+    email: z.email('Enter a valid email address'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Include at least one uppercase letter')
+      .regex(/[a-z]/, 'Include at least one lowercase letter')
+      .regex(/[0-9]/, 'Include at least one number')
+      .regex(/[^A-Za-z0-9]/, 'Include at least one symbol'),
+    confirmPassword: z.string().min(1, 'Confirm your password'),
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  });
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
@@ -65,6 +72,7 @@ export default function RegisterPage() {
     defaultValues: {
       email: '',
       password: '',
+      confirmPassword: '',
       firstName: '',
       lastName: '',
     },
@@ -194,9 +202,8 @@ export default function RegisterPage() {
 
                 <div className="md:col-span-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
+                  <PasswordInput
                     id="password"
-                    type="password"
                     autoComplete="new-password"
                     className="mt-2"
                     {...register('password')}
@@ -208,6 +215,20 @@ export default function RegisterPage() {
                       Use at least 8 characters with uppercase, lowercase, number, and symbol.
                     </p>
                   )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <PasswordInput
+                    id="confirmPassword"
+                    toggleLabel="confirm password"
+                    autoComplete="new-password"
+                    className="mt-2"
+                    {...register('confirmPassword')}
+                  />
+                  {errors.confirmPassword ? (
+                    <p className="mt-2 text-sm text-red-700">{errors.confirmPassword.message}</p>
+                  ) : null}
                 </div>
               </div>
 
