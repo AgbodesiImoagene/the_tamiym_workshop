@@ -1,7 +1,7 @@
 # TTW-260 — Keep the customer sidebar mounted between pages
 
 **Epic:** 2B — Customer app polish  
-**Status:** In progress  
+**Status:** Complete  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** TTW-253 (UI alignment work is easier on one shared layout)
@@ -136,13 +136,22 @@ Run on branch `codex/ttw-260-keep-the-customer-sidebar-mounted`, 2026-11-24.
 
 New tests, written first and failing for a missing module before the code existed: `__tests__/lib/dashboard-nav.test.ts` (route → entry), `__tests__/lib/current-user.test.tsx` (one request for two readers, no refetch on a later page, 401 not retried, other errors retried once, one redirect, banner focus refetch with a fresh user, cache cleared on session reset), `__tests__/dashboard/dashboard-layout.test.tsx` (sidebar element kept across a page change with one `getMe`, active entry, placeholder while loading, 401 redirect once, one error screen that recovers, workshop route inside the sidebar). The old `WorkshopPageShell.test.tsx` cases (sidebar around the editor with Design current, 401 redirect) now live in the layout test; the component is deleted. No other existing test was changed.
 
+**CI on `main`** (merge `8a06515` then fix `bfd5e97`, 2026-11-24/25):
+
+| Run                                    | Commit    | Result                                                                                                                                                                                                                      |
+| -------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CI` 45503397872                       | `bfd5e97` | success                                                                                                                                                                                                                     |
+| `Playwright Comprehensive` 45503397921 | `bfd5e97` | success: 276 passed, 3 skipped. It ran the new sidebar persistence spec (`dashboard-navigation.comprehensive.spec.ts`, sidebar kept and `/v1/auth/me` requested once) and `email-verification-banner.comprehensive.spec.ts` |
+
+Earlier on the merge `07826ad` the smoke test `session-boundaries.smoke.spec.ts` ("customer app stores the API CSRF token in sessionStorage") failed once and passed on retry: since this ticket the dashboard heading appears before `/auth/me` returns, so the test read `sessionStorage` too early. It now waits for the token with `expect.poll` (same assertions), done under TTW-262.
+
 **Not verified:**
 
-- The Playwright spec added to `tests/e2e/app/dashboard-navigation.comprehensive.spec.ts` (sidebar mark survives Products → Cart → Orders → Home and `/v1/auth/me` is requested once) has not been run: ports 3001 and 3002 are held by the developer's own servers, and a run needs production builds, a throwaway database and those ports.
-- The other specs that render the sidebar (`email-verification-banner`, `design-workshop.*`, `checkout-*`, `orders.comprehensive`, `products-cart`, `settings*`, `campaign-authoring*`, `design-order`, `customer.smoke`) have not been re-run.
+- Nothing was run by hand in a browser; the visual result was only seen by the product owner on the dev server.
 - No real browser journey. The logout then login as another person case is covered by Jest only (the e2e would invalidate the shared saved sessions).
 - A second review iteration was not run after the review-1 fixes (tests and two small removals).
+- Two real browser tabs at once and the production case (API on another origin) are not exercised.
 
 ## Completion summary
 
-Pending.
+The customer sidebar now lives in one `app/dashboard/layout.tsx` and stays mounted between dashboard pages. The signed-in user is read from one cached query shared with the verification banner, with a single owner of the 401 redirect (`useRequireUser`), and the cache is reset on every session change. Pages no longer render the shell or load the user themselves; `WorkshopPageShell` is gone. Alongside, the sidebar no longer shows a made-up name while loading, the Home icons are larger, and the Home counters count only paid orders. Merged into `main` (`07826ad`), CI and Playwright Comprehensive green on `bfd5e97`. Follow-ups: none for this ticket (session renewal is TTW-262; the same layout work is not needed for `apps/web` or `apps/admin`).

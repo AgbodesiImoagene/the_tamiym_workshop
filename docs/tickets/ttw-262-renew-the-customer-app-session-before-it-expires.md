@@ -1,7 +1,7 @@
 # TTW-262 — Renew the customer app session before it expires
 
 **Epic:** 2B — Accounts and sign-in  
-**Status:** Complete (work left uncommitted in the worktree, as instructed)  
+**Status:** Complete  
 **Risk:** High (API and client)  
 **Blocked by:** None  
 **Blocks:** TTW-148 (client acceptance: a customer must not be signed out every 15 minutes)
@@ -171,3 +171,14 @@ The customer app now renews its session: on an eligible 401 it asks `GET /auth/c
 - **`session-boundaries.smoke.spec.ts` "customer app stores the API CSRF token in sessionStorage"** failed once then passed on retry. Since TTW-260 the dashboard heading appears before `/auth/me` returns, so the test read `sessionStorage` too early. It now waits for the token with `expect.poll`; the assertions are unchanged.
 
 Not re-run: the two Playwright specs (ports 3001/3002 are held by other sessions' servers); the API e2e `auth-session-renewal` passed (18/18) in isolation and in most full runs, but failed intermittently (404/403 on unrelated calls) while other sessions' API processes ran against the shared Redis/database.
+
+## CI on `main` after the fixes (2026-11-25)
+
+| Run                                    | Commit    | Result                                                                                       |
+| -------------------------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `CI` 45503397872                       | `bfd5e97` | success                                                                                      |
+| `Playwright Comprehensive` 45503397921 | `bfd5e97` | success: 276 passed, 3 skipped, including both `session-renewal.comprehensive.spec.ts` tests |
+
+The no-cookie spec first failed on `07826ad` and `8a06515` because it clicked a sidebar link: the signed-in user is cached for a minute (TTW-260), so no request answered 401 inside the page. It now loads the page with `page.goto`; the claim it checks is unchanged. The first suspicion (429 from the shared per-IP identity) was not the cause of that failure, but the guard fix stays: signed-out visitors are no longer counted in those buckets.
+
+Follow-ups before launch (ROADMAP, "Mise en ligne"): the same renewal for `apps/web` (no refresh method yet) and `apps/admin`.
