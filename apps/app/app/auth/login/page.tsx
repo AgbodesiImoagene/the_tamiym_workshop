@@ -1,5 +1,6 @@
 'use client';
 
+import { PasswordInput } from '@/components/password-input';
 import { authApi, ApiError, getGoogleSignInUrl, GOOGLE_SIGN_IN_ERROR_MESSAGES } from '@/lib/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -125,9 +126,8 @@ export default function LoginPage() {
                     Forgot password?
                   </a>
                 </div>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   autoComplete="current-password"
                   className="mt-2"
                   {...register('password')}
