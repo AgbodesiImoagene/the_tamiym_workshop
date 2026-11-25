@@ -22,6 +22,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DELIVERY_INSTRUCTIONS_MAX_LENGTH, instructionsPayload } from '@/lib/delivery-instructions';
+import { ProfilePictureField } from '@/components/profile-picture-field';
 import { canGoBack } from '@/lib/can-go-back';
 import { getGeoLgas, getGeoStates, matchSavedState } from '@/lib/geo';
 import {
@@ -34,6 +35,8 @@ import {
 
 interface CustomerSettingsFormProps {
   pageTitle: string;
+  /** Label of the picture button ("Upload Profile Picture" or "Update Profile Picture"). No picture block without it. */
+  pictureButtonLabel?: string;
   personalTitle: string;
   passwordTitle: string;
   shippingTitle: string;
@@ -100,6 +103,7 @@ const labelClassName = 'text-[20px] font-bold text-black';
 
 export function CustomerSettingsForm({
   pageTitle,
+  pictureButtonLabel,
   personalTitle,
   passwordTitle,
   shippingTitle,
@@ -264,6 +268,8 @@ export function CustomerSettingsForm({
         </button>
         <h1 className="text-[32px] font-bold tracking-[-0.02em] text-black/90">{pageTitle}</h1>
       </div>
+
+      {pictureButtonLabel ? <ProfilePictureField buttonLabel={pictureButtonLabel} /> : null}
 
       {/* ── Profile ── */}
       <SectionCard title={personalTitle}>

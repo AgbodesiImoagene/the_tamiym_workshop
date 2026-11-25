@@ -18,6 +18,7 @@ import {
   PrivacyRequestType,
   UserStatus,
 } from '../generated/prisma/enums';
+import { UserAvatarService } from '../users/user-avatar.service';
 import {
   PRIVACY_OPEN_OBLIGATIONS,
   PRIVACY_PASSWORD_REQUIRED,
@@ -55,6 +56,7 @@ describe('PrivacyService', () => {
   };
   const authSessions = { revokeAllForUser: jest.fn() };
   const audit = { log: jest.fn() };
+  const userAvatars = { purgeObject: jest.fn() };
   const moderationDecisions = {
     withdrawPendingAppealsForOwnerInTx: jest.fn().mockResolvedValue(0),
   };
@@ -74,6 +76,7 @@ describe('PrivacyService', () => {
           provide: ModerationDecisionService,
           useValue: moderationDecisions,
         },
+        { provide: UserAvatarService, useValue: userAvatars },
       ],
     }).compile();
     service = module.get(PrivacyService);
@@ -282,6 +285,65 @@ describe('PrivacyService', () => {
         customerNote: null,
       }),
     });
+  });
+
+  it('erases the profile picture with the account (TTW-263)', async () => {
+    await stubActivePassword();
+    prisma.order.count.mockResolvedValue(0);
+    prisma.campaign.count.mockResolvedValue(0);
+    prisma.payout.count.mockResolvedValue(0);
+    prisma.privacyRequest.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'req-1',
+        status: PrivacyRequestStatus.COMPLETED,
+        actions: [],
+      });
+    prisma.privacyRequest.create.mockResolvedValue({
+      id: 'req-1',
+      userId: 'u1',
+      type: PrivacyRequestType.ERASURE,
+      status: PrivacyRequestStatus.IN_PROGRESS,
+    });
+    prisma.privacyRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.privacyRequest.findUnique.mockResolvedValue({
+      legalHoldUntil: null,
+    });
+    authSessions.revokeAllForUser.mockResolvedValue(2);
+    prisma.authToken.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.adminMfaRecoveryCode.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.adminMfaCredential.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.userOAuthAccount.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.address.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.updateMany.mockResolvedValue({ count: 0 });
+    prisma.userPayoutProfile.updateMany.mockResolvedValue({ count: 1 });
+    prisma.campaign.updateMany.mockResolvedValue({ count: 0 });
+    prisma.design.updateMany.mockResolvedValue({ count: 1 });
+    prisma.designShareLink.updateMany.mockResolvedValue({ count: 1 });
+    prisma.user.update.mockResolvedValue({});
+    prisma.privacyRequestAction.create.mockResolvedValue({});
+    prisma.privacyRequest.update.mockResolvedValue({});
+    audit.log.mockResolvedValue({});
+
+    // The password check reads the user; the erasure then reads the picture key.
+    prisma.user.findUnique.mockResolvedValue({
+      avatarKey: 'avatars/u1/abc.webp',
+      passwordHash: await bcrypt.hash('TestPassword1!', 4),
+      status: UserStatus.ACTIVE,
+    });
+    userAvatars.purgeObject.mockResolvedValue(undefined);
+
+    await service.requestErasure('u1', 'TestPassword1!');
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: UserStatus.DELETED,
+          avatarKey: null,
+        }),
+      }),
+    );
+    expect(userAvatars.purgeObject).toHaveBeenCalledWith('avatars/u1/abc.webp');
   });
 
   it('resumes a stuck IN_PROGRESS erasure request', async () => {

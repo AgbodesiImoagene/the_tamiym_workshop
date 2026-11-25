@@ -571,6 +571,8 @@ model User {
   phone           String? // not unique by default; can be unique if you enforce it
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
+  /// Key of the profile picture in the PRIVATE bucket (TTW-263). Never returned by an API.
+  avatarKey       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

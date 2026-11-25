@@ -1,3 +1,4 @@
+import { avatarVersionOf } from '../../users/avatar-image';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -39,6 +40,11 @@ export interface RequestUser {
    * Exposed as a boolean only — never the raw timestamp.
    */
   emailVerified: boolean;
+  /**
+   * Version of the profile picture (TTW-263), present only when there is one. It is the
+   * random part of the storage key, which itself never leaves the API.
+   */
+  avatarVersion?: string;
   /** Surface this request authenticated on (from the validated JWT). */
   surface: AuthSurface;
   /** Live AuthSession id from the access JWT `sid` claim. */
@@ -114,6 +120,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         lastName: true,
         phone: true,
         emailVerifiedAt: true,
+        avatarKey: true,
       },
     });
 
@@ -171,10 +178,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    const { emailVerifiedAt, ...safeUser } = user;
+    const { emailVerifiedAt, avatarKey, ...safeUser } = user;
+    const avatarVersion = avatarVersionOf(avatarKey);
     return {
       ...safeUser,
       emailVerified: Boolean(emailVerifiedAt),
+      ...(avatarVersion ? { avatarVersion } : {}),
       surface: payload.surface,
       sessionId: payload.sid,
     };

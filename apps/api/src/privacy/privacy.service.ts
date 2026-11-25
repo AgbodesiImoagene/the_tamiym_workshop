@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthSessionService } from '../auth/auth-session.service';
 import { AuditService } from '../audit/audit.service';
 import { ModerationDecisionService } from '../moderation/moderation-decision.service';
+import { UserAvatarService } from '../users/user-avatar.service';
 import {
   AuditAction,
   AuditSource,
@@ -62,6 +63,7 @@ export class PrivacyService {
     private readonly authSessions: AuthSessionService,
     private readonly audit: AuditService,
     private readonly moderationDecisions: ModerationDecisionService,
+    private readonly userAvatars: UserAvatarService,
   ) {}
 
   listForUser(userId: string) {
@@ -335,6 +337,9 @@ export class PrivacyService {
     }
 
     const tombstoneEmail = `deleted_${userId}@privacy.invalid`;
+    // TTW-263: the profile picture is personal data. The row stops referencing it inside
+    // the transaction; the object is deleted once the erasure is committed.
+    let erasedAvatarKey: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       const [openOrders, openCampaigns, openPayouts] = await Promise.all([
@@ -365,6 +370,12 @@ export class PrivacyService {
         });
       }
 
+      const avatarRow = await tx.user.findUnique({
+        where: { id: userId },
+        select: { avatarKey: true },
+      });
+      erasedAvatarKey = avatarRow?.avatarKey ?? null;
+
       // Disable login first so a mid-flight failure cannot leave an ACTIVE
       // password-authenticated account after sessions were revoked.
       await tx.user.update({
@@ -377,6 +388,7 @@ export class PrivacyService {
           lastName: 'User',
           phone: null,
           emailVerifiedAt: null,
+          avatarKey: null,
         },
       });
       await this.recordActionTx(tx, requestId, 'postgres.user', 'OK', {
@@ -548,6 +560,8 @@ export class PrivacyService {
         },
       });
     });
+
+    if (erasedAvatarKey) await this.userAvatars.purgeObject(erasedAvatarKey);
 
     try {
       await this.audit.log({

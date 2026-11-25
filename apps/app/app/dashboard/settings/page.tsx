@@ -7,6 +7,7 @@ export default function DashboardSettingsPage() {
     <>
       <CustomerSettingsForm
         pageTitle="Settings"
+        pictureButtonLabel="Update Profile Picture"
         personalTitle="Update Personal Information"
         passwordTitle="Update Password"
         shippingTitle="Update Shipping Information"

@@ -15,6 +15,8 @@ export interface User {
   role: UserRole;
   /** True when the API reports the email as verified (TTW-023). */
   emailVerified?: boolean;
+  /** Version of the profile picture (TTW-263). Absent when the user has none. */
+  avatarVersion?: string;
   /**
    * Session CSRF token echoed back by the API for cookie sessions (TTW-020).
    * Absent for bearer-only callers.

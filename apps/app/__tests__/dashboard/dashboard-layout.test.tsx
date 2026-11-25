@@ -115,3 +115,22 @@ describe('dashboard layout', () => {
     await screen.findByText('Ada');
   });
 });
+
+describe('dashboard layout profile picture (TTW-263)', () => {
+  it('shows the picture of the signed-in user in the sidebar', async () => {
+    getMe.mockResolvedValue({ ...user, avatarVersion: 'v7' });
+    renderLayout('page');
+    await screen.findByText('Ada');
+    const img = document.querySelector('aside img[src*="/users/profile/avatar"]');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toContain('v=v7');
+  });
+
+  it('keeps the initials when the user has no picture', async () => {
+    getMe.mockResolvedValue(user);
+    renderLayout('page');
+    await screen.findByText('Ada');
+    expect(document.querySelector('aside img[src*="/users/profile/avatar"]')).toBeNull();
+    expect(screen.getByText('AD')).toBeInTheDocument();
+  });
+});

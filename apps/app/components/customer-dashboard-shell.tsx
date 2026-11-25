@@ -4,16 +4,8 @@ import { EmailVerificationBanner } from '@/components/email-verification-banner'
 import { authApi } from '@/lib/auth';
 import { customerAssets } from '@/lib/assets';
 import type { NavKey } from '@/lib/dashboard-nav';
-import {
-  Avatar,
-  AvatarFallback,
-  Button,
-  Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  cn,
-} from '@tamiym/ui';
+import { UserAvatar } from '@/components/user-avatar';
+import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger, cn } from '@tamiym/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -23,6 +15,8 @@ interface CustomerDashboardShellProps {
   activeNav: NavKey;
   /** Undefined while the account is loading: the sidebar then shows a placeholder, never a made-up name. */
   displayName?: string;
+  /** Version of the user's profile picture (TTW-263). Absent: the initials are shown. */
+  avatarVersion?: string;
   children: ReactNode;
 }
 
@@ -43,6 +37,7 @@ const desktopNavItems: Array<{
 export function CustomerDashboardShell({
   activeNav,
   displayName,
+  avatarVersion,
   children,
 }: CustomerDashboardShellProps) {
   const router = useRouter();
@@ -63,11 +58,13 @@ export function CustomerDashboardShell({
           <div className="space-y-10">
             {displayName ? (
               <div className="flex items-center gap-3 px-1">
-                <Avatar className="h-10 w-10 shrink-0">
-                  <AvatarFallback className="bg-white/20 text-sm font-semibold text-white">
-                    {displayName.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  initials={displayName.slice(0, 2).toUpperCase()}
+                  avatarVersion={avatarVersion}
+                  alt={`${displayName}'s profile picture`}
+                  className="h-10 w-10"
+                  initialsClassName="text-sm text-white"
+                />
                 <p className="text-base font-medium">{displayName}</p>
               </div>
             ) : (
