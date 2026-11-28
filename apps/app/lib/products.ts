@@ -23,6 +23,9 @@ export interface DashboardProduct {
   }>;
   /** List card summary (TTW-204). Absent on the detail endpoint. */
   colors?: Array<{ code: string; name: string; hex: string | null }>;
+  /** Badges an admin sets on the product (TTW-267). Display only. */
+  isBestSeller?: boolean;
+  expressProduction?: boolean;
   /** For example "S-5XL"; `null` when the product has no sizes. */
   sizeRange?: string | null;
   /** Product-level bulk tier with the lowest unit price; display only. */

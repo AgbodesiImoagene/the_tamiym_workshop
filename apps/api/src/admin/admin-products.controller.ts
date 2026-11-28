@@ -42,6 +42,7 @@ import { ProductSurchargesService } from '../products/product-surcharges.service
 import { CreateOptionDto } from '../products/dto/create-option.dto';
 import { CreateOptionValueDto } from '../products/dto/create-option-value.dto';
 import { CreatePrintAreaDto } from '../products/dto/create-print-area.dto';
+import { PRODUCT_FLAG_SCHEMA } from '../products/dto/product-flags';
 import { CreateProductDto } from '../products/dto/create-product.dto';
 import { CreateProductImageDto } from '../products/dto/create-product-image.dto';
 import { CreateProductImageUploadDto } from '../products/dto/create-product-image-upload.dto';
@@ -71,6 +72,19 @@ type UploadedImageFile = {
   originalname?: string;
 };
 
+/** The product fields documented on admin responses (TTW-267); not the full row. */
+const ADMIN_PRODUCT_SCHEMA = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    slug: { type: 'string' },
+    status: { type: 'string' },
+    ...PRODUCT_FLAG_SCHEMA,
+  },
+} as const;
+
 @ApiTags('Admin')
 @Controller('admin/products')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -85,7 +99,13 @@ export class AdminProductsController {
   @ApiOperation({ summary: 'List all products (admin, no status filter)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiResponse({ status: 200, description: 'Product list' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product list',
+    schema: { type: 'array', items: ADMIN_PRODUCT_SCHEMA },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   async findAll() {
     return this.productsService.adminFindAll();
   }
@@ -98,7 +118,10 @@ export class AdminProductsController {
   @ApiResponse({
     status: 200,
     description: 'Product detail with views, layers, and images',
+    schema: ADMIN_PRODUCT_SCHEMA,
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   async findOne(@Param('id') id: string) {
     return this.productsService.adminFindOne(id);
@@ -109,7 +132,12 @@ export class AdminProductsController {
   @ApiOperation({ summary: 'Create product (admin)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
-  @ApiResponse({ status: 201, description: 'Product created' })
+  @ApiResponse({
+    status: 201,
+    description: 'Product created',
+    schema: ADMIN_PRODUCT_SCHEMA,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid body' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async create(@Body() dto: CreateProductDto) {
@@ -121,7 +149,12 @@ export class AdminProductsController {
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
   @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'Product updated' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product updated',
+    schema: ADMIN_PRODUCT_SCHEMA,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid body' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Product not found' })

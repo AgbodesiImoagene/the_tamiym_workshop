@@ -3966,6 +3966,18 @@ export interface components {
             categoryId: string;
             /** @example Soft cotton t-shirt */
             description?: string;
+            /**
+             * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+             * @default false
+             * @example true
+             */
+            expressProduction: boolean;
+            /**
+             * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+             * @default false
+             * @example true
+             */
+            isBestSeller: boolean;
             /** @example Classic Cotton Tee */
             name: string;
             /** @example 40 */
@@ -5394,6 +5406,16 @@ export interface components {
             categoryId?: string;
             /** @example Soft cotton t-shirt */
             description?: string;
+            /**
+             * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+             * @example true
+             */
+            expressProduction?: boolean;
+            /**
+             * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+             * @example true
+             */
+            isBestSeller?: boolean;
             /** @example Classic Cotton Tee */
             name?: string;
             /** @example 40 */
@@ -8529,6 +8551,33 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": ({
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
         };
@@ -8547,6 +8596,18 @@ export interface operations {
                     categoryId: string;
                     /** @example Soft cotton t-shirt */
                     description?: string;
+                    /**
+                     * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+                     * @default false
+                     * @example true
+                     */
+                    expressProduction?: boolean;
+                    /**
+                     * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+                     * @default false
+                     * @example true
+                     */
+                    isBestSeller?: boolean;
                     /** @example Classic Cotton Tee */
                     name: string;
                     /** @example 40 */
@@ -8570,6 +8631,26 @@ export interface operations {
         responses: {
             /** @description Product created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid body */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8605,6 +8686,33 @@ export interface operations {
         responses: {
             /** @description Product detail with views, layers, and images */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8678,6 +8786,16 @@ export interface operations {
                     categoryId?: string;
                     /** @example Soft cotton t-shirt */
                     description?: string;
+                    /**
+                     * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+                     * @example true
+                     */
+                    expressProduction?: boolean;
+                    /**
+                     * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+                     * @example true
+                     */
+                    isBestSeller?: boolean;
                     /** @example Classic Cotton Tee */
                     name?: string;
                     /** @example 40 */
@@ -8698,6 +8816,26 @@ export interface operations {
         responses: {
             /** @description Product updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid body */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15455,7 +15593,11 @@ export interface operations {
                             name?: string;
                         }[];
                         description?: string | null;
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
                         id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
                         name?: string;
                         prices?: {
                             amount?: number;
@@ -15500,7 +15642,11 @@ export interface operations {
                     "application/json": {
                         category?: Record<string, never>;
                         description?: string | null;
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
                         id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
                         name?: string;
                         prices?: unknown[];
                         slug?: string;

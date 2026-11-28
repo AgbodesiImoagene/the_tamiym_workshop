@@ -528,6 +528,8 @@ export class ProductsService {
         slug: true,
         status: true,
         description: true,
+        isBestSeller: true,
+        expressProduction: true,
         updatedAt: true,
         category: { select: { id: true, name: true, slug: true } },
         prices: { select: { currency: true, amount: true } },
@@ -731,6 +733,8 @@ export class ProductsService {
         packageLengthMm: dto.packageLengthMm,
         packageWidthMm: dto.packageWidthMm,
         packageHeightMm: dto.packageHeightMm,
+        isBestSeller: dto.isBestSeller,
+        expressProduction: dto.expressProduction,
       },
       include: {
         category: { select: { id: true, name: true, slug: true } },
@@ -788,6 +792,12 @@ export class ProductsService {
         }),
         ...(dto.packageHeightMm !== undefined && {
           packageHeightMm: dto.packageHeightMm,
+        }),
+        ...(dto.isBestSeller !== undefined && {
+          isBestSeller: dto.isBestSeller,
+        }),
+        ...(dto.expressProduction !== undefined && {
+          expressProduction: dto.expressProduction,
         }),
       },
       include: {

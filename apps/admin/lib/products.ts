@@ -157,6 +157,8 @@ export interface AdminProductDetail {
   slug: string;
   status: ProductStatus;
   description: string | null;
+  isBestSeller: boolean;
+  expressProduction: boolean;
   updatedAt: string;
   category: { id: string; name: string; slug: string } | null;
   options: ProductOption[];
@@ -260,6 +262,8 @@ export async function updateAdminProduct(
     packageLengthMm?: number;
     packageWidthMm?: number;
     packageHeightMm?: number;
+    isBestSeller?: boolean;
+    expressProduction?: boolean;
   }
 ) {
   return apiClient.patch<AdminProductDetail>(`/admin/products/${id}`, dto);

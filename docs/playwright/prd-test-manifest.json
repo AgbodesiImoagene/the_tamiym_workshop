@@ -341,6 +341,16 @@
       "tags": ["@admin"]
     },
     {
+      "id": "ADMIN-PRODUCT-BADGE-FLAGS",
+      "surface": "admin",
+      "feature": "Admin flags a product as best seller or express production, and the flags stay saved",
+      "prd_ref": "Admin Dashboard",
+      "automation": "automated",
+      "tests": ["tests/e2e/admin/product-badge-flags.comprehensive.spec.ts"],
+      "browser_tiers": ["comprehensive"],
+      "tags": ["@admin"]
+    },
+    {
       "id": "ADMIN-SHIPPING-CORRECTIONS",
       "surface": "admin",
       "feature": "Admin corrects a shipping rate, removes a state from a zone and deletes a rate, with a warning before a state loses delivery",

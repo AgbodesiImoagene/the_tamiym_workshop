@@ -868,6 +868,18 @@
             "example": "Soft cotton t-shirt",
             "type": "string"
           },
+          "expressProduction": {
+            "default": false,
+            "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+            "example": true,
+            "type": "boolean"
+          },
+          "isBestSeller": {
+            "default": false,
+            "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+            "example": true,
+            "type": "boolean"
+          },
           "name": {
             "example": "Classic Cotton Tee",
             "type": "string"
@@ -4444,6 +4456,16 @@
           "description": {
             "example": "Soft cotton t-shirt",
             "type": "string"
+          },
+          "expressProduction": {
+            "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+            "example": true,
+            "type": "boolean"
+          },
+          "isBestSeller": {
+            "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+            "example": true,
+            "type": "boolean"
           },
           "name": {
             "example": "Classic Cotton Tee",
@@ -9759,7 +9781,46 @@
         "parameters": [],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "expressProduction": {
+                        "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "isBestSeller": {
+                        "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
             "description": "Product list"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -9790,6 +9851,18 @@
                   "description": {
                     "example": "Soft cotton t-shirt",
                     "type": "string"
+                  },
+                  "expressProduction": {
+                    "default": false,
+                    "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                    "example": true,
+                    "type": "boolean"
+                  },
+                  "isBestSeller": {
+                    "default": false,
+                    "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                    "example": true,
+                    "type": "boolean"
                   },
                   "name": {
                     "example": "Classic Cotton Tee",
@@ -9837,7 +9910,40 @@
         },
         "responses": {
           "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "expressProduction": {
+                      "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "isBestSeller": {
+                      "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Product created"
+          },
+          "400": {
+            "description": "Invalid body"
           },
           "401": {
             "description": "Unauthorized"
@@ -9916,7 +10022,43 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "expressProduction": {
+                      "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "isBestSeller": {
+                      "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Product detail with views, layers, and images"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           },
           "404": {
             "description": "Product not found"
@@ -9961,6 +10103,16 @@
                     "example": "Soft cotton t-shirt",
                     "type": "string"
                   },
+                  "expressProduction": {
+                    "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                    "example": true,
+                    "type": "boolean"
+                  },
+                  "isBestSeller": {
+                    "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                    "example": true,
+                    "type": "boolean"
+                  },
                   "name": {
                     "example": "Classic Cotton Tee",
                     "type": "string"
@@ -10002,7 +10154,40 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "expressProduction": {
+                      "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "isBestSeller": {
+                      "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Product updated"
+          },
+          "400": {
+            "description": "Invalid body"
           },
           "401": {
             "description": "Unauthorized"
@@ -20309,8 +20494,16 @@
                         "nullable": true,
                         "type": "string"
                       },
+                      "expressProduction": {
+                        "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                        "type": "boolean"
+                      },
                       "id": {
                         "type": "string"
+                      },
+                      "isBestSeller": {
+                        "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                        "type": "boolean"
                       },
                       "name": {
                         "type": "string"
@@ -20411,8 +20604,16 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "expressProduction": {
+                      "description": "Shows the \"2-Day Express Production Available\" tag on the product card. Display only: it changes no price or delivery time.",
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string"
+                    },
+                    "isBestSeller": {
+                      "description": "Shows the \"Best Seller\" badge on the product card. Set by an admin, not computed from sales.",
+                      "type": "boolean"
                     },
                     "name": {
                       "type": "string"

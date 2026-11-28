@@ -36,6 +36,20 @@ function priceLine(product: DashboardProduct) {
   return `${formatCurrency(price.amount, price.currency)} each`;
 }
 
+function ExpressProductionTag({ id }: { id: string }) {
+  return (
+    <p
+      id={id}
+      className="flex w-fit items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-tamiym-blue"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3 shrink-0" fill="currentColor">
+        <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+      </svg>
+      2-Day Express Production Available
+    </p>
+  );
+}
+
 export default function DashboardProductsPage() {
   const { user } = useCurrentUser();
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORIES);
@@ -118,12 +132,22 @@ export default function DashboardProductsPage() {
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product) => {
                 const imageUrl = product.productImageRoles[0]?.image?.url;
+                const bestSellerId = `best-seller-${product.id}`;
+                const expressId = `express-${product.id}`;
+                // The link's own label replaces its content, so the badges are its description.
+                const badgeIds = [
+                  product.isBestSeller ? bestSellerId : null,
+                  product.expressProduction ? expressId : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ');
 
                 return (
                   <article key={product.id} className="bg-background">
                     <Link
                       href={`/dashboard/products/${product.id}`}
                       aria-label={`View product: ${product.name}`}
+                      aria-describedby={badgeIds || undefined}
                       className="group block rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1e39d2]"
                     >
                       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-[#f4f6f9]">
@@ -138,6 +162,15 @@ export default function DashboardProductsPage() {
                         ) : (
                           <ProductImagePlaceholder />
                         )}
+                        {product.isBestSeller ? (
+                          // The left padding keeps the text clear of the rounded corner.
+                          <span
+                            id={bestSellerId}
+                            className="absolute left-0 top-0 rounded-br-xl bg-tamiym-blue py-1.5 pl-5 pr-3 text-xs font-semibold text-white"
+                          >
+                            Best Seller
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="space-y-2 px-1 pt-3">
@@ -167,6 +200,9 @@ export default function DashboardProductsPage() {
                           </div>
                           <p className="text-sm text-black/80">{priceLine(product)}</p>
                           <p className="text-sm text-black/70">No Minimum</p>
+                          {product.expressProduction ? (
+                            <ExpressProductionTag id={expressId} />
+                          ) : null}
                         </div>
                       </div>
                     </Link>

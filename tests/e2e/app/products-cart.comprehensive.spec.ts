@@ -92,11 +92,33 @@ describeViewportMatrix('Customer catalog and cart @comprehensive @app', () => {
     await expect(tee.getByText('No Minimum')).toBeVisible();
     await expect(tee.getByText(/ each for [A-Za-z]/)).toHaveCount(0);
     await expect(tee.getByText(/Soft cotton/)).toHaveCount(0);
-    await expect(customerPage.getByText(/best seller/i)).toHaveCount(0);
+    // TTW-267: the hoodie is not flagged as a best seller (the seeded tee is).
+    await expect(hoodie.getByText(/best seller/i)).toHaveCount(0);
 
     // Choosing size and colour, and so adding to the cart, stays one click away.
     await tee.getByRole('link', { name: /^View product/ }).click();
     await expect(customerPage).toHaveURL(/\/dashboard\/products\/e2e-product-classic-tee$/);
+  });
+
+  test('each card shows only the badges its product is flagged with (TTW-267)', async ({
+    customerPage,
+  }) => {
+    await customerPage.goto('/dashboard/products');
+    await customerPage.getByRole('tab', { name: 'Apparel' }).click();
+
+    const card = (name: string) =>
+      customerPage
+        .getByRole('article')
+        .filter({ has: customerPage.getByText(name, { exact: true }) });
+    const tee = card('Classic Tee');
+    const hoodie = card('Campus Hoodie');
+    const express = '2-Day Express Production Available';
+
+    // Seed: the tee is a best seller, the hoodie has express production.
+    await expect(tee.getByText('Best Seller', { exact: true })).toBeVisible();
+    await expect(tee.getByText(express)).toHaveCount(0);
+    await expect(hoodie.getByText(express)).toBeVisible();
+    await expect(hoodie.getByText('Best Seller', { exact: true })).toHaveCount(0);
   });
 
   test('buys several sizes of one product in a single action (TTW-092)', async ({
