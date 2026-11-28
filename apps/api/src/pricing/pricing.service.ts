@@ -408,8 +408,10 @@ export class PricingService {
         product: {
           include: {
             prices: { where: { currency: currency as any }, take: 1 },
+            // Product-level tiers only: every tier carries a productId, so
+            // this relation would also load sibling variants' tiers (TTW-271).
             bulkPricingTiers: {
-              where: { currency: currency as any },
+              where: { variantId: null, currency: currency as any },
               orderBy: { minQuantity: 'asc' },
             },
           },

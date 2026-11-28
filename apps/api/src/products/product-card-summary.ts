@@ -4,9 +4,9 @@
  * authority, and raw variants and tiers are never put in the list response.
  */
 
-const COLOR_CODE = 'color';
+import { isColorOptionCode, isHexColor } from './color-option';
+
 const SIZE_CODE = 'size';
-const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 export interface CardSummaryVariant {
   optionValues: Array<{
@@ -34,18 +34,21 @@ export interface ProductCardSummary {
 function hexOf(metadata: unknown): string | null {
   if (typeof metadata !== 'object' || metadata === null) return null;
   const hex = (metadata as { hex?: unknown }).hex;
-  return typeof hex === 'string' && HEX_COLOR.test(hex) ? hex : null;
+  return isHexColor(hex) ? hex : null;
 }
 
 /** Option values of one kind (colour or size), each once, in option-value order. */
-function distinctValues(variants: CardSummaryVariant[], optionCode: string) {
+function distinctValues(
+  variants: CardSummaryVariant[],
+  isWanted: (optionCode: string) => boolean,
+) {
   const found = new Map<
     string,
     { code: string; name: string; sortOrder: number; metadata: unknown }
   >();
   for (const variant of variants) {
     for (const entry of variant.optionValues) {
-      if (entry.option.code.toLowerCase() !== optionCode) continue;
+      if (!isWanted(entry.option.code)) continue;
       const { valueCode, displayName, sortOrder, metadata } = entry.optionValue;
       if (!found.has(valueCode)) {
         found.set(valueCode, {
@@ -67,13 +70,18 @@ export function summarizeProductCard(input: {
   variants: CardSummaryVariant[];
   bulkPricingTiers: CardSummaryTier[];
 }): ProductCardSummary {
-  const colors = distinctValues(input.variants, COLOR_CODE).map((color) => ({
-    code: color.code,
-    name: color.name,
-    hex: hexOf(color.metadata),
-  }));
+  const colors = distinctValues(input.variants, isColorOptionCode).map(
+    (color) => ({
+      code: color.code,
+      name: color.name,
+      hex: hexOf(color.metadata),
+    }),
+  );
 
-  const sizes = distinctValues(input.variants, SIZE_CODE);
+  const sizes = distinctValues(
+    input.variants,
+    (code) => code.toLowerCase() === SIZE_CODE,
+  );
   const sizeRange =
     sizes.length === 0
       ? null

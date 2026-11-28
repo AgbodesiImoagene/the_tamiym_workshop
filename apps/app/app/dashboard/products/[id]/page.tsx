@@ -8,12 +8,13 @@ import { quoteOrder, type OrderQuote } from '@/lib/checkout';
 import { designThumbnailSrc } from '@/lib/design-thumbnail';
 import { getDesign } from '@/lib/designs';
 import { getUserAddresses } from '@/lib/profile';
-import { groupVariantsByColor, imagesForColor } from '@/lib/product-variants';
+import { groupVariantsByColor, headlinePrice, imagesForColor } from '@/lib/product-variants';
 import { getDashboardProductDetail, getDashboardProducts } from '@/lib/products';
+import { Badge, Button } from '@tamiym/ui';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useRef, useState } from 'react';
 import { useCurrentUser } from '@/lib/current-user';
 
@@ -41,6 +42,7 @@ type QuoteStatus = 'idle' | 'loading' | 'error' | 'no-address';
 function ProductDetailContent({ productId }: { productId: string }) {
   // TTW-058: opened from a saved design, the page orders that design.
   const designId = useSearchParams().get('designId');
+  const router = useRouter();
 
   const { user } = useCurrentUser();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -82,6 +84,9 @@ function ProductDetailContent({ productId }: { productId: string }) {
     [product, activeGroup]
   );
   const mainImage = images[selectedImage] ?? images[0];
+  const price = product ? headlinePrice(product, activeGroup) : null;
+  const inStock = activeGroup?.choices.some((choice) => choice.purchasable) ?? false;
+  const showColours = groups.length > 1 || !!activeGroup?.isColor;
   const canBuy = groups.some((group) => group.choices.some((choice) => choice.purchasable));
 
   const chosen = groups.flatMap((group) =>
@@ -186,6 +191,13 @@ function ProductDetailContent({ productId }: { productId: string }) {
     );
   };
 
+  const proceedToCheckout = () => {
+    if (!product || totalQuantity === 0) return;
+    // Also empties the selection, which disables the button: a second click adds nothing.
+    addToCart();
+    router.push('/dashboard/checkout');
+  };
+
   const productError = productQuery.error as ApiError | null;
 
   return (
@@ -258,15 +270,39 @@ function ProductDetailContent({ productId }: { productId: string }) {
 
               <div className="space-y-6">
                 <div className="space-y-2">
+                  {product.category?.name ? (
+                    <p className="text-sm text-muted-foreground">{product.category.name}</p>
+                  ) : null}
                   <h1 className="text-[32px] font-bold tracking-[-0.02em] text-foreground">
                     {product.name}
                   </h1>
-                  {product.category?.name ? (
-                    <p className="text-sm text-muted-foreground">{product.category.name}</p>
+                  {activeGroup ? (
+                    <Badge data-testid="stock-status" variant={inStock ? 'accent' : 'danger'}>
+                      {inStock ? 'In stock' : 'Out of stock'}
+                    </Badge>
                   ) : null}
                   {product.description ? (
                     <p className="text-sm text-foreground/80">{product.description}</p>
                   ) : null}
+                  <p className="flex flex-wrap items-baseline gap-x-3 pt-1">
+                    <span
+                      data-testid="product-price"
+                      className="text-2xl font-bold text-foreground"
+                    >
+                      {price
+                        ? `${price.from ? 'From ' : ''}${formatCurrency(price.amount, price.currency)}`
+                        : 'Quote on request'}
+                    </span>
+                    {price?.compareAt ? (
+                      <s
+                        data-testid="product-compare-at"
+                        className="text-base text-muted-foreground"
+                      >
+                        <span className="sr-only">Original price: </span>
+                        {formatCurrency(price.compareAt, price.currency)}
+                      </s>
+                    ) : null}
+                  </p>
                 </div>
 
                 {designId ? (
@@ -311,22 +347,39 @@ function ProductDetailContent({ productId }: { productId: string }) {
                   </p>
                 ) : (
                   <>
-                    {groups.length > 1 ? (
+                    {showColours ? (
                       <div className="space-y-2">
-                        <p className="text-sm font-semibold text-foreground">Colour</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          Colour
+                          {activeGroup?.isColor ? (
+                            <span
+                              data-testid="selected-colour"
+                              className="ml-2 font-normal text-muted-foreground"
+                            >
+                              {activeGroup.label}
+                            </span>
+                          ) : null}
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {groups.map((group) => (
                             <button
                               key={group.code}
                               type="button"
+                              aria-label={group.label}
+                              title={group.label}
                               aria-pressed={group.code === activeGroup?.code}
                               onClick={() => {
                                 setSelectedColor(group.code);
                                 setSelectedImage(0);
                               }}
-                              className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                              className={
+                                group.hex
+                                  ? 'h-8 w-8 rounded-md border border-border aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-2'
+                                  : 'rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground'
+                              }
+                              style={group.hex ? { backgroundColor: group.hex } : undefined}
                             >
-                              {group.label}
+                              {group.hex ? null : group.label}
                             </button>
                           ))}
                         </div>
@@ -374,6 +427,22 @@ function ProductDetailContent({ productId }: { productId: string }) {
                           </li>
                         ))}
                       </ul>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="product-total-quantity"
+                        className="block text-sm font-semibold text-foreground"
+                      >
+                        Total quantity
+                      </label>
+                      {/* Not an <output>: that has the `status` role of the cart message. */}
+                      <input
+                        id="product-total-quantity"
+                        readOnly
+                        value={totalQuantity}
+                        className="w-40 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground"
+                      />
                     </div>
 
                     {totalQuantity > 0 ? (
@@ -448,14 +517,23 @@ function ProductDetailContent({ productId }: { productId: string }) {
                       </div>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-4">
-                      <button
+                      <Button
                         type="button"
+                        onClick={proceedToCheckout}
+                        disabled={totalQuantity === 0}
+                        className="h-11 px-6 font-semibold"
+                      >
+                        Proceed To Checkout
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={addToCart}
                         disabled={totalQuantity === 0}
-                        className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                        className="h-11 px-6 font-semibold"
                       >
                         Add to cart
-                      </button>
+                      </Button>
                       <Link
                         href="/dashboard/cart"
                         className="text-sm font-semibold text-primary hover:underline"
@@ -469,6 +547,12 @@ function ProductDetailContent({ productId }: { productId: string }) {
                       </p>
                     ) : null}
                   </>
+                )}
+
+                {designId ? null : (
+                  <Button asChild variant="secondary" className="h-11 px-6 font-semibold">
+                    <Link href={`/dashboard/design/new/${product.id}`}>Start Designing</Link>
+                  </Button>
                 )}
               </div>
             </div>

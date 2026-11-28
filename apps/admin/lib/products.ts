@@ -115,6 +115,14 @@ export interface ProductImage {
   } | null;
 }
 
+/**
+ * TTW-266: the option whose values carry a hex color code. New data is stored as `color`;
+ * `colour` is the spelling of rows written before.
+ */
+export function isColorOptionCode(code: string): boolean {
+  return ['color', 'colour'].includes(code.trim().toLowerCase());
+}
+
 export interface OptionValue {
   id: string;
   valueCode: string;

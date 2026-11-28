@@ -131,6 +131,13 @@ Overlap enforcement:
 - `minQuantity` and `maxQuantity` cannot exceed 2147483646, the largest value that range can hold. The admin API rejects anything higher with a 400 (TTW-163)
 - The columns and constraint behind this are listed in `database-only-objects.md`
 
+Which tier a standard quote applies (TTW-271):
+
+- A variant with tiers of its own uses only those. When none covers the quantity, the base price applies, with no fallback to the product tiers
+- A variant without tiers of its own uses the product-level tiers (`variantId` empty), never another variant's
+- The quantity is that of the order line
+- Campaign orders ignore bulk tiers
+
 ### Product view pricing
 
 View surcharge rules are stored in:

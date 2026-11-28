@@ -1,7 +1,7 @@
 # TTW-267 — Show the "Best Seller" badge and the express production tag from product flags
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review (implemented and verified 2026-11-25; not committed, no separate reviewer yet)\
+**Status:** In review (implemented, reviewed, committed and merged into local `main`; CI not run)\
 **Risk:** High (schema change, admin write, admin screen)\
 **Blocked by:** None\
 **Blocks:** None
@@ -149,3 +149,19 @@ Left:
 - Commit and merge: handled by another session at the user's request. Overlaps with unmerged work: TTW-269 and TTW-272 (`schema.prisma`, their own migrations, generated OpenAPI files; TTW-269 also the products controller and service), TTW-266 (`admin-products.controller.ts`, `products.service.ts`, admin `lib/products.ts`, manifest, generated files), TTW-268 (`apps/app/lib/products.ts`), and the uncommitted TTW-253 card change in the main checkout (`dashboard/products/page.tsx`). Regenerate `openapi.json` and `openapi.generated.ts` with `pnpm openapi:generate` instead of merging them by hand.
 - Independent review by a separate reviewer, then CI on push.
 - Express delivery time and checkout option → TTW-153.
+
+## Independent review and merge into local main (2026-11-28)
+
+Independent review by the parent session (it did not write the code): schema, migration,
+DTO validation, service writes and reads, admin form, customer card and tests read.
+Verdict: **PASS**, no blocking finding. Not reviewed again: the design question already
+recorded (the express tag wording while Q39 is open).
+
+Committed as `bc30526`, then `main` (`6d683e7`) merged. Conflicts: the product card (kept
+the description for screen readers and the new border and shadow), the Playwright manifest
+and the ticket index (both entries kept). On the merged tree: `db:generate`,
+`openapi:generate` and `openapi:check` passed; `typecheck` and `lint` 6/6; unit tests API
+2539, app 600, web 84 passed; `docs:validate` and `playwright:validate` passed; on a
+throwaway database `migrate deploy` and `migrations:check` passed; API e2e 545 of 546, the
+failure (`address-state-not-deliverable`, untouched by this ticket) passing twice alone
+(6/6). Not run: Playwright after the merge, CI.

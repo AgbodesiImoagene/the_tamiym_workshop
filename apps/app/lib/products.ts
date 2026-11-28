@@ -34,6 +34,7 @@ export interface DashboardProduct {
 
 export interface DashboardProductDetail extends DashboardProduct {
   resolvedBasePrice?: number | null;
+  resolvedBaseCompareAt?: number | null;
   resolvedCurrency?: string;
   /** Display images; `variantId` ties an image to one variant (and so to a colour). */
   images: Array<{
@@ -60,6 +61,8 @@ export interface DashboardProductDetail extends DashboardProduct {
       optionValue: {
         valueCode: string;
         displayName: string;
+        /** Free JSON set by the admin; a colour keeps its swatch in `hex`. */
+        metadata?: unknown;
       };
     }>;
   }>;
