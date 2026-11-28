@@ -6160,7 +6160,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Overlap, invalid range, or a quantity above the limit */
+            /** @description Overlap, invalid range, a quantity above the limit, or a variant that does not belong to the product */
             400: {
                 headers: {
                     [name: string]: unknown;
