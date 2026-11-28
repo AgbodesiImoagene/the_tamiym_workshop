@@ -481,6 +481,44 @@ describe('ProductsService', () => {
     });
   });
 
+  describe('getWorkshopContext', () => {
+    it('should return the product, its options and its views', async () => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue(mockProduct);
+
+      const result = await service.getWorkshopContext('prod-1');
+
+      expect(result).toEqual({
+        product: {
+          id: 'prod-1',
+          name: 'Classic Tee',
+          slug: 'classic-tee',
+          options: [],
+        },
+        views: [],
+      });
+    });
+
+    it('should throw NotFoundException when there is no product', async () => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getWorkshopContext('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    // TTW-273: a draft or archived product must stay hidden, as on `findOne`.
+    it('should only look for a published product', async () => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue(mockProduct);
+
+      await service.getWorkshopContext('prod-1');
+
+      expect(prisma.product.findUnique).toHaveBeenCalledWith({
+        where: { id: 'prod-1', status: ProductStatus.ACTIVE },
+        include: expect.any(Object),
+      });
+    });
+  });
+
   describe('create', () => {
     it('should create a product', async () => {
       (prisma.category.findUnique as jest.Mock).mockResolvedValue({

@@ -15,6 +15,22 @@ function statusOf(error: unknown): number | undefined {
   return (error as { statusCode?: number } | null)?.statusCode;
 }
 
+/** A screen the customer can only leave: nothing to retry. */
+function DeadEnd({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <h1 className="text-xl font-bold text-zinc-900">{title}</h1>
+      <p className="text-sm text-zinc-600">{text}</p>
+      <Link
+        href="/dashboard/design"
+        className="text-sm font-semibold text-[#004385] underline-offset-4 hover:underline"
+      >
+        Back to Design Workshop
+      </Link>
+    </div>
+  );
+}
+
 /**
  * Loads a saved design and its product workshop in the browser, where the customer's session
  * cookie is sent (a Server Component has no cookie and could not read the design: TTW-233).
@@ -56,19 +72,16 @@ export default function EditDesignLoader({ designId }: EditDesignLoaderProps) {
   const designStatus = statusOf(designQuery.error);
   if (designStatus === 404 || designStatus === 403) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <h1 className="text-xl font-bold text-zinc-900">Design not found</h1>
-        <p className="text-sm text-zinc-600">
-          This design does not exist, or it does not belong to your account.
-        </p>
-        <Link
-          href="/dashboard/design"
-          className="text-sm font-semibold text-[#004385] underline-offset-4 hover:underline"
-        >
-          Back to Design Workshop
-        </Link>
-      </div>
+      <DeadEnd
+        title="Design not found"
+        text="This design does not exist, or it does not belong to your account."
+      />
     );
+  }
+
+  // The design loaded, but its product is no longer published (TTW-273): a retry cannot help.
+  if (design && statusOf(workshopQuery.error) === 404) {
+    return <DeadEnd title="This product is no longer available" text="Your design is saved." />;
   }
 
   if (designQuery.isError || workshopQuery.isError) {

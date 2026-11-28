@@ -151,8 +151,9 @@ export class ProductsController {
   }
 
   /**
-   * Workshop context for a product (public). Returns everything the Design Workshop editor
-   * needs to initialise: options, views, print areas, template layers, and option-value effects.
+   * Workshop context for a published product (public). Returns everything the Design Workshop
+   * editor needs to initialise: options, views, print areas, template layers, and option-value
+   * effects.
    */
   @Get(':id/workshop')
   @Public()
@@ -194,7 +195,10 @@ export class ProductsController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Product not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found, or not published (draft or archived)',
+  })
   getWorkshop(@Param('id') id: string) {
     return this.productsService.getWorkshopContext(id);
   }

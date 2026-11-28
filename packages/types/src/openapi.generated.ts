@@ -15569,7 +15569,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Product not found */
+            /** @description Product not found, or not published (draft or archived) */
             404: {
                 headers: {
                     [name: string]: unknown;

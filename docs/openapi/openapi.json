@@ -20568,7 +20568,7 @@
             "description": "Workshop context: product metadata, options, views with print areas, template layers, and effects"
           },
           "404": {
-            "description": "Product not found"
+            "description": "Product not found, or not published (draft or archived)"
           }
         },
         "summary": "Get Design Workshop context for a product",

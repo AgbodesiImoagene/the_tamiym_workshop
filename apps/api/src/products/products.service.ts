@@ -2000,8 +2000,9 @@ export class ProductsService {
    * template layers (with resolved image URLs), and option-value effects.
    */
   async getWorkshopContext(productId: string) {
+    // Public read: a draft or archived product stays hidden, as in `findOne`.
     const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+      where: { id: productId, status: ProductStatus.ACTIVE },
       include: {
         options: {
           orderBy: { sortOrder: 'asc' },
