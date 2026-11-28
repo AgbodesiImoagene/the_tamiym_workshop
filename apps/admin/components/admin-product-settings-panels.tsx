@@ -23,6 +23,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   Textarea,
 } from '@tamiym/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,7 +37,36 @@ type ProductForm = {
   description: string;
   status: string;
   categoryId: string;
+  isBestSeller: boolean;
+  expressProduction: boolean;
 };
+
+const BADGE_SWITCHES = [
+  {
+    field: 'isBestSeller',
+    id: 'prod-best-seller',
+    label: 'Best Seller',
+    help: 'Shows a badge on the product photo in the customer catalogue.',
+  },
+  {
+    field: 'expressProduction',
+    id: 'prod-express',
+    label: '2-Day Express Production Available',
+    help: 'Shows a tag on the product card. It does not change delivery times or checkout.',
+  },
+] as const;
+
+function formFromProduct(product: AdminProductDetail): ProductForm {
+  return {
+    name: product.name,
+    slug: product.slug,
+    description: product.description ?? '',
+    status: product.status,
+    categoryId: product.category?.id ?? '',
+    isBestSeller: product.isBestSeller,
+    expressProduction: product.expressProduction,
+  };
+}
 
 export function ProductSettingsPanel({
   product,
@@ -52,22 +82,10 @@ export function ProductSettingsPanel({
     queryFn: getAdminCategoryList,
   });
 
-  const [form, setForm] = useState<ProductForm>(() => ({
-    name: product.name,
-    slug: product.slug,
-    description: product.description ?? '',
-    status: product.status,
-    categoryId: product.category?.id ?? '',
-  }));
+  const [form, setForm] = useState<ProductForm>(() => formFromProduct(product));
 
   useEffect(() => {
-    setForm({
-      name: product.name,
-      slug: product.slug,
-      description: product.description ?? '',
-      status: product.status,
-      categoryId: product.category?.id ?? '',
-    });
+    setForm(formFromProduct(product));
   }, [product]);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -82,6 +100,8 @@ export function ProductSettingsPanel({
         description: form.description.trim() || undefined,
         status: form.status as AdminProductDetail['status'],
         categoryId: form.categoryId || undefined,
+        isBestSeller: form.isBestSeller,
+        expressProduction: form.expressProduction,
       }),
     onSuccess: async () => {
       setMessage('Product saved.');
@@ -194,6 +214,26 @@ export function ProductSettingsPanel({
               </Select>
             </div>
           </div>
+          <fieldset className="space-y-3">
+            <legend className="mb-3 text-sm font-medium">Catalogue badges</legend>
+            {BADGE_SWITCHES.map(({ field, id, label, help }) => (
+              <div key={field} className="flex items-start gap-3">
+                <Switch
+                  id={id}
+                  aria-describedby={`${id}-help`}
+                  className="mt-0.5"
+                  checked={form[field]}
+                  onCheckedChange={(checked) => setForm((f) => ({ ...f, [field]: checked }))}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor={id}>{label}</Label>
+                  <p id={`${id}-help`} className="text-sm text-muted-foreground">
+                    {help}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </fieldset>
           {message ? <p className="text-sm text-green-700">{message}</p> : null}
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <div className="flex flex-wrap gap-3">

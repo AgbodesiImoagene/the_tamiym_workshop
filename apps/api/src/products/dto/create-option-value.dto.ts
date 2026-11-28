@@ -16,6 +16,8 @@ export class CreateOptionValueDto {
     example: { hex: '#000000' },
     required: false,
     type: Object,
+    description:
+      'Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).',
   })
   @IsOptional()
   metadata?: Record<string, unknown>;

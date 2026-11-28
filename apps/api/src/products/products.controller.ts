@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ProductsQueryDto } from './dto/products-query.dto';
+import { PRODUCT_FLAG_SCHEMA } from './dto/product-flags';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Products')
@@ -30,6 +31,7 @@ export class ProductsController {
           slug: { type: 'string' },
           description: { type: 'string', nullable: true },
           status: { type: 'string' },
+          ...PRODUCT_FLAG_SCHEMA,
           category: {
             type: 'object',
             properties: {
@@ -121,6 +123,7 @@ export class ProductsController {
         slug: { type: 'string' },
         description: { type: 'string', nullable: true },
         status: { type: 'string' },
+        ...PRODUCT_FLAG_SCHEMA,
         category: { type: 'object' },
         variants: {
           type: 'array',

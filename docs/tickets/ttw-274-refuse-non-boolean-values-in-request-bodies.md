@@ -1,7 +1,7 @@
 # TTW-274 — Refuse non-boolean values in request bodies
 
 **Epic:** 2B — API correctness  
-**Status:** In review (committed on `claude/ttw-274-strict-boolean-bodies`, not merged)  
+**Status:** In progress (merged into local `main` on 2026-11-28; not pushed, independent review pending)  
 **Risk:** Standard  
 **Blocked by:** None  
 **Blocks:** None
@@ -200,6 +200,13 @@ text, numbers and `null` answer 400. The product list reads `available=false` an
 `onSale=false` as `false`. No migration and no contract change.
 
 Committed on 2026-11-28 on `claude/ttw-274-strict-boolean-bodies`.
-Not done: push, merge, independent review, row in the local roadmap.
+Merged into local `main` on 2026-11-28 at the user's request, with `main` at
+`109bc1f` (no conflict). Verified on the merged tree: API `typecheck`;
+`jest body-boolean-validation product-flags src/products src/admin` 29 suites,
+832 passed; `body-boolean-validation` and `product-badge-flags` e2e 16 passed on
+a throwaway database; `openapi:check`, `format:check`, `docs:validate` passed
+(after the index state "In review", which the validator refuses, became
+"In progress").
+Not done: push, CI, independent review, row in the local roadmap.
 Follow-ups: numeric implicit conversion (separate task); move the TTW-267 flags
 to the shared decorator.

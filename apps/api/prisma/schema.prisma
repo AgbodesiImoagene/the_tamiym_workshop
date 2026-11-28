@@ -999,6 +999,10 @@ model Product {
   packageWidthMm  Int?
   packageHeightMm Int?
 
+  /// Display-only badges set by hand in the admin; they change no price or delivery time.
+  isBestSeller      Boolean @default(false)
+  expressProduction Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
