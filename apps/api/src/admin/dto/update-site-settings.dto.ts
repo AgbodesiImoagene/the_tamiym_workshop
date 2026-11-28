@@ -1,6 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsNumber,
   IsOptional,
   IsEnum,
@@ -10,6 +9,7 @@ import {
   Max,
 } from 'class-validator';
 import { CurrencyCode, PayoutMode } from '../../generated/prisma/enums';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdateSiteSettingsDto {
   @ApiPropertyOptional({
@@ -24,13 +24,11 @@ export class UpdateSiteSettingsDto {
   vatRate?: number;
 
   @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   pricesIncludeVat?: boolean;
 
   @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   vatAppliesToShipping?: boolean;
 
   @ApiPropertyOptional({ enum: CurrencyCode })
@@ -80,8 +78,7 @@ export class UpdateSiteSettingsDto {
     default: true,
     description: 'Auto-retry failed Paystack transfers',
   })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   autoRetryFailedPayouts?: boolean;
 
   @ApiPropertyOptional({

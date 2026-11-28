@@ -200,3 +200,15 @@ Operations:
 - Remaining: merge (parent session), push and CI, and a row in the local `ROADMAP.md`.
 
 Follow-ups are listed under Out of scope.
+
+## Merge into local main (2026-11-28)
+
+`main` (`b69dba2`: TTW-266, 267, 268, 271, 273, 274, 275) merged into the branch. One
+conflict, in `docs/tickets/README.md` (all rows kept). On the merged tree: `db:generate`,
+`openapi:generate` and `openapi:check` passed; `typecheck` and `lint` 6/6; unit tests API
+3025, app 601, web 84 passed; `docs:validate` and `playwright:validate` passed;
+`migrate deploy` and `migrations:check` passed on a throwaway database. API e2e, full run
+on a throwaway database without the reference seed: 576 of 596; 19 `invoices` failures came
+from the missing LGA seed and passed once seeded; 1 `address-default-and-country-code`
+failure (untouched by this ticket) did not repeat in a run of that file alone (13/13).
+Not run: a single fully green e2e run, Playwright, CI.

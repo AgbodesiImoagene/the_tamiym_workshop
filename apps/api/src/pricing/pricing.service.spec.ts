@@ -65,6 +65,7 @@ describe('PricingService', () => {
     prices: [{ amount: 5000 }],
     product: {
       name: 'Classic Tee',
+      status: 'ACTIVE',
       prices: [],
       bulkPricingTiers: [],
       weightGrams: 300,
@@ -313,6 +314,62 @@ describe('PricingService', () => {
         items: [{ variantId: 'var-1', quantity: 1 }],
       });
       expect(prisma.design.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('product status (TTW-275)', () => {
+    const line = {
+      shippingAddressId: 'addr-1',
+      items: [{ variantId: 'var-1', quantity: 1 }],
+    };
+    const productIs = (status: string) =>
+      (prisma.productVariant.findUnique as jest.Mock).mockResolvedValue({
+        ...mockVariant,
+        product: { ...mockVariant.product, status },
+      });
+    const refusal = {
+      response: {
+        code: 'PRODUCT_NOT_AVAILABLE',
+        message: 'Variant var-1 is not available',
+      },
+      status: 400,
+    };
+
+    beforeEach(() => {
+      (prisma.campaignProduct.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cp-1',
+        prices: [{ amount: 8000 }],
+      });
+    });
+
+    it.each(['DRAFT', 'ARCHIVED'])(
+      'refuses a standard quote of a %s product',
+      async (status) => {
+        productIs(status);
+        await expect(
+          service.quoteStandard('user-1', line),
+        ).rejects.toMatchObject(refusal);
+      },
+    );
+
+    it.each(['DRAFT', 'ARCHIVED'])(
+      'refuses a campaign quote of a %s product',
+      async (status) => {
+        productIs(status);
+        await expect(
+          service.quoteCampaign('user-1', 'camp-1', line),
+        ).rejects.toMatchObject(refusal);
+      },
+    );
+
+    it('quotes an ACTIVE product in both modes', async () => {
+      productIs('ACTIVE');
+      await expect(
+        service.quoteStandard('user-1', line),
+      ).resolves.toMatchObject({ items: [{ unitFinalPrice: 5000 }] });
+      await expect(
+        service.quoteCampaign('user-1', 'camp-1', line),
+      ).resolves.toMatchObject({ items: [{ unitFinalPrice: 8000 }] });
     });
   });
 

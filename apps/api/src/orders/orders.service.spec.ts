@@ -190,6 +190,16 @@ describe('OrdersService', () => {
             update: jest.fn(),
           },
           $executeRaw: jest.fn().mockResolvedValue(1),
+          // TTW-275: the locked status read; every ordered product is active.
+          $queryRaw: jest.fn(
+            (_query: TemplateStringsArray, ids: { values: string[] }) =>
+              Promise.resolve(
+                ids.values.map((variantId) => ({
+                  variantId,
+                  status: 'ACTIVE',
+                })),
+              ),
+          ),
         };
         return cb(tx);
       }),

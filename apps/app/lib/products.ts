@@ -23,6 +23,9 @@ export interface DashboardProduct {
   }>;
   /** List card summary (TTW-204). Absent on the detail endpoint. */
   colors?: Array<{ code: string; name: string; hex: string | null }>;
+  /** Badges an admin sets on the product (TTW-267). Display only. */
+  isBestSeller?: boolean;
+  expressProduction?: boolean;
   /** For example "S-5XL"; `null` when the product has no sizes. */
   sizeRange?: string | null;
   /** Product-level bulk tier with the lowest unit price; display only. */
@@ -31,6 +34,7 @@ export interface DashboardProduct {
 
 export interface DashboardProductDetail extends DashboardProduct {
   resolvedBasePrice?: number | null;
+  resolvedBaseCompareAt?: number | null;
   resolvedCurrency?: string;
   /** Display images; `variantId` ties an image to one variant (and so to a colour). */
   images: Array<{
@@ -57,6 +61,8 @@ export interface DashboardProductDetail extends DashboardProduct {
       optionValue: {
         valueCode: string;
         displayName: string;
+        /** Free JSON set by the admin; a colour keeps its swatch in `hex`. */
+        metadata?: unknown;
       };
     }>;
   }>;

@@ -12,6 +12,7 @@ import { Prisma } from '../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PricingService } from '../pricing/pricing.service';
 import { assertDesignsOrderableBy } from '../pricing/design-order-eligibility';
+import { lockOrderableProducts } from '../pricing/product-orderability';
 import { CreateOrderDto } from './dto/create-order.dto';
 import {
   OrderStatus,
@@ -178,6 +179,11 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          // TTW-275: before any write; the products stay ACTIVE until the commit.
+          await lockOrderableProducts(
+            tx,
+            quote.items.map((item) => item.variantId),
+          );
           // TTW-101: the copy must not outlive a check made before the quote. A design
           // rejected, or no longer the buyer's, since then is refused here with the same
           // codes as the first check. Campaign orders have their own design rule.
@@ -369,6 +375,11 @@ export class OrdersService {
         );
 
         return this.prisma.$transaction(async (tx) => {
+          // TTW-275: before any write; the products stay ACTIVE until the commit.
+          await lockOrderableProducts(
+            tx,
+            quote.items.map((item) => item.variantId),
+          );
           const designSnapshots = await this.snapshotDesigns(
             tx,
             quote.items.map((item) => item.designId),

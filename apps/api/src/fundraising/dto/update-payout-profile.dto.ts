@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsNotEmpty } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdatePayoutProfileDto {
   @ApiProperty({ required: false })
@@ -9,9 +9,7 @@ export class UpdatePayoutProfileDto {
   label?: string;
 
   @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  @Transform(({ value }) => value === true || value === 'true')
+  @IsOptionalStrictBoolean()
   isDefault?: boolean;
 
   @ApiProperty({

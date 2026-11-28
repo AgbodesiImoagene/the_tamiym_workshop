@@ -44,6 +44,10 @@ import type {
 } from '../shipping/shipping.types';
 import { formatVariantDisplaySnapshot } from '../orders/order-item-snapshot';
 import { assertDesignsOrderableBy } from './design-order-eligibility';
+import {
+  isProductOrderable,
+  productNotAvailable,
+} from './product-orderability';
 
 /** Sellable public campaign product offer (TTW-031). */
 export type PublicCampaignOffer = {
@@ -408,8 +412,10 @@ export class PricingService {
         product: {
           include: {
             prices: { where: { currency: currency as any }, take: 1 },
+            // Product-level tiers only: every tier carries a productId, so
+            // this relation would also load sibling variants' tiers (TTW-271).
             bulkPricingTiers: {
-              where: { currency: currency as any },
+              where: { variantId: null, currency: currency as any },
               orderBy: { minQuantity: 'asc' },
             },
           },
@@ -442,6 +448,10 @@ export class PricingService {
       throw new BadRequestException(`Variant ${item.variantId} not found`);
     }
     const productId = variant.productId;
+    // TTW-275: first, so a non-active product gets the same answer in every state.
+    if (!isProductOrderable(variant.product.status)) {
+      throw productNotAvailable(item.variantId);
+    }
     if (!variant.isAvailable) {
       throw new BadRequestException(
         `Variant ${item.variantId} is not available`,

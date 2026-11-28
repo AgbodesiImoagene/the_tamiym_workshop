@@ -131,6 +131,25 @@ describe('EditDesignLoader', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
+  it('says the product is no longer available, with no retry, when it is unpublished (TTW-273)', async () => {
+    mockedGetDesign.mockResolvedValue(design);
+    mockedGetProductWorkshop.mockRejectedValue({ statusCode: 404, message: 'Product not found' });
+
+    renderLoader();
+
+    expect(
+      await screen.findByRole('heading', { name: 'This product is no longer available' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Your design is saved.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to design workshop/i })).toHaveAttribute(
+      'href',
+      '/dashboard/design'
+    );
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/editor for/i)).not.toBeInTheDocument();
+  });
+
   it('loads the design when the retry of a failed product workshop works', async () => {
     mockedGetDesign.mockResolvedValue(design);
     mockedGetProductWorkshop.mockRejectedValueOnce({ statusCode: 500, message: 'Server error' });

@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsOptional,
   IsPhoneNumber,
   IsEnum,
@@ -12,6 +11,7 @@ import { Transform } from 'class-transformer';
 import { AddressText } from './address-text.decorator';
 import { canonicalCountryCode } from '../../shipping/country-code';
 import { AddressProvider } from '../../generated/prisma/enums';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class CreateAddressDto {
   @ApiProperty({
@@ -212,7 +212,6 @@ export class CreateAddressDto {
   longitude?: number;
 
   @ApiProperty({ example: false, default: false, required: false })
-  @IsBoolean()
-  @IsOptional()
+  @IsOptionalStrictBoolean()
   isDefault?: boolean;
 }

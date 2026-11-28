@@ -31,6 +31,21 @@ Mode-specific behavior:
 - standard checkout applies bulk pricing and buyer-paid view surcharge
 - campaign checkout uses campaign product prices and may compute organizer cost basis separately
 
+## Which products can be quoted and ordered
+
+Only an `ACTIVE` product (TTW-275). A `DRAFT` or `ARCHIVED` one is refused with
+400 `PRODUCT_NOT_AVAILABLE`:
+
+- By standard and campaign quotes, and by both kinds of order creation. A cart
+  with one such line is refused whole
+- Order creation reads the status again inside its transaction, with a shared
+  lock on the product rows, so a product cannot leave `ACTIVE` between the quote
+  and the order
+- The message is the one of an unavailable variant: it names neither the product
+  nor its status
+- An order created before the product left `ACTIVE` is unchanged: it stays
+  payable until it expires, and a retry with the same idempotency key returns it
+
 ## Current Pricing Pipeline
 
 At a high level, the current pipeline is:
@@ -139,6 +154,13 @@ Overlap enforcement:
 - A tier with an empty `maxQuantity` is open-ended and stored as an unbounded range, so it overlaps every higher quantity (TTW-005)
 - `minQuantity` and `maxQuantity` cannot exceed 2147483646, the largest value that range can hold. The admin API rejects anything higher with a 400 (TTW-163)
 - The columns and constraint behind this are listed in `database-only-objects.md`
+
+Which tier a standard quote applies (TTW-271):
+
+- A variant with tiers of its own uses only those. When none covers the quantity, the base price applies, with no fallback to the product tiers
+- A variant without tiers of its own uses the product-level tiers (`variantId` empty), never another variant's
+- The quantity is that of the order line
+- Campaign orders ignore bulk tiers
 
 ### Product view pricing
 

@@ -784,6 +784,8 @@ async function main() {
           description: 'Soft cotton crew-neck tee for test flows.',
           status: ProductStatus.ACTIVE,
           weightGrams: 220,
+          // TTW-267: one fixture per catalogue badge.
+          isBestSeller: true,
         },
         {
           id: IDS.products.hoodie,
@@ -793,6 +795,7 @@ async function main() {
           description: 'Heavyweight hoodie used in richer e2e data.',
           status: ProductStatus.ACTIVE,
           weightGrams: 640,
+          expressProduction: true,
         },
         // TTW-093: 22 products in one category, so the customer catalogue needs a
         // second page (page size 12) and "All" holds more than the API default of 20.

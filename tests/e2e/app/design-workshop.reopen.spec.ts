@@ -147,6 +147,43 @@ test.describe('Reopen a saved design @comprehensive @app', () => {
     }
   });
 
+  test('a design whose product was withdrawn says so (TTW-273)', async ({ browser }) => {
+    const { context, csrfToken } = await newCustomer(browser, 'Withdrawn');
+    try {
+      const design = await createDesignThroughApi(
+        context,
+        csrfToken,
+        `Withdrawn ${Date.now()}`,
+        'Kept'
+      );
+      const page = await context.newPage();
+      // The seeded tee is shared by every spec, so it is not archived here: the browser is
+      // given the 404 the API answers for an unpublished product (covered by the API e2e).
+      await page.route(`**/v1/products/${TEE_PRODUCT_ID}/workshop`, (route) =>
+        route.fulfill({
+          status: 404,
+          headers: {
+            'access-control-allow-origin': urls.app,
+            'access-control-allow-credentials': 'true',
+          },
+          json: { statusCode: 404, message: 'Product not found' },
+        })
+      );
+
+      await page.goto(`/dashboard/design/${design.id}/edit`);
+
+      await expect(
+        page.getByRole('heading', { name: 'This product is no longer available' })
+      ).toBeVisible();
+      await expect(page.getByText('Your design is saved.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+      await page.getByRole('link', { name: 'Back to Design Workshop' }).click();
+      await expect(page).toHaveURL(/\/dashboard\/design$/);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("another customer's design shows the same not found message", async ({ browser }) => {
     const owner = await newCustomer(browser, 'Owner');
     const other = await newCustomer(browser, 'Other');
