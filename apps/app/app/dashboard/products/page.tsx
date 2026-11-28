@@ -124,9 +124,9 @@ export default function DashboardProductsPage() {
                     <Link
                       href={`/dashboard/products/${product.id}`}
                       aria-label={`View product: ${product.name}`}
-                      className="group block rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1e39d2]"
+                      className="group block overflow-hidden rounded-[28px] border border-border transition-shadow duration-200 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1e39d2]"
                     >
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-[#f4f6f9]">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f4f6f9]">
                         {imageUrl ? (
                           <Image
                             src={imageUrl}
@@ -140,7 +140,7 @@ export default function DashboardProductsPage() {
                         )}
                       </div>
 
-                      <div className="space-y-2 px-1 pt-3">
+                      <div className="space-y-2 px-4 pb-4 pt-3">
                         {product.colors && product.colors.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
                             {product.colors.map((color) => (
