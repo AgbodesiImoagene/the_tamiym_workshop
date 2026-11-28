@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -10,6 +9,7 @@ import {
 } from 'class-validator';
 import { AddressText } from '../../addresses/dto/address-text.decorator';
 import { ShippingRuleMatchType } from '../../generated/prisma/enums';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class CreateShippingRuleDto {
   @ApiProperty({
@@ -49,7 +49,6 @@ export class CreateShippingRuleDto {
   priority?: number;
 
   @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isActive?: boolean;
 }

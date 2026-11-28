@@ -44,7 +44,8 @@ export class AdminBulkPricingController {
   @ApiResponse({ status: 201, description: 'Tier created' })
   @ApiResponse({
     status: 400,
-    description: 'Overlap, invalid range, or a quantity above the limit',
+    description:
+      'Overlap, invalid range, a quantity above the limit, or a variant that does not belong to the product',
   })
   async create(@Body() dto: CreateBulkPricingDto) {
     return this.bulkPricingService.create({

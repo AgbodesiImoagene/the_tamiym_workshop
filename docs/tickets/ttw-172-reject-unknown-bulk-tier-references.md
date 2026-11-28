@@ -20,6 +20,8 @@ Not tested: a real variant that belongs to a different product. The admin page o
 
 Found while reviewing TTW-163.
 
+Update 2026-11-25: TTW-272 delivers the variant rules. A variant of another product, and an unknown `variantId`, now answer 400 and the database refuses a foreign pair. Remaining here: unknown `currency` and unknown `productId` without a variant.
+
 ## Proposal
 
 - `currency`: validate it against `CurrencyCode` in the DTO, with `enum` in Swagger.

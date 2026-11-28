@@ -115,6 +115,14 @@ export interface ProductImage {
   } | null;
 }
 
+/**
+ * TTW-266: the option whose values carry a hex color code. New data is stored as `color`;
+ * `colour` is the spelling of rows written before.
+ */
+export function isColorOptionCode(code: string): boolean {
+  return ['color', 'colour'].includes(code.trim().toLowerCase());
+}
+
 export interface OptionValue {
   id: string;
   valueCode: string;
@@ -157,6 +165,8 @@ export interface AdminProductDetail {
   slug: string;
   status: ProductStatus;
   description: string | null;
+  isBestSeller: boolean;
+  expressProduction: boolean;
   updatedAt: string;
   category: { id: string; name: string; slug: string } | null;
   options: ProductOption[];
@@ -260,6 +270,8 @@ export async function updateAdminProduct(
     packageLengthMm?: number;
     packageWidthMm?: number;
     packageHeightMm?: number;
+    isBestSeller?: boolean;
+    expressProduction?: boolean;
   }
 ) {
   return apiClient.patch<AdminProductDetail>(`/admin/products/${id}`, dto);

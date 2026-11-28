@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ProductsQueryDto } from './dto/products-query.dto';
+import { PRODUCT_FLAG_SCHEMA } from './dto/product-flags';
 import { Public } from '../auth/decorators/public.decorator';
 
 /** Bulk pricing tiers on the public detail (TTW-269). */
@@ -50,6 +51,7 @@ export class ProductsController {
           slug: { type: 'string' },
           description: { type: 'string', nullable: true },
           status: { type: 'string' },
+          ...PRODUCT_FLAG_SCHEMA,
           category: {
             type: 'object',
             properties: {
@@ -142,6 +144,7 @@ export class ProductsController {
         slug: { type: 'string' },
         description: { type: 'string', nullable: true },
         status: { type: 'string' },
+        ...PRODUCT_FLAG_SCHEMA,
         category: { type: 'object' },
         likeCount: {
           type: 'integer',
@@ -182,8 +185,9 @@ export class ProductsController {
   }
 
   /**
-   * Workshop context for a product (public). Returns everything the Design Workshop editor
-   * needs to initialise: options, views, print areas, template layers, and option-value effects.
+   * Workshop context for a published product (public). Returns everything the Design Workshop
+   * editor needs to initialise: options, views, print areas, template layers, and option-value
+   * effects.
    */
   @Get(':id/workshop')
   @Public()
@@ -225,7 +229,10 @@ export class ProductsController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Product not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found, or not published (draft or archived)',
+  })
   getWorkshop(@Param('id') id: string) {
     return this.productsService.getWorkshopContext(id);
   }

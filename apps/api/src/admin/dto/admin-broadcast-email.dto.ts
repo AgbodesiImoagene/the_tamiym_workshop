@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
-  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -9,6 +8,7 @@ import {
   ArrayMaxSize,
   IsUUID,
 } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export enum AdminEmailAudience {
   /** Verified email, role CUSTOMER, active, non-admin */
@@ -56,7 +56,6 @@ export class AdminBroadcastEmailDto {
       'If true, returns recipient count and sample emails only; no rows queued.',
     default: false,
   })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   dryRun?: boolean;
 }

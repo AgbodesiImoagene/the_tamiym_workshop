@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+const VARIANT_NOT_OWNED = 'Variant does not belong to this product.';
+
 /**
  * Two quantity ranges [minA, maxA] and [minB, maxB] overlap if there exists an integer n
  * in both. Treat null max as infinity.
@@ -29,6 +31,10 @@ function mapBulkConstraintError(err: unknown): never {
     throw new BadRequestException(
       'Quantity range overlaps an existing tier for this product/variant/currency. Tiers must not overlap.',
     );
+  }
+  // TTW-272: the variant left the product between the check and the write.
+  if (/bulk_pricing_variantId_productId_fkey/.test(message)) {
+    throw new BadRequestException(VARIANT_NOT_OWNED);
   }
   throw err;
 }
@@ -86,6 +92,24 @@ export class BulkPricingService {
     }
   }
 
+  /**
+   * TTW-272: a variant tier must be filed under that variant's own product, or
+   * the tier list shows it under a product it does not belong to. The composite
+   * foreign key enforces the rule in PostgreSQL; this check gives a clear 400.
+   */
+  private async assertVariantOfProduct(
+    productId: string,
+    variantId: string,
+  ): Promise<void> {
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: variantId, productId },
+      select: { id: true },
+    });
+    if (!variant) {
+      throw new BadRequestException(VARIANT_NOT_OWNED);
+    }
+  }
+
   async create(data: {
     productId: string;
     variantId?: string | null;
@@ -94,6 +118,9 @@ export class BulkPricingService {
     maxQuantity?: number | null;
     pricePerUnit: number;
   }) {
+    if (data.variantId != null) {
+      await this.assertVariantOfProduct(data.productId, data.variantId);
+    }
     await this.assertNoOverlap(
       data.productId,
       data.variantId ?? null,

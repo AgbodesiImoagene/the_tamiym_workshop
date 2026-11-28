@@ -2,7 +2,7 @@
  * TTW-092: the product page offers colours and sizes built from the variants the API
  * returns, and only variants that can really be bought are selectable.
  */
-import { groupVariantsByColor, imagesForColor } from '@/lib/product-variants';
+import { groupVariantsByColor, headlinePrice, imagesForColor } from '@/lib/product-variants';
 import type { DashboardProductDetail } from '@/lib/products';
 
 function variant(
@@ -181,5 +181,137 @@ describe('imagesForColor', () => {
     const [red] = groupVariantsByColor(detail);
 
     expect(imagesForColor(detail, red)).toEqual([]);
+  });
+});
+
+describe('colour swatches (TTW-268)', () => {
+  function withMetadata(metadata: unknown) {
+    const base = variant('v1', ['NAVY', 'Navy'], ['S', 'S']);
+    return {
+      ...base,
+      optionValues: base.optionValues.map((entry) =>
+        entry.option.code === 'color'
+          ? { ...entry, optionValue: { ...entry.optionValue, metadata } }
+          : entry
+      ),
+    };
+  }
+
+  it.each(['#abc', '#1e39d2', '#1e39d2ff'])(
+    'reads the hex %s of the colour option value',
+    (hex) => {
+      const [group] = groupVariantsByColor(product([withMetadata({ hex })]));
+
+      expect(group).toMatchObject({ isColor: true, hex });
+    }
+  );
+
+  it.each([
+    ['no metadata', undefined],
+    ['null metadata', null],
+    ['no hex', {}],
+    ['a hex that is not a string', { hex: 12 }],
+    ['a value that is not a hex colour', { hex: 'url(https://example.com/x.png)' }],
+  ])('has no hex with %s', (_label, metadata) => {
+    const [group] = groupVariantsByColor(product([withMetadata(metadata)]));
+
+    expect(group).toMatchObject({ isColor: true, hex: null });
+  });
+
+  it('marks the default group as not being a colour', () => {
+    const [group] = groupVariantsByColor(product([variant('v1', null, ['S', 'S'])]));
+
+    expect(group).toMatchObject({ isColor: false, hex: null });
+  });
+});
+
+describe('headlinePrice (TTW-268)', () => {
+  const black: [string, string] = ['BLACK', 'Black'];
+  const priced = (id: string, extra: Partial<DashboardProductDetail['variants'][number]>) =>
+    variant(id, black, [id, id], extra);
+
+  function priceOf(detail: DashboardProductDetail) {
+    return headlinePrice(detail, groupVariantsByColor(detail)[0]);
+  }
+
+  it('gives the single price of the sizes of a colour', () => {
+    expect(priceOf(product([priced('S', {}), priced('M', {})]))).toEqual({
+      amount: 5000,
+      compareAt: null,
+      currency: 'NGN',
+      from: false,
+    });
+  });
+
+  it('gives the lowest price, as "from", with the compare-at price of that size', () => {
+    const detail = product([
+      priced('S', { resolvedPrice: 7000, resolvedCompareAt: 9000 }),
+      priced('M', { resolvedPrice: 6000, resolvedCompareAt: 8000 }),
+    ]);
+
+    expect(priceOf(detail)).toMatchObject({ amount: 6000, compareAt: 8000, from: true });
+  });
+
+  it('strikes a former price only when every size at the lowest price has one', () => {
+    const discounted = priced('S', { resolvedCompareAt: 8000 });
+    const full = priced('M', {});
+    expect(priceOf(product([discounted, full]))?.compareAt).toBeNull();
+    expect(priceOf(product([full, discounted]))?.compareAt).toBeNull();
+
+    const smaller = priced('M', { resolvedCompareAt: 7000 });
+    expect(priceOf(product([discounted, smaller]))?.compareAt).toBe(7000);
+    expect(priceOf(product([smaller, discounted]))?.compareAt).toBe(7000);
+  });
+
+  it('ignores a compare-at price that is not higher than the price', () => {
+    expect(priceOf(product([priced('S', { resolvedCompareAt: 5000 })]))?.compareAt).toBeNull();
+    expect(priceOf(product([priced('S', { resolvedCompareAt: 4000 })]))?.compareAt).toBeNull();
+  });
+
+  it('compares decimal strings from the API as numbers', () => {
+    const detail = product([
+      priced('S', {
+        resolvedPrice: '10000.00' as unknown as number,
+        resolvedCompareAt: '12000.00' as unknown as number,
+      }),
+      priced('M', { resolvedPrice: '9000.00' as unknown as number }),
+    ]);
+
+    expect(priceOf(detail)).toMatchObject({ amount: 9000, from: true });
+  });
+
+  it('prices from the sizes that can be bought, else from all of them', () => {
+    const soldOutCheaper = product([
+      priced('S', { resolvedPrice: 3000, inStock: false, availableQuantity: 0 }),
+      priced('M', { resolvedPrice: 6000 }),
+    ]);
+    expect(priceOf(soldOutCheaper)).toMatchObject({ amount: 6000, from: false });
+
+    const allSoldOut = product([
+      priced('S', { resolvedPrice: 3000, isAvailable: false }),
+      priced('M', { resolvedPrice: 6000, isAvailable: false }),
+    ]);
+    expect(priceOf(allSoldOut)).toMatchObject({ amount: 3000, from: true });
+  });
+
+  it('uses the product base price and compare-at when there is no variant', () => {
+    const detail = { ...product([]), resolvedBaseCompareAt: 5500 };
+
+    expect(headlinePrice(detail, undefined)).toEqual({
+      amount: 4500,
+      compareAt: 5500,
+      currency: 'NGN',
+      from: false,
+    });
+  });
+
+  it('gives nothing, never zero, when no price exists', () => {
+    const detail = {
+      ...product([priced('S', { resolvedPrice: null })]),
+      resolvedBasePrice: null,
+    };
+
+    expect(priceOf(detail)).toBeNull();
+    expect(headlinePrice({ ...detail, variants: [] }, undefined)).toBeNull();
   });
 });

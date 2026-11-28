@@ -5,6 +5,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assertColorMetadata,
+  isColorOptionCode,
+  normalizeOptionCode,
+} from './color-option';
 import { MediaService } from '../media/media.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -56,6 +61,8 @@ type UploadedImageFile = {
   mimetype: string;
   originalname?: string;
 };
+
+const SECOND_COLOR_OPTION = 'This product already has a color option';
 
 @Injectable()
 export class ProductsService {
@@ -544,6 +551,8 @@ export class ProductsService {
         slug: true,
         status: true,
         description: true,
+        isBestSeller: true,
+        expressProduction: true,
         updatedAt: true,
         category: { select: { id: true, name: true, slug: true } },
         prices: { select: { currency: true, amount: true } },
@@ -747,6 +756,8 @@ export class ProductsService {
         packageLengthMm: dto.packageLengthMm,
         packageWidthMm: dto.packageWidthMm,
         packageHeightMm: dto.packageHeightMm,
+        isBestSeller: dto.isBestSeller,
+        expressProduction: dto.expressProduction,
       },
       include: {
         category: { select: { id: true, name: true, slug: true } },
@@ -804,6 +815,12 @@ export class ProductsService {
         }),
         ...(dto.packageHeightMm !== undefined && {
           packageHeightMm: dto.packageHeightMm,
+        }),
+        ...(dto.isBestSeller !== undefined && {
+          isBestSeller: dto.isBestSeller,
+        }),
+        ...(dto.expressProduction !== undefined && {
+          expressProduction: dto.expressProduction,
         }),
       },
       include: {
@@ -937,7 +954,7 @@ export class ProductsService {
   async createOption(productId: string, dto: CreateOptionDto) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
-      include: { options: { select: { id: true } } },
+      include: { options: { select: { id: true, code: true } } },
     });
     if (!product) {
       throw new NotFoundException('Product not found');
@@ -947,14 +964,23 @@ export class ProductsService {
         `Product cannot have more than ${MAX_OPTIONS_PER_PRODUCT} options`,
       );
     }
-    const option = await this.prisma.productOption.create({
-      data: {
-        productId,
-        code: dto.code,
-        name: dto.name,
-        sortOrder: dto.sortOrder ?? 0,
-      },
-    });
+    const code = normalizeOptionCode(dto.code);
+    if (
+      isColorOptionCode(code) &&
+      product.options.some((other) => isColorOptionCode(other.code))
+    ) {
+      throw new ConflictException(SECOND_COLOR_OPTION);
+    }
+    const option = await this.writeOption(() =>
+      this.prisma.productOption.create({
+        data: {
+          productId,
+          code,
+          name: dto.name,
+          sortOrder: dto.sortOrder ?? 0,
+        },
+      }),
+    );
     await this.regenerateVariants(productId);
     return option;
   }
@@ -973,14 +999,29 @@ export class ProductsService {
     if (!option || option.productId !== productId) {
       throw new NotFoundException('Option not found');
     }
-    const updated = await this.prisma.productOption.update({
-      where: { id: optionId },
-      data: {
-        ...(dto.code && { code: dto.code }),
-        ...(dto.name && { name: dto.name }),
-        ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
-      },
-    });
+    let code = dto.code ? normalizeOptionCode(dto.code) : undefined;
+    if (
+      code &&
+      isColorOptionCode(code) &&
+      (await this.hasOtherColorOption(productId, optionId))
+    ) {
+      if (!isColorOptionCode(option.code)) {
+        throw new ConflictException(SECOND_COLOR_OPTION);
+      }
+      // Old data may hold two color options. Each keeps its stored code, so that
+      // its other fields can still be saved.
+      code = undefined;
+    }
+    const updated = await this.writeOption(() =>
+      this.prisma.productOption.update({
+        where: { id: optionId },
+        data: {
+          ...(code && { code }),
+          ...(dto.name && { name: dto.name }),
+          ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
+        },
+      }),
+    );
     await this.regenerateVariants(option.productId);
     return updated;
   }
@@ -1013,6 +1054,9 @@ export class ProductsService {
     if (!option || option.productId !== productId) {
       throw new NotFoundException('Option not found');
     }
+    if (dto.metadata !== undefined && isColorOptionCode(option.code)) {
+      assertColorMetadata(dto.metadata);
+    }
     const value = await this.prisma.productOptionValue.create({
       data: {
         optionId,
@@ -1040,6 +1084,9 @@ export class ProductsService {
     });
     if (!value || value.option.productId !== productId) {
       throw new NotFoundException('Option value not found');
+    }
+    if (dto.metadata !== undefined && isColorOptionCode(value.option.code)) {
+      assertColorMetadata(dto.metadata);
     }
     const updated = await this.prisma.productOptionValue.update({
       where: { id: valueId },
@@ -1980,6 +2027,35 @@ export class ProductsService {
     }
   }
 
+  private async hasOtherColorOption(productId: string, optionId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { options: { select: { id: true, code: true } } },
+    });
+    return (
+      product?.options.some(
+        (other) => other.id !== optionId && isColorOptionCode(other.code),
+      ) ?? false
+    );
+  }
+
+  /** A product has each option code once: a second one is a conflict, not a server error. */
+  private async writeOption<T>(write: () => PromiseLike<T>): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'This product already has an option with this code',
+        );
+      }
+      throw error;
+    }
+  }
+
   private async assertOption(productId: string, optionId: string) {
     const option = await this.prisma.productOption.findUnique({
       where: { id: optionId },
@@ -2016,8 +2092,9 @@ export class ProductsService {
    * template layers (with resolved image URLs), and option-value effects.
    */
   async getWorkshopContext(productId: string) {
+    // Public read: a draft or archived product stays hidden, as in `findOne`.
     const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+      where: { id: productId, status: ProductStatus.ACTIVE },
       include: {
         options: {
           orderBy: { sortOrder: 'asc' },

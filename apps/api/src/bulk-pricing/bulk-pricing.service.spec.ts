@@ -7,6 +7,7 @@ import { BulkPricingService } from './bulk-pricing.service';
 describe('BulkPricingService', () => {
   let service: BulkPricingService;
   let prisma: {
+    productVariant: { findFirst: jest.Mock };
     bulkPricing: {
       findMany: jest.Mock;
       create: jest.Mock;
@@ -18,6 +19,9 @@ describe('BulkPricingService', () => {
 
   beforeEach(async () => {
     prisma = {
+      productVariant: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'v1' }),
+      },
       bulkPricing: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockResolvedValue({ id: 'tier-1' }),
@@ -45,6 +49,58 @@ describe('BulkPricingService', () => {
         pricePerUnit: 1000,
       }),
     ).resolves.toEqual({ id: 'tier-1' });
+  });
+
+  describe('variant ownership (TTW-272)', () => {
+    const variantTier = {
+      productId: 'p1',
+      variantId: 'v1',
+      currency: 'NGN',
+      minQuantity: 1,
+      pricePerUnit: 1000,
+    };
+    const NOT_OWNED = 'Variant does not belong to this product.';
+
+    it('creates a tier for a variant of the product', async () => {
+      await expect(service.create(variantTier)).resolves.toEqual({
+        id: 'tier-1',
+      });
+      expect(prisma.productVariant.findFirst).toHaveBeenCalledWith({
+        where: { id: 'v1', productId: 'p1' },
+        select: { id: true },
+      });
+    });
+
+    it.each(['v-other', ''])(
+      'rejects variant "%s" that the product does not have and writes nothing',
+      async (variantId) => {
+        prisma.productVariant.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.create({ ...variantTier, variantId }),
+        ).rejects.toThrow(new BadRequestException(NOT_OWNED));
+        expect(prisma.bulkPricing.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('looks up no variant for a product-level tier', async () => {
+      await service.create({ ...variantTier, variantId: null });
+
+      expect(prisma.productVariant.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('maps the ownership foreign key violation to the same 400', async () => {
+      prisma.bulkPricing.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          'Foreign key constraint violated on the constraint: `bulk_pricing_variantId_productId_fkey`',
+          { code: 'P2003', clientVersion: 'test' },
+        ),
+      );
+
+      await expect(service.create(variantTier)).rejects.toThrow(
+        new BadRequestException(NOT_OWNED),
+      );
+    });
   });
 
   it('maps EXCLUDE constraint violations to BadRequestException on create', async () => {

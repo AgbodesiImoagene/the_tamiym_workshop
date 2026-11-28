@@ -55,7 +55,7 @@ export class OrdersController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. A line with a `designId` is refused when the design does not exist, is for another product than the variant, or was rejected by moderation — DESIGN_REJECTED (TTW-239); PENDING, FLAGGED and APPROVED designs are quoted.',
+      'Invalid input or address. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. A line with a `designId` is refused when the design does not exist, is for another product than the variant, or was rejected by moderation — DESIGN_REJECTED (TTW-239); PENDING, FLAGGED and APPROVED designs are quoted. PRODUCT_NOT_AVAILABLE — a line is for a product that is not active, draft or archived (TTW-275); nothing is created, the customer removes that line.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({
@@ -85,7 +85,7 @@ export class OrdersController {
   @ApiResponse({
     status: 400,
     description:
-      'Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. DESIGN_REJECTED — a design on one of the lines was rejected by moderation (TTW-058); nothing is created, the customer removes that line. Designs that are pending, flagged or approved can be ordered.',
+      'Invalid input or insufficient stock. SHIPPING_ADDRESS_NOT_COVERED — the delivery address matches no shipping zone, or its zone has no active rate (TTW-086); nothing is created, correct the address and retry. ADDRESS_STATE_NOT_DELIVERABLE — the saved address is in a state or LGA we no longer deliver to (TTW-217); orders already created are not affected. ADDRESS_LGA_REQUIRED — the saved address is in a Nigerian state that has LGAs but names none (TTW-221); the customer chooses an LGA and retries. DESIGN_REJECTED — a design on one of the lines was rejected by moderation (TTW-058); nothing is created, the customer removes that line. Designs that are pending, flagged or approved can be ordered. PRODUCT_NOT_AVAILABLE — a line is for a product that is not active, draft or archived (TTW-275); nothing is created, the customer removes that line.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({

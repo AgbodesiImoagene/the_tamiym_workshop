@@ -1,7 +1,7 @@
 # TTW-269 — Add product likes and bulk pricing tiers to the product API
 
 **Epic:** 8 — Client review delivery\
-**Status:** Complete (plan approved on 2026-11-25; not committed, not merged)\
+**Status:** Complete (committed and merged into local `main`; CI not run)\
 **Risk:** High (schema change, authenticated writes, personal data)\
 **Blocked by:** None\
 **Blocks:** The likes counter and the bulk price table of the customer product page
@@ -195,3 +195,14 @@ What the front must call:
 - Tiers: use the selected variant's list when it is not empty, else the product's. Show them only; the quote gives the price.
 
 Operations: apply migration `20261125163151_ttw269_product_likes` (`prisma migrate deploy`); it only adds a table. Local `ROADMAP.md` still needs the TTW-269 row. No PR. Follow-up: TTW-270 (reviews).
+
+## Merge into local main (2026-11-28)
+
+Committed as `24b9b08`, then `main` (`df1d53f`) merged. Conflicts: `docs/tickets/README.md`
+(all rows kept) and the two OpenAPI artefacts (taken from `main`, then regenerated with
+`pnpm openapi:generate`; `openapi:check` passed). On the merged tree: `typecheck` and
+`lint` 6/6; unit tests API 196 suites / 3045, app 61 / 601, web 84 passed; `docs:validate`,
+`playwright:validate` and `migrations:check` passed; full API e2e on a seeded throwaway
+database 80 suites / 615 passed. Earlier runs under load had one app failure (the TTW-255
+product list wait) and one `private-design-thumbnails` e2e failure; neither repeated.
+Not run: Playwright, CI.

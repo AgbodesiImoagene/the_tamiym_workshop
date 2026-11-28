@@ -20,6 +20,23 @@ JOIN bulk_pricing b
  AND int4range(a."minQuantity", a."maxQuantity", '[]')
      && int4range(b."minQuantity", b."maxQuantity", '[]');
 
+-- Bulk tiers naming another product's variant (TTW-272). Migration
+-- ttw272_bulk_tier_variant_owner fails while any exist: delete or re-create them.
+-- If it has already failed, Prisma blocks later deployments until, after the
+-- cleanup, you also run:
+--   prisma migrate resolve --rolled-back 20261125163210_ttw272_bulk_tier_variant_owner
+SELECT b.id AS tier_id,
+       b."productId" AS tier_product_id,
+       v."productId" AS variant_product_id,
+       b."variantId",
+       b.currency,
+       b."minQuantity",
+       b."maxQuantity",
+       b."pricePerUnit"
+FROM bulk_pricing b
+JOIN product_variants v ON v.id = b."variantId"
+WHERE v."productId" <> b."productId";
+
 -- Multiple ACTIVE campaign discounts per campaign (quote fail-closed path)
 SELECT dc."campaignId", COUNT(*) AS active_discount_links, array_agg(d.id) AS discount_ids
 FROM discount_campaigns dc

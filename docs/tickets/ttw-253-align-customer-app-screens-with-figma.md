@@ -1,7 +1,7 @@
 # TTW-253 — Align the customer app screens with the approved Figma
 
 **Epic:** 8 — Client review delivery\
-**Status:** Not started\
+**Status:** In progress (slice 1: Product list card)\
 **Risk:** Standard\
 **Blocked by:** None\
 **Blocks:** TTW-254 (visual bug fixes), TTW-255 (general polish)
@@ -83,6 +83,12 @@ The "Borngreat" name seen once on the Orders page (a different name from the one
 4. Update affected e2e specs and `docs/playwright/prd-test-manifest.json` if visible text or selectors change.
 5. Update this plan when reality differs.
 
+Deviations so far (2026-11-25, Product list card):
+
+- Product owner asked for a light border and a sober hover shadow on the card (not in the audit row): `border-border` + `hover:shadow-md` on the card link; image is flush with the card edges.
+- The header "View cart" link is kept (product owner's choice), although Figma omits it.
+- "Best Seller" badge and "2-Day Express" tag are not built: no API field exists, business decision needed.
+
 ## Test and observability plan
 
 - Unit/component: Jest in `apps/app/__tests__/` for each changed screen (add tests for the untested ones before changing them).
@@ -131,6 +137,8 @@ Slice 1, audit row 6 (Product list card), 2026-11-25:
 - `pnpm --filter app typecheck`, `pnpm --filter app lint`, prettier check: clean.
 - Playwright, `pnpm exec playwright test tests/e2e/app/products-cart.comprehensive.spec.ts --project=chromium-app --no-deps` against production builds and the shared `tamiym_workshop_test` DB: 15 passed, 3 failed (same test, 3 viewports: "tabs come from the API categories and every product is reachable (TTW-093)", at the last step `getByText('Bulk Item 01')` after "All" > Next page). Cause: the shared test DB holds many leftover "Authoring Cat" / "Clear Cat" categories and products, so page 2 of "All" no longer starts with the seeded Bulk Items. Not caused by the card change (the 12 / 10 "View product" counts before that step pass). Not re-run on a clean throwaway DB.
 - `--project=setup` also fails for `order-cancel.e2e@tamiym.test` (401, account missing from the shared DB); unrelated to this ticket.
+- Border + hover shadow change: `pnpm --filter app test -- __tests__/products` 6 suites / 52 tests passed; `pnpm --filter app lint` clean; `pnpm exec prettier --check apps/app/app/dashboard/products/page.tsx` clean; `pnpm --filter app typecheck` clean on re-run (one earlier run failed with exit 2 and no TS error shown on re-run, likely another session editing files at the same time).
+- Data finding (read-only SQL on `tamiym_workshop_test`): 539 ACTIVE products; 18 have a `size` option, 1 has `color` (with hex), 8 have `colour` (British spelling, no hex). The API only matches `color` (`apps/api/src/products/product-card-summary.ts`), so most cards show no swatches or sizes: a data gap, not a display bug.
 - Not verified: visual comparison in the browser (needs a signed-in session).
 
 Bug fix, product page image, 2026-11-25 (reported by the product owner: after clicking a product in `/dashboard/products`, the page showed a generic placeholder image instead of the product photo):
@@ -157,4 +165,4 @@ Bug fix, product page image, 2026-11-25 (reported by the product owner: after cl
 
 ## Completion summary
 
-Not complete.
+Not complete. Done: Product list card (audit row 6) except badge and tag. Left: "Best Seller" / "2-Day Express" (needs a decision and an API field); let the API accept `colour` as a colour option (proposed, not decided); visual check against Figma while signed in; Playwright re-run on a clean throwaway DB; the other audit rows.

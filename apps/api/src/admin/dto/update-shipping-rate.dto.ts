@@ -3,7 +3,6 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -19,6 +18,7 @@ import {
   ShippingRateProvider,
 } from '../../generated/prisma/enums';
 import { ShippingRateBracketDto } from './shipping-rate-bracket.dto';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdateShippingRateDto {
   @ApiPropertyOptional({ enum: ShippingRateProvider })
@@ -49,8 +49,7 @@ export class UpdateShippingRateDto {
   priority?: number;
 
   @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isActive?: boolean;
 
   @ApiPropertyOptional({ description: 'ISO date string' })
