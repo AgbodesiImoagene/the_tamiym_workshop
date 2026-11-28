@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNotEmpty, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class CreateVariantDto {
   @ApiProperty({ example: 'Small / Red' })
@@ -13,7 +14,6 @@ export class CreateVariantDto {
   sku!: string;
 
   @ApiProperty({ example: true, required: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isAvailable?: boolean;
 }

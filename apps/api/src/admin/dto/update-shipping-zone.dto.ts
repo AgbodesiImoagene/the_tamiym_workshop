@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdateShippingZoneDto {
   @ApiPropertyOptional()
@@ -9,7 +10,6 @@ export class UpdateShippingZoneDto {
   name?: string;
 
   @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isActive?: boolean;
 }

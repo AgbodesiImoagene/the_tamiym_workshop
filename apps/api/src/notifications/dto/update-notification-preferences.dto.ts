@@ -4,7 +4,6 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsBoolean,
   IsEnum,
   ValidateNested,
 } from 'class-validator';
@@ -12,6 +11,7 @@ import {
   NotificationCategory,
   NotificationPreferenceChannel,
 } from '../../generated/prisma/enums';
+import { IsStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class NotificationPreferenceItemDto {
   @ApiProperty({ enum: NotificationPreferenceChannel })
@@ -23,7 +23,7 @@ export class NotificationPreferenceItemDto {
   category!: NotificationCategory;
 
   @ApiProperty()
-  @IsBoolean()
+  @IsStrictBoolean()
   enabled!: boolean;
 }
 

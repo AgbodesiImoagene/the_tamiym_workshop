@@ -1,11 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsBoolean,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class CreateAdminNotificationRouteDto {
   @ApiProperty({ example: 'admin.order.placed' })
@@ -20,13 +15,11 @@ export class CreateAdminNotificationRouteDto {
   name?: string;
 
   @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   enabled?: boolean;
 
   @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   notifyEmail?: boolean;
 
   @ApiPropertyOptional({ type: [String], default: [] })
@@ -36,8 +29,7 @@ export class CreateAdminNotificationRouteDto {
   emailRecipients?: string[];
 
   @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   notifySms?: boolean;
 
   @ApiPropertyOptional({ type: [String], default: [] })
@@ -47,8 +39,7 @@ export class CreateAdminNotificationRouteDto {
   smsRecipients?: string[];
 
   @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   notifySlack?: boolean;
 
   @ApiPropertyOptional()

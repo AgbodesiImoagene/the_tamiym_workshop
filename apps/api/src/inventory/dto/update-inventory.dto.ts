@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsInt, IsBoolean, Min } from 'class-validator';
+import { IsOptional, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdateInventoryDto {
   @ApiProperty({ example: 100, required: false })
@@ -25,8 +26,7 @@ export class UpdateInventoryDto {
   lowStockThreshold?: number;
 
   @ApiProperty({ example: true, required: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   trackInventory?: boolean;
 
   @ApiProperty({
@@ -34,7 +34,6 @@ export class UpdateInventoryDto {
     required: false,
     description: 'Variant isAvailable flag',
   })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isAvailable?: boolean;
 }

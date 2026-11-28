@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class UpdatePrintAreaDto {
   @ApiProperty({ example: 0.1, required: false })
@@ -28,8 +29,7 @@ export class UpdatePrintAreaDto {
   height?: number;
 
   @ApiProperty({ example: false, required: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   rotationAllowed?: boolean;
 
   @ApiProperty({ example: 5, required: false })
