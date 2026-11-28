@@ -155,6 +155,12 @@ export class AdminProductsController {
 
   @Post(':productId/options')
   @HttpCode(HttpStatus.CREATED)
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Option created' })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'The product already has an option with this code, or already has a color option',
+  })
   @ApiOperation({ summary: 'Create product option (admin)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -180,6 +186,12 @@ export class AdminProductsController {
   }
 
   @Patch(':productId/options/:optionId')
+  @ApiResponse({ status: HttpStatus.OK, description: 'Option updated' })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'The product already has an option with this code, or already has a color option',
+  })
   @ApiOperation({ summary: 'Update product option (admin)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -207,6 +219,15 @@ export class AdminProductsController {
 
   @Post(':productId/options/:optionId/values')
   @HttpCode(HttpStatus.CREATED)
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Option value created',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid request, such as a bad `metadata.hex` on a color value',
+  })
   @ApiOperation({ summary: 'Create option value (admin)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')
@@ -220,6 +241,12 @@ export class AdminProductsController {
   }
 
   @Patch(':productId/options/:optionId/values/:valueId')
+  @ApiResponse({ status: HttpStatus.OK, description: 'Option value updated' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Invalid request, such as a bad `metadata.hex` on a color value',
+  })
   @ApiOperation({ summary: 'Update option value (admin)' })
   @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth('access_token')

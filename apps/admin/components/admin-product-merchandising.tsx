@@ -15,6 +15,7 @@ import {
   deleteAdminProductPrice,
   deleteAdminProductVariant,
   deleteAdminVariantPrice,
+  isColorOptionCode,
   listAdminProductVariants,
   patchAdminVariantInventory,
   type AdminProductDetail,
@@ -46,6 +47,7 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  ColorPicker,
   ConfirmDialog,
   Input,
   Label,
@@ -267,11 +269,13 @@ function BasePriceRow({
 function OptionValueRow({
   productId,
   optionId,
+  isColor,
   value,
   onChanged,
 }: {
   productId: string;
   optionId: string;
+  isColor: boolean;
   value: OptionValue;
   onChanged: () => void;
 }) {
@@ -281,7 +285,16 @@ function OptionValueRow({
   const [metadataJson, setMetadataJson] = useState(
     value.metadata ? JSON.stringify(value.metadata, null, 0) : ''
   );
+  // Null until a color is picked: an untouched value keeps its metadata as stored.
+  const [pickedHex, setPickedHex] = useState<string | null>(null);
+  const storedHex = typeof value.metadata?.hex === 'string' ? value.metadata.hex : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Saved or reloaded data replaces what was being edited.
+  useEffect(() => {
+    setPickedHex(null);
+    setMetadataJson(value.metadata ? JSON.stringify(value.metadata, null, 0) : '');
+  }, [value.metadata]);
 
   const saveMut = useMutation({
     mutationFn: () => {
@@ -295,7 +308,14 @@ function OptionValueRow({
         displayName: displayName.trim(),
         sortOrder: parseInt(sortOrder, 10),
       };
-      if (metadataJson.trim()) {
+      if (isColor) {
+        if (pickedHex) {
+          // Other keys are kept; stored data that is not an object cannot be merged.
+          const stored = value.metadata;
+          const isObject = typeof stored === 'object' && !Array.isArray(stored);
+          payload.metadata = { ...(isObject ? stored : null), hex: pickedHex };
+        }
+      } else if (metadataJson.trim()) {
         try {
           payload.metadata = JSON.parse(metadataJson) as Record<string, unknown>;
         } catch {
@@ -334,12 +354,20 @@ function OptionValueRow({
         />
       </TableCell>
       <TableCell className="py-2 pr-2">
-        <Input
-          className="h-9 font-mono text-xs"
-          placeholder='{"hex":"#000"}'
-          value={metadataJson}
-          onChange={(e) => setMetadataJson(e.target.value)}
-        />
+        {isColor ? (
+          <ColorPicker
+            label={`Color of ${value.displayName}`}
+            value={pickedHex ?? storedHex}
+            onChange={(color) => setPickedHex(color.hex)}
+          />
+        ) : (
+          <Input
+            className="h-9 font-mono text-xs"
+            placeholder='{"hex":"#000"}'
+            value={metadataJson}
+            onChange={(e) => setMetadataJson(e.target.value)}
+          />
+        )}
       </TableCell>
       <TableCell className="py-2">
         <div className="flex gap-1">
@@ -387,7 +415,10 @@ function OptionCard({
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [newSort, setNewSort] = useState('0');
+  const [newHex, setNewHex] = useState<string | null>(null);
   const [confirmDeleteOption, setConfirmDeleteOption] = useState(false);
+  // The saved code, not the one being typed: it is what the API checks.
+  const isColor = isColorOptionCode(option.code);
 
   const saveOpt = useMutation({
     mutationFn: () =>
@@ -396,7 +427,12 @@ function OptionCard({
         name: name.trim(),
         sortOrder: parseInt(sortOrder, 10),
       }),
-    onSuccess: () => onChanged(),
+    onSuccess: (saved) => {
+      // The API may store another spelling than the one typed ("colour" -> "color").
+      setCode(saved.code);
+      onChanged();
+    },
+    onError: (e: Error & { message?: string }) => alert(e.message || 'Could not save option'),
   });
 
   const delOpt = useMutation({
@@ -410,12 +446,14 @@ function OptionCard({
         valueCode: newCode.trim(),
         displayName: newName.trim(),
         sortOrder: parseInt(newSort, 10),
+        ...(isColor && newHex ? { metadata: { hex: newHex } } : {}),
       }),
     onSuccess: () => {
       onChanged();
       setNewCode('');
       setNewName('');
       setNewSort('0');
+      setNewHex(null);
     },
     onError: (e: Error & { message?: string }) => alert(e.message || 'Could not add value'),
   });
@@ -468,7 +506,7 @@ function OptionCard({
               </TableHead>
               <TableHead className="pb-2 text-xs text-muted-foreground font-normal">Sort</TableHead>
               <TableHead className="pb-2 text-xs text-muted-foreground font-normal">
-                Metadata (JSON)
+                {isColor ? 'Color' : 'Metadata (JSON)'}
               </TableHead>
               <TableHead className="pb-2" />
             </TableRow>
@@ -479,6 +517,7 @@ function OptionCard({
                 key={v.id}
                 productId={productId}
                 optionId={option.id}
+                isColor={isColor}
                 value={v}
                 onChanged={onChanged}
               />
@@ -506,6 +545,13 @@ function OptionCard({
           value={newSort}
           onChange={(e) => setNewSort(e.target.value)}
         />
+        {isColor && (
+          <ColorPicker
+            label="Color of the new value"
+            value={newHex}
+            onChange={(color) => setNewHex(color.hex)}
+          />
+        )}
         <Button
           type="button"
           size="sm"

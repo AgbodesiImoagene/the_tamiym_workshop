@@ -635,6 +635,7 @@
       "CreateOptionDto": {
         "properties": {
           "code": {
+            "description": "Unique per product. `colour` is saved as `color`.",
             "example": "size",
             "type": "string"
           },
@@ -660,6 +661,7 @@
             "type": "string"
           },
           "metadata": {
+            "description": "Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).",
             "example": {
               "hex": "#000000"
             },
@@ -4326,6 +4328,7 @@
       "UpdateOptionDto": {
         "properties": {
           "code": {
+            "description": "Unique per product. `colour` is saved as `color`.",
             "example": "size",
             "type": "string"
           },
@@ -4347,6 +4350,7 @@
             "type": "string"
           },
           "metadata": {
+            "description": "Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).",
             "example": {
               "hex": "#000000"
             },
@@ -10453,6 +10457,7 @@
               "schema": {
                 "properties": {
                   "code": {
+                    "description": "Unique per product. `colour` is saved as `color`.",
                     "example": "size",
                     "type": "string"
                   },
@@ -10477,7 +10482,10 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Option created"
+          },
+          "409": {
+            "description": "The product already has an option with this code, or already has a color option"
           }
         },
         "security": [
@@ -10561,6 +10569,7 @@
               "schema": {
                 "properties": {
                   "code": {
+                    "description": "Unique per product. `colour` is saved as `color`.",
                     "example": "size",
                     "type": "string"
                   },
@@ -10581,7 +10590,10 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Option updated"
+          },
+          "409": {
+            "description": "The product already has an option with this code, or already has a color option"
           }
         },
         "security": [
@@ -10630,6 +10642,7 @@
                     "type": "string"
                   },
                   "metadata": {
+                    "description": "Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).",
                     "example": {
                       "hex": "#000000"
                     },
@@ -10656,7 +10669,10 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Option value created"
+          },
+          "400": {
+            "description": "Invalid request, such as a bad `metadata.hex` on a color value"
           }
         },
         "security": [
@@ -10744,6 +10760,7 @@
                     "type": "string"
                   },
                   "metadata": {
+                    "description": "Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).",
                     "example": {
                       "hex": "#000000"
                     },
@@ -10766,7 +10783,10 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Option value updated"
+          },
+          "400": {
+            "description": "Invalid request, such as a bad `metadata.hex` on a color value"
           }
         },
         "security": [

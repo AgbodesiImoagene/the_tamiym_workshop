@@ -67,6 +67,10 @@ export {
   SheetTrigger,
 } from './components/ui/sheet';
 export { ConfirmDialog } from './components/confirm-dialog';
+export { ColorPicker } from './components/color-picker';
+export type { ColorPickerProps } from './components/color-picker';
+export { NAMED_COLORS, findColorByHex, findColorByName, searchColors } from './lib/colors';
+export type { NamedColor } from './lib/colors';
 export {
   Table,
   TableBody,
