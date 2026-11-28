@@ -44,6 +44,10 @@ import type {
 } from '../shipping/shipping.types';
 import { formatVariantDisplaySnapshot } from '../orders/order-item-snapshot';
 import { assertDesignsOrderableBy } from './design-order-eligibility';
+import {
+  isProductOrderable,
+  productNotAvailable,
+} from './product-orderability';
 
 /** Sellable public campaign product offer (TTW-031). */
 export type PublicCampaignOffer = {
@@ -444,6 +448,10 @@ export class PricingService {
       throw new BadRequestException(`Variant ${item.variantId} not found`);
     }
     const productId = variant.productId;
+    // TTW-275: first, so a non-active product gets the same answer in every state.
+    if (!isProductOrderable(variant.product.status)) {
+      throw productNotAvailable(item.variantId);
+    }
     if (!variant.isAvailable) {
       throw new BadRequestException(
         `Variant ${item.variantId} is not available`,
