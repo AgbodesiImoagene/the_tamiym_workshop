@@ -1,7 +1,7 @@
 # TTW-266 — Store product colours as hex codes and pick them by name
 
 **Epic:** 8 — Client review delivery\
-**Status:** In progress (code reviewed; not committed; shared database repair not run)\
+**Status:** In progress (reviewed, committed and merged into local `main`; shared database repair not run)\
 **Risk:** High (admin write validation, admin screen, data repair script)\
 **Blocked by:** None\
 **Blocks:** None
@@ -149,3 +149,14 @@ Not run: the full Playwright suite, the full API integration suite, `pnpm build`
 - Left to do: user's agreement and run of the repair on the shared database; commit, push, CI and merge when asked.
 - Merge: `docs/tickets/README.md` conflicts with `main` (rows added by both). Uncommitted work of TTW-267, TTW-269 and TTW-272 touches some of the same files; regenerate `openapi.json` and `openapi.generated.ts` after merging instead of merging them by hand.
 - A dev seed (TTW-268 seed session) should reuse `NAMED_COLORS` for its colour values.
+
+## Merge into local main (2026-11-28)
+
+Committed as `8ab705e`, then `main` (`f24bfe2`) merged into the branch. One conflict, in
+`docs/tickets/README.md` (rows added on both sides, both kept). `pnpm openapi:generate`
+changed nothing and `pnpm openapi:check` passed. On the merged tree: `pnpm typecheck` and
+`pnpm lint` 6/6 tasks (warnings only); app tests 61 suites / 593 passed; API unit tests 191
+suites / 2503 passed; web 84 passed; `docs:validate` and `playwright:validate` passed. One
+product list test failed once in the parallel run (load average about 200, the TTW-255
+case), then passed twice alone and in the full app run. Not run: CI, API integration and
+Playwright suites after the merge.

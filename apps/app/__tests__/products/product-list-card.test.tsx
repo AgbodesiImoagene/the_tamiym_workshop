@@ -78,7 +78,7 @@ function renderPage(products: ListProduct[]) {
 
 async function cardOf(name: string) {
   // The "Preview" placeholder cards show before the catalogue loads: wait for a real card.
-  const links = await screen.findAllByRole('link', { name: 'View product' });
+  const links = await screen.findAllByRole('link', { name: /^View product/ });
   const card = links
     .map((link) => link.closest('article'))
     .find((article) => article && within(article).queryByText(name));
@@ -106,6 +106,35 @@ describe('product list card (TTW-204)', () => {
     const [dot] = within(card).getAllByTestId('product-colour');
     expect(dot).toHaveAttribute('title', 'Mystery');
     expect(dot.getAttribute('style') ?? '').not.toContain('background-color');
+  });
+
+  it('says the image is not available, with no stand-in picture, when the product has no photo', async () => {
+    renderPage([tee]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).getByText('Image not available')).toBeInTheDocument();
+    expect(card.querySelector('img[src*="product-fallback"]')).toBeNull();
+  });
+
+  it('shows no stand-in picture on the preview cards of an empty catalogue', async () => {
+    const { container } = renderPage([]);
+
+    await screen.findByText('Classic Tee');
+    expect(screen.getAllByText('Image not available')).toHaveLength(3);
+    expect(container.querySelector('img[src*="product-fallback"]')).toBeNull();
+  });
+
+  it('shows the product photo when it has one', async () => {
+    renderPage([
+      { ...tee, productImageRoles: [{ image: { url: '/photo.png', altText: 'Red tee front' } }] },
+    ]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).getByRole('img', { name: 'Red tee front' })).toHaveAttribute(
+      'src',
+      '/photo.png'
+    );
+    expect(within(card).queryByText('Image not available')).not.toBeInTheDocument();
   });
 
   it('shows the size range', async () => {
@@ -170,17 +199,23 @@ describe('product list card (TTW-204)', () => {
     expect(within(card).getByText('No Minimum')).toBeInTheDocument();
   });
 
-  it('keeps the purchase path reachable from the card', async () => {
+  it('makes the whole card one link to the product page, with no buttons (TTW-253)', async () => {
     renderPage([tee]);
     const card = await cardOf('Classic Tee');
 
-    expect(within(card).getByRole('link', { name: 'View product' })).toHaveAttribute(
-      'href',
-      '/dashboard/products/p1'
-    );
-    expect(within(card).getByRole('link', { name: 'Go to cart' })).toHaveAttribute(
-      'href',
-      '/dashboard/cart'
-    );
+    const links = within(card).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName('View product: Classic Tee');
+    expect(links[0]).toHaveAttribute('href', '/dashboard/products/p1');
+    expect(within(card).queryByRole('link', { name: 'Go to cart' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows the size range next to the name (TTW-253)', async () => {
+    renderPage([tee]);
+    const card = await cardOf('Classic Tee');
+
+    const nameLine = within(card).getByText('Classic Tee').parentElement as HTMLElement;
+    expect(within(nameLine).getByText('S-5XL')).toBeInTheDocument();
   });
 });

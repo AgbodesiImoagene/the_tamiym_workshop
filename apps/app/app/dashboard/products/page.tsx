@@ -1,7 +1,7 @@
 'use client';
 
 import { formatCurrency } from '@/components/customer-dashboard-shell';
-import { customerAssets } from '@/lib/assets';
+import { ProductImagePlaceholder } from '@/components/product-image-placeholder';
 
 import {
   type DashboardProduct,
@@ -18,8 +18,6 @@ import { useCurrentUser } from '@/lib/current-user';
 // Not a valid slug, so it can never collide with a real category.
 const ALL_CATEGORIES = '__all__';
 const PAGE_SIZE = 12;
-
-const fallbackImages = customerAssets.productFallbacks;
 
 const previewCards = [
   { name: 'Classic Tee', subtitle: 'Preview while catalog is being published' },
@@ -118,62 +116,60 @@ export default function DashboardProductsPage() {
         ) : filteredProducts.length > 0 ? (
           <div className="space-y-8">
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {filteredProducts.map((product, index) => {
-                const imageUrl =
-                  product.productImageRoles[0]?.image?.url ??
-                  fallbackImages[index % fallbackImages.length];
+              {filteredProducts.map((product) => {
+                const imageUrl = product.productImageRoles[0]?.image?.url;
 
                 return (
-                  <article key={product.id} className="overflow-hidden bg-background">
-                    <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
-                      <Image
-                        src={imageUrl}
-                        alt={product.productImageRoles[0]?.image?.altText || product.name}
-                        fill
-                        className="object-contain p-5"
-                        sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                      />
-                    </div>
+                  <article key={product.id} className="bg-background">
+                    <Link
+                      href={`/dashboard/products/${product.id}`}
+                      aria-label={`View product: ${product.name}`}
+                      className="group block overflow-hidden rounded-[28px] border border-border transition-shadow duration-200 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1e39d2]"
+                    >
+                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f4f6f9]">
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={product.productImageRoles[0]?.image?.altText || product.name}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                            sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
+                          />
+                        ) : (
+                          <ProductImagePlaceholder />
+                        )}
+                      </div>
 
-                    <div className="space-y-3 px-1 py-4">
-                      {product.colors && product.colors.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {product.colors.map((color) => (
-                            <span
-                              key={`${product.id}-${color.code}`}
-                              data-testid="product-colour"
-                              role="img"
-                              aria-label={color.name}
-                              title={color.name}
-                              className="h-3 w-3 rounded-sm border border-border bg-muted"
-                              style={color.hex ? { backgroundColor: color.hex } : undefined}
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-                      <div className="space-y-1">
-                        <p className="text-base font-bold">{product.name}</p>
-                        {product.sizeRange ? (
-                          <p className="text-sm text-black/70">{product.sizeRange}</p>
+                      <div className="space-y-2 px-4 pb-4 pt-3">
+                        {product.colors && product.colors.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {product.colors.map((color) => (
+                              <span
+                                key={`${product.id}-${color.code}`}
+                                data-testid="product-colour"
+                                role="img"
+                                aria-label={color.name}
+                                title={color.name}
+                                className="h-3.5 w-3.5 rounded-[3px] border border-black/10 bg-muted"
+                                style={color.hex ? { backgroundColor: color.hex } : undefined}
+                              />
+                            ))}
+                          </div>
                         ) : null}
-                        <p className="text-sm text-black/80">{priceLine(product)}</p>
-                        <p className="text-sm text-black/70">No Minimum</p>
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-baseline gap-x-2">
+                            <p className="text-base font-bold">{product.name}</p>
+                            {product.sizeRange ? (
+                              <span className="border-l border-black/50 pl-1.5 text-sm text-black/70">
+                                {product.sizeRange}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-sm text-black/80">{priceLine(product)}</p>
+                          <p className="text-sm text-black/70">No Minimum</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 pt-2">
-                        <Link
-                          href={`/dashboard/products/${product.id}`}
-                          className="rounded-full bg-[#004385] px-4 py-2 text-xs font-semibold text-white"
-                        >
-                          View product
-                        </Link>
-                        <Link
-                          href="/dashboard/cart"
-                          className="text-xs font-semibold text-[#004385]"
-                        >
-                          Go to cart
-                        </Link>
-                      </div>
-                    </div>
+                    </Link>
                   </article>
                 );
               })}
@@ -217,19 +213,13 @@ export default function DashboardProductsPage() {
               Your catalog is connected, but no published products are available for this view yet.
             </div>
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {previewCards.map((card, index) => (
+              {previewCards.map((card) => (
                 <article
                   key={card.name}
                   className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_4px_4px_rgba(0,0,0,0.12)]"
                 >
                   <div className="relative h-[260px] w-full bg-[linear-gradient(180deg,#f8fbff_0%,#eef3fb_100%)]">
-                    <Image
-                      src={fallbackImages[index % fallbackImages.length]}
-                      alt={card.name}
-                      fill
-                      className="object-contain p-5 opacity-90"
-                      sizes="(min-width: 1280px) 305px, (min-width: 768px) 45vw, 100vw"
-                    />
+                    <ProductImagePlaceholder />
                     <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#004385]">
                       Preview
                     </span>
