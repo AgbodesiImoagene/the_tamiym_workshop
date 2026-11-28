@@ -266,6 +266,180 @@ describe('Pricing quote (e2e)', () => {
     });
   });
 
+  describe('bulk tier scope (TTW-271)', () => {
+    async function seedSiblingVariant(productId: string, suffix: string) {
+      return prisma.productVariant.create({
+        data: { productId, name: 'Sibling', sku: `SKU-SIBLING-${suffix}` },
+      });
+    }
+
+    function seedTier(
+      productId: string,
+      variantId: string | null,
+      minQuantity: number,
+      pricePerUnit: number,
+      maxQuantity: number | null = null,
+    ) {
+      return prisma.bulkPricing.create({
+        data: {
+          productId,
+          variantId,
+          currency: CurrencyCode.NGN,
+          minQuantity,
+          maxQuantity,
+          pricePerUnit,
+        },
+      });
+    }
+
+    it("applies a variant's own tier ahead of the product tier", async () => {
+      const suffix = `own-tier-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      await seedTier(product.id, null, 2, 3000);
+      await seedTier(product.id, variant.id, 5, 4500);
+
+      const quote = await pricing.quoteStandard(customer.id, {
+        shippingAddressId: address.id,
+        items: [{ variantId: variant.id, quantity: 6 }],
+      });
+
+      expect(quote.items[0]).toMatchObject({
+        unitFinalPrice: 4500,
+        lineTotal: 27000,
+      });
+    });
+
+    it("charges the base price when a variant's own tiers do not cover the quantity", async () => {
+      const suffix = `own-uncovered-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      await seedTier(product.id, null, 2, 3000);
+      await seedTier(product.id, variant.id, 10, 2500);
+
+      const quote = await pricing.quoteStandard(customer.id, {
+        shippingAddressId: address.id,
+        items: [{ variantId: variant.id, quantity: 6 }],
+      });
+
+      expect(quote.items[0]).toMatchObject({
+        unitFinalPrice: 5000,
+        lineTotal: 30000,
+      });
+    });
+
+    it("does not give a variant without tiers a sibling variant's tier", async () => {
+      const suffix = `sibling-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      const sibling = await seedSiblingVariant(product.id, suffix);
+      await seedTier(product.id, sibling.id, 5, 1000);
+
+      const quote = await pricing.quoteStandard(customer.id, {
+        shippingAddressId: address.id,
+        items: [{ variantId: variant.id, quantity: 6 }],
+      });
+
+      expect(quote.items[0]).toMatchObject({
+        unitFinalPrice: 5000,
+        lineTotal: 30000,
+      });
+      expect(quote.items[0].pricingBreakdown.bulkAdjustment).toBeUndefined();
+    });
+
+    it("applies the product tier, not a sibling variant's tier with a lower minimum", async () => {
+      const suffix = `product-tier-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      const sibling = await seedSiblingVariant(product.id, suffix);
+      await seedTier(product.id, sibling.id, 2, 1000);
+      await seedTier(product.id, null, 5, 4000);
+
+      const quote = await pricing.quoteStandard(customer.id, {
+        shippingAddressId: address.id,
+        items: [{ variantId: variant.id, quantity: 6 }],
+      });
+
+      expect(quote.items[0]).toMatchObject({
+        unitFinalPrice: 4000,
+        lineTotal: 24000,
+      });
+    });
+
+    it("does not store an order priced with a sibling variant's tier", async () => {
+      const suffix = `sibling-order-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      const sibling = await seedSiblingVariant(product.id, suffix);
+      await seedTier(product.id, sibling.id, 2, 9000);
+
+      const order = await orders.create(customer.id, {
+        shippingAddressId: address.id,
+        items: [{ variantId: variant.id, quantity: 2 }],
+      });
+
+      expect(Number(order.totalAmount)).toBe(12000);
+    });
+
+    it('prices each line of an order with the tiers of its own variant', async () => {
+      const suffix = `two-lines-${Date.now()}`;
+      const { customer, product, variant, address } =
+        await seedPurchasableVariant(suffix);
+      const sibling = await seedSiblingVariant(product.id, suffix);
+      await prisma.inventoryItem.create({
+        data: { variantId: sibling.id, stockOnHand: 10, trackInventory: true },
+      });
+      await seedTier(product.id, sibling.id, 2, 4000);
+
+      const order = await orders.create(customer.id, {
+        shippingAddressId: address.id,
+        items: [
+          { variantId: sibling.id, quantity: 2 },
+          { variantId: variant.id, quantity: 2 },
+        ],
+      });
+
+      const items = await prisma.orderItem.findMany({
+        where: { orderId: order.id },
+      });
+      const lineOf = (variantId: string) =>
+        items.find((item) => item.variantId === variantId)!;
+      expect(Number(lineOf(sibling.id).unitFinalPrice)).toBe(4000);
+      expect(lineOf(sibling.id).pricingBreakdown).toMatchObject({
+        bulkAdjustment: -1000,
+      });
+      expect(Number(lineOf(variant.id).unitFinalPrice)).toBe(5000);
+      expect(lineOf(variant.id).pricingBreakdown).not.toHaveProperty(
+        'bulkAdjustment',
+      );
+      expect(Number(order.totalAmount)).toBe(20000);
+    });
+
+    it.each([
+      [1, 5000],
+      [2, 4000],
+      [4, 4000],
+      [5, 5000],
+    ])(
+      'quotes %i units at %i when the product tier covers 2 to 4',
+      async (quantity, unitPrice) => {
+        const suffix = `bounds-${quantity}-${Date.now()}`;
+        const { customer, product, variant, address } =
+          await seedPurchasableVariant(suffix);
+        const sibling = await seedSiblingVariant(product.id, suffix);
+        await seedTier(product.id, null, 2, 4000, 4);
+        await seedTier(product.id, sibling.id, 5, 1000);
+
+        const quote = await pricing.quoteStandard(customer.id, {
+          shippingAddressId: address.id,
+          items: [{ variantId: variant.id, quantity }],
+        });
+
+        expect(quote.items[0].unitFinalPrice).toBe(unitPrice);
+      },
+    );
+  });
+
   it('quotes a standard variant without options at the product price plus zone shipping', async () => {
     const suffix = `plain-${Date.now()}`;
     const { customer, variant, address } = await seedPurchasableVariant(suffix);
