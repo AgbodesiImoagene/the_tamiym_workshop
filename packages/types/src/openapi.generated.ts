@@ -3865,7 +3865,10 @@ export interface components {
             variantIds?: string[];
         };
         CreateOptionDto: {
-            /** @example size */
+            /**
+             * @description Unique per product. `colour` is saved as `color`.
+             * @example size
+             */
             code: string;
             /** @example Size */
             name: string;
@@ -3876,6 +3879,7 @@ export interface components {
             /** @example Large */
             displayName: string;
             /**
+             * @description Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).
              * @example {
              *       "hex": "#000000"
              *     }
@@ -3966,6 +3970,18 @@ export interface components {
             categoryId: string;
             /** @example Soft cotton t-shirt */
             description?: string;
+            /**
+             * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+             * @default false
+             * @example true
+             */
+            expressProduction: boolean;
+            /**
+             * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+             * @default false
+             * @example true
+             */
+            isBestSeller: boolean;
             /** @example Classic Cotton Tee */
             name: string;
             /** @example 40 */
@@ -5339,7 +5355,10 @@ export interface components {
             }[];
         };
         UpdateOptionDto: {
-            /** @example size */
+            /**
+             * @description Unique per product. `colour` is saved as `color`.
+             * @example size
+             */
             code?: string;
             /** @example Size */
             name?: string;
@@ -5350,6 +5369,7 @@ export interface components {
             /** @example Large */
             displayName?: string;
             /**
+             * @description Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).
              * @example {
              *       "hex": "#000000"
              *     }
@@ -5394,6 +5414,16 @@ export interface components {
             categoryId?: string;
             /** @example Soft cotton t-shirt */
             description?: string;
+            /**
+             * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+             * @example true
+             */
+            expressProduction?: boolean;
+            /**
+             * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+             * @example true
+             */
+            isBestSeller?: boolean;
             /** @example Classic Cotton Tee */
             name?: string;
             /** @example 40 */
@@ -8529,6 +8559,33 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": ({
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
         };
@@ -8547,6 +8604,18 @@ export interface operations {
                     categoryId: string;
                     /** @example Soft cotton t-shirt */
                     description?: string;
+                    /**
+                     * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+                     * @default false
+                     * @example true
+                     */
+                    expressProduction?: boolean;
+                    /**
+                     * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+                     * @default false
+                     * @example true
+                     */
+                    isBestSeller?: boolean;
                     /** @example Classic Cotton Tee */
                     name: string;
                     /** @example 40 */
@@ -8570,6 +8639,26 @@ export interface operations {
         responses: {
             /** @description Product created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid body */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8605,6 +8694,33 @@ export interface operations {
         responses: {
             /** @description Product detail with views, layers, and images */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8678,6 +8794,16 @@ export interface operations {
                     categoryId?: string;
                     /** @example Soft cotton t-shirt */
                     description?: string;
+                    /**
+                     * @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time.
+                     * @example true
+                     */
+                    expressProduction?: boolean;
+                    /**
+                     * @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales.
+                     * @example true
+                     */
+                    isBestSeller?: boolean;
                     /** @example Classic Cotton Tee */
                     name?: string;
                     /** @example 40 */
@@ -8698,6 +8824,26 @@ export interface operations {
         responses: {
             /** @description Product updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
+                        id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
+                        name?: string;
+                        slug?: string;
+                        status?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid body */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8957,7 +9103,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @example size */
+                    /**
+                     * @description Unique per product. `colour` is saved as `color`.
+                     * @example size
+                     */
                     code: string;
                     /** @example Size */
                     name: string;
@@ -8967,7 +9116,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Option created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The product already has an option with this code, or already has a color option */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9010,7 +9167,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @example size */
+                    /**
+                     * @description Unique per product. `colour` is saved as `color`.
+                     * @example size
+                     */
                     code?: string;
                     /** @example Size */
                     name?: string;
@@ -9020,7 +9180,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Option updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The product already has an option with this code, or already has a color option */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9045,6 +9213,7 @@ export interface operations {
                     /** @example Large */
                     displayName: string;
                     /**
+                     * @description Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).
                      * @example {
                      *       "hex": "#000000"
                      *     }
@@ -9058,7 +9227,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Option value created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request, such as a bad `metadata.hex` on a color value */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9104,6 +9281,7 @@ export interface operations {
                     /** @example Large */
                     displayName?: string;
                     /**
+                     * @description Free data of the value. On a color option it must be an object, and `hex`, when present, a hex color code (`#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`).
                      * @example {
                      *       "hex": "#000000"
                      *     }
@@ -9117,7 +9295,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Option value updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request, such as a bad `metadata.hex` on a color value */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15455,7 +15641,11 @@ export interface operations {
                             name?: string;
                         }[];
                         description?: string | null;
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
                         id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
                         name?: string;
                         prices?: {
                             amount?: number;
@@ -15500,7 +15690,11 @@ export interface operations {
                     "application/json": {
                         category?: Record<string, never>;
                         description?: string | null;
+                        /** @description Shows the "2-Day Express Production Available" tag on the product card. Display only: it changes no price or delivery time. */
+                        expressProduction?: boolean;
                         id?: string;
+                        /** @description Shows the "Best Seller" badge on the product card. Set by an admin, not computed from sales. */
+                        isBestSeller?: boolean;
                         name?: string;
                         prices?: unknown[];
                         slug?: string;

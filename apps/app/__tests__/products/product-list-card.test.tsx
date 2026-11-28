@@ -183,8 +183,9 @@ describe('product list card (TTW-204)', () => {
     expect(within(card).queryByText(/long description/)).not.toBeInTheDocument();
   });
 
-  it('never shows a "Best Seller" tag', async () => {
-    renderPage([tee, bareProduct]);
+  // TTW-267: this used to say "never", only because no data supported the tag.
+  it('shows no "Best Seller" tag when the flag is false or missing', async () => {
+    renderPage([{ ...tee, isBestSeller: false }, bareProduct]);
     await cardOf('Classic Tee');
 
     expect(screen.queryByText(/best seller/i)).not.toBeInTheDocument();
@@ -217,5 +218,74 @@ describe('product list card (TTW-204)', () => {
 
     const nameLine = within(card).getByText('Classic Tee').parentElement as HTMLElement;
     expect(within(nameLine).getByText('S-5XL')).toBeInTheDocument();
+  });
+});
+
+describe('product list card badges (TTW-267)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const EXPRESS = '2-Day Express Production Available';
+  const photo = [{ image: { url: '/photo.png', altText: 'Red tee front' } }];
+
+  it('puts "Best Seller" on the photo of a best seller', async () => {
+    renderPage([{ ...tee, isBestSeller: true, productImageRoles: photo }]);
+    const card = await cardOf('Classic Tee');
+
+    const photoFrame = within(card).getByRole('img', { name: 'Red tee front' })
+      .parentElement as HTMLElement;
+    expect(within(photoFrame).getByText('Best Seller')).toBeInTheDocument();
+  });
+
+  it('keeps "Best Seller" on a best seller without a photo', async () => {
+    renderPage([{ ...tee, isBestSeller: true }]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).getByText('Best Seller')).toBeInTheDocument();
+    expect(within(card).getByText('Image not available')).toBeInTheDocument();
+  });
+
+  it('shows the express tag, with a decorative icon, under "No Minimum"', async () => {
+    renderPage([{ ...tee, expressProduction: true }]);
+    const card = await cardOf('Classic Tee');
+
+    const tag = within(card).getByText(EXPRESS);
+    expect(
+      within(card).getByText('No Minimum').compareDocumentPosition(tag) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(tag.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it.each([
+    ['false', false],
+    ['missing', undefined],
+  ])('shows no express tag when the flag is %s', async (_label, expressProduction) => {
+    renderPage([{ ...tee, expressProduction }]);
+    const card = await cardOf('Classic Tee');
+
+    expect(within(card).queryByText(EXPRESS)).not.toBeInTheDocument();
+  });
+
+  it('describes the card link with its badges, for screen readers', async () => {
+    renderPage([{ ...tee, isBestSeller: true, expressProduction: true }, bareProduct]);
+    const flagged = await cardOf('Classic Tee');
+    const plain = await cardOf('Bare Cap');
+
+    expect(within(flagged).getByRole('link')).toHaveAccessibleDescription(`Best Seller ${EXPRESS}`);
+    expect(within(plain).getByRole('link')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('shows each one only on the products that have it', async () => {
+    renderPage([
+      { ...tee, isBestSeller: true, expressProduction: false },
+      { ...bareProduct, isBestSeller: false, expressProduction: true },
+    ]);
+    const best = await cardOf('Classic Tee');
+    const express = await cardOf('Bare Cap');
+
+    expect(within(best).getByText('Best Seller')).toBeInTheDocument();
+    expect(within(best).queryByText(EXPRESS)).not.toBeInTheDocument();
+    expect(within(express).getByText(EXPRESS)).toBeInTheDocument();
+    expect(within(express).queryByText('Best Seller')).not.toBeInTheDocument();
   });
 });

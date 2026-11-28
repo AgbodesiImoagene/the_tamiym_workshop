@@ -8,6 +8,7 @@ import {
   Min,
 } from 'class-validator';
 import { ProductStatus } from '../../generated/prisma/enums';
+import { IsOptionalProductFlag, PRODUCT_FLAG_SCHEMA } from './product-flags';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'prod-cat-1' })
@@ -63,4 +64,22 @@ export class CreateProductDto {
   @IsInt()
   @Min(0)
   packageHeightMm?: number;
+
+  @ApiProperty({
+    ...PRODUCT_FLAG_SCHEMA.isBestSeller,
+    example: true,
+    default: false,
+    required: false,
+  })
+  @IsOptionalProductFlag()
+  isBestSeller?: boolean;
+
+  @ApiProperty({
+    ...PRODUCT_FLAG_SCHEMA.expressProduction,
+    example: true,
+    default: false,
+    required: false,
+  })
+  @IsOptionalProductFlag()
+  expressProduction?: boolean;
 }

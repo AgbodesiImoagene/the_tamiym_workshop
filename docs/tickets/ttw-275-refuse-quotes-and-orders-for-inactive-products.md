@@ -367,6 +367,13 @@ changes `docs/openapi/openapi.json`, the generated types and the ticket index:
 resolve the index, run `pnpm openapi:generate`, and the `products.service.ts`
 line references of this ticket shift.
 
-Not committed, pushed or merged. Follow-ups without a ticket: the variant
-availability window (Out of scope) and the variant deletion error (review
-iteration 1).
+Committed and merged into local `main` on 2026-11-28 at the user's request, on
+top of TTW-266, TTW-267 and TTW-274; the only conflict was the ticket index.
+Verified on the merged tree: API `typecheck`; unit tests of `pricing`, `orders`,
+`fundraising` and `products` 36 suites, 762 passed; the `order-*`,
+`pricing-quote`, `campaign-authoring` and `product-*` e2e suites 12 suites, 127
+passed on a throwaway database; `openapi:generate` without a diff,
+`openapi:check`, `docs:validate`, `format:check` passed.
+
+Not pushed, no CI. Follow-ups without a ticket: the variant availability window
+(Out of scope) and the variant deletion error (review iteration 1).

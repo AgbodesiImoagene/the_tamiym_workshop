@@ -2,7 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateOptionDto {
-  @ApiProperty({ example: 'size' })
+  @ApiProperty({
+    example: 'size',
+    description: 'Unique per product. `colour` is saved as `color`.',
+  })
   @IsString()
   @IsNotEmpty()
   code!: string;
