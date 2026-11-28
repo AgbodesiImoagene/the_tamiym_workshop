@@ -10,6 +10,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductSort } from './dto/products-query.dto';
 import { ProductStatus } from '../generated/prisma/enums';
+import { Prisma } from '../generated/prisma/client';
 import { ImageRole } from '../generated/prisma/enums';
 import { TemplateEffectType } from '../generated/prisma/enums';
 import { TemplateLayerType } from '../generated/prisma/enums';
@@ -917,6 +918,223 @@ describe('ProductsService', () => {
       await expect(
         service.updateOptionValue('prod-1', 'invalid', { displayName: 'X' }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('colour options (TTW-266)', () => {
+    const emptyProduct = {
+      id: 'prod-1',
+      slug: 'test-product',
+      options: [],
+      variants: [],
+    };
+    const duplicate = () =>
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
+
+    beforeEach(() => {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue(emptyProduct);
+    });
+
+    function givenOption(code: string) {
+      (prisma.productOption.findUnique as jest.Mock).mockResolvedValue({
+        id: 'opt-1',
+        productId: 'prod-1',
+        code,
+      });
+      (prisma.productOptionValue.create as jest.Mock).mockResolvedValue({
+        id: 'val-1',
+      });
+    }
+
+    function givenValueOfOption(code: string) {
+      (prisma.productOptionValue.findUnique as jest.Mock).mockResolvedValue({
+        id: 'val-1',
+        option: { productId: 'prod-1', code },
+      });
+      (prisma.productOptionValue.update as jest.Mock).mockResolvedValue({
+        id: 'val-1',
+      });
+    }
+
+    it('saves a new option coded "Colour" as "color"', async () => {
+      (prisma.productOption.create as jest.Mock).mockResolvedValue({
+        id: 'opt-1',
+      });
+
+      await service.createOption('prod-1', { code: 'Colour', name: 'Colour' });
+
+      expect(prisma.productOption.create).toHaveBeenCalledWith({
+        data: {
+          productId: 'prod-1',
+          code: 'color',
+          name: 'Colour',
+          sortOrder: 0,
+        },
+      });
+    });
+
+    it('saves an option renamed to "colour" as "color"', async () => {
+      givenOption('shade');
+      (prisma.productOption.update as jest.Mock).mockResolvedValue({
+        id: 'opt-1',
+      });
+
+      await service.updateOption('prod-1', 'opt-1', { code: 'colour' });
+
+      expect(prisma.productOption.update).toHaveBeenCalledWith({
+        where: { id: 'opt-1' },
+        data: { code: 'color' },
+      });
+    });
+
+    it('answers 409 when a new option code is already used by the product', async () => {
+      (prisma.productOption.create as jest.Mock).mockRejectedValue(duplicate());
+
+      await expect(
+        service.createOption('prod-1', { code: 'colour', name: 'Colour' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('answers 409 when a renamed option code is already used by the product', async () => {
+      givenOption('shade');
+      (prisma.productOption.update as jest.Mock).mockRejectedValue(duplicate());
+
+      await expect(
+        service.updateOption('prod-1', 'opt-1', { code: 'colour' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    /** The product and the options it holds, as the conflict check reads them. */
+    function givenProductOptions(...codes: string[]) {
+      (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+        ...emptyProduct,
+        options: codes.map((code, index) => ({
+          id: `opt-${index + 1}`,
+          code,
+          values: [],
+        })),
+      });
+    }
+
+    it('answers 409 for a second colour option under another case, writing nothing', async () => {
+      givenProductOptions('Color');
+
+      await expect(
+        service.createOption('prod-1', { code: 'colour', name: 'Colour' }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.productOption.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when another option is renamed to a second colour option', async () => {
+      givenOption('shade');
+      givenProductOptions('shade', 'Color');
+
+      await expect(
+        service.updateOption('prod-1', 'opt-1', { code: 'color' }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.productOption.update).not.toHaveBeenCalled();
+    });
+
+    it('keeps the stored code of an old option next to another colour option', async () => {
+      givenOption('colour');
+      givenProductOptions('colour', 'color');
+      (prisma.productOption.update as jest.Mock).mockResolvedValue({
+        id: 'opt-1',
+      });
+
+      await service.updateOption('prod-1', 'opt-1', {
+        code: 'colour',
+        name: 'Old colour',
+      });
+
+      expect(prisma.productOption.update).toHaveBeenCalledWith({
+        where: { id: 'opt-1' },
+        data: { name: 'Old colour' },
+      });
+    });
+
+    it('does not turn another database error into a conflict', async () => {
+      (prisma.productOption.create as jest.Mock).mockRejectedValue(
+        new Error('connection lost'),
+      );
+
+      await expect(
+        service.createOption('prod-1', { code: 'size', name: 'Size' }),
+      ).rejects.toThrow('connection lost');
+    });
+
+    it.each(['color', 'colour'])(
+      'refuses an invalid hex on a new value of a "%s" option, writing nothing',
+      async (code) => {
+        givenOption(code);
+
+        await expect(
+          service.createOptionValue('prod-1', 'opt-1', {
+            valueCode: 'GREEN',
+            displayName: 'Green',
+            metadata: { hex: 'green' },
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(prisma.productOptionValue.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('stores a valid hex on a new colour value', async () => {
+      givenOption('color');
+
+      await service.createOptionValue('prod-1', 'opt-1', {
+        valueCode: 'GREEN',
+        displayName: 'Green',
+        metadata: { hex: '#008000' },
+      });
+
+      expect(prisma.productOptionValue.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ metadata: { hex: '#008000' } }),
+      });
+    });
+
+    it('refuses an invalid hex when a colour value is updated, writing nothing', async () => {
+      givenValueOfOption('color');
+
+      await expect(
+        service.updateOptionValue('prod-1', 'val-1', {
+          metadata: { hex: '#12' },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.productOptionValue.update).not.toHaveBeenCalled();
+    });
+
+    it('updates the name of a colour value without looking at its stored metadata', async () => {
+      givenValueOfOption('color');
+
+      await service.updateOptionValue('prod-1', 'val-1', {
+        displayName: 'Forest green',
+      });
+
+      expect(prisma.productOptionValue.update).toHaveBeenCalledWith({
+        where: { id: 'val-1' },
+        data: { displayName: 'Forest green' },
+      });
+    });
+
+    it('accepts any metadata on a value of another option, as before', async () => {
+      givenOption('size');
+      givenValueOfOption('size');
+
+      await service.createOptionValue('prod-1', 'opt-1', {
+        valueCode: 'L',
+        displayName: 'Large',
+        metadata: { hex: 'not-a-colour' },
+      });
+      await service.updateOptionValue('prod-1', 'val-1', {
+        metadata: { hex: 'not-a-colour' },
+      });
+
+      expect(prisma.productOptionValue.create).toHaveBeenCalled();
+      expect(prisma.productOptionValue.update).toHaveBeenCalled();
     });
   });
 

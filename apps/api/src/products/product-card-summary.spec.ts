@@ -133,6 +133,34 @@ describe('summarizeProductCard (TTW-204)', () => {
     });
   });
 
+  it.each(['colour', 'Colour'])(
+    'lists the colours of an option coded "%s" (TTW-266)',
+    (code) => {
+      const summary = summarizeProductCard({
+        variants: [
+          {
+            optionValues: [
+              {
+                option: { code },
+                optionValue: {
+                  valueCode: RED.code,
+                  displayName: RED.name,
+                  sortOrder: RED.sortOrder,
+                  metadata: RED.metadata,
+                },
+              },
+            ],
+          },
+        ],
+        bulkPricingTiers: [],
+      });
+
+      expect(summary.colors).toEqual([
+        { code: 'RED', name: 'Red', hex: '#ef2557' },
+      ]);
+    },
+  );
+
   it('ignores variants that have neither a colour nor a size option', () => {
     const summary = summarizeProductCard({
       variants: [variant()],

@@ -2,13 +2,13 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
-  IsBoolean,
   IsNumber,
   IsEnum,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptionalQueryBoolean } from '../../common/boolean-fields.decorator';
 
 /** Sort order for product list. Price-based sort may be added later (e.g. raw query). */
 export enum ProductSort {
@@ -42,9 +42,7 @@ export class ProductsQueryDto {
     example: true,
     description: 'Only products that have at least one available variant',
   })
-  @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
+  @IsOptionalQueryBoolean()
   available?: boolean;
 
   @ApiPropertyOptional({
@@ -89,9 +87,7 @@ export class ProductsQueryDto {
     example: true,
     description: 'Only products that have a compare-at price (on sale)',
   })
-  @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
+  @IsOptionalQueryBoolean()
   onSale?: boolean;
 
   @ApiPropertyOptional({

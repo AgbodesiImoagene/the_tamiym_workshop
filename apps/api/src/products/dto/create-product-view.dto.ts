@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsOptionalStrictBoolean } from '../../common/boolean-fields.decorator';
 
 export class CreateProductViewDto {
   @ApiProperty({ example: 'front' })
@@ -24,12 +19,10 @@ export class CreateProductViewDto {
   sortOrder?: number;
 
   @ApiProperty({ example: true, required: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isDesignable?: boolean;
 
   @ApiProperty({ example: false, required: false })
-  @IsOptional()
-  @IsBoolean()
+  @IsOptionalStrictBoolean()
   isDefault?: boolean;
 }

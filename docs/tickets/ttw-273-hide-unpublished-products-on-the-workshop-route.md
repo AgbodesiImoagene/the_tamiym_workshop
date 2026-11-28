@@ -1,7 +1,7 @@
 # TTW-273 — Hide unpublished products on the public workshop route
 
 **Epic:** 8 — Client review delivery\
-**Status:** In review (verified 2026-11-28; not committed, no separate reviewer yet)\
+**Status:** In progress (merged into local `main` on 2026-11-28; not pushed, independent review pending)\
 **Risk:** High (public route, data exposure)\
 **Blocked by:** None\
 **Blocks:** None
@@ -110,4 +110,6 @@ Run on 2026-11-28, branch `claude/ttw-273-hide-unpublished-workshop` from `main`
 
 Done: the workshop route answers 404 for draft and archived products; the saved design editor says "This product is no longer available. Your design is saved."; Swagger, OpenAPI and the audit note are updated. No schema change.
 
-Left: commit and merge (on the user's request), a separate reviewer, CI. Possible conflicts: TTW-267, TTW-269 and TTW-274 in the products files, the ticket index and the generated OpenAPI files; regenerate the latter with `pnpm openapi:generate`.
+Committed and merged into local `main` on 2026-11-28 at the user's request, on top of TTW-266, TTW-267, TTW-274 and TTW-275; the only conflict was the ticket index. Verified on the merged tree: `typecheck` api and app; `jest src/products src/designs` 17 suites, 438 passed; app `jest` for `workshop`, `shared-design` and `products` 27 suites, 190 passed; the `workshop-*`, `product-*` and `products` e2e suites 4 suites, 46 passed on a throwaway database; `openapi:generate` without a diff, `openapi:check`, `docs:validate`, `playwright:validate`, `format:check` passed. Playwright was not run again on the merged tree.
+
+Left: a separate reviewer, push and CI. Ordering an unpublished product was handled by TTW-275.
