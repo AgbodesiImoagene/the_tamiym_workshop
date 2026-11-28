@@ -596,6 +596,7 @@ model User {
   oauthAccounts        UserOAuthAccount[]
   adminMfaCredential   AdminMfaCredential?
   privacyRequests      PrivacyRequest[]
+  productLikes         ProductLike[]
   organizerApplications OrganizerApplication[] @relation("OrganizerApplicationApplicant")
   organizerApplicationsReviewed OrganizerApplication[] @relation("OrganizerApplicationReviewer")
 
@@ -1018,10 +1019,27 @@ model Product {
   workshopTemplateLayers     WorkshopTemplateLayer[]
   optionValueTemplateEffects OptionValueTemplateEffect[]
   organizerPricingPolicies   OrganizerPricingPolicy[]
+  likes                      ProductLike[]
 
   @@index([categoryId])
   @@index([slug])
   @@map("products")
+}
+
+/// A customer's like on a product (TTW-269): at most one per user and product.
+/// Account erasure keeps the user row, so it deletes these rows itself.
+model ProductLike {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("product_likes")
 }
 
 /// Option definition for a product (e.g. size, color). Contains a set of ProductOptionValues.

@@ -3366,6 +3366,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read my like on a product and its like count */
+        get: operations["ProductLikesController_getState"];
+        /**
+         * Like a product
+         * @description Idempotent: liking a product already liked changes nothing.
+         */
+        put: operations["ProductLikesController_like"];
+        post?: never;
+        /**
+         * Remove my like from a product
+         * @description Idempotent: removing a like that does not exist changes nothing.
+         */
+        delete: operations["ProductLikesController_unlike"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{id}/workshop": {
         parameters: {
             query?: never;
@@ -4624,6 +4649,14 @@ export interface components {
         };
         PrivacyReauthDto: {
             password: string;
+        };
+        ProductLikeStateDto: {
+            /** @description Number of users who like the product */
+            likeCount: number;
+            /** @description Whether the signed-in user likes the product */
+            likedByMe: boolean;
+            /** @description Product ID */
+            productId: string;
         };
         ProductSurchargesResponseDto: {
             optionValueUpcharges: {
@@ -15491,22 +15524,40 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Product with variants and prices */
+            /** @description Product with variants, prices, bulk pricing tiers and like count. The body is the same for every reader; whether the signed-in user likes it is on GET /products/{id}/like. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        /** @description Product-level bulk tiers (NGN), lowest quantity first; empty without tiers. Display only: the cart quote is the price authority. */
+                        bulkPricingTiers?: {
+                            currency: string;
+                            /** @description Null when the tier has no upper limit */
+                            maxQuantity: number | null;
+                            minQuantity: number;
+                            pricePerUnit: number;
+                        }[];
                         category?: Record<string, never>;
                         description?: string | null;
                         id?: string;
+                        /** @description Number of users who like the product */
+                        likeCount?: number;
                         name?: string;
                         prices?: unknown[];
                         slug?: string;
                         status?: string;
                         variants?: {
                             availableQuantity?: number | null;
+                            /** @description Own bulk tiers of this variant (NGN). When not empty they replace the product tiers. */
+                            bulkPricingTiers?: {
+                                currency: string;
+                                /** @description Null when the tier has no upper limit */
+                                maxQuantity: number | null;
+                                minQuantity: number;
+                                pricePerUnit: number;
+                            }[];
                             id?: string;
                             inStock?: boolean;
                             isAvailable?: boolean;
@@ -15522,6 +15573,149 @@ export interface operations {
                 };
             };
             /** @description Product not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductLikesController_getState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Number of users who like the product */
+                        likeCount: number;
+                        /** @description Whether the signed-in user likes the product */
+                        likedByMe: boolean;
+                        /** @description Product ID */
+                        productId: string;
+                    };
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown product, or a product that is not active */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductLikesController_like: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Number of users who like the product */
+                        likeCount: number;
+                        /** @description Whether the signed-in user likes the product */
+                        likedByMe: boolean;
+                        /** @description Product ID */
+                        productId: string;
+                    };
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Browser session without a valid X-CSRF-Token header or from a disallowed Origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown product, or a product that is not active */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductLikesController_unlike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Number of users who like the product */
+                        likeCount: number;
+                        /** @description Whether the signed-in user likes the product */
+                        likedByMe: boolean;
+                        /** @description Product ID */
+                        productId: string;
+                    };
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Browser session without a valid X-CSRF-Token header or from a disallowed Origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown product, or a product that is not active */
             404: {
                 headers: {
                     [name: string]: unknown;

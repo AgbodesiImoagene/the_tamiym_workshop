@@ -2613,6 +2613,29 @@
         ],
         "type": "object"
       },
+      "ProductLikeStateDto": {
+        "properties": {
+          "likeCount": {
+            "description": "Number of users who like the product",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "likedByMe": {
+            "description": "Whether the signed-in user likes the product",
+            "type": "boolean"
+          },
+          "productId": {
+            "description": "Product ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "likeCount",
+          "likedByMe",
+          "productId"
+        ],
+        "type": "object"
+      },
       "ProductSurchargesResponseDto": {
         "properties": {
           "optionValueUpcharges": {
@@ -20404,6 +20427,35 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "bulkPricingTiers": {
+                      "description": "Product-level bulk tiers (NGN), lowest quantity first; empty without tiers. Display only: the cart quote is the price authority.",
+                      "items": {
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "maxQuantity": {
+                            "description": "Null when the tier has no upper limit",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "minQuantity": {
+                            "type": "integer"
+                          },
+                          "pricePerUnit": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "currency",
+                          "maxQuantity",
+                          "minQuantity",
+                          "pricePerUnit"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "category": {
                       "type": "object"
                     },
@@ -20413,6 +20465,10 @@
                     },
                     "id": {
                       "type": "string"
+                    },
+                    "likeCount": {
+                      "description": "Number of users who like the product",
+                      "type": "integer"
                     },
                     "name": {
                       "type": "string"
@@ -20432,6 +20488,35 @@
                           "availableQuantity": {
                             "nullable": true,
                             "type": "number"
+                          },
+                          "bulkPricingTiers": {
+                            "description": "Own bulk tiers of this variant (NGN). When not empty they replace the product tiers.",
+                            "items": {
+                              "properties": {
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "maxQuantity": {
+                                  "description": "Null when the tier has no upper limit",
+                                  "nullable": true,
+                                  "type": "integer"
+                                },
+                                "minQuantity": {
+                                  "type": "integer"
+                                },
+                                "pricePerUnit": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "currency",
+                                "maxQuantity",
+                                "minQuantity",
+                                "pricePerUnit"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
                           },
                           "id": {
                             "type": "string"
@@ -20475,13 +20560,215 @@
                 }
               }
             },
-            "description": "Product with variants and prices"
+            "description": "Product with variants, prices, bulk pricing tiers and like count. The body is the same for every reader; whether the signed-in user likes it is on GET /products/{id}/like."
           },
           "404": {
             "description": "Product not found"
           }
         },
         "summary": "Get product by ID",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/v1/products/{id}/like": {
+      "delete": {
+        "description": "Idempotent: removing a like that does not exist changes nothing.",
+        "operationId": "ProductLikesController_unlike",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "likeCount": {
+                      "description": "Number of users who like the product",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "likedByMe": {
+                      "description": "Whether the signed-in user likes the product",
+                      "type": "boolean"
+                    },
+                    "productId": {
+                      "description": "Product ID",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "likeCount",
+                    "likedByMe",
+                    "productId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "403": {
+            "description": "Browser session without a valid X-CSRF-Token header or from a disallowed Origin"
+          },
+          "404": {
+            "description": "Unknown product, or a product that is not active"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Remove my like from a product",
+        "tags": [
+          "Products"
+        ]
+      },
+      "get": {
+        "operationId": "ProductLikesController_getState",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "likeCount": {
+                      "description": "Number of users who like the product",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "likedByMe": {
+                      "description": "Whether the signed-in user likes the product",
+                      "type": "boolean"
+                    },
+                    "productId": {
+                      "description": "Product ID",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "likeCount",
+                    "likedByMe",
+                    "productId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "404": {
+            "description": "Unknown product, or a product that is not active"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Read my like on a product and its like count",
+        "tags": [
+          "Products"
+        ]
+      },
+      "put": {
+        "description": "Idempotent: liking a product already liked changes nothing.",
+        "operationId": "ProductLikesController_like",
+        "parameters": [
+          {
+            "description": "Product ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "likeCount": {
+                      "description": "Number of users who like the product",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "likedByMe": {
+                      "description": "Whether the signed-in user likes the product",
+                      "type": "boolean"
+                    },
+                    "productId": {
+                      "description": "Product ID",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "likeCount",
+                    "likedByMe",
+                    "productId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "description": "No valid session"
+          },
+          "403": {
+            "description": "Browser session without a valid X-CSRF-Token header or from a disallowed Origin"
+          },
+          "404": {
+            "description": "Unknown product, or a product that is not active"
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Like a product",
         "tags": [
           "Products"
         ]

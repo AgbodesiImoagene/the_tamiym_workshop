@@ -35,6 +35,8 @@ const mockProduct = {
   images: [],
   productImageRoles: [],
   views: [],
+  bulkPricingTiers: [],
+  _count: { likes: 0 },
 };
 
 const mockVariant = {
@@ -418,6 +420,7 @@ describe('ProductsService', () => {
             isAvailable: true,
             inventory: { stockOnHand: 10, reserved: 2, trackInventory: true },
             optionValues: [],
+            bulkPricing: [],
             prices: [{ currency: 'NGN', amount: 5000, compareAt: null }],
           },
           {
@@ -427,6 +430,7 @@ describe('ProductsService', () => {
             isAvailable: true,
             inventory: { stockOnHand: 0, reserved: 0, trackInventory: true },
             optionValues: [],
+            bulkPricing: [],
             prices: [],
           },
           {
@@ -436,6 +440,7 @@ describe('ProductsService', () => {
             isAvailable: true,
             inventory: { stockOnHand: 0, reserved: 0, trackInventory: false },
             optionValues: [],
+            bulkPricing: [],
             prices: [],
           },
           {
@@ -445,6 +450,7 @@ describe('ProductsService', () => {
             isAvailable: true,
             inventory: null,
             optionValues: [],
+            bulkPricing: [],
             prices: [],
           },
         ],
@@ -452,6 +458,8 @@ describe('ProductsService', () => {
         images: [],
         productImageRoles: [],
         views: [],
+        bulkPricingTiers: [],
+        _count: { likes: 0 },
       });
 
       const result = await service.findOne('prod-1');

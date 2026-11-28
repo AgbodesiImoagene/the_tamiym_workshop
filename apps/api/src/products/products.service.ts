@@ -49,6 +49,7 @@ import {
 } from '../generated/prisma/enums';
 import { Prisma } from '../generated/prisma/client';
 import { summarizeProductCard } from './product-card-summary';
+import { BULK_TIER_SELECT, toBulkTiers } from './bulk-tiers';
 
 type UploadedImageFile = {
   buffer: Buffer;
@@ -311,6 +312,12 @@ export class ProductsService {
       where: { id, status: ProductStatus.ACTIVE },
       include: {
         category: { select: { id: true, name: true, slug: true } },
+        _count: { select: { likes: true } },
+        bulkPricingTiers: {
+          where: { variantId: null, currency: DEFAULT_CURRENCY },
+          select: BULK_TIER_SELECT,
+          orderBy: { minQuantity: 'asc' },
+        },
         options: {
           select: {
             id: true,
@@ -360,6 +367,11 @@ export class ProductsService {
             },
             prices: {
               select: { currency: true, amount: true, compareAt: true },
+            },
+            bulkPricing: {
+              where: { currency: DEFAULT_CURRENCY },
+              select: BULK_TIER_SELECT,
+              orderBy: { minQuantity: 'asc' },
             },
           },
         },
@@ -461,7 +473,7 @@ export class ProductsService {
     const basePrice =
       product.prices.find((price) => price.currency === currency) ?? null;
     const variants = product.variants.map((variant) => {
-      const { inventory, ...variantData } = variant;
+      const { inventory, bulkPricing, ...variantData } = variant;
       const tracked = inventory?.trackInventory === true;
       let availableQuantity: number | null = null;
       let inStock = true;
@@ -482,6 +494,7 @@ export class ProductsService {
         resolvedCurrency: resolved?.currency ?? currency,
         inStock,
         availableQuantity,
+        bulkPricingTiers: toBulkTiers(bulkPricing),
       };
     });
     const images = product.images.map((image) =>
@@ -507,8 +520,11 @@ export class ProductsService {
           : null,
       })),
     }));
+    const { _count, bulkPricingTiers, ...productData } = product;
     return {
-      ...product,
+      ...productData,
+      likeCount: _count.likes,
+      bulkPricingTiers: toBulkTiers(bulkPricingTiers),
       resolvedBasePrice: basePrice?.amount ?? null,
       resolvedBaseCompareAt: basePrice?.compareAt ?? null,
       resolvedCurrency: basePrice?.currency ?? currency,

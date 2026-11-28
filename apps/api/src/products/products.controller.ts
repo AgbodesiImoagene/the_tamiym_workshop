@@ -4,6 +4,26 @@ import { ProductsService } from './products.service';
 import { ProductsQueryDto } from './dto/products-query.dto';
 import { Public } from '../auth/decorators/public.decorator';
 
+/** Bulk pricing tiers on the public detail (TTW-269). */
+const BULK_TIERS_SCHEMA = (description: string) => ({
+  type: 'array' as const,
+  description,
+  items: {
+    type: 'object' as const,
+    required: ['minQuantity', 'maxQuantity', 'pricePerUnit', 'currency'],
+    properties: {
+      minQuantity: { type: 'integer' as const },
+      maxQuantity: {
+        type: 'integer' as const,
+        nullable: true,
+        description: 'Null when the tier has no upper limit',
+      },
+      pricePerUnit: { type: 'number' as const },
+      currency: { type: 'string' as const },
+    },
+  },
+});
+
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
@@ -104,7 +124,7 @@ export class ProductsController {
   }
 
   /**
-   * Get a product by ID (public). Includes variants and prices.
+   * Get a product by ID (public). Includes variants, prices, bulk tiers and the like count.
    */
   @Get(':id')
   @Public()
@@ -112,7 +132,8 @@ export class ProductsController {
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiResponse({
     status: 200,
-    description: 'Product with variants and prices',
+    description:
+      'Product with variants, prices, bulk pricing tiers and like count. The body is the same for every reader; whether the signed-in user likes it is on GET /products/{id}/like.',
     schema: {
       type: 'object',
       properties: {
@@ -122,6 +143,13 @@ export class ProductsController {
         description: { type: 'string', nullable: true },
         status: { type: 'string' },
         category: { type: 'object' },
+        likeCount: {
+          type: 'integer',
+          description: 'Number of users who like the product',
+        },
+        bulkPricingTiers: BULK_TIERS_SCHEMA(
+          'Product-level bulk tiers (NGN), lowest quantity first; empty without tiers. Display only: the cart quote is the price authority.',
+        ),
         variants: {
           type: 'array',
           items: {
@@ -138,6 +166,9 @@ export class ProductsController {
               resolvedCurrency: { type: 'string' },
               optionValues: { type: 'array' },
               prices: { type: 'array' },
+              bulkPricingTiers: BULK_TIERS_SCHEMA(
+                'Own bulk tiers of this variant (NGN). When not empty they replace the product tiers.',
+              ),
             },
           },
         },

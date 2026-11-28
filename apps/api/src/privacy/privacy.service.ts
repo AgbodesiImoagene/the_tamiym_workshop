@@ -412,6 +412,18 @@ export class PrivacyService {
         {},
       );
 
+      // TTW-269: the user row stays (tombstone), so its cascade never removes the likes.
+      // Keep this after the user update: ProductLikesService locks that row to stop a
+      // like from slipping in behind this delete.
+      await tx.productLike.deleteMany({ where: { userId } });
+      await this.recordActionTx(
+        tx,
+        requestId,
+        'postgres.product_likes',
+        'OK',
+        {},
+      );
+
       await tx.address.updateMany({
         where: { userId },
         data: {
@@ -646,12 +658,18 @@ export class PrivacyService {
       take: 500,
       orderBy: { createdAt: 'desc' },
     });
+    const likes = await this.prisma.productLike.findMany({
+      where: { userId },
+      select: { productId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
     return {
       exportedAt: new Date().toISOString(),
       policyVersion: PRIVACY_POLICY_VERSION,
       user,
       addresses,
       orders,
+      likes,
       designs: designs.map(({ shareLinks, ...rest }) => {
         const active = shareLinks.filter((l) => !l.revokedAt);
         const now = Date.now();

@@ -51,6 +51,7 @@ describe('PrivacyService', () => {
     adminMfaRecoveryCode: { deleteMany: jest.fn() },
     adminMfaCredential: { deleteMany: jest.fn() },
     userOAuthAccount: { deleteMany: jest.fn() },
+    productLike: { findMany: jest.fn(), deleteMany: jest.fn() },
     design: { findMany: jest.fn(), updateMany: jest.fn() },
     designShareLink: { updateMany: jest.fn() },
   };
@@ -277,6 +278,10 @@ describe('PrivacyService', () => {
     );
     expect(prisma.userPayoutProfile.updateMany).toHaveBeenCalled();
     expect(result.id).toBe('req-1');
+    // TTW-269: the likes of the account are removed with it.
+    expect(prisma.productLike.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'u1' },
+    });
     // TTW-197: the order note is erased with the shipping snapshot.
     expect(prisma.order.updateMany).toHaveBeenCalledWith({
       where: { userId: 'u1' },
@@ -284,6 +289,61 @@ describe('PrivacyService', () => {
         shipInstructions: null,
         customerNote: null,
       }),
+    });
+  });
+
+  it('removes the likes inside the erasure transaction (TTW-269)', async () => {
+    await stubActivePassword();
+    prisma.order.count.mockResolvedValue(0);
+    prisma.campaign.count.mockResolvedValue(0);
+    prisma.payout.count.mockResolvedValue(0);
+    prisma.privacyRequest.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'req-1',
+        status: PrivacyRequestStatus.COMPLETED,
+        actions: [],
+      });
+    prisma.privacyRequest.create.mockResolvedValue({
+      id: 'req-1',
+      userId: 'u1',
+      type: PrivacyRequestType.ERASURE,
+      status: PrivacyRequestStatus.IN_PROGRESS,
+    });
+    prisma.privacyRequest.updateMany.mockResolvedValue({ count: 1 });
+    authSessions.revokeAllForUser.mockResolvedValue(0);
+    for (const update of [
+      prisma.address.updateMany,
+      prisma.order.updateMany,
+      prisma.userPayoutProfile.updateMany,
+      prisma.campaign.updateMany,
+      prisma.design.updateMany,
+      prisma.designShareLink.updateMany,
+    ]) {
+      update.mockResolvedValue({ count: 0 });
+    }
+    // A transaction client of its own: a delete outside it would not be counted.
+    const productLike = { findMany: jest.fn(), deleteMany: jest.fn() };
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => Promise<unknown>) =>
+        fn({ ...prisma, productLike }),
+    );
+
+    await service.requestErasure('u1', 'TestPassword1!');
+
+    expect(productLike.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'u1' },
+    });
+    expect(prisma.productLike.deleteMany).not.toHaveBeenCalled();
+    // The account is tombstoned first: the like route locks that row (see the e2e race).
+    expect(prisma.user.update.mock.invocationCallOrder[0]).toBeLessThan(
+      productLike.deleteMany.mock.invocationCallOrder[0],
+    );
+    expect(prisma.privacyRequestAction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        systemCode: 'postgres.product_likes',
+        outcomeCode: 'OK',
+      }) as unknown,
     });
   });
 
